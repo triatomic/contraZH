@@ -94,6 +94,7 @@
 #include "GameLogic/AIGuard.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/GameLogic.h"
@@ -4947,6 +4948,12 @@ Real InGameUI::getPlacementAngle()
 //-------------------------------------------------------------------------------------------------
 void InGameUI::selectDrawable( Drawable *draw )
 {
+	const Object *obj = draw->getObject();
+	const BodyModuleInterface *body = obj ? obj->getBodyModule() : nullptr;
+	if (body && body->isJammed())
+	{
+		return;
+	}
 
 	if( draw->isSelected() == FALSE )
 	{

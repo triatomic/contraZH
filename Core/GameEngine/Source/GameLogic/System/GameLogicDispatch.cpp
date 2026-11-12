@@ -2581,6 +2581,14 @@ bool GameLogic::onCreateSelectedGroup(MAYBE_UNUSED GameMessage *msg)
 			continue;
 		}
 
+#if RTS_ZEROHOUR
+		const BodyModuleInterface *body = obj->getBodyModule();
+		if (body && body->isJammed())
+		{
+			continue;
+		}
+#endif
+
 		selectObject(obj, createNewGroup && firstObject, msgPlayer->getPlayerMask());
 		firstObject = FALSE;
 	}
