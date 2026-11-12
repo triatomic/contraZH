@@ -15,6 +15,13 @@ designed to clear garrisons keep their normal behavior.
 
 This changes the simulation and can change older replay playback after a map border change.
 
+## Healed infantry follow the barracks rally point
+
+Infantry leaving a barracks after healing now follow its rally point. The healing container
+reads the rally point from the building's production module when it has no rally point of its own.
+
+Changes the simulation and can change older replay playback.
+
 ## Failed saves clean up safely
 
 A save that fails to load can leave update modules with unfinished queue indices. Cleanup now
