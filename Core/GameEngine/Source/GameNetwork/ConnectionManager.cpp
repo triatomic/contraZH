@@ -231,51 +231,80 @@ static UnsignedInt getTransferFileMaxSize(const AsciiString& filePath)
 	return transferFileRules[fileType].maxSize;
 }
 
-Bool CanTransferFile(const AsciiString& path, UnicodeString *problem)
+TransferFileProblem CheckTransferFile(const AsciiString& path)
 {
-	const AsciiString name = GetFileFromPath(path);
-	UnicodeString text;
-	Bool valid = FALSE;
-
 	File *theFile = TheLocalFileSystem->openFile(path.str());
-	const Int len = theFile ? theFile->size() : 0;
+	if (theFile == nullptr)
+	{
+		return TRANSFER_FILE_MISSING;
+	}
+
+	const Int len = theFile->size();
 	const UnsignedInt maxSize = getTransferFileMaxSize(path);
 
+	TransferFileProblem problem = TRANSFER_FILE_OK;
 	if (len <= 0)
 	{
-		text.format(L"'%hs' is missing or empty", name.str());
+		problem = TRANSFER_FILE_EMPTY;
+	}
+	else if (maxSize == 0)
+	{
+		problem = TRANSFER_FILE_WRONG_TYPE;
 	}
 	else if ((UnsignedInt)len > maxSize)
 	{
-		text.format(L"'%hs' is %d bytes, the limit is %u bytes", name.str(), len, maxSize);
+		problem = TRANSFER_FILE_TOO_LARGE;
 	}
 
-	if (theFile != nullptr && !text.isEmpty())
+	if (problem != TRANSFER_FILE_OK)
 	{
 		theFile->close();
-		theFile = nullptr;
+		return problem;
 	}
 
-	if (theFile != nullptr)
+	char *buf = theFile->readEntireAndClose();
+	if (buf == nullptr)
 	{
-		char *buf = theFile->readEntireAndClose();
-		if (buf != nullptr)
-		{
-			valid = hasValidTransferFileContent(path, reinterpret_cast<const UnsignedByte *>(buf), len);
-			delete[] buf;
-		}
-
-		if (!valid)
-		{
-			text.format(L"'%hs' is not a valid file of its type", name.str());
-		}
+		return TRANSFER_FILE_UNREADABLE;
 	}
 
-	if (problem != nullptr)
+	const Bool valid = hasValidTransferFileContent(path, reinterpret_cast<const UnsignedByte *>(buf), len);
+	delete[] buf;
+
+	if (!valid)
 	{
-		*problem = text;
+		return TRANSFER_FILE_INVALID;
 	}
-	return valid;
+	return TRANSFER_FILE_OK;
+}
+
+UnicodeString GetTransferFileProblemText(TransferFileProblem problem, const AsciiString& path)
+{
+	const AsciiString name = GetFileFromPath(path);
+
+	switch (problem)
+	{
+		case TRANSFER_FILE_MISSING:
+			return TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:MapTransferFileMissing", L"'%hs' is missing", name.str());
+
+		case TRANSFER_FILE_EMPTY:
+			return TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:MapTransferFileEmpty", L"'%hs' is empty", name.str());
+
+		case TRANSFER_FILE_UNREADABLE:
+			return TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:MapTransferFileUnreadable", L"'%hs' could not be read", name.str());
+
+		case TRANSFER_FILE_WRONG_TYPE:
+			return TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:MapTransferFileWrongType", L"'%hs' is not a file type that can be transferred", name.str());
+
+		case TRANSFER_FILE_TOO_LARGE:
+			return TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:MapTransferFileTooLarge", L"'%hs' is larger than the limit of %u bytes", name.str(), getTransferFileMaxSize(path));
+
+		case TRANSFER_FILE_INVALID:
+			return TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:MapTransferFileInvalid", L"'%hs' is not a valid file of its type", name.str());
+
+		default:
+			return UnicodeString::TheEmptyString;
+	}
 }
 
 /**
@@ -905,7 +934,7 @@ void ConnectionManager::processFile(NetFileCommandMsg *msg)
 	Int len = msg->getFileLength();
 
 #if COMPRESS_FILE_TRANSFERS
-	// Only the sender's own zlib layer is unpacked: the other decoders take no output size, and a file compressed on disk arrives inside that layer
+	// The other decoders take no output size, so only the sender's zlib layer is unpacked. A file compressed on disk arrives inside that layer.
 	Bool deleteBuf = FALSE;
 	if (CompressionManager::getCompressionType(buf, len) == TRANSFER_COMPRESSION)
 	{

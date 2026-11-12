@@ -290,10 +290,6 @@ void LANAPI::handleRequestJoin( LANMessage *msg, UnsignedInt senderIP )
 #if !RTS_ZEROHOUR
 			if (msg->GameToJoin.iniCRC != TheGlobalData->m_iniCRC ||
 					msg->GameToJoin.exeCRC != TheGlobalData->m_exeCRC)
-#else
-			// Builds differ in packet size and transfer format, so they cannot share a game
-			if (msg->GameToJoin.exeCRC != TheGlobalData->m_exeCRC)
-#endif
 			{
 				DEBUG_LOG(("LANAPI::handleRequestJoin - join denied because of CRC mismatch. CRCs are them/us INI:%X/%X exe:%X/%X",
 					msg->GameToJoin.iniCRC, TheGlobalData->m_iniCRC,
@@ -304,6 +300,19 @@ void LANAPI::handleRequestJoin( LANMessage *msg, UnsignedInt senderIP )
 				reply.GameNotJoined.playerIP = senderIP;
 				canJoin = false;
 			}
+#else
+			// A build from before this field existed sends whatever its stack held here
+			if (msg->GameToJoin.protocolVersion != NETWORK_PROTOCOL_VERSION)
+			{
+				DEBUG_LOG(("LANAPI::handleRequestJoin - join denied because of a protocol mismatch. Versions are them/us %X/%X",
+					msg->GameToJoin.protocolVersion, NETWORK_PROTOCOL_VERSION));
+				reply.messageType = LANMessage::MSG_JOIN_DENY;
+				reply.GameNotJoined.reason = LANAPIInterface::RET_CRC_MISMATCH;
+				reply.GameNotJoined.gameIP = m_localIP;
+				reply.GameNotJoined.playerIP = senderIP;
+				canJoin = false;
+			}
+#endif
 #if defined(RTS_DEBUG)
 			}
 #endif
@@ -394,6 +403,7 @@ void LANAPI::handleRequestJoin( LANMessage *msg, UnsignedInt senderIP )
 					reply.GameJoined.slotPosition = player;
 					reply.GameJoined.gameIP = m_localIP;
 					reply.GameJoined.playerIP = senderIP;
+					reply.GameJoined.protocolVersion = NETWORK_PROTOCOL_VERSION;
 
 					LANGameSlot newSlot;
 					newSlot.setState(SLOT_PLAYER, UnicodeString(msg->name));
@@ -439,6 +449,27 @@ void LANAPI::handleJoinAccept( LANMessage *msg, UnsignedInt senderIP )
 	{
 		if (m_pendingAction == ACT_JOIN) // Are we trying to join?
 		{
+#if RTS_ZEROHOUR
+			// A host from before the protocol check accepts every build, so the joiner has to refuse it
+			if (msg->GameJoined.protocolVersion != NETWORK_PROTOCOL_VERSION)
+			{
+				DEBUG_LOG(("LANAPI::handleJoinAccept - leaving because of a protocol mismatch. Versions are them/us %X/%X",
+					msg->GameJoined.protocolVersion, NETWORK_PROTOCOL_VERSION));
+
+				LANMessage leaveMsg;
+				leaveMsg.messageType = LANMessage::MSG_REQUEST_GAME_LEAVE;
+				fillInLANMessage( &leaveMsg );
+				wcslcpy(leaveMsg.PlayerInfo.playerName, m_name.str(), ARRAY_SIZE(leaveMsg.PlayerInfo.playerName));
+				sendMessage(&leaveMsg);
+				m_transport->update();
+
+				OnGameJoin(RET_CRC_MISMATCH, nullptr);
+				m_pendingAction = ACT_NONE;
+				m_expiration = 0;
+				return;
+			}
+#endif
+
 			m_currentGame = LookupGame(UnicodeString(msg->GameJoined.gameName));
 
 			if (!m_currentGame)

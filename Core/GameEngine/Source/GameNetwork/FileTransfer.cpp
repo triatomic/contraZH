@@ -30,8 +30,6 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
-#include "Common/file.h"
-#include "Common/LocalFileSystem.h"
 #include "GameClient/LoadScreen.h"
 #include "GameClient/Shell.h"
 #include "GameNetwork/FileTransfer.h"
@@ -285,19 +283,6 @@ static const MapSideFile s_mapSideFiles[] =
 	{ 64, GetReadmeFromMap, FALSE },
 };
 
-static Bool isFileEmpty(const AsciiString& path)
-{
-	File *theFile = TheLocalFileSystem->openFile(path.str());
-	if (theFile == nullptr)
-	{
-		return FALSE;
-	}
-
-	const Bool empty = theFile->size() <= 0;
-	theFile->close();
-	return empty;
-}
-
 static void getMapTransferFiles(const GameInfo *game, std::vector<AsciiString>& files)
 {
 	for (Int i = 0; i < ARRAY_SIZE(s_mapSideFiles); ++i)
@@ -321,13 +306,14 @@ Int RemoveUntransferableMapContents(const AsciiString& mapPath, Int contentsMask
 		}
 
 		const AsciiString path = s_mapSideFiles[i].getPath(mapPath);
-		if (CanTransferFile(path))
+		const TransferFileProblem problem = CheckTransferFile(path);
+		if (problem == TRANSFER_FILE_OK)
 		{
 			continue;
 		}
 
-		// An empty file loads the same as an absent one, so it is the only game data file that may be left out
-		if (s_mapSideFiles[i].changesGameData && !isFileEmpty(path))
+		// The bit can come from a file inside an archive, which the sender cannot read. A game data file on disk stays listed, so Start reports it.
+		if (problem != TRANSFER_FILE_MISSING && s_mapSideFiles[i].changesGameData)
 		{
 			continue;
 		}
@@ -338,7 +324,7 @@ Int RemoveUntransferableMapContents(const AsciiString& mapPath, Int contentsMask
 	return contentsMask;
 }
 
-Bool CanTransferMap(const GameInfo *game, UnicodeString *problem)
+Bool CanTransferMap(const GameInfo *game, UnicodeString *problemText)
 {
 	if (!getMapTransferMask(game))
 	{
@@ -349,8 +335,13 @@ Bool CanTransferMap(const GameInfo *game, UnicodeString *problem)
 	getMapTransferFiles(game, files);
 	for (size_t i = 0; i < files.size(); ++i)
 	{
-		if (!CanTransferFile(files[i], problem))
+		const TransferFileProblem problem = CheckTransferFile(files[i]);
+		if (problem != TRANSFER_FILE_OK)
 		{
+			if (problemText != nullptr)
+			{
+				*problemText = GetTransferFileProblemText(problem, files[i]);
+			}
 			return FALSE;
 		}
 	}

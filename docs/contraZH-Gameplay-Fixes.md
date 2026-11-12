@@ -90,14 +90,18 @@ identically.
 
 Network game packets now carry up to about 1100 bytes instead of the 476 bytes sized for a 512-byte
 modem packet, so a burst of orders goes out in one packet instead of several. This applies to every
-multiplayer game. A lobby refuses a player whose executable differs, so an older build cannot join
-a game hosted on this one.
+multiplayer game. An older build cannot share a game with this one. A GameSpy lobby refuses a
+player whose executable differs, and a LAN lobby refuses one on another network version.
 
-## LAN games need the same build
+## LAN games need the same network version
 
-A LAN host now refuses a player whose game executable differs from its own, and that player sees
-the CRC mismatch message. Previously, Zero Hour let any build join a LAN game. Builds differ in
-packet size and in how they send map files, so a mixed game could not work.
+Each build carries a network version, which changes when the packet size or the map file format
+changes. A LAN host refuses a joiner on another version, and a joiner leaves a host on another
+version. Both see the CRC mismatch message. Previously, Zero Hour let any build join a LAN game,
+and the two sides then could not understand each other.
+
+Builds of the same code share a version, so a cheats build can join a normal build and a D3D8 build
+can join a D3D9 build. A Generals Online build has its own version, because its packet size differs.
 
 ## Map transfer
 
@@ -111,8 +115,11 @@ limit or not a valid file of its type, such as a preview without a TGA 2.0 foote
 such file failed the whole transfer.
 
 `map.ini` and `solo.ini` change the game data, so a player without them would go out of sync. A map
-whose `map.ini` or `solo.ini` cannot be sent (over 2 MB, or containing a zero byte) still blocks
-Start. An empty one is left out, because it loads the same as a missing one.
+whose `map.ini` or `solo.ini` cannot be sent (empty, over 2 MB, or containing a zero byte) still
+blocks Start.
+
+The cause lines use the labels `GUI:MapTransferFileMissing`, `Empty`, `Unreadable`, `WrongType`,
+`TooLarge` and `Invalid`. A translation can supply them, and the game falls back to English text.
 
 The transfer now ends after 60 seconds without progress from any player. Previously, it ended two
 minutes after it began, even while a slow link was still delivering.

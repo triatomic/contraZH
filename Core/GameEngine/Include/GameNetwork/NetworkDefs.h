@@ -93,6 +93,9 @@ static constexpr const Int MAX_PACKET_SIZE = MAX_UDP_PAYLOAD_SIZE - sizeof(Trans
 static constexpr const Int MAX_NETWORK_MESSAGE_LEN = MAX_UDP_PAYLOAD_SIZE;
 #endif
 
+// LAN peers must agree on this to share a game. The high word counts changes to the bytes on the wire, the low word is the packet size.
+static constexpr const UnsignedInt NETWORK_PROTOCOL_VERSION = (1u << 16) | MAX_PACKET_SIZE;
+
 #if defined(GENERALS_ONLINE)
 // Alias used by the GeneralsOnline sources; upstream GO renamed the constant.
 static constexpr const Int MAX_MESSAGE_LEN = MAX_NETWORK_MESSAGE_LEN;
