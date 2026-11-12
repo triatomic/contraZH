@@ -46,3 +46,12 @@ AsciiString GetReadmeFromMap( AsciiString path );
 
 // The meat of file (map) transfers
 Bool DoAnyMapTransfers(GameInfo *game);
+
+// Applies the checks a receiver runs before it writes a transferred file
+Bool CanTransferFile(const AsciiString& path);
+
+// TRUE when no player needs the map or every file of it passes CanTransferFile. Only the host holds the files.
+Bool CanTransferMap(const GameInfo *game);
+
+// Clears the contents bit of every side file that fails CanTransferFile, so the map still transfers without it
+Int RemoveUntransferableMapContents(const AsciiString& mapPath, Int contentsMask);

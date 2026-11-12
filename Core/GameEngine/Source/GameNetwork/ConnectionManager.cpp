@@ -43,6 +43,7 @@
 #include "GameClient/GameText.h"
 #include "GameClient/MessageBox.h"
 #include "GameNetwork/ConnectionManager.h"
+#include "GameNetwork/FileTransfer.h"
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameNetwork/NAT.h"
 #include "GameNetwork/NetCommandWrapperList.h"
@@ -60,6 +61,13 @@
 #include "GameNetwork/GeneralsOnline/NextGenTransport.h"
 #include "GameNetwork/GeneralsOnline/NetworkMesh.h"
 #include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
+#endif
+
+// A compressed transfer changes the bytes on the wire, so every peer must run this build. A Generals Online peer may not.
+#if RTS_ZEROHOUR && !defined(GENERALS_ONLINE)
+#define COMPRESS_FILE_TRANSFERS (1)
+#else
+#define COMPRESS_FILE_TRANSFERS (0)
 #endif
 
 static Bool hasValidTransferFileExtension(const AsciiString& filePath)
@@ -203,6 +211,51 @@ static Bool hasValidTransferFileContent(const AsciiString& filePath, const Unsig
 	}
 
 	return true;
+}
+
+static UnsignedInt getTransferFileMaxSize(const AsciiString& filePath)
+{
+	const char* fileExt = strrchr(filePath.str(), '.');
+	if (fileExt == nullptr)
+	{
+		return 0;
+	}
+
+	const TransferFileType fileType = getTransferFileType(fileExt);
+	if (fileType == TransferFileType_Invalid)
+	{
+		return 0;
+	}
+
+	return transferFileRules[fileType].maxSize;
+}
+
+Bool CanTransferFile(const AsciiString& path)
+{
+	File *theFile = TheLocalFileSystem->openFile(path.str());
+	if (theFile == nullptr)
+	{
+		return FALSE;
+	}
+
+	const Int len = theFile->size();
+	if (len <= 0 || (UnsignedInt)len > getTransferFileMaxSize(path))
+	{
+		theFile->close();
+		return FALSE;
+	}
+
+	char *buf = theFile->readEntireAndClose();
+	if (buf == nullptr)
+	{
+		return FALSE;
+	}
+
+	const Bool valid = hasValidTransferFileExtension(path)
+		&& hasValidTransferFileContent(path, reinterpret_cast<const UnsignedByte *>(buf), len);
+
+	delete[] buf;
+	return valid;
 }
 
 /**
@@ -831,40 +884,44 @@ void ConnectionManager::processFile(NetFileCommandMsg *msg)
 	UnsignedByte *buf = msg->getFileData();
 	Int len = msg->getFileLength();
 
-	// uncompress Targas
-#ifdef COMPRESS_TARGAS
+#if COMPRESS_FILE_TRANSFERS
+	// The sender adds one compression layer to every file, also to a file that is compressed on disk
 	Bool deleteBuf = FALSE;
-	if (msg->getPortableFilename().endsWith(".tga") && CompressionManager::isDataCompressed(buf, len))
+	if (CompressionManager::isDataCompressed(buf, len))
 	{
-		Int uncompLen = CompressionManager::getUncompressedSize(buf, len);
+		const Int uncompLen = CompressionManager::getUncompressedSize(buf, len);
+		if (uncompLen <= 0 || (UnsignedInt)uncompLen > getTransferFileMaxSize(realFileName))
+		{
+			DEBUG_LOG(("File '%s' claims %d bytes uncompressed. Transfer aborted.", realFileName.str(), uncompLen));
+			return;
+		}
+
 		UnsignedByte *uncompBuffer = NEW UnsignedByte[uncompLen];
-		Int actualLen = CompressionManager::decompressData(buf, len, uncompBuffer, uncompLen);
-		if (actualLen == uncompLen)
+		const Int actualLen = CompressionManager::decompressData(buf, len, uncompBuffer, uncompLen);
+		if (actualLen != uncompLen)
 		{
-			DEBUG_LOG(("Uncompressed Targa after map transfer"));
-			deleteBuf = TRUE;
-			buf = uncompBuffer;
-			len = uncompLen;
+			DEBUG_LOG(("Failed to uncompress '%s' after transfer. Transfer aborted.", realFileName.str()));
+			delete[] uncompBuffer;
+			return;
 		}
-		else
-		{
-			DEBUG_LOG(("Failed to uncompress Targa after map transfer"));
-			delete[] uncompBuffer; // failed to decompress, so just use the source
-		}
+
+		deleteBuf = TRUE;
+		buf = uncompBuffer;
+		len = uncompLen;
 	}
-#endif // COMPRESS_TARGAS
+#endif // COMPRESS_FILE_TRANSFERS
 
 	// TheSuperHackers @security bobtista 12/02/2026 Validate file content in memory before writing to disk
 	if (!hasValidTransferFileContent(realFileName, buf, len))
 	{
 		DEBUG_LOG(("File '%s' failed content validation. Transfer aborted.", realFileName.str()));
-#ifdef COMPRESS_TARGAS
+#if COMPRESS_FILE_TRANSFERS
 		if (deleteBuf)
 		{
 			delete[] buf;
 			buf = nullptr;
 		}
-#endif // COMPRESS_TARGAS
+#endif // COMPRESS_FILE_TRANSFERS
 		return;
 	}
 
@@ -903,13 +960,13 @@ void ConnectionManager::processFile(NetFileCommandMsg *msg)
 	processFileProgress(progressMsg);
 	progressMsg->detach();
 
-#ifdef COMPRESS_TARGAS
+#if COMPRESS_FILE_TRANSFERS
 	if (deleteBuf)
 	{
 		delete[] buf;
 		buf = nullptr;
 	}
-#endif // COMPRESS_TARGAS
+#endif // COMPRESS_FILE_TRANSFERS
 }
 
 void ConnectionManager::processFileAnnounce(NetFileAnnounceCommandMsg *msg)
@@ -2641,30 +2698,35 @@ void ConnectionManager::sendFile(AsciiString path, UnsignedByte playerMask, Unsi
 	}
 	NetCommandDataChunk rawDataChunk(buf, len);
 
-	// compress Targas
-#ifdef COMPRESS_TARGAS
-	char *compressedBuf = nullptr;
-	Int compressedLen = path.endsWith(".tga")?CompressionManager::getMaxCompressedSize(len, CompressionManager::getPreferredCompression()):0;
-	Int compressedSize = 0;
-	if (compressedLen)
-		compressedSize = CompressionManager::compressData(CompressionManager::getPreferredCompression(),
-		buf, len, compressedBuf, compressedLen);
+#if COMPRESS_FILE_TRANSFERS
+	// zlib is told the output size, so a file that does not shrink cannot overrun the buffer
+	const CompressionType compType = COMPRESSION_ZLIB9;
+	const Int compressedLen = CompressionManager::getMaxCompressedSize(len, compType);
+	char *compressedBuf = NEW char[compressedLen];
+	const Int compressedSize = CompressionManager::compressData(compType, buf, len, compressedBuf, compressedLen);
 
 	if (!compressedSize)
 	{
 		delete[] compressedBuf;
 		compressedBuf = nullptr;
+
+		// The receiver unwraps whatever looks compressed, so a file that is compressed on disk cannot go out bare
+		if (CompressionManager::isDataCompressed(buf, len))
+		{
+			DEBUG_LOG_LEVEL(DEBUG_LEVEL_NET, ("Not sending file '%s' to %X, it could not be compressed", path.str(), playerMask));
+			return;
+		}
 	}
 
 	NetCommandDataChunk compressedDataChunk(compressedBuf, compressedSize);
-#endif // COMPRESS_TARGAS
+#endif // COMPRESS_FILE_TRANSFERS
 
 	NetFileCommandMsg *fileMsg = newInstance(NetFileCommandMsg);
 	fileMsg->setPlayerID(m_localSlot);
 	fileMsg->setID(commandID);
 	fileMsg->setRealFilename(path);
 
-#ifdef COMPRESS_TARGAS
+#if COMPRESS_FILE_TRANSFERS
 	if (compressedBuf)
 	{
 		DEBUG_LOG_LEVEL(DEBUG_LEVEL_NET, ("Compressed '%s' from %d to %d (%g%%) before transfer", path.str(), len, compressedSize,
@@ -2672,7 +2734,7 @@ void ConnectionManager::sendFile(AsciiString path, UnsignedByte playerMask, Unsi
 		fileMsg->setFileData(compressedDataChunk);
 	}
 	else
-#endif // COMPRESS_TARGAS
+#endif // COMPRESS_FILE_TRANSFERS
 	{
 		fileMsg->setFileData(rawDataChunk);
 	}

@@ -62,6 +62,7 @@
 #include "GameNetwork/GameSpy/PersistentStorageDefs.h"
 #include "GameNetwork/GameSpy/PersistentStorageThread.h"
 #include "GameNetwork/GameSpyOverlay.h"
+#include "GameNetwork/FileTransfer.h"
 #include "GameNetwork/NAT.h"
 #include "GameNetwork/GUIUtil.h"
 #include "GameNetwork/GameSpy/GSConfig.h"
@@ -844,6 +845,12 @@ static void StartPressed()
 				humanCount++;
 			playerCount++;
 		}
+	}
+
+	if (myGame->amIHost() && !CanTransferMap(myGame))
+	{
+		TheGameSpyInfo->addText(TheGameText->fetch("GUI:CouldNotTransferMap"), GameSpyColor[GSCOLOR_DEFAULT], listboxGameSetupChat);
+		return;
 	}
 
 	// Check for too many players

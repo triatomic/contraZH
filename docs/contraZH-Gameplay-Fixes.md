@@ -93,6 +93,27 @@ modem packet, so a burst of orders goes out in one packet instead of several. Th
 multiplayer game. The lobby already refuses a player whose executable differs, so an older build
 cannot join a game hosted on this one.
 
+## Map transfer
+
+A host whose map cannot be transferred is told when pressing Start, before anyone enters the
+transfer screen. A map fails this check when its `.map` file is over 5 MB. Previously the whole map
+was sent, every receiver rejected it silently and all players waited two minutes.
+
+A side file that cannot be sent is left out and the map transfers without it. The side files are the
+preview, `map.ini`, `map.str`, `solo.ini`, `assetusage.txt` and `readme.txt`. One is left out when it
+is empty, over its size limit (2 MB for the preview and `map.ini`) or not a valid file of its type,
+such as a preview without a TGA 2.0 footer. Previously, one such file failed the whole transfer.
+
+The transfer now ends after 60 seconds without progress from any player. Previously, it ended two
+minutes after it began, even while a slow link was still delivering.
+
+The host sends only as many pieces at once as the receiver has acknowledged room for. The amount
+grows while pieces arrive and halves when one has to be sent again. Previously, the host sent up to
+256 packets every frame, most were dropped at the receiver and sent again.
+
+In LAN and GameSpy games every file is compressed for the transfer. Generals Online games send
+the files as they are, because other clients there do not expect compressed data.
+
 ## Drones stay on their leash
 
 The leash is twice the guard range from the parent. The drone now checks that distance before
