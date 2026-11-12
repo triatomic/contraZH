@@ -95,11 +95,12 @@ cannot join a game hosted on this one.
 
 ## Drones stay on their leash
 
-* The leash (twice the guard range from the master) was never checked while the master had a
-victim, so drones wandered off indefinitely.
-* The leash is now checked first. A drone past it drops its attack and returns.
-* Unchanged: normal fights within the master's range, drones without guard range, Stinger Site
-stingers.
+The leash is twice the guard range from the parent. The drone now checks that distance before
+attack and scout orders, even when the parent has no target. A drone past the leash clears its
+attack state and moves back toward its parent. Previously, the return order could leave the
+drone's attack active after the parent lost its target.
+
+Drones without a guard range and Stinger Site stingers keep their existing behavior.
 
 Changes the simulation.
 
