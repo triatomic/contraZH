@@ -71,8 +71,25 @@ protected:
 	afx_msg void OnSelChanged(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnDeleteItem(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnDblclk(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnRClick(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnToggleMeshVis();
+	afx_msg void OnShowBones();
+	afx_msg void OnExportInfo();
+	afx_msg void OnDumpW3DInfo();
+	// TheSuperHackers @feature Open the right-clicked asset in the W3D Material Viewer.
+	afx_msg void OnOpenInMaterialViewer();
+	// TheSuperHackers @feature Rebuild themed check-state image list on dark/light switch.
+	afx_msg LRESULT OnW3DViewThemeChanged(WPARAM wParam, LPARAM lParam);
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
+
+	// Rebuilds the TVSIL_STATE checkbox image list using the current theme.
+	void RebuildStateImageList();
+
+	// Rebuilds the TVSIL_NORMAL tree-node icon list using the current theme.
+	// Indices into the list (m_iAnimationIcon, m_iMeshIcon, etc.) stay stable.
+	void RebuildNormalImageList();
 
 	public:
 
@@ -100,6 +117,8 @@ protected:
 		//	Texture insertion methods
 		//
 		void					Load_Materials_Into_Tree ();
+		void					Load_Bones_Into_Tree ();
+		void					Toggle_Mesh_Visibility (HTREEITEM hItem);
 
 		//
 		//	Display methods
@@ -114,10 +133,18 @@ protected:
 		//
 		RenderObjClass *	Get_Current_Render_Obj () const;
 		AssetInfoClass *	Get_Current_Asset_Info () const;
+
+		// Opens the Material Viewer for the current tree selection: a selected
+		// mesh opens pre-selected to that mesh; any other (or no) selection opens
+		// the whole currently displayed object. Used by the Ctrl+M hotkey.
+		void					OpenSelectionInMaterialViewer ();
 		LPCTSTR				GetCurrentSelectionName ();
 		ASSET_TYPE			GetCurrentSelectionType ();
 		HTREEITEM			FindChildItem (HTREEITEM hParentItem, LPCTSTR pszChildItemName);
 		HTREEITEM			FindChildItem (HTREEITEM hParentItem, RenderObjClass *prender_obj);
+		// Searches every asset root (Hierarchies, Meshes, LODs, etc.) for an item
+		// whose AssetInfo name matches. Used by Reload-Assets restore in MainFrm.cpp.
+		HTREEITEM			Find_Asset_Item_By_Name (LPCTSTR pszName);
 		HTREEITEM			FindFirstChildItemBasedOnHierarchyName (HTREEITEM hParentItem, LPCTSTR pszHierarchyName);
 		HTREEITEM			FindSiblingItemBasedOnHierarchyName (HTREEITEM hCurrentItem, LPCTSTR pszHierarchyName);
 		void					Build_Render_Object_List (DynamicVectorClass <CString> &asset_list, HTREEITEM hparent = TVI_ROOT);
@@ -126,6 +153,12 @@ protected:
 		//	Initialization methods
 		//
 		void					CreateRootNodes ();
+		void					Rebuild_State_Images ();
+
+		// TheSuperHackers @performance Tria 25/04/2026 Bulk-release all AssetInfo data
+		// and texture refs in one pass, then zero each item's lParam so the subsequent
+		// DeleteAllItems() does not fire per-item TVN_DELETEITEM work.
+		void					Free_All_Asset_Data ();
 
 	protected:
 
@@ -137,6 +170,9 @@ protected:
 		RenderObjClass *	Create_Render_Obj_To_Display (HTREEITEM htree_item);
 		void					Add_Emitters_To_Menu (HMENU hmenu, RenderObjClass &render_obj);
 		void					Free_Child_Models (HTREEITEM parent_item);
+		bool					Is_Mesh_Sub_Object (HTREEITEM hItem) const;
+		void					Set_Mesh_Visibility (HTREEITEM hItem, bool visible);
+		void					Set_Mesh_Visibility_Recursive (HTREEITEM hItem, bool visible);
 
 	private:
 
@@ -153,6 +189,9 @@ protected:
 		HTREEITEM	m_hPrimitivesRoot;
 		HTREEITEM	m_hHierarchyRoot;
 		HTREEITEM	m_hSoundRoot;
+		// TheSuperHackers @feature Owns the TVSIL_NORMAL image list so we can swap
+		// between dark and light icon variants on theme change.
+		CImageList	m_normalImageList;
 		int			m_iAnimationIcon;
 		int			m_iTCAnimationIcon;
 		int			m_iADAnimationIcon;
@@ -164,7 +203,12 @@ protected:
 		int			m_iAggregateIcon;
 		int			m_iHierarchyIcon;
 		int			m_iSoundIcon;
+		int			m_iBoneIcon;
+		HTREEITEM	m_hRightClickItem;
 		bool			m_RestrictAnims;
+		// TheSuperHackers @feature Tria 23/04/2026 Multi-select set for sub-object visibility toggling.
+		DynamicVectorClass<HTREEITEM>	m_selectedMeshItems;
+		HTREEITEM							m_hLastMultiSelectAnchor;
 };
 
 /////////////////////////////////////////////////////////////////////////////
