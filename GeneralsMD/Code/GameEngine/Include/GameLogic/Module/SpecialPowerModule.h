@@ -215,6 +215,7 @@ protected:
 	Int m_pausedCount;									///< Reference count of sources pausing me
 	UnsignedInt m_pausedOnFrame;
 	Real m_pausedPercent;
+	Int m_pendingCost;
 	Int m_pendingShotsState;						///< one of the PENDING_ values above
 	UnsignedInt m_pendingTimeoutFrame;	///< start the cooldown anyway once this frame passes
 	UnsignedInt m_pendingStartFrame;		///< frame the wait began, so the cameo can count down from it
