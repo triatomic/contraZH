@@ -27,6 +27,8 @@
 #include "GameNetwork/NetworkDefs.h"
 #include "GameNetwork/NetworkInterface.h"
 
+#include "WW3D2/ww3d.h"
+
 
 FramePacer* TheFramePacer = nullptr;
 
@@ -58,7 +60,16 @@ FramePacer::~FramePacer()
 void FramePacer::update()
 {
 	// Uses a high resolution counter to cap the frame rate more accurately to the desired limit than retail did.
-	const UnsignedInt maxFps = getActualFramesPerSecondLimit();
+	UnsignedInt maxFps = getActualFramesPerSecondLimit();
+
+	// Vertical sync paces a limit at or above the refresh rate. The limiter then only catches a Present that does not wait.
+	const UnsignedInt refreshRate = WW3D::Get_VSync_Refresh_Rate();
+
+	if (refreshRate != 0 && maxFps >= refreshRate)
+	{
+		maxFps = max(maxFps, refreshRate + refreshRate / 50);
+	}
+
 	m_updateTime = m_frameRateLimit.wait(maxFps);
 
 	if (TheGameLogic != nullptr)

@@ -677,6 +677,7 @@ public:
 
 #if RTS_ZEROHOUR
 		MSG_DO_MOVETO_FACING,											///< location, angle, rows, formation style
+		MSG_SET_AUTO_QUEUE_UNIT,										///< (producer objectID, thingTemplate ID or 0 for none) the producer builds this unit whenever its queue is empty
 #endif
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.

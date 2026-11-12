@@ -70,6 +70,7 @@ void GameSlot::reset()
 	m_NATBehavior = FirewallHelperClass::FIREWALL_TYPE_SIMPLE;
 	m_lastFrameInGame = 0;
 	m_disconnected = FALSE;
+	m_IP = 0;
 	m_port = 0;
 	m_isMuted = FALSE;
 	m_hasSavedOriginalSetup = FALSE;
@@ -401,6 +402,7 @@ void GameInfo::reset()
   m_diplomacy = FALSE;
   m_freeRadar = FALSE;
   m_revealMap = FALSE;
+  m_autoQueue = FALSE;
 
 	for (Int i=0; i<MAX_SLOTS; ++i)
 	{
@@ -1090,6 +1092,10 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 	{
 		optionsString.concat("RM=1;");
 	}
+	if (game.getAutoQueue())
+	{
+		optionsString.concat("AQ=1;");
+	}
 #endif
 
 	//add player info for each slot
@@ -1222,6 +1228,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
   Bool diplomacy = FALSE;
   Bool freeRadar = FALSE;
   Bool revealMap = FALSE;
+  Bool autoQueue = FALSE;
 
 	Bool sawMap = FALSE;
 	Bool sawMapCRC = FALSE;
@@ -1368,6 +1375,10 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
     else if (key.compare("RM") == 0 )
     {
       revealMap = atoi( val.str() ) != 0;
+    }
+    else if (key.compare("AQ") == 0 )
+    {
+      autoQueue = atoi( val.str() ) != 0;
     }
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
@@ -1743,6 +1754,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		game->setDiplomacy(diplomacy);
 		game->setFreeRadar(freeRadar);
 		game->setRevealMap(revealMap);
+		game->setAutoQueue(autoQueue);
 
 		return true;
 	}
@@ -1772,14 +1784,14 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 #if RTS_GENERALS
 	const XferVersion currentVersion = 2;
 #else
-	const XferVersion currentVersion = 6;
+	const XferVersion currentVersion = 7;
 #endif
 	XferVersion version = currentVersion;
 #if !RTS_GENERALS
-	// Versions 5 and 6 only add rules, so a save with them off stays readable by older exes
-	if (xfer->getXferMode() == XFER_SAVE && !m_freeRadar && !m_revealMap)
+	// Versions 5 to 7 only add rules, so a save with them off stays readable by older exes
+	if (xfer->getXferMode() == XFER_SAVE && !m_autoQueue)
 	{
-		version = m_quickGame ? 5 : 4;
+		version = ( m_freeRadar || m_revealMap ) ? 6 : ( m_quickGame ? 5 : 4 );
 	}
 #endif
 	xfer->xferVersion( &version, currentVersion );
@@ -1900,6 +1912,15 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
   {
     m_freeRadar = FALSE;
     m_revealMap = FALSE;
+  }
+
+  if ( version >= 7 )
+  {
+    xfer->xferBool( &m_autoQueue );
+  }
+  else if ( xfer->getXferMode() == XFER_LOAD )
+  {
+    m_autoQueue = FALSE;
   }
 
 }

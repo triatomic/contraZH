@@ -1,5 +1,24 @@
 # Objects & Modules
 
+## Lifetime progress bars
+
+`LifetimeUpdate` can show a draining lifetime bar on objects with `SHOW_PROGRESS_BAR`
+in their `KindOf` list. The game's health-bar display setting must be enabled.
+
+```
+  Behavior = LifetimeUpdate ModuleTag_Lifetime
+    MinLifetime = 60000
+    MaxLifetime = 60000
+    ShowProgressBar = Yes
+    ProgressBarUpgrade = Upgrade_GLARecycling
+  End
+```
+
+`ShowProgressBar` defaults to `No`. `ProgressBarUpgrade` defaults to `None`.
+When an upgrade is specified, the bar appears only after the object or its current owner
+has completed that upgrade. The timer keeps running while the bar is hidden. Researching
+the upgrade reveals the remaining lifetime without restarting it.
+
 ## Building lights
 
 Building lights turn off while the building is disabled, including low power, EMP, hacking
@@ -110,6 +129,8 @@ Notes:
 Quick Game.
 * The build tooltip lists the requirements of the current game.
 * A map.ini override replaces the list, as it does for `Prerequisites`.
+* An `ObjectExtend` child inherits the list until it defines `QuickGamePrerequisites`. Its first
+block replaces the inherited entries; later blocks add entries. See [Extend Blocks](contraZH-Extend.md#object-inis).
 
 ### Display Decal
 
@@ -1125,11 +1146,24 @@ Behavior = PoweredBehavior ModuleTag_Powered
   DisableWeapon = Yes   ; (default = No; Yes = cannot attack while out of power)
   MovePenalty = 50%     ; (default = 0%; move speed lost while out of power)
   LiftPenalty = 20%     ; (default = 0%; lift lost while out of power, hovering units only)
+  DamagePenalty = 30%   ; (default = 0%; weapon damage lost while out of power)
+  RateOfFirePenalty = 50%  ; (default = 0%; rate of fire lost while out of power)
+  RangePenalty = 25%    ; (default = 0%; weapon range lost while out of power)
   Icon = LowPower       ; (optional; name of an Animation block, shown while out of power)
 End
 ```
 **Notes:**
 - `MovePenalty` of 100% or more acts like `IsMobile = No`.
+- `DamagePenalty`, `RateOfFirePenalty` or `RangePenalty` of 100% or more acts like `DisableWeapon = Yes`.
+- The weapon penalties multiply the result of any `WeaponBonus` conditions. A 50% `RateOfFirePenalty`
+  doubles the delay between shots and the clip reload time.
+- A projectile keeps the penalties of its launcher at the moment it was fired.
+- `RangePenalty` does not lower `MinimumAttackRange`. Keep the reduced range above it, or the
+  weapon cannot fire while out of power.
+- The weapon effects cover the object's own weapon set. `DisableWeapon` does not stop weapons
+  fired by other modules, such as `FireWeaponUpdate`, and a penalty of 100% or more cuts those
+  weapons to 1%. `PointDefenseLaserUpdate` ignores `RateOfFirePenalty` and `RangePenalty`. Slaves
+  of a `KINDOF_SPAWNS_ARE_THE_WEAPONS` object fire normally.
 - `MovePenalty` never touches lift, so helicopters keep hovering. `LiftPenalty` lowers lift on
   its own. Once lift no longer beats gravity the unit sinks, so keep it small. 100% is ignored.
 - `Icon` names an `Animation` block from `animation2d.ini`, like the stock `Disabled` one. It sits

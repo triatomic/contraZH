@@ -479,23 +479,22 @@ void MarkLobbyGameTab( LobbyTabs &tabs )
 struct LobbyRuleCaption
 {
 	const char *label;
-	const WideChar *labelText;
 	const char *tip;
-	const WideChar *tipText;
 };
 
 static const LobbyRuleCaption s_lobbyRuleCaptions[LOBBY_RULE_COUNT] =
 {
-	{ "GUI:DiplomacyRule", L"Diplomacy", "TOOLTIP:DiplomacyRule", L"Players may change alliances during the match from the Diplomacy window" },
-	{ "GUI:FreeRadar", L"Free Radar", "TOOLTIP:FreeRadar", L"Every player has radar from the start without building a radar source" },
-	{ "GUI:RevealMap", L"Reveal Map", "TOOLTIP:RevealMap", L"No shroud: every player sees the whole map from the start" },
-	{ "GUI:CoopBuildings", L"Coop Buildings", "TOOLTIP:CoopBuildings", L"Lets allies finish each other's unfinished buildings" },
-	{ "GUI:QuickGame", L"Quick Game", "TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units" },
+	{ "GUI:DiplomacyRule", "TOOLTIP:DiplomacyRule" },
+	{ "GUI:FreeRadar", "TOOLTIP:FreeRadar" },
+	{ "GUI:RevealMap", "TOOLTIP:RevealMap" },
+	{ "GUI:CoopBuildings", "TOOLTIP:CoopBuildings" },
+	{ "GUI:QuickGame", "TOOLTIP:QuickGame" },
+	{ "GUI:AutoQueue", "TOOLTIP:AutoQueue" },
 };
 
 UnicodeString LobbyRuleName( LobbyRule rule )
 {
-	return TheGameText->FETCH_OR_SUBSTITUTE( s_lobbyRuleCaptions[rule].label, s_lobbyRuleCaptions[rule].labelText );
+	return TheGameText->fetch( s_lobbyRuleCaptions[rule].label );
 }
 
 void SetLobbyRuleCaption( GameWindow *check, LobbyRule rule )
@@ -505,7 +504,7 @@ void SetLobbyRuleCaption( GameWindow *check, LobbyRule rule )
 		return;
 	}
 	GadgetCheckBoxSetText( check, LobbyRuleName( rule ) );
-	check->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( s_lobbyRuleCaptions[rule].tip, s_lobbyRuleCaptions[rule].tipText ) );
+	check->winSetTooltip( TheGameText->fetch( s_lobbyRuleCaptions[rule].tip ) );
 }
 
 void PopulateStartingCashComboBox(GameWindow *comboBox, GameInfo *myGame)

@@ -1412,6 +1412,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		Player *owningPlayer = sourceObj->getControllingPlayer(); //Need to know so missiles don't collide with firer
 		Object *projectile = TheThingFactory->newObject( getProjectileTemplate(), owningPlayer->getDefaultTeam() );
 		projectile->setProducer(sourceObj);
+		projectile->copyWeaponScalars(sourceObj);
 
 		//If the player has battle plans (America Strategy Center), then apply those bonuses
 		//to this object if applicable. Internally it validates certain kinds of objects.
@@ -2589,6 +2590,8 @@ void Weapon::computeBonus(const Object *source, WeaponBonusConditionFlags extraB
 	const WeaponBonusSet* extra = m_template->getExtraBonus();
 	if (extra)
 		extra->appendBonuses(flags, bonus);
+
+	bonusRefObj->applyWeaponScalars(bonus);
 }
 
 //-------------------------------------------------------------------------------------------------

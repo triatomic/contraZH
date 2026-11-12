@@ -127,14 +127,17 @@ public:
 	struct PixelLight
 	{
 		PixelLight() : position(0.0f, 0.0f, 0.0f), innerRadius(0.0f), outerRadius(0.0f),
-			diffuse(0.0f, 0.0f, 0.0f), ambientScale(0.0f), terrainOnly(FALSE), objectsOnly(FALSE) {}
+			diffuse(0.0f, 0.0f, 0.0f), ambientScale(0.0f), terrainOnly(FALSE), objectsOnly(FALSE),
+			splitAtGround(FALSE), groundHeight(0.0f) {}
 		Vector3 position;
 		Real innerRadius;	///< full strength inside this
 		Real outerRadius;	///< nothing past this
 		Vector3 diffuse;
 		Real ambientScale;	///< ambient colour as a fraction of the diffuse
 		Bool terrainOnly;	///< lights the ground and nothing standing on it
-		Bool objectsOnly;	///< the laser terrain pass already lights the ground
+		Bool objectsOnly;	///< the ground gets its light from a laser's terrain pass or a fitted ground light
+		Bool splitAtGround;	///< the depth pass can part ground from objects at groundHeight
+		Real groundHeight;
 	};
 	/// Each lighting pass takes eight lights, or two under standing water.
 	enum { MAX_PIXEL_LIGHTS = 8, SEABED_PIXEL_LIGHTS = 2, MAX_UNIT_PIXEL_LIGHTS = 8, MAX_PIXEL_LIGHT_CANDIDATES = 64 };
@@ -142,6 +145,8 @@ public:
 	static void setPixelLights(const PixelLight *lights, Int count);
 	static Int getPixelLightCount();
 	static const PixelLight &getPixelLight(Int index);
+	/// Lists in rising order every light that could reach a ground rectangle, for the caller to test against its own shape.
+	static void gatherPixelLights(Real minX, Real minY, Real maxX, Real maxY, std::vector<Int> &lights);
 	/// Lights the draws that follow in batches under the terrain, road, flat terrain
 	/// or point light shader in use. Null indices take the first count except object-only lights.
 	static void setDrawPixelLights(const Int *indices, Int count);
@@ -227,13 +232,16 @@ public:
 	static IDirect3DTexture8 * endRenderToTexture(); ///< Ends render to texture, & returns texture.
 	static IDirect3DTexture8 * getRenderTexture();	///< returns last used render target texture
 	/// Copies the bound render target into copy, resolving multisampling and recreating copy when the target changes shape.
-	static Bool copyRenderTarget(IDirect3DTexture8 *&copy);
+	/// An area copies those target pixels alone, and leaves the rest of copy as it was.
+	static Bool copyRenderTarget(IDirect3DTexture8 *&copy, const RECT *area = nullptr);
 	/// Scale in xy and offset in zw from clip space to the texel centres of a width by height copy of the render target.
 	static Vector4 getClipToTargetMapping(Real width, Real height);
 	/// Target pixels per screen pixel, above 1 while the scene renders larger than the screen for supersampling.
 	static Real getScreenToTargetScale();
 	/// Draws a quad over the viewport through identity transforms, its uv mapped from clip space by clipToTarget.
 	static void drawClipQuad(const Vector4 &clipToTarget);
+	/// Binds the terrain's cloud map to stage and gives the mapping from camera space onto it, where objects take cloud shadows.
+	static Bool bindCloudMap(Int stage, D3DMATRIX &cameraToCloud);
 	static Bool isRenderingToTexture() {return m_renderingToTexture; }
 	static void drawViewport(Int color);	///<draws 2 triangles covering the current tactical viewport
 

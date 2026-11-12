@@ -91,6 +91,7 @@ static DisplayString *s_countdownString = nullptr;
 static Int s_countdownLastSeconds = -1;
 static Int s_countdownLastMode = -1;
 static DisplayString *s_letterStrings[ 256 ] = { nullptr };
+static DisplayString *s_autoQueueString = nullptr;
 
 // the plate behind a count badge or corner letter over a cameo
 static const Color CAMEO_PLATE_COLOR = GameMakeColor( 0, 0, 0, 160 );
@@ -102,6 +103,12 @@ void W3DGadgetPushButtonFreeDisplayStrings( void )
 	s_countdownString = nullptr;
 	s_countdownLastSeconds = -1;
 	s_countdownLastMode = -1;
+
+	if( s_autoQueueString != nullptr && TheDisplayStringManager != nullptr )
+	{
+		TheDisplayStringManager->freeDisplayString( s_autoQueueString );
+	}
+	s_autoQueueString = nullptr;
 
 	for( Int i = 0; i < 256; ++i )
 	{
@@ -336,6 +343,56 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 
 	drawButtonCornerLetter( window, (UnsignedByte)corner, font, TheGlobalData->m_keyboardOverlayBackdrop,
 		TheGlobalData->m_keyboardOverlayBackdropColor, TheGlobalData->m_keyboardOverlayColor );
+}
+
+// drawButtonAutoQueue ========================================================
+/** A green frame and an AUTO tag on the cameo of the unit its producer auto queues. */
+//=============================================================================
+static void drawButtonAutoQueue( GameWindow *window )
+{
+	if( TheDisplayStringManager == nullptr )
+	{
+		return;
+	}
+
+	if( s_autoQueueString == nullptr )
+	{
+		s_autoQueueString = TheDisplayStringManager->newDisplayString();
+		if( s_autoQueueString == nullptr )
+		{
+			return;
+		}
+
+		s_autoQueueString->setText( L"AUTO" );
+	}
+
+	// the size follows the resolution, which can change between matches
+	Int pointSize = 8;
+	if( TheGlobalLanguageData )
+	{
+		pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
+	}
+	GameFont *font = TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE );
+	if( s_autoQueueString->getFont() != font )
+	{
+		s_autoQueueString->setFont( font );
+	}
+
+	ICoord2D origin, size;
+	window->winGetScreenPosition( &origin.x, &origin.y );
+	window->winGetSize( &size.x, &size.y );
+
+	const Color green = GameMakeColor( 80, 255, 80, 255 );
+	TheDisplay->drawOpenRect( origin.x + 1, origin.y + 1, size.x - 2, size.y - 2, 2.0f, green );
+
+	Int width, height;
+	s_autoQueueString->getSize( &width, &height );
+
+	const Int textX = origin.x + size.x - width - 3;
+	const Int textY = origin.y + size.y - height - 3;
+
+	drawTextPlate( textX, textY, width, height, CAMEO_PLATE_COLOR );
+	s_autoQueueString->draw( textX, textY, green, GameMakeColor( 0, 0, 0, 255 ) );
 }
 
 // drawButtonText =============================================================
@@ -808,6 +865,12 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 	else
 	{
 		drawButtonHotKeyOverlay( window );
+	}
+
+	if( pData && pData->autoQueue )
+	{
+		drawButtonAutoQueue( window );
+		pData->autoQueue = FALSE;
 	}
 }
 

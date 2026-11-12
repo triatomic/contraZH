@@ -349,6 +349,15 @@ void CampaignManager::markCurrentMissionCompleted()
 }
 
 //-----------------------------------------------------------------------------
+void CampaignManager::reloadProgress()
+{
+	// Picks up hand edits of the file made while the game runs
+	UserPreferences &progress = getCampaignProgress();
+	progress.clear();
+	progress.load( "CampaignProgress.ini" );
+}
+
+//-----------------------------------------------------------------------------
 void CampaignManager::setCampaignAndMission( AsciiString campaign, AsciiString mission )
 {
 	if(mission.isEmpty())

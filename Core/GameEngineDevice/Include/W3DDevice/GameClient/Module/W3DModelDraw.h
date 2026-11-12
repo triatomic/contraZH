@@ -261,6 +261,11 @@ struct ModelConditionInfo
 		clear();
 	}
 
+	ModelConditionInfo(const ModelConditionInfo&) = default;
+	ModelConditionInfo& operator=(const ModelConditionInfo&) = default;
+	ModelConditionInfo(ModelConditionInfo&&) noexcept = default;
+	ModelConditionInfo& operator=(ModelConditionInfo&&) = default;
+
 	void clear();
 	void loadAnimations() const;
 	void preloadAssets( TimeOfDay timeOfDay, Real scale );			///< preload any assets for time of day
@@ -284,6 +289,7 @@ private:
 	void validateCachedBones(RenderObjClass* robj, Real scale) const;
 };
 typedef std::vector<ModelConditionInfo> ModelConditionVector;
+static_assert(std::is_nothrow_move_constructible<ModelConditionInfo>::value, "ModelConditionVector would copy its states on growth");
 
 //-------------------------------------------------------------------------------------------------
 //typedef std::hash_map< TransitionSig, ModelConditionInfo, std::hash<TransitionSig>, std::equal_to<TransitionSig> > TransitionMap;

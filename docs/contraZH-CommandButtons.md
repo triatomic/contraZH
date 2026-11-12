@@ -1,5 +1,21 @@
 # CommandButtons & Selection
 
+## Power requirements
+
+`Options = REQUIRES_POWER` disables a button when its owner lacks sufficient power. It also applies to units using `PoweredBehavior`, whose movement and weapon penalties replace the normal `POWERED` disable. Buttons without this option keep their current behavior. `REQUIRES_POWER` takes precedence over `IGNORES_UNDERPOWERED`.
+
+`Options = IGNORES_UNDERPOWERED` lets an OCL special power activate when low power is its only disable reason. EMP, hacking, subdual, and other disable reasons still block activation. A power that was ready before the shortage remains usable. An unfinished recharge stays paused until power returns, and using the ability starts a new recharge without crediting the earlier pause again.
+
+```
+CommandButton Command_ElectricityNet
+  Command = SPECIAL_POWER
+  SpecialPower = SuperweaponElectricityNet
+  Options = IGNORES_UNDERPOWERED
+End
+```
+
+The UI checks `REQUIRES_POWER` for every command type. Object command-button dispatch and special-power dispatch also check it during execution. Other command types still need execution-path validation before this option can be treated as a general simulation-side restriction.
+
 ## New CommandButton Commands
 
 ### HOLD_FIRE
@@ -119,6 +135,21 @@ Off by default; enable with `QueueReorder = Yes` in the `GameData` block of Game
 finished units of a batch stay finished.
 * No effect on the first entry or a finished unit waiting to exit.
 * Plain click still cancels; Shift+click still cancels all of that type.
+
+### Auto queue
+
+Needs the [Military Auto Queue](contraZH-Maps-and-Setup.md#military-auto-queue) lobby rule. Right click
+a unit cameo on a production building to have that building build the unit by itself.
+
+* The building queues one unit at a time, only when its queue is empty.
+* The cameo shows a green frame and an AUTO tag.
+* Right click the cameo again to stop. Right clicking another unit switches to that unit.
+* Short of money, at the unit limit or out of parking, the building waits and builds when it can.
+* Cancelling the last queued unit of that type also stops it. So does losing the building to capture.
+* With several producers selected, a right click starts it on all of them. If any already auto queues
+that unit, those producers stop instead.
+* On a greyed out cameo, a right click can only stop it.
+* Save and load keep it.
 
 ## New CommandButton Options
 

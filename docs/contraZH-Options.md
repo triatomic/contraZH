@@ -40,6 +40,9 @@ host's limit, or `GameData.ini`'s.)
 * `RenderFPSLimit = 240` - (`30` | `60` | `120` | `240` | `0` for Unlimited. Also the FPS Limit
 combo in the main menu's Graphics section. Accept saves the selection; Back discards it.
 Without this key, the limit defaults to 240 FPS. VSync can impose a lower cap.
+With VSync on and a limit at or above the monitor's refresh rate, VSync alone paces the frames.
+The limiter holds the average rate exactly on the limit and sleeps on a high resolution timer
+on Windows 10 1803 and later, which costs far less CPU than before.
 The render rate cannot drop below the current simulation rate, so faster game speeds and
 60 Hz online matches can raise a selected 30 FPS limit. Replay fast-forward bypasses the cap.)
 
@@ -455,26 +458,54 @@ of the driver's usual three, so the screen answers the mouse sooner. Can cost a 
 
 ### Path tracing
 
-`PathTracing = No` is the default. `Yes` lets additive particles, streaks, laser beams,
-additive lamp meshes and model `_emi.dds` glow masks light nearby surfaces. The
-`Path tracing` checkbox on the Graphics page applies on Accept. Back discards changes
-and Defaults turns it off. The menu creates the checkbox when the layout has a Graphics
-panel and an ambient occlusion checkbox, so existing layouts need no new control.
-Layouts can supply `CheckPathTracing` to choose their own placement.
+`PathTracing = Off` is the default. `Quality` and `Fast` let additive particles, streaks,
+laser beams, additive lamp meshes and model `_emi.dds` glow masks light nearby surfaces.
+The `yes` and `no` of older files read as `Quality` and `Off`.
+
+| Value | Look | Cost |
+|---|---|---|
+| `Quality` | Each surface is lit with its own textures, normals and normal maps. | Extra passes per surface, so a lit base at night can add thousands of draw calls. |
+| `Fast` | Softer and blockier on models, because surface facing is rebuilt from the depth buffer. | One screen-space draw for all of these lights. |
+
+The `Path tracing` drop-down on the Graphics page applies on Accept. Back discards changes
+and Defaults turns it off. A layout supplies the drop-down as `ComboBoxPathTracing` with a
+`PathTracingLabel`. In a layout without it the menu creates a checkbox when there is a
+Graphics panel and an ambient occlusion checkbox, and that checkbox switches between `Off`
+and the mode last saved, `Quality` at first. Layouts can supply `CheckPathTracing` to place it.
 
 Requires D3D9, shader model 2.0a, `DynamicLights = Yes` and `PixelLights = Yes`.
-The checkbox stays grey while either lighting setting is off. Bloom is independent.
+The control stays grey while either lighting setting is off. Bloom is independent.
 Glow masks follow the existing specular pass and the day/night emissive
 intensity settings; `Specular = No` disables their light.
+
+A mesh lights its surroundings through its material only when it is additive. A mesh that is
+emissive without being additive, the usual way to keep thin parts such as barbed wire bright in
+shadow, emits no light. Give it an `_emi.dds` mask to make it a lamp.
 
 `PathTracingLightMaxRadius` in `GameData.ini` caps large lights without shrinking
 smaller ones. It defaults to `25`; `0` means no cap. `PathTracingLightBrightness`
 scales brightness independently and defaults to `0.75`; zero disables the new light
 spill. See [Light radius and brightness](contraZH-GameData.md#path-tracing-light-radius-and-brightness).
 
+In `Fast`, where the scene's depth can be read and the card instances draws, these lights
+are added in one screen-space draw after the opaque scene, so their count no longer adds
+draw calls. That draw takes a surface's normal from the depth buffer, without normal maps,
+and multiplies the colour already on screen, so it leaves sprites and transparent meshes
+drawn later unlit. The batches described below draw everything in `Quality`. In `Fast` they
+remain for game lights, laser spill on models, and cards or settings the screen-space draw
+cannot run on, such as multisampling.
+Setting the environment variable `CONTRA_DEFERREDLIGHTS=0` sends every light back to them.
+
 This option approximates emissive lighting with world-space point lights. It does not
-trace rays, cast local shadows, or calculate reflected light. Lights can pass through walls.
+cast local shadows or calculate reflected light.
 Particle texture colours are averaged once per cached texture.
+
+A model's own opaque meshes block the light its lamps throw on the ground. Each group of
+lamps that sit together and face one way casts 24 rays to the ground around it. A lamp the
+hull hides, such as one on a turret roof, lights no ground. A half-hidden one, such as a lamp
+on a wall, lights a smaller pool on its open side. The lamp still lights models as before,
+including its own, and one model's meshes never block another model's lamps. Meshes that blend, skinned meshes and particles block
+nothing. `Fast` tells ground from models by height, so on a slope the split is rough.
 Nearby emitters share lights within 24 world units. All visible lights are kept, and
 surfaces draw additional batches of eight lights, or two under standing water.
 Extra passes add only light and do not repeat sunlight, glow masks or shadow darkening.

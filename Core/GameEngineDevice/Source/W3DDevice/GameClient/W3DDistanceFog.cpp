@@ -96,7 +96,7 @@ void W3DDistanceFog::render(CameraClass &camera)
 	camera.Apply();
 	DX8Wrapper::Apply_Render_State_Changes();
 	D3DMATRIX projection;
-	device->GetTransform(D3DTS_PROJECTION, &projection);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
 	if (!W3DShaderManager::copyRenderTarget(m_sceneCopy))
 	{
 		bound->Release();

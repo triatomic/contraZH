@@ -183,6 +183,7 @@ enum
 	WIN_STATUS_ON_MOUSE_DOWN			= 0x02000000,		// Pushbutton triggers on mouse down.
 	WIN_STATUS_SHORTCUT_BUTTON		= 0x04000000,   // Oh god... this is a total hack for shortcut buttons to handle rendering text top left corner...
 	WIN_STATUS_COUNT_BADGE				= 0x08000000,		// TheSuperHackers @feature Push button text drawn bottom right on a plate, code only like SHORTCUT_BUTTON
+	WIN_STATUS_RIGHT_CLICK_ON_PRESS	= 0x10000000,		// Push button sends GBM_SELECTED_RIGHT on the right press, even while disabled, code only like SHORTCUT_BUTTON
 	// when you edit this, remember to edit WindowStatusNames[]
 
 };

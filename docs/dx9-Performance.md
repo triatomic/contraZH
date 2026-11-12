@@ -1,6 +1,6 @@
 # Supersampling
 
-`Supersampling` on the Graphics page offers `150%` and `200%`. The world renders to a target that
+`Supersampling` on the Graphics page offers `150%`, `200%` and [`16K`](#16k). The world renders to a target that
 many percent of the screen's size each way and is filtered down to the screen with a box filter,
 which smooths edges, alpha-tested cutouts, particles and shader output alike. The interface and
 the mouse draw after that at the screen's own size, so text stays sharp. Unlike MSAA the larger
@@ -12,6 +12,24 @@ Notes:
 * Supersampling takes MSAA's place; the Anti-aliasing box greys out while it is on.
 * `Options.ini` stores it as `SuperSampling = 150` or `200`.
 * The `CONTRA_SSAA` environment variable set to a percent overrides the option for one run.
+
+## 16K
+
+The `16K` entry is for screenshots, not for play. It renders the world 15360 pixels wide on any
+screen, which is 600% at 2560x1440 and 400% at 4K, and the frame rate drops to match.
+
+* While it is on, both screenshot keys save the world at its full size as a PNG, 15360x8640 on a
+16:9 screen. The shot has no interface and no mouse, because those draw after the world is
+shrunk to the screen.
+* The game pauses for several seconds while the file is written. A shot is often over 100 MB.
+* The colour grade runs at the full size in this mode, so the saved picture carries it.
+* The world's colour and depth take about 1 GB of video memory, and every effect that copies the
+scene takes another 0.5 GB. If the card cannot make the target, supersampling turns itself off.
+* A card that cannot make textures 15360 wide gets the largest scene it can make.
+* It lasts for one run. `Options.ini` keeps the percent saved before, so the next launch returns to
+it, and a `SuperSampling` value typed into the file never turns 16K on.
+* `CONTRA_SSAA=15360` starts a run in 16K.
+* The combo's fourth entry reads its label from `GUI:SuperSampling3` in `Generals.str`.
 * The combo needs a layout with the `ComboBoxSuperSampling` row, which `build/add_ssaa_wnd.py` adds
 to a loose `OptionsMenu.wnd`.
 
@@ -61,6 +79,20 @@ may layer wrongly.
 * The `CONTRA_BLENDSORT` environment variable helps track down rendering faults: `0` sorts every
 translucent triangle and draws each piece on its own, `1` adds the additive batches and shared
 draws, and `2` (the default) also sorts translucent models as whole objects.
+
+# Screen-space shadow receiving
+
+Units and buildings take the sun's shadow in one full-screen draw instead of each drawing a second
+time. The pass finds each object pixel's position from the scene's depth and reads the shadow map
+there. Scenes with many objects issue far fewer draw calls. Direct3D 9 build only.
+
+Notes:
+* Terrain, roads, bridges and water still shade themselves.
+* Needs a readable scene depth, so MSAA and drivers without INTZ depth textures keep the per-object
+shadow draws.
+* The coloured outline of a unit hidden behind a building darkens where the building's face is in
+shade.
+* The `CONTRA_SCREENSHADOW` environment variable set to `0` returns to the per-object shadow draws.
 
 # Flip model presentation
 

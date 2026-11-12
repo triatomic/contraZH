@@ -496,7 +496,26 @@ Bool OptionPreferences::getPixelLightsEnabled(void) const
 
 Bool OptionPreferences::getPathTracingEnabled(void) const
 {
-	return getBool("PathTracing", FALSE);
+	return getPathTracingMode() != 0;
+}
+
+// Off, Quality or Fast. The yes and no of older files read as Quality and Off.
+Int OptionPreferences::getPathTracingMode(void) const
+{
+	OptionPreferences::const_iterator it = find("PathTracing");
+	if (it == end())
+	{
+		return 0;
+	}
+	if (stricmp(it->second.str(), "Fast") == 0)
+	{
+		return 2;
+	}
+	if (stricmp(it->second.str(), "Quality") == 0)
+	{
+		return 1;
+	}
+	return getBool("PathTracing", FALSE) ? 1 : 0;
 }
 
 Bool OptionPreferences::getAmbientOcclusionEnabled(void) const

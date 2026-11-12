@@ -256,6 +256,7 @@ static GameWindow *   checkDynamicLights          = nullptr;
 static NameKeyType    checkPixelLightsID          = NAMEKEY_INVALID;
 static GameWindow *   checkPixelLights            = nullptr;
 static GameWindow *   checkPathTracing            = nullptr;
+static GameWindow *   comboBoxPathTracing         = nullptr;
 static GameWindow *   checkDynamicLightsDebug     = nullptr;
 static GameWindow *   checkSoftParticles          = nullptr;
 static NameKeyType    checkAmbientOcclusionID     = NAMEKEY_INVALID;
@@ -273,7 +274,8 @@ static const char *const BuildTimerModeNames[] = { "None", "Seconds", "Auto" };
 static const char *const CastModeNames[] = { "Normal", "QuickCast", "QuickCastWithIndicator" };
 static const Int AnisotropyLevels[] = { 2, 4, 8, 16 };
 static const Int ShadowMapResolutions[] = { 512, 1024, 2048, 4096 };
-static const Int SuperSamplingPercents[] = { 100, 150, 200 };
+static const Int SuperSamplingPercents[] = { 100, 150, 200, WW3D::SUPER_SAMPLING_16K };
+static const char *const PathTracingModeNames[] = { "Off", "Quality", "Fast" };
 static const Int RenderFPSLimits[] = { 30, 60, 120, 240, 0 };
 static_assert( ARRAY_SIZE(HealthBarModeNames) == HealthBarDisplayMode_Count, "HealthBarModeNames out of date" );
 static const char *const AlliedDecalModeNames[] = { "Hidden", "House", "Army" };
@@ -608,8 +610,10 @@ static void updateGameOptionsEnables()
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
 #if defined(BUILD_WITH_D3D9)
 	enableWindow( checkPathTracing, getCheck( checkDynamicLights, TRUE ) && getCheck( checkPixelLights, TRUE ) );
+	enableWindow( comboBoxPathTracing, getCheck( checkDynamicLights, TRUE ) && getCheck( checkPixelLights, TRUE ) );
 #else
 	enableWindow( checkPathTracing, FALSE );
+	enableWindow( comboBoxPathTracing, FALSE );
 #endif
 	enableWindow( checkDynamicLightsDebug, getCheck( checkDynamicLights, TRUE ) && getCheck( checkPixelLights, TRUE ) );
 	// the specular pass also draws normal maps, so its debug tint shows while either is on
@@ -667,7 +671,9 @@ static void populateGameOptions()
 static void populateShaders()
 {
 	setComboPos( comboBoxShadows, levelIndex( ShadowMapResolutions, ARRAY_SIZE(ShadowMapResolutions), pref->getShadowMapResolution() ) );
-	setComboPos( comboBoxSuperSampling, levelIndex( SuperSamplingPercents, ARRAY_SIZE(SuperSamplingPercents), pref->getSuperSampling() ) );
+	// The device's own setting, because 16K is never saved and the file would show the entry before it
+	setComboPos( comboBoxSuperSampling, levelIndex( SuperSamplingPercents, ARRAY_SIZE(SuperSamplingPercents), WW3D::Get_Super_Sampling() ) );
+	setComboPos( comboBoxPathTracing, pref->getPathTracingMode() );
 	for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
 	{
 		GameWindow *check = *BoolOptions[i].check;
@@ -779,6 +785,7 @@ static void setDefaults()
 	showMaxCameraHeight( FALSE, (Int)TheGlobalData->m_defaultMaxCameraHeight );
 	setGameOptionsDefaults();
 	setComboPos( comboBoxShadows, ARRAY_SIZE(ShadowMapResolutions) - 1 );
+	setComboPos( comboBoxPathTracing, 0 );
 
 
 	Int valMin, valMax;
@@ -1239,12 +1246,25 @@ static void saveOptions()
 		(*pref)["CastMode"] = CastModeNames[idx];
 		TheWritableGlobalData->m_castMode = idx;
 
+		const Int savedPathTracing = pref->getPathTracingMode();
 		for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
 		{
 			const BoolOption &option = BoolOptions[i];
 			const Bool on = getCheck( *option.check, (pref->*option.read)() );
 			(*pref)[option.prefKey] = on ? "yes" : "no";
 			TheWritableGlobalData->*option.field = on;
+		}
+
+		// path tracing keeps its mode in the one key. A layout with only the checkbox turns on the mode last saved.
+		{
+			Int mode = TheGlobalData->m_usePathTracing ? max( savedPathTracing, 1 ) : 0;
+			if (comboBoxPathTracing)
+			{
+				mode = clamp( 0, getComboPos( comboBoxPathTracing, savedPathTracing ), (Int)ARRAY_SIZE(PathTracingModeNames) - 1 );
+			}
+			(*pref)["PathTracing"] = PathTracingModeNames[mode];
+			TheWritableGlobalData->m_usePathTracing = mode != 0;
+			TheWritableGlobalData->m_pathTracingFast = mode == 2;
 		}
 		WW3D::Set_Low_Latency( TheGlobalData->m_lowLatency != FALSE );
 		const Bool veterancyLevel = getCheck( checkVeterancyLevel, pref->getBool( "VeterancyLevel", FALSE ) );
@@ -1313,6 +1333,8 @@ static void saveOptions()
 	if (comboBoxSuperSampling)
 	{
 		Int percent = SuperSamplingPercents[getComboPos( comboBoxSuperSampling, 0 )];
+		// 16K lasts for this run alone, so choosing it leaves the file's percent as it is
+		const Bool saved = percent != WW3D::SUPER_SAMPLING_16K;
 		if (percent != WW3D::Get_Super_Sampling())
 		{
 			WW3D::Set_Super_Sampling( percent );
@@ -1320,9 +1342,12 @@ static void saveOptions()
 			percent = WW3D::Get_Super_Sampling();
 			TheWritableGlobalData->m_antiAliasLevel = (UnsignedInt)WW3D::Get_MSAA_Mode();
 		}
-		AsciiString prefString;
-		prefString.format( "%d", percent );
-		(*pref)["SuperSampling"] = prefString;
+		if (saved)
+		{
+			AsciiString prefString;
+			prefString.format( "%d", percent );
+			(*pref)["SuperSampling"] = prefString;
+		}
 		TheWritableGlobalData->m_superSampling = percent;
 	}
 
@@ -1807,9 +1832,8 @@ static GameWindow *createPathTracingCheck()
 	}
 	if (check != nullptr)
 	{
-		GadgetCheckBoxSetText( check, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:PathTracing", L"Path tracing" ) );
-		check->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( "TOOLTIP:PathTracing",
-			L"Particles, lasers and glowing lamps light nearby surfaces. Requires dynamic lights and per-pixel lights." ) );
+		GadgetCheckBoxSetText( check, TheGameText->fetch( "GUI:PathTracing" ) );
+		check->winSetTooltip( TheGameText->fetch( "TOOLTIP:PathTracing" ) );
 	}
 	return check;
 }
@@ -2037,7 +2061,10 @@ static void initGameOptionsWindows()
 static void initShadersWindows()
 {
 	WinShaders = findOptionsWindow( "OptionsMenu.wnd:WinShaders" );
-	checkPathTracing = createPathTracingCheck();
+
+	// A layout with the combo offers both modes, and one without it gets the checkbox made here.
+	comboBoxPathTracing = findOptionsWindow( "OptionsMenu.wnd:ComboBoxPathTracing" );
+	checkPathTracing = comboBoxPathTracing ? nullptr : createPathTracingCheck();
 	GameWindow *button = findOptionsWindow( "OptionsMenu.wnd:ButtonShaders", ButtonShadersID );
 	if (!WinShaders)
 	{
@@ -2063,6 +2090,10 @@ static void initShadersWindows()
 	setLabelText( "OptionsMenu.wnd:SuperSamplingLabel", "GUI:SuperSampling" );
 	setTooltip( comboBoxSuperSampling, "TOOLTIP:SuperSampling" );
 	addComboEntries( comboBoxSuperSampling, "GUI:SuperSampling", ARRAY_SIZE(SuperSamplingPercents) );
+
+	setLabelText( "OptionsMenu.wnd:PathTracingLabel", "GUI:PathTracing" );
+	setTooltip( comboBoxPathTracing, "TOOLTIP:PathTracing" );
+	addComboEntries( comboBoxPathTracing, "GUI:PathTracing", ARRAY_SIZE(PathTracingModeNames) );
 
 	// not every layout ships the panel hidden
 	WinShaders->winHide( TRUE );

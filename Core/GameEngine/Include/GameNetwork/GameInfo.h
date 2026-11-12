@@ -257,6 +257,8 @@ public:
   inline void setFreeRadar( Bool freeRadar );
   inline Bool getRevealMap() const;
   inline void setRevealMap( Bool revealMap );
+  inline Bool getAutoQueue() const;
+  inline void setAutoQueue( Bool autoQueue );
 
 protected:
 	Int m_preorderMask;
@@ -285,6 +287,7 @@ protected:
   Bool m_diplomacy; // Players may change their stance toward each other mid-match
   Bool m_freeRadar; // Every player has radar without a radar source
   Bool m_revealMap; // Every player sees the whole map from the start
+  Bool m_autoQueue; // Players may have producers build a unit whenever their queue is empty
 };
 
 extern GameInfo *TheGameInfo;
@@ -318,6 +321,8 @@ Bool        GameInfo::getFreeRadar() const              { return m_freeRadar; }
 void        GameInfo::setFreeRadar( Bool freeRadar )     { m_freeRadar = freeRadar; }
 Bool        GameInfo::getRevealMap() const              { return m_revealMap; }
 void        GameInfo::setRevealMap( Bool revealMap )     { m_revealMap = revealMap; }
+Bool        GameInfo::getAutoQueue() const              { return m_autoQueue; }
+void        GameInfo::setAutoQueue( Bool autoQueue )     { m_autoQueue = autoQueue; }
 
 AsciiString GameInfoToAsciiString( const GameInfo *game );
 Bool ParseAsciiStringToGameInfo( GameInfo *game, AsciiString options );

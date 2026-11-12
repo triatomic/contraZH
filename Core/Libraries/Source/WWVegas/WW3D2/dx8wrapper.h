@@ -318,6 +318,7 @@ public:
 	static void Clear(bool clear_color, bool clear_z_stencil, const Vector3 &color, float dest_alpha=0.0f, float z=1.0f, unsigned int stencil=0);
 
 	static void	Set_Viewport(CONST D3DVIEWPORT8* pViewport);
+	static void	Get_Viewport(D3DVIEWPORT8& viewport);
 
 	static void Set_Vertex_Buffer(const VertexBufferClass* vb, unsigned stream=0);
 	static void Set_Vertex_Buffer(const DynamicVBAccessClass& vba);
@@ -502,8 +503,15 @@ public:
 	static void Resolve_Scene_Target();
 
 	// Supersampling renders the scene this many times the back buffer's size each way, 1 to 2, and takes MSAA's place.
-	static void Set_Super_Sampling(float scale) { SuperSampleScale = (scale < 1.0f) ? 1.0f : (scale > 2.0f) ? 2.0f : scale; }
+	static void Set_Super_Sampling(float scale) { SuperSampleWidth = 0; SuperSampleScale = (scale < 1.0f) ? 1.0f : (scale > 2.0f) ? 2.0f : scale; }
 	static float Get_Super_Sampling() { return SuperSampleScale; }
+
+	// A scene width in pixels sets the scale from the back buffer's width, past the usual limit of 2. 0 is for none.
+	static void Set_Super_Sample_Width(unsigned width) { SuperSampleWidth = width; }
+	static unsigned Get_Super_Sample_Width() { return SuperSampleWidth; }
+
+	// The supersampled scene at its own size, which holds the last frame's world between frames, or null without supersampling
+	static IDirect3DSurface8 * _Peek_Scene_Target() { return (SuperSampleScale > 1.0f) ? SceneRenderTarget : nullptr; }
 
 	static IDirect3DSurface8 * _Create_DX8_Surface(unsigned int width, unsigned int height, WW3DFormat format);
 	static IDirect3DSurface8 * _Create_DX8_Surface(const char *filename);
@@ -609,7 +617,14 @@ public:
 	static void Set_Vertex_Shader_Constant(int reg, const void* data, int count);
 	static void Set_Pixel_Shader_Constant(int reg, const void* data, int count);
 
+	// What the wrapper last bound, for passes that write the device directly and put it back.
+	static DWORD Get_Pixel_Shader() { return Pixel_Shader; }
+	static const Vector4* Peek_Pixel_Shader_Constants(int reg) { return &Pixel_Shader_Constants[reg]; }
+
 	static DWORD Get_Vertex_Processing_Behavior() { return Vertex_Processing_Behavior; }
+
+	// A device created hardware or software keeps that mode for its lifetime. A mixed one can switch, so it reports false.
+	static bool Is_Hardware_Vertex_Processing() { return !(Vertex_Processing_Behavior & (D3DCREATE_SOFTWARE_VERTEXPROCESSING|D3DCREATE_MIXED_VERTEXPROCESSING)); }
 
 	// Needed by scene lighting class
 	static void						Set_Ambient(const Vector3& color);
@@ -633,6 +648,10 @@ public:
 	static const char* Get_DX8_Render_State_Name(D3DRENDERSTATETYPE state);
 	static const char* Get_DX8_Texture_Stage_State_Name(D3DTEXTURESTAGESTATETYPE state);
 	static unsigned Get_DX8_Render_State(D3DRENDERSTATETYPE state) { return RenderStates[state]; }
+
+	// The device's value, from the cache unless an invalidation dropped it. Not for states D3D9 takes translated.
+	static unsigned Get_Device_Render_State(D3DRENDERSTATETYPE state);
+	static unsigned Get_Device_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state);
 
 	// Names of the specific values of render states and texture stage states
 	static void Get_DX8_Texture_Stage_State_Value_Name(StringClass& name, D3DTEXTURESTAGESTATETYPE state, unsigned value);
@@ -706,6 +725,8 @@ protected:
 	// -1 keeps vsync on in fullscreen and off in a window, 0 turns it off, 1 on. A change resets a live device.
 	static void	Set_VSync_Mode(int mode);
 	static bool	Is_VSync_On() { return Choose_Present_Interval() != D3DPRESENT_INTERVAL_IMMEDIATE; }
+	// Rate in Hz at which Present paces frames, 0 while it does not wait for the display.
+	static unsigned	Get_VSync_Refresh_Rate() { return D3DDevice != nullptr ? VSyncRefreshRate : 0; }
 	// On keeps at most one frame queued ahead of the GPU; off leaves the driver's default. Direct3D 9 only.
 	static void	Set_Low_Latency(bool on);
 	static void Set_Polygon_Mode(int mode);
@@ -745,12 +766,15 @@ protected:
 	static bool								IsWindowed;
 	static int								VSyncMode;
 	static UINT Choose_Present_Interval();
+	static unsigned						VSyncRefreshRate;
+	static void Update_VSync_Refresh_Rate();
 	static bool								LowLatency;
 	static void Apply_Frame_Latency();
 	static void Release_Frame_Query();
 	static D3DFORMAT					DisplayFormat;
 	static D3DMULTISAMPLE_TYPE	MultiSampleAntiAliasing;
 	static float						SuperSampleScale;
+	static unsigned						SuperSampleWidth;
 
 
 	// shader system updates KJM v
@@ -811,6 +835,9 @@ protected:
 	static IDirect3DSurface8 *			DeviceDepthBuffer;
 	// True from the resolve to the next frame's start, while the back buffer is the target
 	static bool							SceneResolved;
+	// Each halves the one before it, so a scene far larger than the screen reaches it with every pixel counted
+	enum { MAX_SCENE_RESOLVE_STEPS = 4 };
+	static IDirect3DSurface8 *			SceneResolveSteps[MAX_SCENE_RESOLVE_STEPS];
 	static void Create_Scene_Target();
 	static void Create_Scene_Depth_Texture(unsigned width, unsigned height);
 	static void Release_Scene_Target();
@@ -941,7 +968,62 @@ WWINLINE void DX8Wrapper::_Set_DX8_Transform(D3DTRANSFORMSTATETYPE transform, co
 
 WWINLINE void DX8Wrapper::_Get_DX8_Transform(D3DTRANSFORMSTATETYPE transform, D3DMATRIX& m)
 {
-	DX8CALL(GetTransform(transform,&m));
+	// The world matrix is also written straight to the device, so its record cannot be trusted.
+	const bool recorded=transform==D3DTS_VIEW || transform==D3DTS_PROJECTION ||
+		(transform>=D3DTS_TEXTURE0 && transform<=D3DTS_TEXTURE7);
+	if (!recorded)
+	{
+		DX8CALL(GetTransform(transform,&m));
+		return;
+	}
+
+	// An invalidation zeroes the record, which no matrix in use is.
+	D3DMATRIX& known=DX8Transforms[transform];
+	const float* values=&known.m[0][0];
+	bool dropped=true;
+	for (int i=0;i<16;++i)
+	{
+		if (values[i]!=0.0f)
+		{
+			dropped=false;
+			break;
+		}
+	}
+	if (dropped)
+	{
+		DX8CALL(GetTransform(transform,&known));
+	}
+	m=known;
+}
+
+WWINLINE unsigned DX8Wrapper::Get_Device_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state)
+{
+	DWORD value=0;
+	if (stage>=MAX_TEXTURE_STAGES)
+	{
+		DX8CALL(GetTextureStageState(stage,state,&value));
+		return value;
+	}
+
+	// Invalidate_Cached_Render_States leaves this marker in every entry.
+	if (TextureStageStates[stage][(unsigned int)state]==0x12345678)
+	{
+		DX8CALL(GetTextureStageState(stage,state,&value));
+		TextureStageStates[stage][(unsigned int)state]=value;
+	}
+	return TextureStageStates[stage][(unsigned int)state];
+}
+
+WWINLINE unsigned DX8Wrapper::Get_Device_Render_State(D3DRENDERSTATETYPE state)
+{
+	// Invalidate_Cached_Render_States leaves this marker in every entry.
+	if (RenderStates[state]==0x12345678)
+	{
+		DWORD value=0;
+		DX8CALL(GetRenderState(state,&value));
+		RenderStates[state]=value;
+	}
+	return RenderStates[state];
 }
 
 // ----------------------------------------------------------------------------
@@ -1528,9 +1610,11 @@ WWINLINE void DX8Wrapper::Set_Projection_Transform_With_Z_Bias(const Matrix4x4& 
 		tmp_zbias*=(1.0f/16.0f);
 		tmp_zbias*=1.0f / (ZFar - ZNear);
 		tmp.m[2][2]-=tmp_zbias*tmp.m[3][2];
+		DX8Transforms[D3DTS_PROJECTION]=tmp;
 		DX8CALL(SetTransform(D3DTS_PROJECTION,&tmp));
 	}
 	else {
+		DX8Transforms[D3DTS_PROJECTION]=ProjectionMatrix;
 		DX8CALL(SetTransform(D3DTS_PROJECTION,&ProjectionMatrix));
 	}
 }
@@ -1553,12 +1637,17 @@ WWINLINE void DX8Wrapper::Set_Transform(D3DTRANSFORMSTATETYPE transform,const Ma
 			D3DMATRIX ProjectionMatrix=To_D3DMATRIX(m);
 			ZFar=0.0f;
 			ZNear=0.0f;
+			DX8Transforms[D3DTS_PROJECTION]=ProjectionMatrix;
 			DX8CALL(SetTransform(D3DTS_PROJECTION,&ProjectionMatrix));
 		}
 		break;
 	default:
 		DX8_RECORD_MATRIX_CHANGE();
 		D3DMATRIX dxm=To_D3DMATRIX(m);
+		if ((unsigned)transform<=D3DTS_WORLD)
+		{
+			DX8Transforms[transform]=dxm;
+		}
 		DX8CALL(SetTransform(transform,&dxm));
 		break;
 	}
@@ -1580,6 +1669,10 @@ WWINLINE void DX8Wrapper::Set_Transform(D3DTRANSFORMSTATETYPE transform,const Ma
 	default:
 		DX8_RECORD_MATRIX_CHANGE();
 		D3DMATRIX dxm=To_D3DMATRIX(m);
+		if ((unsigned)transform<=D3DTS_WORLD)
+		{
+			DX8Transforms[transform]=dxm;
+		}
 		DX8CALL(SetTransform(transform,&dxm));
 		break;
 	}
@@ -1608,7 +1701,7 @@ WWINLINE void DX8Wrapper::Get_Transform(D3DTRANSFORMSTATETYPE transform, Matrix4
 		break;
 	default:
 		D3DMATRIX dxm;
-		DX8CALL(GetTransform(transform,&dxm));
+		_Get_DX8_Transform(transform,dxm);
 		m=To_Matrix4x4(dxm);
 		break;
 	}

@@ -136,6 +136,11 @@ public:
 	*/
 	AsciiString(const AsciiString& stringSrc);
 	/**
+		Move constructor -- take over the other AsciiString's buffer
+		and leave it empty. No reference count changes, so no lock.
+	*/
+	AsciiString(AsciiString&& stringSrc) noexcept;
+	/**
 		Constructor -- from a literal string. Constructs an AsciiString
 		with the given string. Note that a copy of the string is made;
 		the input ptr is not saved.
@@ -377,6 +382,7 @@ public:
 //
 
 	AsciiString& operator=(const AsciiString& stringSrc);	///< the same as set()
+	AsciiString& operator=(AsciiString&& stringSrc) noexcept;	///< take over the buffer, leave the source empty
 	AsciiString& operator=(const char* s);				///< the same as set()
 
 	void debugIgnoreLeaks();
@@ -394,6 +400,13 @@ inline char* AsciiString::peek() const
 // -----------------------------------------------------
 inline AsciiString::AsciiString() : m_data(0)
 {
+	validate();
+}
+
+// -----------------------------------------------------
+inline AsciiString::AsciiString(AsciiString&& stringSrc) noexcept : m_data(stringSrc.m_data)
+{
+	stringSrc.m_data = nullptr;
 	validate();
 }
 
@@ -454,6 +467,19 @@ inline AsciiString& AsciiString::operator=(const AsciiString& stringSrc)
 {
 	validate();
 	set(stringSrc);
+	validate();
+	return *this;
+}
+
+// -----------------------------------------------------
+inline AsciiString& AsciiString::operator=(AsciiString&& stringSrc) noexcept
+{
+	if (&stringSrc != this)
+	{
+		releaseBuffer();
+		m_data = stringSrc.m_data;
+		stringSrc.m_data = nullptr;
+	}
 	validate();
 	return *this;
 }

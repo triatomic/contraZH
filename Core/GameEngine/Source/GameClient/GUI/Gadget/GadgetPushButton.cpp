@@ -607,6 +607,7 @@ PushButtonData * getNewPushButtonData()
 	p->ammoInClip = 0;
 	p->ammoClipSize = 0;
 	p->cornerLetter = 0;
+	p->autoQueue = FALSE;
 	return p;
 }
 
@@ -746,6 +747,27 @@ void GadgetButtonSetCornerLetter( GameWindow *g, Char letter )
 		pData = getNewPushButtonData();
 	}
 	pData->cornerLetter = letter;
+	g->winSetUserData(pData);
+
+}
+
+// GadgetButtonDrawAutoQueue ==================================================
+/** Mark the cameo of the unit its producer auto queues. One shot like the health bar. */
+//=============================================================================
+void GadgetButtonDrawAutoQueue( GameWindow *g )
+{
+
+	if( g == nullptr )
+	{
+		return;
+	}
+
+	PushButtonData *pData = (PushButtonData *)g->winGetUserData();
+	if( !pData )
+	{
+		pData = getNewPushButtonData();
+	}
+	pData->autoQueue = TRUE;
 	g->winSetUserData(pData);
 
 }

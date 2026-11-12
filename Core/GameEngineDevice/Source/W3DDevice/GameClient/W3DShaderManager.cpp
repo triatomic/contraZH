@@ -1561,6 +1561,103 @@ static Real Bind_Terrain_Emissive(Bool terrain)
 // The point lights draws may add, set once a frame by the scene. Each draw names its own.
 static std::vector<W3DShaderManager::PixelLight> PixelLights;
 static Int PixelLightCount = 0;
+
+// A key per light that sorts neighbours on the ground next to each other.
+static std::vector<UnsignedInt> PixelLightOrder;
+static const Real PIXEL_LIGHT_ORDER_CELL = 16.0f;
+
+// Past a handful of lights, those no wider than a cell sit in a ground grid by their centre and the rest in a list.
+static const Int PIXEL_LIGHT_GRID_MIN_LIGHTS = 32;
+static const Int PIXEL_LIGHT_GRID_MAX_SIDE = 128;
+static const Real PIXEL_LIGHT_GRID_MIN_CELL = 64.0f;
+static std::vector<Int> PixelLightGridStarts;
+static std::vector<Int> PixelLightGridLights;
+static std::vector<Int> PixelLightGridWide;
+static Int PixelLightGridWidth = 0;
+static Int PixelLightGridHeight = 0;
+static Real PixelLightGridCell = 0.0f;
+static Real PixelLightGridMinX = 0.0f;
+static Real PixelLightGridMinY = 0.0f;
+
+static Int Pixel_Light_Grid_Column(Real x)
+{
+	return (Int)min(max((x - PixelLightGridMinX) / PixelLightGridCell, 0.0f), (Real)(PixelLightGridWidth - 1));
+}
+
+static Int Pixel_Light_Grid_Row(Real y)
+{
+	return (Int)min(max((y - PixelLightGridMinY) / PixelLightGridCell, 0.0f), (Real)(PixelLightGridHeight - 1));
+}
+
+static void Build_Pixel_Light_Grid()
+{
+	PixelLightGridWidth = 0;
+	PixelLightGridHeight = 0;
+	PixelLightGridWide.clear();
+	if (PixelLightCount < PIXEL_LIGHT_GRID_MIN_LIGHTS)
+	{
+		return;
+	}
+
+	Real minX = PixelLights[0].position.X;
+	Real minY = PixelLights[0].position.Y;
+	Real maxX = minX;
+	Real maxY = minY;
+	for (Int i = 1; i < PixelLightCount; i++)
+	{
+		minX = min(minX, PixelLights[i].position.X);
+		minY = min(minY, PixelLights[i].position.Y);
+		maxX = max(maxX, PixelLights[i].position.X);
+		maxY = max(maxY, PixelLights[i].position.Y);
+	}
+	PixelLightGridMinX = minX;
+	PixelLightGridMinY = minY;
+	PixelLightGridCell = max(PIXEL_LIGHT_GRID_MIN_CELL, max(maxX - minX, maxY - minY) / (Real)PIXEL_LIGHT_GRID_MAX_SIDE);
+	PixelLightGridWidth = (Int)((maxX - minX) / PixelLightGridCell) + 1;
+	PixelLightGridHeight = (Int)((maxY - minY) / PixelLightGridCell) + 1;
+
+	// Counted first, so each cell's lights lie together in one array.
+	static std::vector<Int> cells;
+	cells.resize(PixelLightCount);
+	PixelLightGridStarts.assign(PixelLightGridWidth * PixelLightGridHeight + 1, 0);
+	for (Int i = 0; i < PixelLightCount; i++)
+	{
+		const W3DShaderManager::PixelLight &light = PixelLights[i];
+		if (light.outerRadius > PixelLightGridCell)
+		{
+			cells[i] = -1;
+			PixelLightGridWide.push_back(i);
+			continue;
+		}
+		cells[i] = Pixel_Light_Grid_Row(light.position.Y) * PixelLightGridWidth + Pixel_Light_Grid_Column(light.position.X);
+		PixelLightGridStarts[cells[i] + 1]++;
+	}
+	for (size_t cell = 1; cell < PixelLightGridStarts.size(); cell++)
+	{
+		PixelLightGridStarts[cell] += PixelLightGridStarts[cell - 1];
+	}
+	static std::vector<Int> next;
+	next.assign(PixelLightGridStarts.begin(), PixelLightGridStarts.end());
+	PixelLightGridLights.resize(PixelLightCount);
+	for (Int i = 0; i < PixelLightCount; i++)
+	{
+		if (cells[i] >= 0)
+		{
+			PixelLightGridLights[next[cells[i]]++] = i;
+		}
+	}
+}
+
+// Moves the low 16 bits apart, leaving a zero between each.
+static UnsignedInt Spread_Bits(UnsignedInt value)
+{
+	value &= 0x0000ffff;
+	value = (value | (value << 8)) & 0x00ff00ff;
+	value = (value | (value << 4)) & 0x0f0f0f0f;
+	value = (value | (value << 2)) & 0x33333333;
+	value = (value | (value << 1)) & 0x55555555;
+	return value;
+}
 enum { PIXEL_LIGHT_REGISTERS = W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + (W3DShaderManager::MAX_PIXEL_LIGHTS + 3) / 4 };
 static Bool TerrainPixelLightsLoaded = FALSE;
 static Bool UnitPixelLightsLoaded = FALSE;
@@ -1713,11 +1810,8 @@ static Int AdditionalLightRegister = 0;
 static D3DMATRIX AdditionalLightView;
 static Bool AdditionalLightsInView = FALSE;
 static DWORD AdditionalLightShader = 0;
-static IDirect3DPixelShader9 *SavedLightShader = nullptr;
-static Vector4 SavedLightConstants[PIXEL_LIGHT_REGISTERS];
-static const D3DRENDERSTATETYPE AdditionalLightStates[] = { D3DRS_ALPHABLENDENABLE, D3DRS_DESTBLEND, D3DRS_ZWRITEENABLE, D3DRS_FOGCOLOR, D3DRS_BLENDOP, D3DRS_SRCBLEND, D3DRS_SCISSORTESTENABLE };
+static const D3DRENDERSTATETYPE AdditionalLightStates[] = { D3DRS_ALPHABLENDENABLE, D3DRS_DESTBLEND, D3DRS_ZWRITEENABLE, D3DRS_FOGCOLOR, D3DRS_BLENDOP, D3DRS_SRCBLEND };
 static DWORD SavedLightStates[ARRAY_SIZE(AdditionalLightStates)];
-static RECT SavedLightScissor;
 static D3DVIEWPORT9 AdditionalLightViewport;
 static D3DMATRIX AdditionalLightWorldToClip;
 static Bool AdditionalLightScissor = FALSE;
@@ -1879,13 +1973,6 @@ static bool Additional_Light_Screen_Rect(size_t first, RECT &rectangle)
 			rectangle.bottom = max(rectangle.bottom, lightRectangle.bottom);
 		}
 	}
-	if (SavedLightStates[ARRAY_SIZE(AdditionalLightStates) - 1])
-	{
-		rectangle.left = max(rectangle.left, SavedLightScissor.left);
-		rectangle.top = max(rectangle.top, SavedLightScissor.top);
-		rectangle.right = min(rectangle.right, SavedLightScissor.right);
-		rectangle.bottom = min(rectangle.bottom, SavedLightScissor.bottom);
-	}
 	return rectangle.left < rectangle.right && rectangle.top < rectangle.bottom;
 }
 
@@ -1895,27 +1982,25 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 	const Int registers = AdditionalLightSlots * 2 + (AdditionalLightSlots + 3) / 4;
 	if (pass == 1)
 	{
-		// Direct device writes keep the wrapper's cached base-pass state unchanged.
-		device->GetPixelShader(&SavedLightShader);
-		if (SavedLightShader == nullptr)
+		// Direct device writes leave the wrapper's record of the base pass intact, and the device goes back to it afterwards.
+		if (Peek_D3D9_Pixel_Shader(DX8Wrapper::Get_Pixel_Shader()) == nullptr)
 		{
 			return false;
 		}
-		device->GetPixelShaderConstantF(AdditionalLightRegister, &SavedLightConstants[0].X, registers);
 		for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
 		{
-			device->GetRenderState(AdditionalLightStates[i], &SavedLightStates[i]);
+			SavedLightStates[i] = DX8Wrapper::Get_Device_Render_State(AdditionalLightStates[i]);
 		}
-		DWORD colorWrite = 0;
-		D3DMATRIX view, projection;
-		AdditionalLightScissor = SUCCEEDED(device->GetScissorRect(&SavedLightScissor)) &&
-			SUCCEEDED(device->GetViewport(&AdditionalLightViewport)) &&
-			SUCCEEDED(device->GetTransform(D3DTS_VIEW, &view)) &&
-			SUCCEEDED(device->GetTransform(D3DTS_PROJECTION, &projection)) &&
-			SUCCEEDED(device->GetRenderState(D3DRS_COLORWRITEENABLE, &colorWrite)) &&
-			(colorWrite & D3DCOLORWRITEENABLE_ALPHA) == 0;
+		AdditionalLightScissor = (DX8Wrapper::Get_Device_Render_State(D3DRS_COLORWRITEENABLE) & D3DCOLORWRITEENABLE_ALPHA) == 0;
 		if (AdditionalLightScissor)
 		{
+			D3DMATRIX view, projection;
+			DX8Wrapper::Get_Viewport(AdditionalLightViewport);
+			DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
+			if (!AdditionalLightsInView)
+			{
+				DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+			}
 			AdditionalLightWorldToClip = (AdditionalLightsInView ? AdditionalLightView : view) * projection;
 		}
 		AdditionalLightNext = AdditionalLightSlots;
@@ -1940,33 +2025,22 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 	}
 	if (first >= AdditionalLightIndices.size())
 	{
-		if (SavedLightShader != nullptr)
+		device->SetPixelShader(Peek_D3D9_Pixel_Shader(DX8Wrapper::Get_Pixel_Shader()));
+		device->SetPixelShaderConstantF(AdditionalLightRegister, &DX8Wrapper::Peek_Pixel_Shader_Constants(AdditionalLightRegister)->X, registers);
+		for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
 		{
-			device->SetPixelShader(SavedLightShader);
-			SAFE_RELEASE(SavedLightShader);
-			device->SetPixelShaderConstantF(AdditionalLightRegister, &SavedLightConstants[0].X, registers);
-			for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
-			{
-				device->SetRenderState(AdditionalLightStates[i], SavedLightStates[i]);
-			}
-			if (AdditionalLightScissor)
-			{
-				device->SetScissorRect(&SavedLightScissor);
-			}
+			device->SetRenderState(AdditionalLightStates[i], SavedLightStates[i]);
+		}
+		// No other draw scissors, so off is the state to leave behind.
+		if (AdditionalLightScissor)
+		{
+			device->SetRenderState(D3DRS_SCISSORTESTENABLE, FALSE);
 		}
 		return false;
 	}
 	if (AdditionalLightScissor)
 	{
-		if (SUCCEEDED(device->SetScissorRect(&rectangle)))
-		{
-			device->SetRenderState(D3DRS_SCISSORTESTENABLE, TRUE);
-		}
-		else
-		{
-			device->SetScissorRect(&SavedLightScissor);
-			device->SetRenderState(D3DRS_SCISSORTESTENABLE, SavedLightStates[ARRAY_SIZE(AdditionalLightStates) - 1]);
-		}
+		device->SetRenderState(D3DRS_SCISSORTESTENABLE, SUCCEEDED(device->SetScissorRect(&rectangle)) ? TRUE : FALSE);
 	}
 	AdditionalLightNext = first + AdditionalLightSlots;
 	Vector4 constants[PIXEL_LIGHT_REGISTERS];
@@ -1974,6 +2048,15 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 		(Int)(AdditionalLightIndices.size() - first), AdditionalLightsInView ? &AdditionalLightView : nullptr);
 	device->SetPixelShaderConstantF(AdditionalLightRegister, &constants[0].X, registers);
 	return true;
+}
+#endif
+
+#if defined(BUILD_WITH_D3D9)
+static bool Pixel_Light_Nearer_First(Int a, Int b)
+{
+	const UnsignedInt keyA = (a >= 0 && a < (Int)PixelLightOrder.size()) ? PixelLightOrder[a] : 0xffffffff;
+	const UnsignedInt keyB = (b >= 0 && b < (Int)PixelLightOrder.size()) ? PixelLightOrder[b] : 0xffffffff;
+	return keyA < keyB;
 }
 #endif
 
@@ -1994,6 +2077,9 @@ static void Set_Additional_Pixel_Lights(DWORD shader, const Int *indices, Int co
 	{
 		AdditionalLightIndices[i] = indices != nullptr ? indices[i] : i;
 	}
+
+	// Each extra pass scissors to its lights, so neighbours share a pass and it shades a small area.
+	std::sort(AdditionalLightIndices.begin() + slots, AdditionalLightIndices.end(), Pixel_Light_Nearer_First);
 	AdditionalLightSlots = slots;
 	AdditionalLightRegister = firstRegister;
 	AdditionalLightShader = shader;
@@ -2302,21 +2388,15 @@ void ShadowDepthShader::applyOverride(const ShaderClass &shader)
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
 
 	const ShaderClass::SrcBlendFuncType src = shader.Get_Src_Blend_Func();
-	const ShaderClass::DstBlendFuncType dst = shader.Get_Dst_Blend_Func();
 
 	// Alpha decides the shape only where the mesh's own shader cuts or blends by it. Many
 	// opaque textures carry masks in alpha, so testing those would punch holes in shadows.
-	Bool casts = TRUE;
 	Bool cutout = FALSE;
 	Bool inverted = (src == ShaderClass::SRCBLEND_ONE_MINUS_SRC_ALPHA);
 
 	// Additive and multiplied passes are glows and effects, which cast nothing, even when they fade by alpha.
-	if (src == ShaderClass::SRCBLEND_ZERO || dst == ShaderClass::DSTBLEND_ONE ||
-		dst == ShaderClass::DSTBLEND_SRC_COLOR || dst == ShaderClass::DSTBLEND_ONE_MINUS_SRC_COLOR)
-	{
-		casts = FALSE;
-	}
-	else if (shader.Uses_Alpha())
+	const Bool casts = DX8MeshRendererClass::Casts_Shadow(shader);
+	if (casts && shader.Uses_Alpha())
 	{
 		cutout = TRUE;
 	}
@@ -2782,7 +2862,7 @@ Int SpecularShader::set(Int pass)
 
 	// The shader lights in camera space, so the sun is turned into it with the view's rotation.
 	D3DMATRIX view;
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
 	SpecularLightView = view;
 	Vector3 toSun(
 		SpecularToSun.X * view.m[0][0] + SpecularToSun.Y * view.m[1][0] + SpecularToSun.Z * view.m[2][0],
@@ -3208,6 +3288,7 @@ public:
 		m_lights.count = 0;
 		m_lights.lightsOnly = FALSE;
 		m_lights.receivesShadow = receivesShadow;
+		Enable_On_Sorted_Meshes(false);
 	}
 
 	/// Makes this a copy of key for one object, adding that object's lights and the shadow receiver's work.
@@ -3297,10 +3378,24 @@ void W3DShaderManager::setPixelLights(const PixelLight *lights, Int count)
 {
 	PixelLightCount = count;
 	PixelLights.resize(count);
+	Real minX = 0.0f;
+	Real minY = 0.0f;
 	for (Int i = 0; i < PixelLightCount; i++)
 	{
 		PixelLights[i] = lights[i];
+		minX = (i == 0) ? lights[i].position.X : min(minX, lights[i].position.X);
+		minY = (i == 0) ? lights[i].position.Y : min(minY, lights[i].position.Y);
 	}
+
+	// Interleaving the bits of each light's ground cell gives a key that keeps nearby cells together.
+	PixelLightOrder.resize(count);
+	for (Int i = 0; i < PixelLightCount; i++)
+	{
+		const UnsignedInt cellX = (UnsignedInt)min((lights[i].position.X - minX) / PIXEL_LIGHT_ORDER_CELL, 65535.0f);
+		const UnsignedInt cellY = (UnsignedInt)min((lights[i].position.Y - minY) / PIXEL_LIGHT_ORDER_CELL, 65535.0f);
+		PixelLightOrder[i] = Spread_Bits(cellX) | (Spread_Bits(cellY) << 1);
+	}
+	Build_Pixel_Light_Grid();
 	ObjectSpecularPassesUsed = 0;
 	Update_Lights_Debug();
 }
@@ -3313,6 +3408,39 @@ Int W3DShaderManager::getPixelLightCount()
 const W3DShaderManager::PixelLight &W3DShaderManager::getPixelLight(Int index)
 {
 	return PixelLights[index];
+}
+
+void W3DShaderManager::gatherPixelLights(Real minX, Real minY, Real maxX, Real maxY, std::vector<Int> &lights)
+{
+	lights.clear();
+	if (PixelLightGridWidth == 0)
+	{
+		for (Int i = 0; i < PixelLightCount; i++)
+		{
+			lights.push_back(i);
+		}
+		return;
+	}
+
+	// A light in the grid reaches no further than a cell, so the box grows by one cell each way.
+	const Real reach = PixelLightGridCell;
+	const Real gridMaxX = PixelLightGridMinX + PixelLightGridWidth * PixelLightGridCell;
+	const Real gridMaxY = PixelLightGridMinY + PixelLightGridHeight * PixelLightGridCell;
+	if (maxX + reach >= PixelLightGridMinX && minX - reach <= gridMaxX && maxY + reach >= PixelLightGridMinY && minY - reach <= gridMaxY)
+	{
+		const Int x0 = Pixel_Light_Grid_Column(minX - reach);
+		const Int x1 = Pixel_Light_Grid_Column(maxX + reach);
+		const Int y0 = Pixel_Light_Grid_Row(minY - reach);
+		const Int y1 = Pixel_Light_Grid_Row(maxY + reach);
+		for (Int y = y0; y <= y1; y++)
+		{
+			const Int first = PixelLightGridStarts[y * PixelLightGridWidth + x0];
+			const Int last = PixelLightGridStarts[y * PixelLightGridWidth + x1 + 1];
+			lights.insert(lights.end(), PixelLightGridLights.begin() + first, PixelLightGridLights.begin() + last);
+		}
+	}
+	lights.insert(lights.end(), PixelLightGridWide.begin(), PixelLightGridWide.end());
+	std::sort(lights.begin(), lights.end());
 }
 
 void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
@@ -3417,9 +3545,12 @@ void W3DShaderManager::filterPixelLights(const AABoxClass &box, std::vector<Int>
 
 Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &lights)
 {
+	static std::vector<Int> nearby;
+	gatherPixelLights(box.Center.X - box.Extent.X, box.Center.Y - box.Extent.Y, box.Center.X + box.Extent.X, box.Center.Y + box.Extent.Y, nearby);
 	lights.clear();
-	for (Int index = 0; index < PixelLightCount; index++)
+	for (size_t i = 0; i < nearby.size(); i++)
 	{
+		const Int index = nearby[i];
 		const PixelLight &light = PixelLights[index];
 		if (light.objectsOnly)
 		{
@@ -3438,9 +3569,12 @@ Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &l
 
 Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)
 {
+	static std::vector<Int> nearby;
+	gatherPixelLights(box.Center.X - box.Extent.X, box.Center.Y - box.Extent.Y, box.Center.X + box.Extent.X, box.Center.Y + box.Extent.Y, nearby);
 	Int count = 0;
-	for (Int index = 0; index < PixelLightCount && count < MAX_PIXEL_LIGHTS; index++)
+	for (size_t i = 0; i < nearby.size() && count < MAX_PIXEL_LIGHTS; i++)
 	{
+		const Int index = nearby[i];
 		const PixelLight &light = PixelLights[index];
 		if (light.objectsOnly)
 		{
@@ -5129,7 +5263,7 @@ static Bool bindCloudTexture(Int stage, D3DMATRIX &cameraToCloud)
 
 	// The wrapper's view copy is zeroed by every invalidate, so the device's is read.
 	D3DMATRIX view;
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
 
 	D3DMATRIX inverseView;
 	float det;
@@ -5137,6 +5271,11 @@ static Bool bindCloudTexture(Int stage, D3DMATRIX &cameraToCloud)
 
 	terrainShader2Stage.updateNoise1(&cameraToCloud, &inverseView, false);
 	return TRUE;
+}
+
+Bool W3DShaderManager::bindCloudMap(Int stage, D3DMATRIX &cameraToCloud)
+{
+	return UnitCloudsEnabled && bindCloudTexture(stage, cameraToCloud);
 }
 
 // Projects the terrain's cloud map onto a fixed-function receiver, the way the terrain samples it.
@@ -6406,7 +6545,7 @@ IDirect3DTexture8 *W3DShaderManager::getRenderTexture()
 	return m_renderTexture;
 }
 
-Bool W3DShaderManager::copyRenderTarget(IDirect3DTexture8 *&copy)
+Bool W3DShaderManager::copyRenderTarget(IDirect3DTexture8 *&copy, const RECT *area)
 {
 #if defined(BUILD_WITH_D3D9)
 	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
@@ -6435,18 +6574,24 @@ Bool W3DShaderManager::copyRenderTarget(IDirect3DTexture8 *&copy)
 		return FALSE;
 	}
 
-	// StretchRect also resolves a multisampled target.
+	// StretchRect also resolves a multisampled target, but only as a whole.
+	if (targetDesc.MultiSampleType != D3DMULTISAMPLE_NONE)
+	{
+		area = nullptr;
+	}
+
 	IDirect3DSurface8 *copySurface = nullptr;
 	Bool copied = FALSE;
 	if (SUCCEEDED(copy->GetSurfaceLevel(0, &copySurface)))
 	{
-		copied = SUCCEEDED(device->StretchRect(target, nullptr, copySurface, nullptr, D3DTEXF_NONE));
+		copied = SUCCEEDED(device->StretchRect(target, area, copySurface, area, D3DTEXF_NONE));
 		copySurface->Release();
 	}
 	target->Release();
 	return copied;
 #else
 	(void)copy;
+	(void)area;
 	return FALSE;
 #endif
 }
@@ -6463,7 +6608,7 @@ Real W3DShaderManager::getScreenToTargetScale()
 Vector4 W3DShaderManager::getClipToTargetMapping(Real width, Real height)
 {
 	D3DVIEWPORT8 viewport;
-	DX8Wrapper::_Get_D3D_Device8()->GetViewport(&viewport);
+	DX8Wrapper::Get_Viewport(viewport);
 	return Vector4(0.5f * viewport.Width / width, -0.5f * viewport.Height / height,
 		(viewport.X + 0.5f * viewport.Width + 0.5f) / width, (viewport.Y + 0.5f * viewport.Height + 0.5f) / height);
 }
@@ -7393,7 +7538,7 @@ Int FlatTerrainShaderPixelShader::set(Int pass)
 		Set_Terrain_World_Position(m_lightStage);
 		Begin_Draw_Pixel_Lights(unlitShaders[textureCount - 1], m_dwLitPixelShader[textureCount - 1]);
 	}
-	DX8Wrapper::_Get_D3D_Device8()->SetRenderState(D3DRS_ALPHABLENDENABLE, false);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, FALSE);
 	DX8Wrapper::Apply_Render_State_Changes();
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(curStage, W3DShaderManager::getShaderTexture(3)->Peek_D3D_Texture());
 	return TRUE;

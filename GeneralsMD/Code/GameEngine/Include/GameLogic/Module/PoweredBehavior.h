@@ -40,7 +40,13 @@ public:
 	Bool	m_disableWeapon;	///< Yes = cannot attack while out of power
 	Real	m_movePenalty;		///< share of move speed lost while out of power, 1.0 or more immobilizes
 	Real	m_liftPenalty;		///< share of lift lost while out of power, for hovering units
+	// A weapon penalty of 1.0 or more disables the weapon.
+	Real	m_damagePenalty;	///< share of weapon damage lost while out of power
+	Real	m_rateOfFirePenalty;	///< share of rate of fire lost while out of power
+	Real	m_rangePenalty;		///< share of weapon range lost while out of power
 	AsciiString	m_iconName;	///< Animation block shown over the object while out of power
+
+	virtual Bool takesOverPowerDisable() const override { return true; }
 
 	static void buildFieldParse(MultiIniFieldParse& p);
 };
@@ -72,6 +78,7 @@ protected:
 
 	Bool									m_powered;
 	ObjectStatusMaskType	m_appliedStatus;	///< status bits this module set, so only those get cleared
+	Bool									m_clearOldDisable;	///< a version 1 save can hold the KINDOF_POWERED disable this module replaces
 
 };
 

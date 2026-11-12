@@ -233,6 +233,28 @@ public:
 	static void releaseACellInfo(PathfindCellInfo *theInfo);
 	static Int getFreeCount() {return s_freeCount;}
 
+	// Orders the open list. On equal totals the cell further along its path sorts first.
+	Bool operator<(const PathfindCellInfo& other) const
+	{
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING)
+		if (m_totalCost == other.m_totalCost)
+		{
+			return m_costSoFar > other.m_costSoFar;
+		}
+#endif
+		return m_totalCost < other.m_totalCost;
+	}
+
+	// Open-list order for one insert. Without breakTies, equal totals stay first in, first out.
+	Bool sortsBefore(const PathfindCellInfo& other, Bool breakTies) const
+	{
+		if (breakTies)
+		{
+			return *this < other;
+		}
+		return m_totalCost < other.m_totalCost;
+	}
+
 protected:
 	static PathfindCellInfo *s_infoArray;
 	static PathfindCellInfo *s_firstFree;							///<
@@ -350,18 +372,18 @@ public:
 	UnsignedInt costSoFar( PathfindCell *parent );
 
 #if RETAIL_COMPATIBLE_PATHFINDING
-	// Forward insertion sort that is 100% retail compatible
-	void forwardInsertionSortRetailCompatible(PathfindCellList& list);
+	// Forward insertion sort with the retail crash guards; its order matches retail in vanilla Generals only
+	void forwardInsertionSortRetailCompatible(PathfindCellList& list, Bool breakTies);
 #endif
 
 	// Forward insertion sort, in ascending cost order
-	void forwardInsertionSort(PathfindCellList& list);
+	void forwardInsertionSort(PathfindCellList& list, Bool breakTies);
 
 	// Reverse insertion sort, in ascending cost order
-	void reverseInsertionSort(PathfindCellList& list);
+	void reverseInsertionSort(PathfindCellList& list, Bool breakTies);
 
-	/// put self on "open" list in ascending cost order
-	void putOnSortedOpenList( PathfindCellList &list );
+	/// put self on "open" list in ascending cost order; pass breakTies false when total cost is not cost so far plus an estimate
+	void putOnSortedOpenList( PathfindCellList &list, Bool breakTies = true );
 
 	/// remove self from "open" list
 	void removeFromOpenList( PathfindCellList &list );
@@ -441,6 +463,9 @@ public:
 	PathfindLayerEnum getUnderDestroyedBridgeLayer( void ) const;
 
 private:
+	/// Cost of the shortest unobstructed 8-way walk between two cells
+	static Int octileDistance( PathfindCell *start, PathfindCell *finish );
+
 	PathfindCellInfo *m_info;
 	ObjectID m_obstacleID;	                  ///< the object ID who overlaps this cell
 	UnsignedInt m_blockedByAlly : 1;          ///< True if this cell is blocked by an allied unit.

@@ -1755,8 +1755,8 @@ Bool PathfindCell::removeObstacle( Object *obstacle )
 }
 
 #if RETAIL_COMPATIBLE_PATHFINDING
-// Retail compatible insertion sort
-void PathfindCell::forwardInsertionSortRetailCompatible(PathfindCellList& list)
+// Insertion sort with the retail crash guards
+void PathfindCell::forwardInsertionSortRetailCompatible(PathfindCellList& list, Bool breakTies)
 {
 	DEBUG_ASSERTCRASH(m_info, ("Has to have info."));
 	DEBUG_ASSERTCRASH(m_info->m_closed==FALSE && m_info->m_open==FALSE, ("Serious error - Invalid flags. jba"));
@@ -1777,7 +1777,7 @@ void PathfindCell::forwardInsertionSortRetailCompatible(PathfindCellList& list)
 	PathfindCell* currentCell = list.m_head;
 	PathfindCell* previousCell = nullptr;
 	UnsignedInt cellCount = 0;
-	while (currentCell && cellCount < PATHFIND_CELLS_PER_FRAME && currentCell->m_info->m_totalCost <= m_info->m_totalCost)
+	while (currentCell && cellCount < PATHFIND_CELLS_PER_FRAME && !m_info->sortsBefore(*currentCell->m_info, breakTies))
 	{
 		// Prevent a retail crash where a pathfindCell has an m_info with a dangling nextOpen pointer
 		if (currentCell->m_info->m_nextOpen && !currentCell->m_info->m_nextOpen->m_cell->m_info)
@@ -1816,7 +1816,7 @@ void PathfindCell::forwardInsertionSortRetailCompatible(PathfindCellList& list)
 #endif
 
 // Forward insertion sort, returns early if the list is being initialized or we are prepending the list
-void PathfindCell::forwardInsertionSort(PathfindCellList& list)
+void PathfindCell::forwardInsertionSort(PathfindCellList& list, Bool breakTies)
 {
 	DEBUG_ASSERTCRASH(m_info, ("Has to have info."));
 	DEBUG_ASSERTCRASH(m_info->m_closed == FALSE && m_info->m_open == FALSE, ("Serious error - Invalid flags. jba"));
@@ -1834,7 +1834,7 @@ void PathfindCell::forwardInsertionSort(PathfindCellList& list)
 	}
 
 	// If the node needs inserting before the current list head
-	if (m_info->m_totalCost < list.m_head->m_info->m_totalCost) {
+	if (m_info->sortsBefore(*list.m_head->m_info, breakTies)) {
 		m_info->m_prevOpen = nullptr;
 		list.m_head->m_info->m_prevOpen = this->m_info;
 		m_info->m_nextOpen = list.m_head->m_info;
@@ -1844,7 +1844,7 @@ void PathfindCell::forwardInsertionSort(PathfindCellList& list)
 
 	// Traverse the list to find correct position
 	PathfindCell* current = list.m_head;
-	while (current->m_info->m_nextOpen && current->m_info->m_nextOpen->m_totalCost <= m_info->m_totalCost) {
+	while (current->m_info->m_nextOpen && !m_info->sortsBefore(*current->m_info->m_nextOpen, breakTies)) {
 		current = current->getNextOpen();
 	}
 
@@ -1862,7 +1862,7 @@ void PathfindCell::forwardInsertionSort(PathfindCellList& list)
 }
 
 // Reverse insertion sort, returns early if the list is being initialized or we are appending the list
-void PathfindCell::reverseInsertionSort(PathfindCellList& list)
+void PathfindCell::reverseInsertionSort(PathfindCellList& list, Bool breakTies)
 {
 	DEBUG_ASSERTCRASH(m_info, ("Has to have info."));
 	DEBUG_ASSERTCRASH(m_info->m_closed == FALSE && m_info->m_open == FALSE, ("Serious error - Invalid flags. jba"));
@@ -1880,7 +1880,7 @@ void PathfindCell::reverseInsertionSort(PathfindCellList& list)
 	}
 
 	// If the node needs inserting after the current list tail
-	if (m_info->m_totalCost >= list.m_tail->m_info->m_totalCost) {
+	if (!m_info->sortsBefore(*list.m_tail->m_info, breakTies)) {
 		m_info->m_prevOpen = list.m_tail->m_info;
 		list.m_tail->m_info->m_nextOpen = this->m_info;
 		m_info->m_nextOpen = nullptr;
@@ -1890,7 +1890,7 @@ void PathfindCell::reverseInsertionSort(PathfindCellList& list)
 
 	// Traverse the list to find correct position
 	PathfindCell* current = list.m_tail;
-	while (current->m_info->m_prevOpen && current->m_info->m_prevOpen->m_totalCost > m_info->m_totalCost) {
+	while (current->m_info->m_prevOpen && m_info->sortsBefore(*current->m_info->m_prevOpen, breakTies)) {
 		current = current->getPrevOpen();
 	}
 
@@ -1908,11 +1908,11 @@ void PathfindCell::reverseInsertionSort(PathfindCellList& list)
 }
 
 /// put self on "open" list in ascending cost order, return new list
-void PathfindCell::putOnSortedOpenList( PathfindCellList &list )
+void PathfindCell::putOnSortedOpenList( PathfindCellList &list, Bool breakTies )
 {
 #if RETAIL_COMPATIBLE_PATHFINDING
 	if (!s_useFixedPathfinding) {
-		forwardInsertionSortRetailCompatible(list);
+		forwardInsertionSortRetailCompatible(list, breakTies);
 		return;
 	}
 #endif
@@ -1921,10 +1921,10 @@ void PathfindCell::putOnSortedOpenList( PathfindCellList &list )
 	// Long and complex paths often append PathfindCell's, with high total path costs, to the open list.
 	// Appending and reverse traversal allow faster insertion of these cells, reducing pathfinding overhead by 50 - 66%.
 	if (list.canReverseSort(*this)) {
-		reverseInsertionSort(list);
+		reverseInsertionSort(list, breakTies);
 	}
 	else {
-		forwardInsertionSort(list);
+		forwardInsertionSort(list, breakTies);
 	}
 }
 
@@ -2137,8 +2137,27 @@ const Int CLEARANCE_SOFT_COST = 4*COST_ORTHOGONAL; // Step cost when the footpri
 const Real COST_TO_DISTANCE_FACTOR = 1.0f/10.0f;
 const Real COST_TO_DISTANCE_FACTOR_SQR = COST_TO_DISTANCE_FACTOR*COST_TO_DISTANCE_FACTOR;
 
+Int PathfindCell::octileDistance( PathfindCell *start, PathfindCell *finish )
+{
+	DEBUG_ASSERTCRASH(start->m_info && finish->m_info, ("Has to have info."));
+	Int dx = abs(start->getXIndex() - finish->getXIndex());
+	Int dy = abs(start->getYIndex() - finish->getYIndex());
+	Int longSide = dx;
+	Int shortSide = dy;
+	if (dy > dx)
+	{
+		longSide = dy;
+		shortSide = dx;
+	}
+
+	return COST_ORTHOGONAL*longSide + (COST_DIAGONAL - COST_ORTHOGONAL)*shortSide;
+}
+
 UnsignedInt PathfindCell::costToGoal( PathfindCell *goal )
 {
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING)
+	return octileDistance(this, goal);
+#else
 	DEBUG_ASSERTCRASH(m_info, ("Has to have info."));
 	Int dx = m_info->m_pos.x - goal->getXIndex();
 	Int dy = m_info->m_pos.y - goal->getYIndex();
@@ -2159,6 +2178,7 @@ UnsignedInt PathfindCell::costToGoal( PathfindCell *goal )
 
 
 	return cost;
+#endif
 }
 
 UnsignedInt PathfindCell::costToHierGoal( PathfindCell *goal )
@@ -7307,7 +7327,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 				newCell->removeFromOpenList( m_openList );
 
 			// insert newCell in open list such that open list is sorted, smallest total path cost first
-			newCell->putOnSortedOpenList( m_openList );
+			newCell->putOnSortedOpenList( m_openList, !m_isTunneling );
 		}
 	return freeCellsAtStart - PathfindCellInfo::getFreeCount();
 }
@@ -8648,7 +8668,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 			startCell->setTotalCost(remCost);
 			startCell->setParentCellHierarchical(parentCell);
 			// insert newCell in open list such that open list is sorted, smallest total path cost first
-			startCell->putOnSortedOpenList( m_openList );
+			startCell->putOnSortedOpenList( m_openList, false );
 
 			cellCount++;
 			if(!cell->allocateInfo(toNdx)) {
@@ -8673,7 +8693,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 			cell->setTotalCost(remCost);
 			cell->setParentCellHierarchical(parentCell);
 			// insert newCell in open list such that open list is sorted, smallest total path cost first
-			cell->putOnSortedOpenList( m_openList );
+			cell->putOnSortedOpenList( m_openList, false );
 		}
 	}
 

@@ -966,6 +966,7 @@ GlobalData::GlobalData()
   m_useDynamicLights = TRUE;
   m_usePixelLights = TRUE;
   m_usePathTracing = FALSE;
+  m_pathTracingFast = FALSE;
   m_useAmbientOcclusion = FALSE;
   m_useHeightBlend = TRUE;
   m_useHQSky = TRUE;
@@ -2132,6 +2133,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_usePixelLights = optionPref.getPixelLightsEnabled();
 	TheWritableGlobalData->m_usePathTracing = optionPref.getPathTracingEnabled();
+	TheWritableGlobalData->m_pathTracingFast = optionPref.getPathTracingMode() == 2;
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
 	TheWritableGlobalData->m_useHeightBlend = optionPref.getHeightBlendEnabled();
 	TheWritableGlobalData->m_useHQSky = optionPref.getHQSkyEnabled();

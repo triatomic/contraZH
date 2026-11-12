@@ -81,6 +81,7 @@ void GadgetButtonDrawCountdown( GameWindow *g, Int seconds );
 void GadgetButtonDrawHealthBar( GameWindow *g, Real ratio );
 void GadgetButtonDrawAmmoBar( GameWindow *g, Int ammoInClip, Int clipSize );
 void GadgetButtonSetCornerLetter( GameWindow *g, Char letter );
+void GadgetButtonDrawAutoQueue( GameWindow *g );
 void GadgetButtonDrawOverlayImage( GameWindow *g, const Image *image );
 void GadgetButtonSetBorder( GameWindow *g, Color color, Bool drawBorder = TRUE );
 void GadgetButtonSetData(GameWindow *g, void *data);

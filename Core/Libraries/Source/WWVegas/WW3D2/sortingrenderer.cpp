@@ -42,6 +42,7 @@
 #include "dx8vertexbuffer.h"
 #include "dx8indexbuffer.h"
 #include "dx8wrapper.h"
+#include "dx8renderer.h"
 #include "vertmaterial.h"
 #include "texture.h"
 #include "dx8compat.h"
@@ -468,6 +469,18 @@ static TempIndexStruct* Get_Temp_Index_Array(unsigned count)
 //
 // ----------------------------------------------------------------------------
 
+// The shadow depth pass writes neither depth nor colour for a blend that casts nothing, so its draw would do nothing.
+static bool Is_Dead_Shadow_Depth_Draw()
+{
+	if (DX8MeshRendererClass::Get_Stats_Scene() != DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH)
+	{
+		return false;
+	}
+	ShaderClass shader;
+	DX8Wrapper::Get_Shader(shader);
+	return !DX8MeshRendererClass::Casts_Shadow(shader);
+}
+
 void SortingRendererClass::Insert_Triangles(
 	const SphereClass& bounding_sphere,
 	unsigned short start_index,
@@ -475,6 +488,11 @@ void SortingRendererClass::Insert_Triangles(
 	unsigned short min_vertex_index,
 	unsigned short vertex_count)
 {
+	if (Is_Dead_Shadow_Depth_Draw())
+	{
+		return;
+	}
+
 	// A disruption draw has no look of its own, so without the hook or the sorter there is nothing to show.
 	const bool disrupts=(InsertEffects & SoftParticleHookClass::EFFECT_DISRUPT) != 0;
 	if (disrupts && (SoftHook == nullptr || !WW3D::Is_Sorting_Enabled())) {
@@ -638,6 +656,10 @@ void SortingRendererClass::Insert_To_Sorting_Pool(SortingNodeStruct* state)
 void SortingRendererClass::Insert_Billboards(const BillboardInstance *instances, unsigned count)
 {
 	WWASSERT(count != 0 && count * 2 <= 65535);
+	if (Is_Dead_Shadow_Depth_Draw())
+	{
+		return;
+	}
 	SortingNodeStruct *state = Get_Sorting_Struct();
 	DX8Wrapper::Get_Render_State(state->sorting_state);
 	state->billboards.assign(instances, instances + count);

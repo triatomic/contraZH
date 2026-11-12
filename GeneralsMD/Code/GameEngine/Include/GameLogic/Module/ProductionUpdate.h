@@ -42,7 +42,8 @@ class UpgradeTemplate;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 enum ProductionID CPP_11(: Int)
 {
-	PRODUCTIONID_INVALID = 0
+	PRODUCTIONID_INVALID = 0,
+	PRODUCTIONID_AUTO_QUEUE_FIRST = 0x7FFF0000	///< auto queue adds the unit's template ID, because requestUniqueUnitID only advances on the clicking client
 };
 
 enum ProductionType CPP_11(: Int)
@@ -162,6 +163,8 @@ public:
 	virtual void moveUnitCreateEarlier( ProductionID productionID ) = 0;
 	virtual void moveUpgradeEarlier( const UpgradeTemplate *upgrade ) = 0;
 	virtual void cancelAllUnitsOfType( const ThingTemplate *unitType) = 0;
+	virtual void setAutoQueueUnit( const ThingTemplate *unitType ) = 0;
+	virtual Bool isAutoQueueUnit( const ThingTemplate *unitType ) const = 0;
 
 	virtual void cancelAndRefundAllProduction() = 0;
 
@@ -221,6 +224,8 @@ public:
 	virtual void moveUnitCreateEarlier( ProductionID productionID ) override;		///< move unit with matching production ID one position earlier in the queue
 	virtual void moveUpgradeEarlier( const UpgradeTemplate *upgrade ) override;		///< move the queued upgrade one position earlier in the queue
 	virtual void cancelAllUnitsOfType( const ThingTemplate *unitType) override;	///< cancel all production of type unitType
+	virtual void setAutoQueueUnit( const ThingTemplate *unitType ) override { m_autoQueueUnit = unitType; }
+	virtual Bool isAutoQueueUnit( const ThingTemplate *unitType ) const override;
 
 	virtual void cancelAndRefundAllProduction() override;									///< cancel and refund anything in the production queue
 
@@ -234,6 +239,7 @@ public:
 	virtual void setHoldDoorOpen(ExitDoorType exitDoor, Bool holdIt) override;
 
 	virtual UpdateSleepTime update() override;					///< the update
+	virtual void onCapture( Player *oldOwner, Player *newOwner ) override;
 
 	//These functions keep track of the special power construction of a new building via a special power instead of standard production interface.
 	//This was added for the sneak attack building functionality.
@@ -253,6 +259,7 @@ protected:
 	Bool cancelUnitCreate( ProductionEntry *production );
 
 	void updateDoors();														///< update the door behavior
+	void tryAutoQueueUnit();
 
 	struct DoorInfo
 	{
@@ -272,5 +279,6 @@ protected:
 	ModelConditionFlags m_clearFlags;										///< flags to clear from model
 	ModelConditionFlags m_setFlags;											///< flags to set in model
 	Bool								m_flagsDirty;										///< clearFlags/setFlags needs to be set into the model
+	const ThingTemplate	*m_autoQueueUnit;								///< queued one at a time whenever the queue is empty, nullptr for none
 
 };

@@ -31,7 +31,7 @@ struct FluidShaderTuning;
 struct BeamShaderTuning;
 struct DisruptionShaderInfo;
 
-// Fades particle sprites near the surface behind them, shades flames as fire, electricity as arcs, beams as lasers and cryo effects as ice, and draws the heat haze behind flames and the disruption behind jammers.
+// Fades particle sprites near the surface behind them, shades flames as fire, electricity as arcs, beams as lasers and cryo effects as ice, and draws the heat haze behind flames, the disruption behind jammers and the smudges of heat particles.
 class W3DSoftParticles : public SoftParticleHookClass
 {
 public:
@@ -67,7 +67,14 @@ public:
 	Bool beginDisruption();
 	void endDisruption();
 
-	/// The effect data is a flame's FlameShaderTuning, a beam's or mesh's BeamShaderTuning or with EFFECT_DISRUPT the draw's DisruptionShaderInfo, and null takes GameData.ini's.
+	/// Whether heat particles draw as sprites through the smudge shader, loading it on first ask.
+	Bool smudgeEnabled();
+
+	/// Copies the scene inside the clip-space area, least xy and most zw, for the smudge pass, whose draws bind only until endSmudges. False leaves them undrawn.
+	Bool beginSmudges(const Vector4 &clipArea);
+	void endSmudges();
+
+	/// The effect data is a flame's FlameShaderTuning, a beam's or mesh's BeamShaderTuning or with EFFECT_DISRUPT the draw's DisruptionShaderInfo, and null takes GameData.ini's. EFFECT_SMUDGE takes none.
 	virtual bool Begin(const ShaderClass &shader, unsigned effects, const void *effectData) override;
 	virtual void End() override;
 	virtual bool Can_Disrupt() override;
@@ -90,6 +97,7 @@ private:
 #endif
 	Bool bindHaze(const ShaderClass &shader, const FlameShaderTuning &tuning);
 	Bool bindDisruption(const ShaderClass &shader, const DisruptionShaderInfo &info);
+	Bool bindSmudge();
 	void bindSceneCopy();
 
 	DWORD m_depthShader;
@@ -114,10 +122,13 @@ private:
 	DWORD m_fluidShader;
 	DWORD m_hazeShader;
 	DWORD m_disruptionShaders[3];	///< one per DisruptionShaderInfo::Shape
+	DWORD m_smudgeShader;
 	IDirect3DTexture8 *m_noise;
 	IDirect3DTexture8 *m_sceneCopy;
 	Bool m_loaded;
 	Bool m_disrupting;	///< between beginDisruption and endDisruption, while the scene copy is the disruption's
+	Bool m_smudging;		///< between beginSmudges and endSmudges, while the scene copy is the smudges'
+	Real m_smudgeBounds[4];	///< the scene uv the smudges' copy holds, the least x and y, then the most
 	unsigned m_bound;		///< effects the current Begin bound, for End to undo
 	D3DMATRIX m_view;
 	D3DMATRIX m_projection;

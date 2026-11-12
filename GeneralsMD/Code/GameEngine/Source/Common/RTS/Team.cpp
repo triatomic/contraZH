@@ -45,6 +45,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/PartitionManager.h"
@@ -1412,6 +1413,13 @@ void Team::setControllingPlayer(Player *newController)
 		if constexpr (RETAIL_COMPATIBLE_CRC) // Not sure if necessary. But likely is.
 		{
 			obj->handlePartitionCellMaintenance();
+
+			// this path skips onCapture, which stops auto queue for a new owner
+			ProductionUpdateInterface *production = obj->getProductionUpdateInterface();
+			if( production != nullptr && oldOwner != newController )
+			{
+				production->setAutoQueueUnit( nullptr );
+			}
 		}
 		else
 		{

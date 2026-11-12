@@ -37,6 +37,7 @@ SmudgeManager::SmudgeManager()
 {
 	m_smudgeCountLastFrame=0;
 	m_hardwareSupportStatus = SMUDGE_SUPPORT_UNKNOWN;
+	m_replaced = FALSE;
 }
 
 SmudgeManager::~SmudgeManager()
@@ -72,6 +73,15 @@ void SmudgeManager::reset()
 		smudgeSet->reset();	//free all smudges.
 		m_freeSmudgeSetList.push_back(smudgeSet);
 	}
+}
+
+void SmudgeManager::setReplaced(Bool replaced)
+{
+	if (replaced && !m_replaced)
+	{
+		reset();
+	}
+	m_replaced = replaced;
 }
 
 void SmudgeManager::resetDraw()

@@ -1028,11 +1028,19 @@ WinInputReturnCode GameWindowManager::winProcessMouseEvent( GameWindowMessage ms
 			{
 				GameWindow *tempWin;
 
+				// a disabled button never gets input messages, so this cannot live in the button input
+				GameWindow *pressedWin = ( msg == GWM_RIGHT_DOWN ) ? window->winPointInChild( mousePos->x, mousePos->y, TRUE ) : nullptr;
+				if( pressedWin != nullptr && BitIsSet( pressedWin->m_status, WIN_STATUS_RIGHT_CLICK_ON_PRESS ) )
+				{
+					winSendSystemMsg( pressedWin->m_instData.getOwner(), GBM_SELECTED_RIGHT,
+														(WindowMsgData)pressedWin, packedMouseCoords );
+					returnCode = WIN_INPUT_USED;
+				}
 				//
 				// only send messages for button states, wheel states, we do not
 				// continually send messages for mouse positions
 				//
-				if( sendMousePosMessages == TRUE || msg != GWM_MOUSE_POS )
+				else if( sendMousePosMessages == TRUE || msg != GWM_MOUSE_POS )
 				{
 
 					tempWin = window;

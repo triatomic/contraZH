@@ -45,10 +45,7 @@ bool DX8VertexShadingClass::Has_Point_Light(LightEnvironmentClass * environment)
 
 DWORD DX8VertexShadingClass::Get_Device_Render_State(D3DRENDERSTATETYPE state)
 {
-	// The wrapper's cache can hold a sentinel after an invalidate, and the device is not pure.
-	DWORD value = 0;
-	DX8Wrapper::_Get_D3D_Device8()->GetRenderState(state, &value);
-	return value;
+	return DX8Wrapper::Get_Device_Render_State(state);
 }
 
 bool DX8VertexShadingClass::Is_Lit(VertexMaterialClass * material)
@@ -177,8 +174,8 @@ void DX8VertexShadingClass::Get_View_Constants(Vector4 * constants)
 {
 	D3DMATRIX view;
 	D3DMATRIX projection;
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_PROJECTION, &projection);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
 
 	for (int column=0;column<4;++column)
 	{
@@ -200,13 +197,10 @@ void DX8VertexShadingClass::Get_View_Constants(Vector4 * constants)
 // A pass's pixel shader reads only the stages it set up, so a stage with texgen the shader lacks gets zero.
 void DX8VertexShadingClass::Get_Stage_Constants(Vector4 * sources, Vector4 * columns)
 {
-	IDirect3DDevice9 * device = DX8Wrapper::_Get_D3D_Device8();
 	for (int stage=0;stage<4;++stage)
 	{
-		DWORD index = 0;
-		DWORD flags = 0;
-		device->GetTextureStageState(stage, D3DTSS_TEXCOORDINDEX, &index);
-		device->GetTextureStageState(stage, D3DTSS_TEXTURETRANSFORMFLAGS, &flags);
+		const DWORD index = DX8Wrapper::Get_Device_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX);
+		const DWORD flags = DX8Wrapper::Get_Device_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS);
 
 		switch (index & 0xffff0000)
 		{
@@ -231,7 +225,7 @@ void DX8VertexShadingClass::Get_Stage_Constants(Vector4 * sources, Vector4 * col
 		}
 		else
 		{
-			device->GetTransform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), &transform);
+			DX8Wrapper::_Get_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), transform);
 		}
 		for (int column=0;column<4;++column)
 		{

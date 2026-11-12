@@ -80,6 +80,9 @@ not exist.
 * `ObjectExtend <NewObject> <ParentObject>` - (Copies keys and modules.)
 * `RemoveModule <ModuleTag>` - (Drops one inherited module.)
 * A `WeaponSet` or `ArmorSet` in the child replaces all inherited sets of that kind.
+* `Prerequisites` and `QuickGamePrerequisites` are inherited independently. The first block
+  of either kind in the child clears the inherited entries of that kind; later blocks add entries.
+  An empty block clears the inherited entries without adding any.
 
 ```
 ObjectExtend ZExtendedTank Chem_GLAVehicleRadarVan

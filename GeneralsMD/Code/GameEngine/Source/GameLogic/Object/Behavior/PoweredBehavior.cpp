@@ -20,6 +20,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/GameState.h"
 #include "Common/Player.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
@@ -34,6 +35,9 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 	m_disableWeapon = FALSE;
 	m_movePenalty = 0.0f;
 	m_liftPenalty = 0.0f;
+	m_damagePenalty = 0.0f;
+	m_rateOfFirePenalty = 0.0f;
+	m_rangePenalty = 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -47,6 +51,9 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 		{ "DisableWeapon",	INI::parseBool,						nullptr, offsetof( PoweredBehaviorModuleData, m_disableWeapon ) },
 		{ "MovePenalty",		INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_movePenalty ) },
 		{ "LiftPenalty",		INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_liftPenalty ) },
+		{ "DamagePenalty",	INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_damagePenalty ) },
+		{ "RateOfFirePenalty",	INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_rateOfFirePenalty ) },
+		{ "RangePenalty",		INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_rangePenalty ) },
 		{ "Icon",						INI::parseAsciiString,		nullptr, offsetof( PoweredBehaviorModuleData, m_iconName ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -56,7 +63,8 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 //-------------------------------------------------------------------------------------------------
 PoweredBehavior::PoweredBehavior( Thing *thing, const ModuleData* moduleData ) :
 	UpdateModule( thing, moduleData ),
-	m_powered(TRUE)
+	m_powered(TRUE),
+	m_clearOldDisable(FALSE)
 {
 	// the owner is not known yet, so the first tick reads the power state
 	setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
@@ -68,8 +76,22 @@ PoweredBehavior::~PoweredBehavior()
 }
 
 //-------------------------------------------------------------------------------------------------
+static Real weaponPenaltyToScalar( Real penalty )
+{
+	// Module-fired weapons ignore NO_ATTACK, and a zero rate of fire would divide by zero.
+	const Real MIN_WEAPON_SCALAR = 0.01f;
+	return penalty > 0.0f ? max( 1.0f - penalty, MIN_WEAPON_SCALAR ) : 1.0f;
+}
+
+//-------------------------------------------------------------------------------------------------
 Bool PoweredBehavior::onPowerChange( Bool hasPower )
 {
+	// A load rebuilds the power totals object by object, so they mean nothing until it ends.
+	if (TheGameState->isInLoadGame())
+	{
+		return TRUE;
+	}
+
 	if (m_powered == hasPower)
 	{
 		return TRUE;
@@ -83,6 +105,7 @@ Bool PoweredBehavior::onPowerChange( Bool hasPower )
 	Bool immobile = !d->m_isMobile || d->m_movePenalty >= 1.0f;
 	Real speedScalar = (!immobile && d->m_movePenalty > 0.0f) ? 1.0f - d->m_movePenalty : 1.0f;
 	Real liftScalar = (d->m_liftPenalty > 0.0f && d->m_liftPenalty < 1.0f) ? 1.0f - d->m_liftPenalty : 1.0f;
+	Bool noAttack = d->m_disableWeapon || d->m_damagePenalty >= 1.0f || d->m_rateOfFirePenalty >= 1.0f || d->m_rangePenalty >= 1.0f;
 
 	if (ai)
 	{
@@ -98,6 +121,7 @@ Bool PoweredBehavior::onPowerChange( Bool hasPower )
 		}
 		obj->clearStatus( m_appliedStatus );
 		m_appliedStatus.clear();
+		obj->setWeaponScalars( 1.0f, 1.0f, 1.0f );
 	}
 	else
 	{
@@ -105,9 +129,10 @@ Bool PoweredBehavior::onPowerChange( Bool hasPower )
 		{
 			draw->setStatusIcon( d->m_iconName );
 		}
-		m_appliedStatus.set( OBJECT_STATUS_NO_ATTACK, d->m_disableWeapon );
+		m_appliedStatus.set( OBJECT_STATUS_NO_ATTACK, noAttack );
 		m_appliedStatus.set( OBJECT_STATUS_IMMOBILE, immobile );
 		obj->setStatus( m_appliedStatus );
+		obj->setWeaponScalars( weaponPenaltyToScalar( d->m_damagePenalty ), weaponPenaltyToScalar( d->m_rateOfFirePenalty ), weaponPenaltyToScalar( d->m_rangePenalty ) );
 		if (immobile && ai)
 		{
 			ai->aiIdle( CMD_FROM_AI );
@@ -148,13 +173,15 @@ void PoweredBehavior::crc( Xfer *xfer )
 
 //-------------------------------------------------------------------------------------------------
 /** Version Info:
-	* 1: Initial version */
+	* 1: Initial version
+	* 2: No data change, marks saves that cannot hold the KINDOF_POWERED disable */
 //-------------------------------------------------------------------------------------------------
 void PoweredBehavior::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
+	m_clearOldDisable = (version < 2);
 
 	UpdateModule::xfer( xfer );
 
@@ -166,4 +193,9 @@ void PoweredBehavior::xfer( Xfer *xfer )
 void PoweredBehavior::loadPostProcess()
 {
 	UpdateModule::loadPostProcess();
+
+	if (m_clearOldDisable)
+	{
+		getObject()->clearDisabled( DISABLED_UNDERPOWERED );
+	}
 }

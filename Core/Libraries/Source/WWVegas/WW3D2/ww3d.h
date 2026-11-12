@@ -228,6 +228,8 @@ public:
 	// -1 keeps vsync on in fullscreen and off in a window, 0 turns it off, 1 on
 	static void					Set_VSync_Mode(int mode);
 	static bool					Is_VSync_On();
+	// Rate in Hz at which Present paces frames, 0 while it does not wait for the display
+	static unsigned			Get_VSync_Refresh_Rate();
 	// On keeps at most one frame queued ahead of the GPU
 	static void					Set_Low_Latency(bool on);
 
@@ -279,6 +281,8 @@ public:
 	static void					Set_MSAA_Mode(MultiSampleModeEnum mode);
 	static MultiSampleModeEnum Get_MSAA_Mode();
 	/// Supersampling as a percent of the screen's size each way, 100 to 200; above 100 it takes MSAA's place. Set before the device is made.
+	/// SUPER_SAMPLING_16K in place of a percent renders the world 15360 pixels wide on any screen, for screenshots. Options.ini never holds it.
+	enum { SUPER_SAMPLING_16K = 15360 };
 	static void					Set_Super_Sampling(int percent);
 	static int					Get_Super_Sampling();
 

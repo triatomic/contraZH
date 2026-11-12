@@ -400,6 +400,9 @@ public:
 
 	static void				Set_Stats_Scene(int scene) { stats_scene=scene; }
 	static int				Get_Stats_Scene() { return stats_scene; }
+
+	// False for the blend modes of glows and effects, which leave no depth in the shadow map.
+	static bool				Casts_Shadow(const ShaderClass& shader);
 	static void				Record_Rigid_Draw() { instancing_stats.Scenes[stats_scene].RigidDraws++; }
 	static void				Record_Eligible_Group(int draws);
 	static void				Record_Instanced_Group(int draws);

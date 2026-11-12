@@ -83,6 +83,7 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/GameClient/W3DPlanarMirror.h
     Include/W3DDevice/GameClient/W3DLaserGlow.h
     Include/W3DDevice/GameClient/W3DAmbientOcclusion.h
+    Include/W3DDevice/GameClient/W3DDeferredLights.h
     Include/W3DDevice/GameClient/W3DGroundNoise.h
     Include/W3DDevice/GameClient/W3DEmbeddedShaders.h
     Include/W3DDevice/GameClient/W3DNoiseTexture.h
@@ -208,6 +209,7 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/W3DPlanarMirror.cpp
     Source/W3DDevice/GameClient/W3DLaserGlow.cpp
     Source/W3DDevice/GameClient/W3DAmbientOcclusion.cpp
+    Source/W3DDevice/GameClient/W3DDeferredLights.cpp
     Source/W3DDevice/GameClient/W3DGroundNoise.cpp
     Source/W3DDevice/GameClient/W3DNoiseTexture.cpp
     Source/W3DDevice/GameClient/W3DSkyClouds.cpp

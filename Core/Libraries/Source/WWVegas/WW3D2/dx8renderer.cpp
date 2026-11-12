@@ -65,6 +65,7 @@
 #include "lightenvironment.h"
 #include <algorithm>
 #include <vector>
+#include <stdlib.h>
 
 /*
 ** Global Instance of the DX8MeshRender
@@ -2048,9 +2049,21 @@ void DX8SkinFVFCategoryContainer::Render_Skinned_Meshes()
 	VisibleVertexCount = kept_vertices;
 }
 
-// The per-mesh material pass loop, with each mesh's palette loaded ahead of its passes.
+// CONTRA_SKINPASSRUNS=0 installs each skin's passes mesh by mesh again, for comparing call counts.
+static bool Get_Skin_Pass_Runs_Enabled()
+{
+	const char *value = getenv("CONTRA_SKINPASSRUNS");
+	return (value != nullptr) ? atoi(value) != 0 : true;
+}
+
+static const bool SkinPassRunsEnabled = Get_Skin_Pass_Runs_Enabled();
+
+// Each pass installs once for all its skins, in the order the passes first appear, so a mesh's own passes keep their order.
 void DX8SkinFVFCategoryContainer::Render_Skinned_Material_Passes()
 {
+	static std::vector<MatPassTaskClass *> tasks;
+	static std::vector<MaterialPassClass *> runs;
+
 	MatPassTaskClass * mpr = visible_matpass_head;
 	MatPassTaskClass * last_mpr = nullptr;
 	bool renderTasksRemaining=false;
@@ -2066,8 +2079,6 @@ void DX8SkinFVFCategoryContainer::Render_Skinned_Material_Passes()
 			continue;
 		}
 
-		DX8SkinningClass::Set_Mesh(mesh, Peek_Skinned_Model(mesh->Peek_Model())->Palette, nullptr);
-		mesh->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
 		DX8MeshRendererClass::Record_Material_Pass_Path(DX8InstancingStatsStruct::PASS_PATH_SKIN);
 		MatPassTaskClass * next_mpr = mpr->Get_Next_Visible();
 
@@ -2077,11 +2088,63 @@ void DX8SkinFVFCategoryContainer::Render_Skinned_Material_Passes()
 			last_mpr->Set_Next_Visible(next_mpr);
 		}
 
-		delete mpr;
+		if (SkinPassRunsEnabled)
+		{
+			tasks.push_back(mpr);
+			if (std::find(runs.begin(), runs.end(), mpr->Peek_Material_Pass()) == runs.end())
+			{
+				runs.push_back(mpr->Peek_Material_Pass());
+			}
+		}
+		else
+		{
+			DX8SkinningClass::Set_Mesh(mesh, Peek_Skinned_Model(mesh->Peek_Model())->Palette, nullptr);
+			mesh->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
+			delete mpr;
+		}
 		mpr = next_mpr;
 	}
 
 	visible_matpass_tail = renderTasksRemaining ? last_mpr : nullptr;
+
+	// These passes take no lighting, and a mesh's light environment set between draws would drop the pass's texgen.
+	for (size_t r=0;r<runs.size();++r)
+	{
+		MaterialPassClass * pass = runs[r];
+		pass->Install_Materials();
+		DX8Wrapper::Set_Index_Buffer(index_buffer,0);
+		DX8Wrapper::Set_World_Identity();
+
+		for (size_t i=0;i<tasks.size();++i)
+		{
+			if (tasks[i]->Peek_Material_Pass() != pass)
+			{
+				continue;
+			}
+			MeshClass * mesh = tasks[i]->Peek_Mesh();
+			DX8SkinningClass::Set_Mesh(mesh, Peek_Skinned_Model(mesh->Peek_Model())->Palette, nullptr);
+
+			DX8PolygonRendererListIterator it(&mesh->Peek_Model()->PolygonRendererList);
+			for (;!it.Is_Done();it.Next())
+			{
+				DX8PolygonRendererClass * renderer = it.Peek_Obj();
+				if (renderer->Get_Pass() == 0)
+				{
+					pass->Install_Polygon_Materials(renderer, mesh);
+					renderer->Render(mesh->Get_Base_Vertex_Offset());
+				}
+			}
+		}
+
+		pass->UnInstall_Materials();
+	}
+
+	for (size_t i=0;i<tasks.size();++i)
+	{
+		delete tasks[i];
+	}
+	tasks.clear();
+	runs.clear();
 }
 
 void DX8SkinFVFCategoryContainer::clearVisibleSkinList()
@@ -2496,8 +2559,24 @@ void DX8TextureCategoryClass::Render_Instanced_Groups(VertexMaterialClass * vmat
 	drawn.clear();
 }
 
+bool DX8MeshRendererClass::Casts_Shadow(const ShaderClass& shader)
+{
+	const ShaderClass::SrcBlendFuncType src = shader.Get_Src_Blend_Func();
+	const ShaderClass::DstBlendFuncType dst = shader.Get_Dst_Blend_Func();
+	return src != ShaderClass::SRCBLEND_ZERO && dst != ShaderClass::DSTBLEND_ONE &&
+		dst != ShaderClass::DSTBLEND_SRC_COLOR && dst != ShaderClass::DSTBLEND_ONE_MINUS_SRC_COLOR;
+}
+
 void DX8TextureCategoryClass::Render()
 {
+	// The shadow depth pass writes neither depth nor colour for these, so their draws would do nothing.
+	if (DX8MeshRendererClass::Get_Stats_Scene() == DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH &&
+		!DX8MeshRendererClass::Casts_Shadow(Get_Shader()))
+	{
+		Clear_Render_List();
+		return;
+	}
+
 	#ifdef WWDEBUG
 	if (!WW3D::Expose_Prelit()) {
 	#endif
@@ -2733,6 +2812,15 @@ void DX8TextureCategoryClass::Clear_Bloom_List()
 	}
 }
 
+// CONTRA_DEPTHUNSORTED=0 sends blended casters through the sorter in the shadow depth pass again, for comparing call counts.
+static bool Get_Depth_Unsorted_Enabled()
+{
+	const char *value = getenv("CONTRA_DEPTHUNSORTED");
+	return (value != nullptr) ? atoi(value) != 0 : true;
+}
+
+static const bool DepthUnsortedEnabled = Get_Depth_Unsorted_Enabled();
+
 // draws one visible mesh fragment with the category's state already applied
 // the bloom replay of a sorting container cannot go through its buffers, which would only queue the draw
 static void Draw_Polygons(DX8FVFCategoryContainer * container, DX8PolygonRendererClass * renderer, MeshClass * mesh, VertexMaterialClass * vmaterial, bool replay)
@@ -2831,7 +2919,11 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 	//(gth) this if statement's contents are not tabbed to avoid perforce merge problems...
 	if (!DX8RendererDebugger::Is_Enabled() || !mesh->Is_Disabled_By_Debugger()) {
 
-	if (!replay && (!!mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT)) && WW3D::Is_Sorting_Enabled()) {
+	// A blended caster is cut out by alpha test in the shadow depth pass, so its draw order cannot matter there.
+	const bool unsortedCaster = DepthUnsortedEnabled && !container->Is_Sorting() &&
+		DX8MeshRendererClass::Get_Stats_Scene() == DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH;
+
+	if (!replay && !unsortedCaster && (!!mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT)) && WW3D::Is_Sorting_Enabled()) {
 		if (mesh->Peek_Disruption() != nullptr) {
 			SortingRendererClass::Set_Insert_Effects(SoftParticleHookClass::EFFECT_DISRUPT,mesh->Peek_Disruption(),mesh->Get_Alpha_Override());
 			renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());

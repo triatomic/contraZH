@@ -202,6 +202,11 @@ static Vector3 Scene_Light()
 	return light;
 }
 
+Vector3 W3DLaserGlow::getSceneLight()
+{
+	return Scene_Light();
+}
+
 // The squared distance on the ground from a point to the beam.
 static Real Ground_Distance_Squared(Real x, Real y, const Vector3 &start, const Vector3 &end)
 {

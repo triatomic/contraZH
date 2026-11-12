@@ -855,6 +855,7 @@ private:
 	Bool					m_armorCopiedFromDefault;
 	Bool					m_weaponsCopiedFromDefault;
 	Bool					m_prereqsCopiedFromExtended;	///< prerequisites came with ObjectExtend; the object's own replace them
+	Bool					m_quickGamePrereqsCopiedFromExtended;
 
 	// ---- Byte-sized things
 	Byte					m_radarPriority;						///< does object appear on radar, and if so at what priority

@@ -121,6 +121,7 @@ int								DX8Wrapper::BitDepth										= DEFAULT_BIT_DEPTH;
 int								DX8Wrapper::TextureBitDepth							= DEFAULT_TEXTURE_BIT_DEPTH;
 bool								DX8Wrapper::IsWindowed									= false;
 int								DX8Wrapper::VSyncMode									= -1;
+unsigned							DX8Wrapper::VSyncRefreshRate							= 0;
 bool								DX8Wrapper::LowLatency									= false;
 #if defined(BUILD_WITH_D3D9)
 IDirect3DQuery9*				DX8Wrapper::FrameQuery									= nullptr;
@@ -129,6 +130,7 @@ bool								DX8Wrapper::FrameQueryIssued							= false;
 D3DFORMAT					DX8Wrapper::DisplayFormat	= D3DFMT_UNKNOWN;
 D3DMULTISAMPLE_TYPE DX8Wrapper::MultiSampleAntiAliasing	= DEFAULT_MSAA;
 float						DX8Wrapper::SuperSampleScale					= 1.0f;
+unsigned					DX8Wrapper::SuperSampleWidth					= 0;
 
 // shader system additions KJM v
 DWORD								DX8Wrapper::Vertex_Shader								= 0;
@@ -209,6 +211,7 @@ bool								DX8Wrapper::IsEx											= false;
 IDirect3DSurface8 *			DX8Wrapper::SceneRenderTarget							= nullptr;
 IDirect3DSurface8 *			DX8Wrapper::DeviceDepthBuffer							= nullptr;
 bool							DX8Wrapper::SceneResolved								= false;
+IDirect3DSurface8 *			DX8Wrapper::SceneResolveSteps[MAX_SCENE_RESOLVE_STEPS]	= { nullptr };
 IDirect3DSurface8 *			DX8Wrapper::SceneDepthBuffer							= nullptr;
 IDirect3DTexture8 *			DX8Wrapper::SceneDepthTexture							= nullptr;
 
@@ -706,6 +709,7 @@ bool DX8Wrapper::Create_Device()
 
 	Create_Scene_Target();
 	Apply_Frame_Latency();
+	Update_VSync_Refresh_Rate();
 
 	/*
 	** Initialize all subsystems
@@ -779,6 +783,7 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 
 		Create_Scene_Target();
 		Apply_Frame_Latency();
+		Update_VSync_Refresh_Rate();
 
 		if (reload_assets)
 		{
@@ -1224,9 +1229,9 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 	const char *ssaaOverride = getenv("CONTRA_SSAA");
 	if (ssaaOverride != nullptr)
 	{
-		Set_Super_Sampling(atoi(ssaaOverride) / 100.0f);
+		WW3D::Set_Super_Sampling(atoi(ssaaOverride));
 	}
-	if (SuperSampleScale > 1.0f)
+	if (SuperSampleScale > 1.0f || SuperSampleWidth != 0)
 	{
 		MultiSampleAntiAliasing = D3DMULTISAMPLE_NONE;
 	}
@@ -1405,6 +1410,32 @@ void DX8Wrapper::Set_VSync_Mode(int mode)
 	_PresentParameters.FullScreen_PresentationInterval = interval;
 	RENDER_LOG(("DX8Wrapper::Set_VSync_Mode is resetting the device."));
 	Reset_Device();
+}
+
+void DX8Wrapper::Update_VSync_Refresh_Rate()
+{
+	VSyncRefreshRate = 0;
+
+	const UINT interval = _PresentParameters.FullScreen_PresentationInterval;
+	if (D3DDevice == nullptr || (interval != D3DPRESENT_INTERVAL_DEFAULT && interval != D3DPRESENT_INTERVAL_ONE))
+	{
+		return;
+	}
+
+#if defined(BUILD_WITH_D3D9)
+	D3DDISPLAYMODE mode;
+	if (SUCCEEDED(D3DDevice->GetDisplayMode(0, &mode)))
+	{
+		VSyncRefreshRate = mode.RefreshRate;
+	}
+#else
+	// Direct3D 8 presents windowed frames without waiting.
+	D3DDISPLAYMODE mode;
+	if (!IsWindowed && SUCCEEDED(D3DDevice->GetDisplayMode(&mode)))
+	{
+		VSyncRefreshRate = mode.RefreshRate;
+	}
+#endif
 }
 
 void DX8Wrapper::Set_Low_Latency(bool on)
@@ -2147,6 +2178,17 @@ void DX8Wrapper::Set_Viewport(CONST D3DVIEWPORT8* pViewport)
 	DX8CALL(SetViewport(pViewport));
 	CurrentViewport = *pViewport;
 	CurrentViewportValid = true;
+}
+
+void DX8Wrapper::Get_Viewport(D3DVIEWPORT8& viewport)
+{
+	DX8_THREAD_ASSERT();
+	if (!CurrentViewportValid)
+	{
+		DX8CALL(GetViewport(&CurrentViewport));
+		CurrentViewportValid = true;
+	}
+	viewport = CurrentViewport;
 }
 
 // ----------------------------------------------------------------------------
@@ -2986,11 +3028,43 @@ void DX8Wrapper::Create_Scene_Target()
 	DX8CALL(GetDepthStencilSurface(&DeviceDepthBuffer));
 	HRESULT hr;
 
+	if (SuperSampleWidth != 0)
+	{
+		// The scene's depth and its copies are textures, so the scene stays within the largest one the device makes
+		D3DCAPS8 caps;
+		::ZeroMemory(&caps, sizeof(caps));
+		DX8CALL(GetDeviceCaps(&caps));
+		SuperSampleScale = (float)SuperSampleWidth / (float)_PresentParameters.BackBufferWidth;
+		if (caps.MaxTextureWidth != 0 && caps.MaxTextureHeight != 0)
+		{
+			const float widest = (float)caps.MaxTextureWidth / (float)_PresentParameters.BackBufferWidth;
+			const float tallest = (float)caps.MaxTextureHeight / (float)_PresentParameters.BackBufferHeight;
+			SuperSampleScale = min(SuperSampleScale, min(widest, tallest));
+		}
+		if (SuperSampleScale <= 1.0f)
+		{
+			SuperSampleScale = 1.0f;
+			SuperSampleWidth = 0;
+		}
+	}
+
 	if (SuperSampleScale > 1.0f)
 	{
 		const unsigned width = (unsigned)(_PresentParameters.BackBufferWidth * SuperSampleScale + 0.5f);
 		const unsigned height = (unsigned)(_PresentParameters.BackBufferHeight * SuperSampleScale + 0.5f);
 		DX8CALL_HRES(CreateRenderTarget(width, height, _PresentParameters.BackBufferFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneRenderTarget, nullptr), hr);
+
+		// A linear filter reads four pixels, which is every pixel only while a step shrinks to half or less
+		unsigned stepWidth = width;
+		unsigned stepHeight = height;
+		for (int step = 0; SUCCEEDED(hr) && step < MAX_SCENE_RESOLVE_STEPS && stepWidth > 2 * _PresentParameters.BackBufferWidth; step++)
+		{
+			stepWidth = (stepWidth + 1) / 2;
+			stepHeight = (stepHeight + 1) / 2;
+			DX8CALL_HRES(CreateRenderTarget(stepWidth, stepHeight, _PresentParameters.BackBufferFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneResolveSteps[step], nullptr), hr);
+		}
+
+		// The depth comes last because it binds itself, and the failure below reads the device's own depth back
 		if (SUCCEEDED(hr))
 		{
 			Create_Scene_Depth_Texture(width, height);
@@ -2999,11 +3073,13 @@ void DX8Wrapper::Create_Scene_Target()
 				DX8CALL_HRES(CreateDepthStencilSurface(width, height, _PresentParameters.AutoDepthStencilFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneDepthBuffer, nullptr), hr);
 			}
 		}
+
 		if (FAILED(hr))
 		{
 			RENDER_LOG(("Supersampled scene target creation failed, disabling supersampling"));
 			Release_Scene_Target();
 			SuperSampleScale = 1.0f;
+			SuperSampleWidth = 0;
 			DX8CALL(GetDepthStencilSurface(&DeviceDepthBuffer));
 			Create_Scene_Depth_Texture(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight);
 			return;
@@ -3117,7 +3193,13 @@ void DX8Wrapper::Resolve_Scene_Target()
 	{
 		return;
 	}
-	DX8CALL(StretchRect(SceneRenderTarget, nullptr, back_buffer, nullptr, D3DTEXF_LINEAR));
+	IDirect3DSurface8 *source = SceneRenderTarget;
+	for (int step = 0; step < MAX_SCENE_RESOLVE_STEPS && SceneResolveSteps[step] != nullptr; step++)
+	{
+		DX8CALL(StretchRect(source, nullptr, SceneResolveSteps[step], nullptr, D3DTEXF_LINEAR));
+		source = SceneResolveSteps[step];
+	}
+	DX8CALL(StretchRect(source, nullptr, back_buffer, nullptr, D3DTEXF_LINEAR));
 	DX8CALL(SetRenderTarget(0, back_buffer));
 	DX8CALL(SetDepthStencilSurface(DeviceDepthBuffer));
 	back_buffer->Release();
@@ -3138,6 +3220,14 @@ void DX8Wrapper::Release_Scene_Target()
 	{
 		SceneRenderTarget->Release();
 		SceneRenderTarget = nullptr;
+	}
+	for (int step = 0; step < MAX_SCENE_RESOLVE_STEPS; step++)
+	{
+		if (SceneResolveSteps[step] != nullptr)
+		{
+			SceneResolveSteps[step]->Release();
+			SceneResolveSteps[step] = nullptr;
+		}
 	}
 	if (SceneDepthBuffer != nullptr)
 	{

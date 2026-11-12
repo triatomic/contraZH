@@ -129,6 +129,7 @@ static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
 static NameKeyType checkDiplomacyRuleID = NAMEKEY_INVALID;
 static NameKeyType checkFreeRadarID = NAMEKEY_INVALID;
 static NameKeyType checkRevealMapID = NAMEKEY_INVALID;
+static NameKeyType checkAutoQueueID = NAMEKEY_INVALID;
 static NameKeyType windowMapID = NAMEKEY_INVALID;
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLanGameOptions = nullptr;
@@ -147,6 +148,7 @@ static GameWindow *checkQuickGame = nullptr;
 static GameWindow *checkDiplomacyRule = nullptr;
 static GameWindow *checkFreeRadar = nullptr;
 static GameWindow *checkRevealMap = nullptr;
+static GameWindow *checkAutoQueue = nullptr;
 static LobbyTabs lobbyTabs;
 static Int lastChatCount = 0;
 static UnicodeString lastChatLine;
@@ -863,6 +865,7 @@ void InitLanGameGadgets()
   checkDiplomacyRuleID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckDiplomacyRule" );
   checkFreeRadarID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckFreeRadar" );
   checkRevealMapID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckRevealMap" );
+  checkAutoQueueID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckAutoQueue" );
 	windowMapID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:MapWindow" );
 
 	// Initialize the pointers to our gadgets
@@ -910,6 +913,8 @@ void InitLanGameGadgets()
 	SetLobbyRuleCaption( checkFreeRadar, LOBBY_RULE_FREE_RADAR );
 	checkRevealMap = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkRevealMapID );
 	SetLobbyRuleCaption( checkRevealMap, LOBBY_RULE_REVEAL_MAP );
+	checkAutoQueue = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkAutoQueueID );
+	SetLobbyRuleCaption( checkAutoQueue, LOBBY_RULE_AUTO_QUEUE );
 
 	InitLobbyTabs( lobbyTabs, parentLanGameOptions, "LanGameOptionsMenu.wnd" );
 	lastChatCount = 0;
@@ -1016,6 +1021,7 @@ void DeinitLanGameGadgets()
   checkDiplomacyRule = nullptr;
   checkFreeRadar = nullptr;
   checkRevealMap = nullptr;
+  checkAutoQueue = nullptr;
 	lobbyTabs = LobbyTabs();
 	if (windowMap)
 	{
@@ -1229,6 +1235,12 @@ void updateGameOptions()
 		{
 			GadgetCheckBoxSetChecked( checkRevealMap, theGame->getRevealMap() );
 			checkRevealMap->winEnable( TheLAN->AmIHost() );
+		}
+
+		if (checkAutoQueue)
+		{
+			GadgetCheckBoxSetChecked( checkAutoQueue, theGame->getAutoQueue() );
+			checkAutoQueue->winEnable( TheLAN->AmIHost() );
 		}
 	}
 	s_isRefreshingControls = wasRefreshing;
@@ -1570,6 +1582,10 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
         else if ( controlID == checkRevealMapID )
         {
           commitLanRule( checkRevealMap, &GameInfo::getRevealMap, &GameInfo::setRevealMap );
+        }
+        else if ( controlID == checkAutoQueueID )
+        {
+          commitLanRule( checkAutoQueue, &GameInfo::getAutoQueue, &GameInfo::setAutoQueue );
         }
         else if ( controlID == lobbyTabs.buttonGameID )
         {

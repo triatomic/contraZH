@@ -25,13 +25,19 @@ class FrameRateLimit
 {
 public:
 	FrameRateLimit();
+	~FrameRateLimit();
 
 	Real wait(UnsignedInt maxFps);
 	void reset(); ///< Move the timing anchor to now, discarding any time elapsed since the last call to wait.
 
 private:
+	FrameRateLimit(const FrameRateLimit&);
+	FrameRateLimit& operator=(const FrameRateLimit&);
+
 	Int64 m_freq;
-	Int64 m_start;
+	Int64 m_start; ///< Scheduled start of the current frame; trails m_last when a frame ran late
+	Int64 m_last; ///< When wait last returned
+	HANDLE m_timer; ///< High resolution timer, null where Windows has none
 };
 
 

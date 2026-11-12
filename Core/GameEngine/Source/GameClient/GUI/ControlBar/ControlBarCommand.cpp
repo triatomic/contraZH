@@ -789,9 +789,13 @@ void ControlBar::updateContextCommand()
 		if( pu )
 		{
 
-			// update the whole queue as necessary
-			if( pu->getProductionCount() != m_displayedQueueCount )
+			// update the whole queue as necessary, an auto queue refill keeps the count but changes the head
+			const ProductionEntry *head = pu->firstProduction();
+			if( pu->getProductionCount() != m_displayedQueueCount ||
+					( head != nullptr && head->getProductionID() != m_queueData[ 0 ].productionID ) )
+			{
 				populateBuildQueue( obj );
+			}
 
 			//
 			// update the build percentage on the first thing (the thing that's being built)
@@ -914,6 +918,13 @@ void ControlBar::updateContextCommand()
 			const Image *image = calculateVeterancyOverlayForThing( command->getThingTemplate() );
 			GadgetButtonDrawOverlayImage( win, image );
 		}
+
+#if RTS_ZEROHOUR
+		if( pu && command->getCommandType() == GUI_COMMAND_UNIT_BUILD && pu->isAutoQueueUnit( command->getThingTemplate() ) )
+		{
+			GadgetButtonDrawAutoQueue( win );
+		}
+#endif
 
 		//
 		// for check-like commands we will keep the push button "pushed" or "unpushed" depending
@@ -1125,6 +1136,17 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 	if ( obj->isDisabledByType( DISABLED_CHRONO ) )
         return COMMAND_RESTRICTED;
  
+#if RTS_ZEROHOUR
+	if (BitIsSet(command->getOptions(), REQUIRES_POWER))
+	{
+		const Player *player = obj->getControllingPlayer();
+		if (!player || !player->getEnergy()->hasSufficientPower())
+		{
+			return COMMAND_RESTRICTED;
+		}
+	}
+#endif
+
 	//Other disabled objects are unable to use buttons -- so gray them out.
 	Bool disabled = obj->isDisabled();
 
@@ -1518,7 +1540,11 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 				DEBUG_CRASH(( "Object %s does not contain special power module (%s) to execute.  Did you forget to add it to the object INI?",
 											obj->getTemplate()->getName().str(), command->getSpecialPowerTemplate()->getName().str() ));
 			}
+#if RTS_ZEROHOUR
+			else if( mod->isReadyForCommand(command->getOptions()) == FALSE )
+#else
 			else if( mod->isReady() == FALSE )
+#endif
 			{
 				Int percent =  mod->getPercentReady() * 100;
 

@@ -266,6 +266,7 @@ GameLogic::GameLogic()
 	m_diplomacy = FALSE;
 	m_freeRadar = FALSE;
 	m_revealMap = FALSE;
+	m_autoQueue = FALSE;
 #if defined(GENERALS_ONLINE)
 	m_pendingLobbyRules = 0;
 #endif
@@ -1402,6 +1403,9 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	// Both saved with the skirmish setup, like Quick Game
 	m_freeRadar = TheGameInfo != nullptr && TheGameInfo->getFreeRadar();
 	m_revealMap = TheGameInfo != nullptr && TheGameInfo->getRevealMap();
+
+	// Saved too, because producers save the unit they auto queue
+	m_autoQueue = TheGameInfo != nullptr && TheGameInfo->getAutoQueue();
 #if defined(GENERALS_ONLINE)
 	m_pendingLobbyRules = 0;
 	if (!loadingSaveGame && TheNGMPGame != nullptr && TheGameInfo == TheNGMPGame && !TheRecorder->isPlaybackMode())
@@ -5858,15 +5862,15 @@ bool GameLogic::onEnableLobbyRule(GameMessage *msg)
 	{
 		Bool GameLogic::*flag;
 		const char *label;
-		const WideChar *fallback;
 	};
 	static const Enable enables[LOBBY_RULE_COUNT] =
 	{
-		{ &GameLogic::m_diplomacy, "GUI:DiplomacyRuleEnabled", L"%ls turned on Diplomacy. Players may change alliances." },
-		{ &GameLogic::m_freeRadar, "GUI:FreeRadarEnabled", L"%ls turned on Free Radar. Every player has radar." },
-		{ &GameLogic::m_revealMap, "GUI:RevealMapEnabled", L"%ls turned on Reveal Map. Every player sees the whole map." },
-		{ &GameLogic::m_coopBuildings, "GUI:CoopBuildingsEnabled", L"%ls turned on Coop Buildings. Allies may finish each other's buildings." },
-		{ &GameLogic::m_quickGame, "GUI:QuickGameEnabled", L"%ls turned on Quick Game. Rank requirements are lifted." },
+		{ &GameLogic::m_diplomacy, "GUI:DiplomacyRuleEnabled" },
+		{ &GameLogic::m_freeRadar, "GUI:FreeRadarEnabled" },
+		{ &GameLogic::m_revealMap, "GUI:RevealMapEnabled" },
+		{ &GameLogic::m_coopBuildings, "GUI:CoopBuildingsEnabled" },
+		{ &GameLogic::m_quickGame, "GUI:QuickGameEnabled" },
+		{ &GameLogic::m_autoQueue, "GUI:AutoQueueEnabled" },
 	};
 
 	// The host sends them on the first frames; a late one would change the rules mid-match
@@ -5887,11 +5891,16 @@ bool GameLogic::onEnableLobbyRule(GameMessage *msg)
 	{
 		revealMapForAllPlayers();
 	}
-	TheInGameUI->messageNoFormat(TheGameText->FETCH_OR_SUBSTITUTE_FORMAT(enables[rule].label, enables[rule].fallback,
+	TheInGameUI->messageNoFormat(TheGameText->fetchFormat(enables[rule].label,
 		ThePlayerList->getNthPlayer(msg->getPlayerIndex())->getPlayerDisplayName().str()));
 	if (rule == LOBBY_RULE_DIPLOMACY)
 	{
 		PopulateInGameDiplomacyPopup();
+	}
+	if (rule == LOBBY_RULE_AUTO_QUEUE)
+	{
+		// a building selected before this message has cameos that ignore right clicks
+		TheControlBar->markUIDirty();
 	}
 	return true;
 }

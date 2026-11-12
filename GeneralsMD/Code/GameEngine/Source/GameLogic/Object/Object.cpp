@@ -303,6 +303,9 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 
 	m_weaponBonusCondition = 0;
 	m_weaponBonusConditionAgainst = 0;
+	m_weaponDamageScalar = 1.0f;
+	m_weaponRateOfFireScalar = 1.0f;
+	m_weaponRangeScalar = 1.0f;
 	m_curWeaponSetFlags.clear();
 
 	// sanity
@@ -4464,6 +4467,7 @@ void Object::crc( Xfer *xfer )
 	* 7: save full mtx, not pos+orient.
 	* 8: Kris: Conversion of object status bits from UnsignedInt to BitFlags<>
 	* 9: Extra sighting for reveal to all with different range units
+	* 10: Weapon damage, rate of fire and range scalars
 	*/
 //-------------------------------------------------------------------------------------------------
 void Object::xfer( Xfer *xfer )
@@ -4887,6 +4891,13 @@ void Object::xfer( Xfer *xfer )
 
 	m_weaponBonusConditionAgainst.xfer(xfer);
 
+	if (version >= 10)
+	{
+		xfer->xferReal(&m_weaponDamageScalar);
+		xfer->xferReal(&m_weaponRateOfFireScalar);
+		xfer->xferReal(&m_weaponRangeScalar);
+	}
+
 }  // end xfer
 
 //-------------------------------------------------------------------------------------------------
@@ -5183,6 +5194,35 @@ void Object::clearWeaponBonusCondition(WeaponBonusConditionType wst)
 		// Our weapon bonus just changed, so we need to immediately update our weapons
 		m_weaponSet.weaponSetOnWeaponBonusChange(this);
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void Object::setWeaponScalars(Real damage, Real rateOfFire, Real range)
+{
+	Bool rateOfFireChanged = m_weaponRateOfFireScalar != rateOfFire;
+
+	m_weaponDamageScalar = damage;
+	m_weaponRateOfFireScalar = rateOfFire;
+	m_weaponRangeScalar = range;
+
+	if( rateOfFireChanged )
+	{
+		m_weaponSet.weaponSetOnWeaponBonusChange(this);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void Object::copyWeaponScalars(const Object *source)
+{
+	setWeaponScalars(source->m_weaponDamageScalar, source->m_weaponRateOfFireScalar, source->m_weaponRangeScalar);
+}
+
+//-------------------------------------------------------------------------------------------------
+void Object::applyWeaponScalars(WeaponBonus &bonus) const
+{
+	bonus.setField(WeaponBonus::DAMAGE, bonus.getField(WeaponBonus::DAMAGE) * m_weaponDamageScalar);
+	bonus.setField(WeaponBonus::RATE_OF_FIRE, bonus.getField(WeaponBonus::RATE_OF_FIRE) * m_weaponRateOfFireScalar);
+	bonus.setField(WeaponBonus::RANGE, bonus.getField(WeaponBonus::RANGE) * m_weaponRangeScalar);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -5953,13 +5993,32 @@ SpecialPowerModuleInterface *Object::getSpecialPowerModule( const SpecialPowerTe
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool Object::isDisabledForCommand( UnsignedInt commandOptions ) const
+{
+	const Player *player = getControllingPlayer();
+	if (BitIsSet(commandOptions, REQUIRES_POWER) && (!player || !player->getEnergy()->hasSufficientPower()))
+	{
+		return TRUE;
+	}
+
+	DisabledMaskType disabled = getDisabledFlags();
+	if (BitIsSet(commandOptions, IGNORES_UNDERPOWERED))
+	{
+		disabled.set(DISABLED_UNDERPOWERED, FALSE);
+	}
+	return disabled.any();
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Execute special power */
 //-------------------------------------------------------------------------------------------------
 void Object::doSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	if (isDisabledForCommand(commandOptions))
+	{
 		return;
+	}
 
 	// sanity
 	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
@@ -5978,8 +6037,10 @@ void Object::doSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, U
 void Object::doSpecialPowerAtObject( const SpecialPowerTemplate *specialPowerTemplate, Object *obj, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	if (isDisabledForCommand(commandOptions))
+	{
 		return;
+	}
 
 	// sanity
 	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
@@ -5998,8 +6059,10 @@ void Object::doSpecialPowerAtLocation( const SpecialPowerTemplate *specialPowerT
 																			 const Coord3D *loc, Real angle, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	if (isDisabledForCommand(commandOptions))
+	{
 		return;
+	}
 
 	// sanity
 	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
@@ -6021,8 +6084,10 @@ void Object::doSpecialPowerAtMultipleLocations( const SpecialPowerTemplate *spec
 																								const std::vector<Coord3D>& locs, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	if (isDisabledForCommand(commandOptions))
+	{
 		return;
+	}
 
 	if( locs.empty() )
 		return;
@@ -6051,8 +6116,10 @@ void Object::doSpecialPowerAtMultipleLocations( const SpecialPowerTemplate *spec
 void Object::doSpecialPowerUsingWaypoints( const SpecialPowerTemplate *specialPowerTemplate, const Waypoint *way, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	if (isDisabledForCommand(commandOptions))
+	{
 		return;
+	}
 
 	// sanity
 	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
@@ -6070,8 +6137,10 @@ void Object::doSpecialPowerUsingWaypoints( const SpecialPowerTemplate *specialPo
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButton( const CommandButton *commandButton, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	{
 		return;
+	}
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
 	if( ai && cmdSource == CMD_FROM_SCRIPT )
@@ -6244,8 +6313,10 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object *obj, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	{
 		return;
+	}
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
 	if( ai && cmdSource == CMD_FROM_SCRIPT )
@@ -6386,8 +6457,10 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonAtPosition( const CommandButton *commandButton, const Coord3D *pos, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	{
 		return;
+	}
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
 	if( ai && cmdSource == CMD_FROM_SCRIPT && pos )
@@ -6505,8 +6578,10 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonUsingWaypoints( const CommandButton *commandButton, const Waypoint *way, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	{
 		return;
+	}
 
 	if( commandButton )
 	{

@@ -866,6 +866,13 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onMoveUpgradeEarlier(msg, currentlySelectedGroup);
 			break;
 		}
+#if RTS_ZEROHOUR
+		case GameMessage::MSG_SET_AUTO_QUEUE_UNIT:
+		{
+			onSetAutoQueueUnit(msg, currentlySelectedGroup);
+			break;
+		}
+#endif
 		case GameMessage::MSG_DOZER_CONSTRUCT:
 		case GameMessage::MSG_DOZER_CONSTRUCT_LINE:
 		{
@@ -2327,6 +2334,34 @@ bool GameLogic::onCancelUnitCreate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cu
 
 	return true;
 }
+
+#if RTS_ZEROHOUR
+bool GameLogic::onSetAutoQueueUnit(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
+{
+	// refused here as well as at the click, so no client can use it with the rule off
+	if( !isAutoQueue() )
+	{
+		return false;
+	}
+
+	Object *producer = findObjectByID((ObjectID)msg->getArgument(0)->objectID);
+	if( producer == nullptr || producer->getControllingPlayer() != getMessagePlayer(msg) )
+	{
+		return false;
+	}
+
+	ProductionUpdateInterface *pu = producer->getProductionUpdateInterface();
+	if( pu == nullptr )
+	{
+		return false;
+	}
+
+	const Int templateID = msg->getArgument(1)->integer;
+	pu->setAutoQueueUnit( templateID != 0 ? TheThingFactory->findByTemplateID( (UnsignedShort)templateID ) : nullptr );
+
+	return true;
+}
+#endif
 
 bool GameLogic::onMoveUnitCreateEarlier(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {

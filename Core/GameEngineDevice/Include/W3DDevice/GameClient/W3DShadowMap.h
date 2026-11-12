@@ -43,6 +43,11 @@ class W3DShadowReceiveMaterialPassClass : public MaterialPassClass
 {
 public:
 
+	W3DShadowReceiveMaterialPassClass()
+	{
+		Enable_On_Sorted_Meshes(false);
+	}
+
 	virtual void Install_Materials() const override;
 	virtual void UnInstall_Materials() const override;
 };
@@ -74,7 +79,7 @@ public:
 
 	// True once the depth pass has filled the map, until clearDepth is called.
 	Bool hasDepth() const { return m_hasDepth; }
-	void clearDepth() { m_hasDepth = FALSE; }
+	void clearDepth() { m_hasDepth = FALSE; m_screenReceiver = FALSE; }
 
 	// Fits the sun frustum to the ground the camera can see, for this frame. The sun is
 	// lifted to minSunElevation degrees when it sits lower.
@@ -118,8 +123,20 @@ public:
 	Vector4 getReceiverParams() const;
 	Vector4 getReceiverColor() const;
 
-	// The pass objects push to receive the shadow, or null when nothing can receive it.
+	// True when a surface can multiply the shadow in with a second draw of its own, as bridges do.
+	Bool canMultiplyReceive() const;
+
+	// The pass objects push to receive the shadow, or null when they receive some other way or not at all.
 	MaterialPassClass* getReceivePass();
+
+	// The stencil bit the scene sets on object pixels for the full-screen receiver.
+	enum { SCREEN_RECEIVER_STENCIL_BIT = 0x04 };
+
+	// True while this frame's objects are left to the full-screen receiver.
+	Bool usesScreenReceiver() const { return m_screenReceiver; }
+
+	// Shadows the marked object pixels from the scene's depth in one full-screen draw.
+	void renderScreenReceiver(RenderInfoClass& rinfo);
 
 	const Matrix4x4& getSunViewProjection() const { return m_sunViewProj; }
 	const Matrix4x4& getSunProjection() const { return m_sunProjection; }
@@ -134,6 +151,8 @@ public:
 	static Real getCasterSlopeBias();
 
 protected:
+
+	Bool canUseScreenReceiver();
 
 	// Both read the fit updateFrustum stores.
 	void computeSunViewProjection();
@@ -175,6 +194,11 @@ protected:
 	Vector3        m_shadowColor;
 	Bool           m_hasDepth;
 	CasterStats    m_casterStats;
+
+	DWORD          m_screenShader;
+	DWORD          m_screenCloudShader;
+	Bool           m_screenShaderLoaded;
+	Bool           m_screenReceiver;	///< this frame's objects are left to the full-screen pass
 
 	W3DShadowReceiveMaterialPassClass m_receivePass;
 };

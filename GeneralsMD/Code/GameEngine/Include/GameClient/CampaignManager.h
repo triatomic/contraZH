@@ -145,6 +145,7 @@ public:
 	Bool isMissionCompleted( const Campaign *campaign, const Mission *mission );
 	Bool isMissionUnlocked( const Campaign *campaign, const Mission *mission );
 	void markCurrentMissionCompleted();
+	void reloadProgress();
 	Bool isVictorious() { return m_victorious; }
 	void SetVictorious( Bool victory ) { m_victorious = victory;	}
 
