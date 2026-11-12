@@ -1355,22 +1355,6 @@ void OpenContain::exitObjectViaDoor( Object *exitObj, ExitDoorType exitDoor )
 		///< @todo This really should be automatically wrapped up in an activation sequence	for objects in general
 		// tell the AI about it
 		TheAI->pathfinder()->addObjectToPathfindMap( exitObj );
-
-		AIUpdateInterface *ai = exitObj->getAI();
-		const Coord3D *rallyPoint = getRallyPoint();
-		if( ai && rallyPoint )
-		{
-			std::vector<Coord3D> exitPath;
-			ExitInterface *primaryExit = me->getObjectExitInterface();
-			Coord3D naturalRallyPoint;
-			if( primaryExit && primaryExit != static_cast<ExitInterface *>(this)
-				&& primaryExit->getNaturalRallyPoint(naturalRallyPoint) )
-			{
-				exitPath.push_back(naturalRallyPoint);
-			}
-			exitPath.push_back(*rallyPoint);
-			ai->aiFollowPath( &exitPath, me, CMD_FROM_AI );
-		}
 	}
 }
 // ------------------------------------------------------------------------------------------------
@@ -1920,8 +1904,7 @@ const Coord3D *OpenContain::getRallyPoint() const
 	if (m_rallyPointExists)
 		return &m_rallyPoint;
 
-#if !RETAIL_COMPATIBLE_CRC
-	// TheSuperHackers @bugfix arcticdolphin 02/03/2026 Use primary exit interface rally point if available.
+	// The production module owns the building's rally point.
 	if (getObject())
 	{
 		ExitInterface *primaryExit = getObject()->getObjectExitInterface();
@@ -1930,7 +1913,6 @@ const Coord3D *OpenContain::getRallyPoint() const
 			return primaryExit->getRallyPoint();
 		}
 	}
-#endif
 
 	return nullptr;
 }

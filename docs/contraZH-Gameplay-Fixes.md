@@ -5,9 +5,8 @@ it changes the simulation (older replays no longer play back identically) or onl
 
 ## Healed infantry follow the barracks rally point
 
-Infantry leaving a healing container move clear of the building, then follow its rally point.
-This also works when the container has no model exit paths (`NumberOfExitPaths = 0`).
-The container uses the building's production rally point when it has no rally point of its own.
+Infantry leaving a barracks after healing now follow its rally point. The healing container
+reads the rally point from the building's production module when it has no rally point of its own.
 
 Changes the simulation and can change older replay playback.
 
