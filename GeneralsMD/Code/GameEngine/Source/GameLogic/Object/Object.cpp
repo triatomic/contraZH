@@ -3207,9 +3207,15 @@ void Object::friend_prepareForMapBoundaryAdjust()
 //-------------------------------------------------------------------------------------------------
 void Object::friend_notifyOfNewMapBoundary()
 {
-	ThePartitionManager->registerObject(this);
+	// the radar keeps occupants listed and hides them, so every object goes back on it
 	TheRadar->addObject(this);
-	TheAI->pathfinder()->addObjectToPathfindMap( this );
+
+	// a container keeps its enclosed occupants out of the partition and the pathfind map
+	if (!getEnclosingContainedBy())
+	{
+		ThePartitionManager->registerObject(this);
+		TheAI->pathfinder()->addObjectToPathfindMap( this );
+	}
 
 	// Now that the PartitionManager has finished its reset, we need to relook
 	handlePartitionCellMaintenance();
