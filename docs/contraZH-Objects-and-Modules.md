@@ -370,6 +370,9 @@ What it does, by order type:
 | Attack (direct order) | Closes on the target, halts, fires. |
 | Stationary | Fires normally. |
 
+Warning: a unit with a second turret also holds that turret's idle scan while the chassis turns in
+place to aim. Check multi-turret units that use `NOTWHILEMOVING`.
+
 This takes two separate checks, because the two halves pull against each other. Targets of opportunity - the
 idle scans, including a turret scanning while the chassis under it drives - are suppressed while the object is
 in motion, which is what keeps it from shooting on an ordinary move. Attack-move deliberately still acquires
