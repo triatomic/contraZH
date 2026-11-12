@@ -640,6 +640,7 @@ public:
 
 	DisabledMaskType getDisabledFlags() const { return m_disabledMask; }
 	Bool isDisabled() const { return m_disabledMask.any(); }
+	Bool isDisabledForCommand( UnsignedInt commandOptions ) const;
 	Bool clearDisabled( DisabledType type );
 
 	void setDisabled( DisabledType type );

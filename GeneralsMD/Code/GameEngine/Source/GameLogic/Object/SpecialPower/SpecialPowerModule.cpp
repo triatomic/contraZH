@@ -312,6 +312,36 @@ Bool SpecialPowerModule::isModuleForPower( const SpecialPowerTemplate *specialPo
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool SpecialPowerModule::isReadyForCommand( UnsignedInt commandOptions ) const
+{
+	if (getObject()->isDisabledForCommand(commandOptions))
+	{
+		return FALSE;
+	}
+	if (m_pausedCount == 0)
+	{
+		return isReady();
+	}
+	return m_pendingShotsState == PENDING_NONE && m_pausedCount == 1
+		&& BitIsSet(commandOptions, IGNORES_UNDERPOWERED)
+		&& getObject()->isDisabledByType(DISABLED_UNDERPOWERED)
+		&& (getSpecialPowerTemplate()->isSharedNSync() ? isReady() : m_pausedOnFrame >= m_availableOnFrame);
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool SpecialPowerModule::canActivateForCommand( UnsignedInt commandOptions ) const
+{
+	if (getObject()->isDisabledForCommand(commandOptions))
+	{
+		return FALSE;
+	}
+	return m_pausedCount == 0 || (m_pausedCount == 1
+		&& BitIsSet(commandOptions, IGNORES_UNDERPOWERED)
+		&& getObject()->isDisabledByType(DISABLED_UNDERPOWERED)
+		&& isReadyForCommand(commandOptions));
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Is this special power ready to use */
 //-------------------------------------------------------------------------------------------------
 Bool SpecialPowerModule::isReady() const
@@ -486,6 +516,11 @@ void SpecialPowerModule::beginCooldownNow()
 	{
 		// set the frame we will be 100% available on now
 		m_availableOnFrame = TheGameLogic->getFrame() + getSpecialPowerTemplate()->getReloadTime();
+	}
+	if (m_pausedCount > 0)
+	{
+		m_pausedOnFrame = TheGameLogic->getFrame();
+		m_pausedPercent = 0.0f;
 	}
 }
 
@@ -954,7 +989,8 @@ void SpecialPowerModule::aboutToDoSpecialPower( const Coord3D *location )
 //-------------------------------------------------------------------------------------------------
 void SpecialPowerModule::doSpecialPower( UnsignedInt commandOptions )
 {
-	if (m_pausedCount > 0 || getObject()->isDisabled()) {
+	if (!canActivateForCommand(commandOptions))
+	{
 		return;
 	}
 
@@ -976,7 +1012,8 @@ void SpecialPowerModule::doSpecialPower( UnsignedInt commandOptions )
 //-------------------------------------------------------------------------------------------------
 void SpecialPowerModule::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions )
 {
-	if (m_pausedCount > 0 || getObject()->isDisabled()) {
+	if (!canActivateForCommand(commandOptions))
+	{
 		return;
 	}
 
@@ -998,7 +1035,8 @@ void SpecialPowerModule::doSpecialPowerAtObject( Object *obj, UnsignedInt comman
 //-------------------------------------------------------------------------------------------------
 void SpecialPowerModule::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	if (m_pausedCount > 0 || getObject()->isDisabled()) {
+	if (!canActivateForCommand(commandOptions))
+	{
 		return;
 	}
 
@@ -1026,7 +1064,8 @@ void SpecialPowerModule::doSpecialPowerAtLocation( const Coord3D *loc, Real angl
 //-------------------------------------------------------------------------------------------------
 void SpecialPowerModule::doSpecialPowerUsingWaypoints( const Waypoint *way, UnsignedInt commandOptions )
 {
-	if (m_pausedCount > 0 || getObject()->isDisabled()) {
+	if (!canActivateForCommand(commandOptions))
+	{
 		return;
 	}
 

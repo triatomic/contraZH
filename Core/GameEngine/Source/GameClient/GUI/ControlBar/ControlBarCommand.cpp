@@ -1136,6 +1136,17 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 	if ( obj->isDisabledByType( DISABLED_CHRONO ) )
         return COMMAND_RESTRICTED;
  
+#if RTS_ZEROHOUR
+	if (BitIsSet(command->getOptions(), REQUIRES_POWER))
+	{
+		const Player *player = obj->getControllingPlayer();
+		if (!player || !player->getEnergy()->hasSufficientPower())
+		{
+			return COMMAND_RESTRICTED;
+		}
+	}
+#endif
+
 	//Other disabled objects are unable to use buttons -- so gray them out.
 	Bool disabled = obj->isDisabled();
 
@@ -1529,7 +1540,11 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 				DEBUG_CRASH(( "Object %s does not contain special power module (%s) to execute.  Did you forget to add it to the object INI?",
 											obj->getTemplate()->getName().str(), command->getSpecialPowerTemplate()->getName().str() ));
 			}
+#if RTS_ZEROHOUR
+			else if( mod->isReadyForCommand(command->getOptions()) == FALSE )
+#else
 			else if( mod->isReady() == FALSE )
+#endif
 			{
 				Int percent =  mod->getPercentReady() * 100;
 
