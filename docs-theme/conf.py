@@ -108,6 +108,7 @@ contra_nav = [
         ('Viewing & D3D9 Effects', 'WorldBuilder-Qt-Viewing'),
         ('Scripts & INI', 'WorldBuilder-Qt-Scripts-and-INI'),
         ('Map Generator & MCP', 'WorldBuilder-Qt-Map-Generator'),
+        ('MCP Server', 'WorldBuilder-Qt-MCP'),
     ]),
     ('Upstream reference', [
         ('Changes & Bug Fixes', 'Changes-&-Bug-Fixes'),

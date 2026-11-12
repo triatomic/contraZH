@@ -15,6 +15,7 @@ changelog](https://github.com/triatomic/contraZH/blob/main/GeneralsMD/Code/Tools
 * [Viewing & D3D9 Effects](WorldBuilder-Qt-Viewing.md) - model display options and the Direct3D 9 effects
 * [Scripts & INI](WorldBuilder-Qt-Scripts-and-INI.md) - the script editor and the map.ini and INI editors
 * [Map Generator & MCP](WorldBuilder-Qt-Map-Generator.md) - the map generator and the MCP server
+* [MCP Server](WorldBuilder-Qt-MCP.md) - setup, tools, conventions and limits of the MCP server
 
 ## Running
 

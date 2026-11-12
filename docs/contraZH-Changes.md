@@ -13,7 +13,7 @@ Everything here is additional to upstream; the rest of these docs still applies.
 as of October 2026. The only casualty was the texture filter option, replaced by TheSuperHackers'
 version - see [Rendering](contraZH-Options.md#rendering) for the renamed `AnisotropyLevel` key.
 * Upstream's WorldBuilder MCP server is not included; contraZH has its own, see
-[Map Generator & MCP](WorldBuilder-Qt-Map-Generator.md#mcp-server).
+[MCP Server](WorldBuilder-Qt-MCP.md).
 
 ## Pages
 
