@@ -161,6 +161,10 @@ private:
 	void Layout(int cx, int cy);
 	void ReassertLayout();
 	void ApplyPanelTheme();
+
+	// The shader toggles of the main toolbar, with the same commands and icons
+	void CreateToolBar();
+	void ApplyToolBarTheme();
 	void UpdatePreviewModel();
 
 	// Positions the ground-height slider thumb from the pane's current ground Z
@@ -285,6 +289,9 @@ private:
 
 	static CMaterialViewerFrame *_TheInstance;
 
+	CToolBar				m_ToolBar;
+	CImageList				m_ToolBarImagesLight;
+	CImageList				m_ToolBarImagesDark;
 	CMaterialPreviewPane	*m_Preview;
 	CStatic					m_PlaceholderText;	// shown where the Qt panel would be
 	HWND					m_PanelWnd;

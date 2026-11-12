@@ -497,7 +497,8 @@ CMainFrame::OnCreate (LPCREATESTRUCT lpCreateStruct)
 
 		// 17 buttons * 16px wide, 15px tall, palette index 15 as the transparency
 		// mask color (matches the convention used by CToolBar::LoadToolBar).
-		m_toolbarImgDark.Create (16, 15, ILC_COLOR4 | ILC_MASK, 17, 0);
+		// A 4-bit list would snap the strip's own palette colours to the VGA ones.
+		m_toolbarImgDark.Create (16, 15, ILC_COLOR24 | ILC_MASK, 17, 0);
 		HBITMAP hbm = ::LoadBitmap (::AfxGetResourceHandle (),
 			MAKEINTRESOURCE (IDR_MAINFRAME_DM));
 		if (hbm) {

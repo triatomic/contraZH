@@ -52,6 +52,33 @@ namespace
 	const int PREVIEW_ID = 1;
 	const int PLACEHOLDER_ID = 2;
 
+	// The shader toggle icons sit in the main toolbar strip, after the file buttons
+	const int TOOLBAR_ICON_WIDTH = 16;
+	const int TOOLBAR_ICON_HEIGHT = 15;
+	const int TOOLBAR_STRIP_ICONS = 17;
+	const int TOOLBAR_FIRST_SHADER_ICON = 10;
+	const UINT TOOLBAR_BUTTONS[] =
+	{
+		IDM_TOGGLE_ALPHA,
+		IDM_SHADER_ADDITIVE,
+		IDM_SHADER_ALPHA_TEST,
+		IDM_SHADER_ALPHA_BLEND,
+		IDM_SHADER_ALPHA_BLEND_TEST,
+		IDM_SHADER_DOUBLE_SIDED,
+	};
+	const int TOOLBAR_BUTTON_COUNT = sizeof(TOOLBAR_BUTTONS) / sizeof(TOOLBAR_BUTTONS[0]);
+
+	// Grey is the strip's transparent colour, as in every MFC toolbar bitmap
+	void Load_Toolbar_Strip(CImageList &images, UINT bitmap_id)
+	{
+		images.Create(TOOLBAR_ICON_WIDTH, TOOLBAR_ICON_HEIGHT, ILC_COLOR24 | ILC_MASK, TOOLBAR_STRIP_ICONS, 0);
+		HBITMAP bitmap = ::LoadBitmap(::AfxGetResourceHandle(), MAKEINTRESOURCE(bitmap_id));
+		if (bitmap != nullptr) {
+			::ImageList_AddMasked(images.GetSafeHandle(), bitmap, RGB(192, 192, 192));
+			::DeleteObject(bitmap);
+		}
+	}
+
 	// Ground-height slider (Qt QSlider): strip width left of the preview, and
 	// tick count (position resolution) across the pane's z range.
 	const int GROUND_SLIDER_WIDTH = 26;
@@ -840,6 +867,8 @@ CMaterialViewerFrame::OnCreate(LPCREATESTRUCT create_struct)
 		return -1;
 	}
 
+	CreateToolBar();
+
 	m_Preview = new CMaterialPreviewPane;
 	m_Preview->Create(this, CRect(0, 0, 10, 10), PREVIEW_ID);
 
@@ -926,6 +955,39 @@ CMaterialViewerFrame::OnCreate(LPCREATESTRUCT create_struct)
 	RedrawWindow(nullptr, nullptr,
 		RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME);
 	return 0;
+}
+
+void
+CMaterialViewerFrame::CreateToolBar()
+{
+	if (!m_ToolBar.CreateEx(this, TBSTYLE_FLAT, WS_CHILD | WS_VISIBLE | CBRS_TOP | CBRS_TOOLTIPS | CBRS_FLYBY)) {
+		return;
+	}
+
+	m_ToolBar.SetButtons(TOOLBAR_BUTTONS, TOOLBAR_BUTTON_COUNT);
+	m_ToolBar.SetSizes(CSize(TOOLBAR_ICON_WIDTH + 7, TOOLBAR_ICON_HEIGHT + 7),
+		CSize(TOOLBAR_ICON_WIDTH, TOOLBAR_ICON_HEIGHT));
+	for (int i = 0; i < TOOLBAR_BUTTON_COUNT; i++) {
+		m_ToolBar.SetButtonInfo(i, TOOLBAR_BUTTONS[i], TBBS_BUTTON, TOOLBAR_FIRST_SHADER_ICON + i);
+	}
+
+	Load_Toolbar_Strip(m_ToolBarImagesLight, IDR_MAINFRAME);
+	Load_Toolbar_Strip(m_ToolBarImagesDark, IDR_MAINFRAME_DM);
+	ApplyToolBarTheme();
+}
+
+void
+CMaterialViewerFrame::ApplyToolBarTheme()
+{
+	if (!::IsWindow(m_ToolBar.m_hWnd)) {
+		return;
+	}
+
+	CImageList &images = W3DDarkMode::IsDark() ? m_ToolBarImagesDark : m_ToolBarImagesLight;
+	if (images.GetSafeHandle() != nullptr) {
+		m_ToolBar.GetToolBarCtrl().SetImageList(&images);
+	}
+	m_ToolBar.Invalidate();
 }
 
 void
@@ -1041,7 +1103,15 @@ CMaterialViewerFrame::ReassertLayout()
 void
 CMaterialViewerFrame::Layout(int cx, int cy)
 {
-	// File-tab strip across the top, shown only while tabs are open.
+	// The frame docks the toolbar along the top; the panes start below it
+	int bar_height = 0;
+	if (::IsWindow(m_ToolBar.m_hWnd) && m_ToolBar.IsWindowVisible()) {
+		CRect bar;
+		m_ToolBar.GetWindowRect(&bar);
+		bar_height = bar.Height();
+	}
+
+	// File-tab strip under the toolbar, shown only while tabs are open.
 	int tab_height = 0;
 #ifdef W3DVIEW_HAS_QT
 	if (m_TabBarWnd != nullptr && HasTabs()) {
@@ -1050,11 +1120,12 @@ CMaterialViewerFrame::Layout(int cx, int cy)
 			tab_height = MIN_TAB_BAR_HEIGHT;
 		}
 		W3dMaterialViewer::ResizeTabBar(cx, tab_height);
-		::MoveWindow(m_TabBarWnd, 0, 0, cx, tab_height, TRUE);
+		::MoveWindow(m_TabBarWnd, 0, bar_height, cx, tab_height, TRUE);
 	}
 #endif
 
-	int body_height = cy - tab_height;
+	int body_top = bar_height + tab_height;
+	int body_height = cy - body_top;
 	int preview_width = (int)(cx * PREVIEW_WIDTH_RATIO);
 
 	// Ground-height slider strip (Qt QSlider) on the preview's left, only while
@@ -1068,7 +1139,7 @@ CMaterialViewerFrame::Layout(int cx, int cy)
 			// Resize through Qt first so its logical geometry matches (same
 			// dance as the panel/tab bar).
 			W3dMaterialViewer::ResizeGroundSlider(slider_width, body_height);
-			::MoveWindow(m_GroundSliderWnd, 0, tab_height, slider_width, body_height, TRUE);
+			::MoveWindow(m_GroundSliderWnd, 0, body_top, slider_width, body_height, TRUE);
 			::ShowWindow(m_GroundSliderWnd, SW_SHOW);
 		} else {
 			::ShowWindow(m_GroundSliderWnd, SW_HIDE);
@@ -1084,7 +1155,7 @@ CMaterialViewerFrame::Layout(int cx, int cy)
 		if (m_AnimBarVisible) {
 			anim_height = W3dMaterialViewer::GetAnimBarPreferredHeight();
 			W3dMaterialViewer::ResizeAnimBar(preview_width - slider_width, anim_height);
-			::MoveWindow(m_AnimBarWnd, slider_width, tab_height + body_height - anim_height,
+			::MoveWindow(m_AnimBarWnd, slider_width, body_top + body_height - anim_height,
 				preview_width - slider_width, anim_height, TRUE);
 			::ShowWindow(m_AnimBarWnd, SW_SHOW);
 		} else {
@@ -1094,7 +1165,7 @@ CMaterialViewerFrame::Layout(int cx, int cy)
 #endif
 
 	if ((m_Preview != nullptr) && ::IsWindow(m_Preview->m_hWnd)) {
-		m_Preview->MoveWindow(slider_width, tab_height, preview_width - slider_width, body_height - anim_height);
+		m_Preview->MoveWindow(slider_width, body_top, preview_width - slider_width, body_height - anim_height);
 	}
 
 	if (m_PanelWnd != nullptr) {
@@ -1104,9 +1175,9 @@ CMaterialViewerFrame::Layout(int cx, int cy)
 		// a stale pre-reparent position).
 		W3dMaterialViewer::ResizePanel(cx - preview_width, body_height);
 #endif
-		::MoveWindow(m_PanelWnd, preview_width, tab_height, cx - preview_width, body_height, TRUE);
+		::MoveWindow(m_PanelWnd, preview_width, body_top, cx - preview_width, body_height, TRUE);
 	} else if (::IsWindow(m_PlaceholderText.m_hWnd)) {
-		m_PlaceholderText.MoveWindow(preview_width, tab_height, cx - preview_width, body_height);
+		m_PlaceholderText.MoveWindow(preview_width, body_top, cx - preview_width, body_height);
 	}
 }
 
@@ -2330,6 +2401,7 @@ CMaterialViewerFrame::OnThemeChanged(WPARAM wparam, LPARAM lparam)
 {
 	W3DDarkMode::ApplyToWindow(m_hWnd);
 	ApplyPanelTheme();
+	ApplyToolBarTheme();
 	if (m_Preview != nullptr && ::IsWindow(m_Preview->m_hWnd)) {
 		m_Preview->Invalidate();
 	}

@@ -23,6 +23,11 @@ if(WIN32 OR "${CMAKE_SYSTEM}" MATCHES "Windows")
         # TheSuperHackers @build Disable linker auto-manifest; manifest is embedded via RC file instead
         LINK_FLAGS "/MANIFEST:NO"
     )
+
+    # Ninja tracks the resource script, but not the bitmaps and icons it embeds
+    file(GLOB_RECURSE W3DVIEW_RES_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/Core/Tools/W3DView/Res/*")
+    set_source_files_properties("${CMAKE_SOURCE_DIR}/Core/Tools/W3DView/W3DView.rc"
+        PROPERTIES OBJECT_DEPENDS "${W3DVIEW_RES_FILES}")
 else()
     set_target_properties(z_w3dview PROPERTIES OUTPUT_NAME "w3dviewzh${RTS_BUILD_OUTPUT_SUFFIX}")
 endif()
