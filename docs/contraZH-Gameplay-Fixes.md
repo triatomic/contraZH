@@ -134,6 +134,8 @@ until it sinks. Dying vehicles still block until they become hulks.
 until the jam ends, including `ALWAYS_SELECTABLE` objects.
 * Jamming clears both the UI and simulation selections and hides the object's command buttons.
 * `UNSELECTABLE` alone blocks new selection clicks but no longer empties the current selection.
+* Deselecting another object preserves temporarily `UNSELECTABLE` selection members, so control
+returns when their status clears.
 * The jam state is tracked directly, so a promotion or health upgrade can no longer leave a unit
 jammed forever.
 
