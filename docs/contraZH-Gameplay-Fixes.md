@@ -90,8 +90,46 @@ identically.
 
 Network game packets now carry up to about 1100 bytes instead of the 476 bytes sized for a 512-byte
 modem packet, so a burst of orders goes out in one packet instead of several. This applies to every
-multiplayer game. The lobby already refuses a player whose executable differs, so an older build
-cannot join a game hosted on this one.
+multiplayer game. An older build cannot share a game with this one. A GameSpy lobby refuses a
+player whose executable differs, and a LAN lobby refuses one on another network version.
+
+## LAN games need the same network version
+
+Each build carries a network version, which changes when the packet size or the map file format
+changes. A LAN host refuses a joiner on another version, and a joiner leaves a host on another
+version. Both see the CRC mismatch message. Previously, Zero Hour let any build join a LAN game,
+and the two sides then could not understand each other.
+
+Builds of the same code share a version, so a cheats build can join a normal build and a D3D8 build
+can join a D3D9 build. A Generals Online build has its own version, because its packet size differs.
+
+## Map transfer
+
+A host whose map cannot be transferred is told when pressing Start, before anyone enters the
+transfer screen. The lobby chat names the file and the cause, such as a `.map` over 5 MB. Previously
+the whole map was sent, every receiver rejected it silently and all players waited two minutes.
+
+A side file that cannot be sent is left out and the map transfers without it. This applies to the
+preview, `map.str`, `assetusage.txt` and `readme.txt`. One is left out when it is empty, over its size
+limit or not a valid file of its type, such as a preview without a TGA 2.0 footer. Previously, one
+such file failed the whole transfer.
+
+`map.ini` and `solo.ini` change the game data, so a player without them would go out of sync. A map
+whose `map.ini` or `solo.ini` cannot be sent (empty, over 2 MB, or containing a zero byte) still
+blocks Start.
+
+The cause lines use the labels `GUI:MapTransferFileMissing`, `Empty`, `Unreadable`, `WrongType`,
+`TooLarge` and `Invalid`. A translation can supply them, and the game falls back to English text.
+
+The transfer now ends after 60 seconds without progress from any player. Previously, it ended two
+minutes after it began, even while a slow link was still delivering.
+
+The host sends only as many pieces at once as the receiver has acknowledged room for. The amount
+grows while pieces arrive and halves when one has to be sent again. Previously, the host sent up to
+256 packets every frame, most were dropped at the receiver and sent again.
+
+In LAN and GameSpy games every file is compressed for the transfer. Generals Online games send
+the files as they are, because other clients there do not expect compressed data.
 
 ## Drones stay on their leash
 
