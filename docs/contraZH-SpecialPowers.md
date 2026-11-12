@@ -19,10 +19,38 @@ End
 Notes:
 * At least one shot fired: the cooldown starts even if the rest never fire (move order, empty clip,
 death).
-* **No** shot fired: the power comes back ready. Credits are not refunded.
+* **No** shot fired: the power comes back ready. Upfront costs are not refunded;
+deferred costs are not charged.
 * Failsafe: after `ReloadTime` of waiting the cooldown starts anyway, and the log names the power
 (also catches OCLs with no `Attack` nugget).
 * Ignored for `SharedSyncedTimer` powers.
+
+## DeductCostOnFirstShot
+
+`DeductCostOnFirstShot = No` by default. Set it to `Yes` to deduct `Cost` once, when the
+caster fires its first shot, instead of when the power triggers.
+
+```
+SpecialPower SpecialPowerDig
+  Enum                     = SPECIAL_HELIX_NAPALM_BOMB
+  ReloadTime               = 60000
+  Cost                     = 500
+  DeductCostOnFirstShot     = Yes
+  StartCooldownOnFirstShot  = Yes
+End
+```
+
+* The player must have enough money when the power triggers. Money is not reserved.
+* If the player spends that money before firing, the first shot takes up to the remaining balance.
+* Cancelling before the first shot costs nothing. Later shots in the burst cost nothing extra.
+* Cooldown timing still follows `StartCooldownOnFirstShot`. With that setting off, the cooldown
+starts when the power triggers, even if the attack is later cancelled.
+* The caster must fire the shot itself, as with an OCL `Attack` nugget. Shots from spawned units
+do not count. A caster that cannot fire pays when the power triggers.
+* Any shot from the caster during the wait counts, including one at a target ordered afterwards.
+* The shot wait ends after `ReloadTime`. A caster still attacking at that point pays then.
+* A script or crate that resets the timer during the wait also collects the cost.
+* Saving and loading preserves any unpaid cost.
 
 ## Eva events for Contra superweapons
 
