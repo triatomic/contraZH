@@ -804,6 +804,16 @@ CMaterialViewerFrame::PreTranslateMessage(MSG *msg)
 		}
 	}
 
+	// 7 toggles the poly and vertex totals, unless it is being typed into the panel
+	if (ViewportStats::Is_Toggle_Key(msg)
+#ifdef W3DVIEW_HAS_QT
+			&& !W3dMaterialViewer::PanelFocusIsTextEntry()
+#endif
+			) {
+		ViewportStats::Toggle();
+		return TRUE;
+	}
+
 	if (msg->message >= WM_KEYFIRST && msg->message <= WM_KEYLAST) {
 #ifdef W3DVIEW_HAS_QT
 		HWND panel = m_PanelWnd;

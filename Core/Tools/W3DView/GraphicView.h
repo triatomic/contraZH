@@ -42,6 +42,7 @@ class ParticleEmitterClass;
 // CGraphicView view
 
 #include "WW3D2/camera.h"
+#include "ViewportOverlay.h"
 
 class CGraphicView : public CView
 {
@@ -286,6 +287,8 @@ protected:
         void                    Clip_Cursor_To_View (void);
         bool                    Wrap_Cursor_In_View (CPoint &point);
         void                    Orbit_Camera (int deltaX, int deltaY, CW3DViewDoc *doc);
+        void                    Apply_Camera_Transform (const Matrix3D &transform, CW3DViewDoc *doc);
+        void                    Update_View_Cube_Snap (CW3DViewDoc *doc);
 
         /////////////////////////////////////////////////
         //
@@ -321,6 +324,7 @@ protected:
 		  OBJECT_ROTATION		m_LightRotation;
         CAMERA_ROTATION		m_allowedCameraRotation;
         bool					m_InvertCameraY;
+        ViewCubeClass			m_ViewCube;
 
         // Ground plane (Ground menu); height defaults to the displayed object's
         // bounding-box bottom whenever the toggle turns on.

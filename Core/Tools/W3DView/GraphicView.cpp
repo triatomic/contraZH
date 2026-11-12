@@ -57,16 +57,6 @@
 #include "W3DDarkMode.h"
 #include "MaterialViewer/MaterialViewerFrame.h"
 
-// D3D9 moved the filter states to the sampler and split the FVF from the vertex shader
-#if defined(BUILD_WITH_D3D9)
-#define VIEW_GET_FILTER(dev, state, out)		(dev)->GetSamplerState (0, D3DSAMP_##state, out)
-#define VIEW_SET_FILTER(dev, state, value)	(dev)->SetSamplerState (0, D3DSAMP_##state, value)
-#define VIEW_GET_FVF(dev, out)					(dev)->GetFVF (out)
-#else
-#define VIEW_GET_FILTER(dev, state, out)		(dev)->GetTextureStageState (0, D3DTSS_##state, out)
-#define VIEW_SET_FILTER(dev, state, value)	(dev)->SetTextureStageState (0, D3DTSS_##state, value)
-#define VIEW_GET_FVF(dev, out)					(dev)->GetVertexShader (out)
-#endif
 #ifdef RTS_DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
@@ -891,28 +881,6 @@ CGraphicView::~CGraphicView ()
 }
 
 
-// Walk all mesh subobjects and sum vertex counts.
-static int Count_Render_Obj_Vertices (RenderObjClass *obj)
-{
-	if (!obj) return 0;
-	int total = 0;
-	int n = obj->Get_Num_Sub_Objects ();
-	for (int i = 0; i < n; i++)
-	{
-		RenderObjClass *sub = obj->Get_Sub_Object (i);
-		if (sub)
-		{
-			if (sub->Class_ID () == RenderObjClass::CLASSID_MESH)
-			{
-				MeshModelClass *model = static_cast<MeshClass *>(sub)->Peek_Model ();
-				if (model) total += model->Get_Vertex_Count ();
-			}
-			sub->Release_Ref ();
-		}
-	}
-	return total;
-}
-
 
 BEGIN_MESSAGE_MAP(CGraphicView, CView)
 	//{{AFX_MSG_MAP(CGraphicView)
@@ -1308,6 +1276,9 @@ CGraphicView::RepaintView
 			Rotate_Light ();
 		}
 
+		// A click on the view cube turns the camera over a few frames
+		Update_View_Cube_Snap (doc);
+
 		// Reset the current lod to be the lowest possible LOD...
 		RenderObjClass *prender_obj = doc->GetDisplayedObject ();
 		if ((prender_obj != nullptr) &&
@@ -1392,6 +1363,13 @@ CGraphicView::RepaintView
 		// TheSuperHackers @feature Tria 23/04/2026 Highlight selected bone or sub-object in viewport.
 		Render_Selected_Item_Overlay (this, doc, m_pCamera.Peek ());
 
+		// View cube and the 7 key statistics, over everything else
+		m_ViewCube.Render (m_hWnd, m_pCamera->Get_Transform ());
+		if (ViewportStats::Is_Visible ())
+		{
+			ViewportStats::Render (prender_obj);
+		}
+
 		// Finish out the rendering process
 		WW3D::End_Render ();
 
@@ -1408,7 +1386,7 @@ CGraphicView::RepaintView
 			doc->Update_Particle_Count ();
 
 			int polys = (prender_obj != nullptr) ? prender_obj->Get_Num_Polys () : 0;
-			int verts = Count_Render_Obj_Vertices (prender_obj);
+			int verts = ViewportStats::Count_Vertices (prender_obj);
 			((CMainFrame *)::AfxGetMainWnd ())->UpdatePolygonCount (polys, verts, polys);
 		}
 
@@ -1651,6 +1629,14 @@ CGraphicView::OnLButtonDown
     CPoint point
 )
 {
+	// The view cube takes the clicks that land on it
+	if (!m_bRMouseDown && !m_bMMouseDown && m_pCamera != nullptr &&
+		 m_ViewCube.On_LButton_Down (m_hWnd, m_pCamera->Get_Transform (), point))
+	{
+		SetCapture ();
+		return ;
+	}
+
 	// Capture all mouse messages
 	SetCapture ();
 	Clip_Cursor_To_View ();
@@ -1682,6 +1668,15 @@ CGraphicView::OnLButtonUp
     CPoint point
 )
 {
+	if (m_ViewCube.On_LButton_Up ())
+	{
+		if (!m_bRMouseDown && !m_bMMouseDown)
+		{
+			ReleaseCapture ();
+		}
+		return ;
+	}
+
     // Mouse button is up
     m_bMouseDown = FALSE;
 
@@ -1781,6 +1776,39 @@ CGraphicView::Orbit_Camera (int deltaX, int deltaY, CW3DViewDoc *doc)
 
 ////////////////////////////////////////////////////////////////////////////
 //
+//  Apply_Camera_Transform
+//
+////////////////////////////////////////////////////////////////////////////
+void
+CGraphicView::Apply_Camera_Transform (const Matrix3D &transform, CW3DViewDoc *doc)
+{
+	// Pan reads the camera basis from this accumulator
+	rotation = Build_Quaternion (transform);
+
+	m_pCamera->Set_Transform (transform);
+	doc->GetBackObjectCamera ()->Set_Transform (transform);
+	doc->GetBackObjectCamera ()->Set_Position (Vector3 (0.00F, 0.00F, 0.00F));
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Update_View_Cube_Snap
+//
+////////////////////////////////////////////////////////////////////////////
+void
+CGraphicView::Update_View_Cube_Snap (CW3DViewDoc *doc)
+{
+	Matrix3D transform;
+	if (m_pCamera != nullptr && m_ViewCube.Update_Snap (sphereCenter, m_pCamera->Get_Transform (), transform))
+	{
+		Apply_Camera_Transform (transform, doc);
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
 //  OnMouseMove
 //
 ////////////////////////////////////////////////////////////////////////////
@@ -1796,6 +1824,18 @@ CGraphicView::OnMouseMove
 
 	// Get the document to display
 	CW3DViewDoc* doc = (CW3DViewDoc *)GetDocument();
+
+	// A drag that began on the view cube orbits the camera
+	int cubeDeltaX = 0;
+	int cubeDeltaY = 0;
+	if (m_ViewCube.On_Mouse_Move (point, cubeDeltaX, cubeDeltaY))
+	{
+		if ((cubeDeltaX != 0 || cubeDeltaY != 0) && m_bInitialized && doc->GetScene ())
+		{
+			Orbit_Camera (cubeDeltaX, cubeDeltaY, doc);
+		}
+		return ;
+	}
 
 	if (!(nFlags & MK_CONTROL) && m_bLightMeshInScene) {
 		m_pLightMesh->Remove ();
@@ -2029,7 +2069,7 @@ CGraphicView::OnMouseMove
 					if (prender_obj != nullptr) {
 
 						// Ensure the status bar is updated with the correct poly count
-						pCMainWnd->UpdatePolygonCount (prender_obj->Get_Num_Polys (), Count_Render_Obj_Vertices (prender_obj), prender_obj->Get_Num_Polys ());
+						pCMainWnd->UpdatePolygonCount (prender_obj->Get_Num_Polys (), ViewportStats::Count_Vertices (prender_obj), prender_obj->Get_Num_Polys ());
 					}
 
 					// Ensure the status bar is updated with the correct camera distance
@@ -2243,7 +2283,7 @@ CGraphicView::Reset_Camera_To_Display_Object (RenderObjClass &render_object)
 	// Update the polygon count in the main window
 	CMainFrame *pCMainWnd = (CMainFrame *)::AfxGetMainWnd ();
 	if (pCMainWnd != nullptr) {
-		pCMainWnd->UpdatePolygonCount (render_object.Get_Num_Polys (), Count_Render_Obj_Vertices (&render_object), render_object.Get_Num_Polys ());
+		pCMainWnd->UpdatePolygonCount (render_object.Get_Num_Polys (), ViewportStats::Count_Vertices (&render_object), render_object.Get_Num_Polys ());
 	}
 
 	// Load the settings in the default.dat if its in the local directory.
@@ -2463,7 +2503,7 @@ CGraphicView::OnMouseWheel
             if (pCMainWnd != nullptr) {
                 RenderObjClass *prender_obj = doc->GetDisplayedObject ();
                 if (prender_obj != nullptr)
-                    pCMainWnd->UpdatePolygonCount (prender_obj->Get_Num_Polys (), Count_Render_Obj_Vertices (prender_obj), prender_obj->Get_Num_Polys ());
+                    pCMainWnd->UpdatePolygonCount (prender_obj->Get_Num_Polys (), ViewportStats::Count_Vertices (prender_obj), prender_obj->Get_Num_Polys ());
                 pCMainWnd->UpdateCameraDistance (m_CameraDistance);
             }
         }
@@ -2604,7 +2644,7 @@ CGraphicView::SetCameraPos (CAMERA_POS cameraPos)
             RenderObjClass *pCRenderObj = doc->GetDisplayedObject ();
             if (pCRenderObj)
             {
-                pCMainWnd->UpdatePolygonCount (pCRenderObj->Get_Num_Polys (), Count_Render_Obj_Vertices (pCRenderObj), pCRenderObj->Get_Num_Polys ());
+                pCMainWnd->UpdatePolygonCount (pCRenderObj->Get_Num_Polys (), ViewportStats::Count_Vertices (pCRenderObj), pCRenderObj->Get_Num_Polys ());
             }
 
             pCMainWnd->UpdateCameraDistance(m_CameraDistance);

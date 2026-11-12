@@ -178,6 +178,8 @@ set(W3DVIEW_SRC
     "ViewerAssetMgr.h"
     "ViewerScene.cpp"
     "ViewerScene.h"
+    "ViewportOverlay.cpp"
+    "ViewportOverlay.h"
     "VolumeRandomDialog.cpp"
     "VolumeRandomDialog.h"
     "W3DView.cpp"

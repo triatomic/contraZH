@@ -29,6 +29,7 @@
 #include "WWMath/matrix3d.h"
 #include "WWMath/sphere.h"
 #include "WW3D2/dx8wrapper.h"
+#include "../ViewportOverlay.h"
 
 class RenderObjClass;
 class SimpleSceneClass;
@@ -246,6 +247,8 @@ private:
 	bool				m_AltOnMDown;		// Alt latched at middle-down
 	CPoint				m_LastPoint;
 	CPoint				m_MButtonDownPoint;
+
+	ViewCubeClass		m_ViewCube;
 
 	// Set by OnSize; the swap chain is recreated on the next Render() so a
 	// drag-resize recreates at most once per rendered frame.

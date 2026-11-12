@@ -1222,6 +1222,13 @@ CMaterialPreviewPane::Render()
 		}
 	}
 
+	// A click on the view cube turns the camera over a few frames
+	Matrix3D snapped;
+	if (m_ViewCube.Update_Snap(m_SphereCenter, m_Camera->Get_Transform(), snapped)) {
+		m_Rotation = Build_Quaternion(snapped);
+		m_Camera->Set_Transform(snapped);
+	}
+
 	WW3D::Begin_Render(true, true, Vector3(bg, bg, bg));
 
 	// Ground first (see Render_Ground_Plane for why it precedes the scene).
@@ -1235,6 +1242,12 @@ CMaterialPreviewPane::Render()
 
 	// Outline the selected mesh while the whole object is displayed.
 	Render_Highlight_Outline();
+
+	// View cube and the 7 key statistics, over everything else
+	m_ViewCube.Render(m_hWnd, m_Camera->Get_Transform());
+	if (ViewportStats::Is_Visible()) {
+		ViewportStats::Render(m_RenderObj);
+	}
 
 	WW3D::End_Render(false);
 
@@ -1269,6 +1282,13 @@ CMaterialPreviewPane::OnSize(UINT type, int cx, int cy)
 void
 CMaterialPreviewPane::OnLButtonDown(UINT flags, CPoint point)
 {
+	// The view cube takes the clicks that land on it
+	if (!m_bRMouseDown && !m_bMMouseDown && m_Camera != nullptr
+			&& m_ViewCube.On_LButton_Down(m_hWnd, m_Camera->Get_Transform(), point)) {
+		SetCapture();
+		return;
+	}
+
 	SetCapture();
 	Clip_Cursor_To_View();
 	m_bMouseDown = TRUE;
@@ -1290,6 +1310,13 @@ CMaterialPreviewPane::OnLButtonDown(UINT flags, CPoint point)
 void
 CMaterialPreviewPane::OnLButtonUp(UINT flags, CPoint point)
 {
+	if (m_ViewCube.On_LButton_Up()) {
+		if (!m_bRMouseDown && !m_bMMouseDown) {
+			ReleaseCapture();
+		}
+		return;
+	}
+
 	m_bMouseDown = FALSE;
 	if (!m_bRMouseDown && !m_bMMouseDown) {
 		::ClipCursor(nullptr);
@@ -1356,6 +1383,16 @@ CMaterialPreviewPane::OnMouseMove(UINT flags, CPoint point)
 {
 	int iDeltaX = m_LastPoint.x - point.x;
 	int iDeltaY = m_LastPoint.y - point.y;
+
+	// A drag that began on the view cube orbits the camera
+	int cubeDeltaX = 0;
+	int cubeDeltaY = 0;
+	if (m_ViewCube.On_Mouse_Move(point, cubeDeltaX, cubeDeltaY)) {
+		if (cubeDeltaX != 0 || cubeDeltaY != 0) {
+			Orbit_Camera(cubeDeltaX, cubeDeltaY);
+		}
+		return;
+	}
 
 	// The light gizmo is visible exactly while Ctrl is held over the pane
 	// (mirrors the main viewport's behaviour).

@@ -62,6 +62,7 @@ public:
 	virtual BOOL OnCreateClient(LPCREATESTRUCT lpcs, CCreateContext* pContext) override;
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs) override;
 	virtual BOOL OnCmdMsg(UINT nID, int nCode, void* pExtra, AFX_CMDHANDLERINFO* pHandlerInfo) override;
+	virtual BOOL PreTranslateMessage(MSG* pMsg) override;
 	// TheSuperHackers @feature View > Lock Toolbars suppresses drag-to-float by
 	// short-circuiting FloatControlBar when m_bToolbarsLocked is set. Both
 	// overrides also re-apply dark theming after a layout change because MFC

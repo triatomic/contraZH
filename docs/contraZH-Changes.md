@@ -8,7 +8,7 @@ Everything here is additional to upstream; the rest of these docs still applies.
 * A few simulation rules are read from the mod's `GameData.ini`; each states its default.
 * NVIDIA cards now load DXT1 textures natively, as AMD and Intel cards do. This halves their memory use and makes one-bit alpha visible.
 * The map editor has its own page, [WorldBuilder Qt](WorldBuilder-Qt.md).
-* W3DView carries the [W3DView+](https://github.com/triatomic/w3dviewerPlus) changes: dark mode, a Material Viewer with a Qt material panel, bone and sub-object overlays, a frame scrubber, a ground plane, MSAA and texture filter menus, folder loading and asset reload.
+* W3DView carries the [W3DView+](https://github.com/triatomic/w3dviewerPlus) changes: dark mode, a Material Viewer with a Qt material panel, bone and sub-object overlays, a frame scrubber, a ground plane, MSAA and texture filter menus, folder loading and asset reload. Both viewports also have a view cube at the top right, and the `7` key shows the poly and vertex totals.
 * On laptops with two GPUs, the game, WorldBuilder and GUIEdit ask the NVIDIA or AMD driver to run them on the dedicated GPU.
 * Synced with TheSuperHackers/GeneralsGameCode as of August 2026 and with GeneralsGameCode_Modding
 as of October 2026. The only casualty was the texture filter option, replaced by TheSuperHackers'
