@@ -463,8 +463,22 @@ CDataTreeView::Update_Folder_Label (HTREEITEM hfolder)
 	FolderKind kind = Get_Folder_Kind (hfolder);
 	if (kind != FOLDER_NONE)
 	{
+		// Under a texture are the meshes that use it, which are not textures
+		int count = 0;
+		if (kind == FOLDER_TEXTURES)
+		{
+			for (HTREEITEM hchild = GetTreeCtrl ().GetChildItem (hfolder); hchild != nullptr; hchild = GetTreeCtrl ().GetNextSiblingItem (hchild))
+			{
+				count ++;
+			}
+		}
+		else
+		{
+			count = Count_Descendants (GetTreeCtrl (), hfolder);
+		}
+
 		CString label;
-		label.Format ("%s (%d)", FOLDER_NAMES[kind], Count_Descendants (GetTreeCtrl (), hfolder));
+		label.Format ("%s (%d)", FOLDER_NAMES[kind], count);
 		GetTreeCtrl ().SetItemText (hfolder, label);
 	}
 }
@@ -705,7 +719,31 @@ CDataTreeView::Add_Textures (HTREEITEM hobject, RenderObjClass *render_obj)
 		return;
 	}
 
-	// The map is ordered by name, so the rows go in sorted
+	// Which parts use each texture: texture -> part label -> part name
+	std::map<CString, std::map<CString, CString> > users;
+	int sub_count = render_obj->Get_Num_Sub_Objects ();
+	for (int index = 0; index < sub_count; index ++)
+	{
+		RenderObjClass *sub_obj = render_obj->Get_Sub_Object (index);
+		if (sub_obj == nullptr)
+		{
+			continue;
+		}
+
+		std::map<CString, TextureClass *> own_textures;
+		Collect_Textures (sub_obj, own_textures);
+
+		CString full_name (sub_obj->Get_Name ());
+		int dot = full_name.Find ('.');
+		CString short_name = (dot >= 0) ? full_name.Mid (dot + 1) : full_name;
+		for (std::map<CString, TextureClass *>::const_iterator own = own_textures.begin (); own != own_textures.end (); ++own)
+		{
+			users[own->first][short_name] = full_name;
+		}
+		sub_obj->Release_Ref ();
+	}
+
+	// The maps are ordered by name, so the rows go in sorted
 	CTreeCtrl &tree = GetTreeCtrl ();
 	HTREEITEM hfolder = Add_Folder (hobject, FOLDER_TEXTURES);
 	for (std::map<CString, TextureClass *>::const_iterator texture = textures.begin (); texture != textures.end (); ++texture)
@@ -718,6 +756,16 @@ CDataTreeView::Add_Textures (HTREEITEM hobject, RenderObjClass *render_obj)
 		HTREEITEM hitem = tree.InsertItem (texture->first, m_iMaterialIcon, m_iMaterialIcon, hfolder, TVI_LAST);
 		texture->second->Add_Ref ();
 		tree.SetItemData (hitem, (ULONG)new AssetInfoClass (texture->first, TypeMaterial, nullptr, (DWORD)texture->second));
+
+		const std::map<CString, CString> &parts = users[texture->first];
+		for (std::map<CString, CString>::const_iterator part = parts.begin (); part != parts.end (); ++part)
+		{
+			// Made as a material, because the mesh type would build a render object just to name this row
+			AssetInfoClass *part_info = new AssetInfoClass (part->second, TypeMaterial);
+			part_info->Set_Type (TypeMesh);
+			HTREEITEM hpart = tree.InsertItem (part->first, m_iMeshIcon, m_iMeshIcon, hitem, TVI_LAST);
+			tree.SetItemData (hpart, (ULONG)part_info);
+		}
 
 		StringClass listed_key = Name_Key (texture->first);
 		if (!m_ListedTextures.Exists (listed_key))
@@ -1904,7 +1952,7 @@ CDataTreeView::Display_Asset (HTREEITEM htree_item)
 		case TypeMesh:
 		{
 			// A part highlights on its object. The row's label is the pivot it hangs on.
-			if (Is_Mesh_Sub_Object (htree_item)) {
+			if (Is_Mesh_Sub_Object (htree_item) || Is_Mesh_Reference (htree_item)) {
 				Show_Owner_Object (htree_item);
 				pdoc->SetSelectedItem (GetTreeCtrl ().GetItemText (htree_item), TypeMesh);
 				return;
@@ -2042,6 +2090,25 @@ CDataTreeView::Is_Mesh_Sub_Object (HTREEITEM hItem) const
 		}
 	}
 	return false;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Is_Mesh_Reference
+//
+//  True for a row under a texture, which names a part that uses the texture.
+//
+bool
+CDataTreeView::Is_Mesh_Reference (HTREEITEM hItem) const
+{
+	HTREEITEM hparent = (hItem != nullptr) ? GetTreeCtrl ().GetParentItem (hItem) : nullptr;
+	if (hparent == nullptr)
+	{
+		return false;
+	}
+
+	return Get_Folder_Kind (GetTreeCtrl ().GetParentItem (hparent)) == FOLDER_TEXTURES;
 }
 
 
@@ -2945,6 +3012,11 @@ CDataTreeView::Build_Render_Object_List
 	for (HTREEITEM htree_item = GetTreeCtrl ().GetChildItem (hparent);
 		  (htree_item != nullptr);
 		  htree_item = GetTreeCtrl ().GetNextSiblingItem (htree_item)) {
+
+		// The textures, and the parts repeated under them, are not objects to list
+		if (Get_Folder_Kind (htree_item) == FOLDER_TEXTURES) {
+			continue;
+		}
 
 		// A part's label is only its pivot, so the name comes from the asset
 		AssetInfoClass *asset_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (htree_item);

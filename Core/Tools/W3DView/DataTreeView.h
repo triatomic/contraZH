@@ -187,6 +187,7 @@ protected:
 		void					Add_Emitters_To_Menu (HMENU hmenu, RenderObjClass &render_obj);
 		void					Free_Child_Models (HTREEITEM parent_item);
 		bool					Is_Mesh_Sub_Object (HTREEITEM hItem) const;
+		bool					Is_Mesh_Reference (HTREEITEM hItem) const;
 		void					Set_Mesh_Visibility (HTREEITEM hItem, bool visible);
 		void					Set_Mesh_Visibility_Recursive (HTREEITEM hItem, bool visible);
 
