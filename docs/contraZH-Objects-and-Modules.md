@@ -43,6 +43,40 @@ See [Storms](dx9-Environment.md#key-names-and-overrides) for the full key mappin
 
 ## Object.ini
 
+### Conditional weapon sync
+
+`AutoChooseSources = TERTIARY SYNC_TO_PRIMARY` fires the tertiary weapon alongside the
+primary weapon. Synced slots now require a valid target by default.
+
+```
+  WeaponSet
+    Conditions = PLAYER_UPGRADE
+    Weapon = PRIMARY M113MGGun
+    Weapon = SECONDARY M113MGGunAir
+    Weapon = TERTIARY M113FlashBangGrenadeWeapon
+    AutoChooseSources = TERTIARY SYNC_TO_PRIMARY
+    SyncRequiresValidTarget = TERTIARY Yes
+  End
+```
+
+`SyncRequiresValidTarget` takes one slot and `Yes` or `No`. It defaults to `Yes` for every
+slot and only affects slots synced through `AutoChooseSources`. Repeat the key for
+multiple slots. All eight weapon slots are supported.
+
+* `Yes` checks the synced weapon's target category, target pitch, range and estimated damage.
+  Garrison-clearing weapons use their normal occupied-building damage check. Torpedoes
+  require a target over water. Attack-ground orders require a ground-capable weapon in range.
+* `No` preserves unconditional target selection. The synced weapon follows its lead even
+  when it cannot normally target or damage the victim.
+* Both modes require the synced weapon to be ready. Reloading slots produce no firing sound
+  or shot notification and spend no ammo.
+* Sync still follows the lead weapon's firing events and skips a separate pre-attack wind-up.
+  `PreferredAgainst` remains a selection preference and does not restrict valid targets.
+
+Omit `SyncRequiresValidTarget` for conditional sync. Use `SyncRequiresValidTarget = TERTIARY No`
+to retain unconditional sync for that slot. These changes affect the simulation, so all players
+and replays need matching engine and INI versions.
+
 ### WeaponSet line of sight
 
 `IgnoreLineOfSight` lists weapon slots that bypass `ATTACK_NEEDS_LINE_OF_SIGHT`.

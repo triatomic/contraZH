@@ -511,6 +511,7 @@ public:
 	UnsignedInt getWeaponInWeaponSlotCommandSourceMask( WeaponSlotType wSlot ) const { return m_weaponSet.getNthCommandSourceMask( wSlot ); }
 	Bool getWeaponInWeaponSlotSyncedToSlot(WeaponSlotType thisSlot, WeaponSlotType otherSlot) const;
 	Bool canWeaponSlotAttackGround(WeaponSlotType wslot, CommandSourceType cmdSource) const { return m_weaponSet.canSlotAttackGround(wslot, cmdSource); }
+	Bool canFireSyncedWeapon(WeaponSlotType wslot, const Object* victim, const Coord3D* pos) const { return m_weaponSet.canFireSyncedWeapon(wslot, this, victim, pos); }
 
 	// see if this current weapon set's weapons has shared reload times
 	Bool isReloadTimeShared() const { return m_weaponSet.isSharedReloadTime(); }
