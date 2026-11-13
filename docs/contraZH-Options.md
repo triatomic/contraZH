@@ -481,9 +481,48 @@ A mesh lights its surroundings through its material only when it is additive. A 
 emissive without being additive, the usual way to keep thin parts such as barbed wire bright in
 shadow, emits no light. Give it an `_emi.dds` mask to make it a lamp, or tick `Specular To Diffuse`
 on its vertex material in the W3D exporter. That checkbox has no other effect in the game, and a
-ticked material lights its surroundings with its emissive colour times its texture. W3DView's
+ticked material lights its surroundings with its emissive colour times its texture, by the
+[lamp formula](#lamp-formula) below. W3DView's
 Material Viewer has the same checkbox on the Vertex Material tab and draws the lamp's light on
 the model while it is ticked.
+
+#### Lamp formula
+
+A lamp mesh is sampled four times per triangle. Each sample's colour is
+
+```
+colour = emission * texture * Opacity + mask * UnitEmissiveIntensity
+```
+
+| Term | Value |
+|---|---|
+| `emission` | `Emissive` when `Specular To Diffuse` is ticked. `Emissive + Diffuse` on an additive mesh (destination blend `One`, source blend `One` or `Src Alpha`), ticked or not. Zero on any other mesh. |
+| `texture` | The base texture's pixel at the sample, read from a 32x32 copy. It is multiplied by the pixel's alpha when the shader's source blend is `Src Alpha`. A mesh without a texture counts as white. |
+| `Opacity` | The vertex material's opacity. |
+| `mask` | The `_emi.dds` pixel at the sample, or zero without a mask. At night `UnitEmissiveNightIntensity` takes the place of `UnitEmissiveIntensity`, and `Specular = No` makes both zero. |
+
+Samples within one 24-unit cell merge into one point light, so a larger or brighter lamp
+gives a stronger light, up to a limit.
+
+```
+weight = sum(area * brightness)
+light  = sum(colour * area) / weight * min(sqrt(weight) / 8, 1.5) * PathTracingLightBrightness
+radius = clamp(3 * sqrt(area), 24, 120), then capped at PathTracingLightMaxRadius
+```
+
+* `area` is a quarter of the triangle's area.
+* `brightness` is the largest of the sample colour's red, green and blue.
+* `radius` uses the largest sample in the cell.
+
+A surface point at `distance` from the light receives
+
+```
+ramp = clamp((radius - distance) / (radius - 0.5), 0, 1)
+lit  = light * ramp * ramp * (3 - 2 * ramp) * (max(facing, 0) + 0.1)
+```
+
+where `facing` is the cosine between the surface normal and the direction to the light. The
+surface shows `lit` times its own texture colour.
 
 `PathTracingLightMaxRadius` in `GameData.ini` caps large lights without shrinking
 smaller ones. It defaults to `25`; `0` means no cap. `PathTracingLightBrightness`
