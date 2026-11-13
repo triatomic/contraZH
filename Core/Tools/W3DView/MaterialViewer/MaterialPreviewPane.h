@@ -22,7 +22,9 @@
 
 #pragma once
 
+#include <map>
 #include <string>
+#include <vector>
 
 #include "WWMath/vector3.h"
 #include "WWMath/quat.h"
@@ -35,8 +37,22 @@ class RenderObjClass;
 class SimpleSceneClass;
 class CameraClass;
 class LightClass;
+class TextureClass;
 
 namespace W3dMaterialViewer { struct MaterialDocument; }
+
+struct MaterialPreviewLamp
+{
+	Vector3 position;
+	Vector3 color;
+	float radius;
+};
+
+struct MaterialPreviewLampTexel
+{
+	Vector3 color;
+	Vector3 alphaColor;
+};
 
 // Implements DX8_CleanupHook because the pane owns non-managed device resources
 // (additional swap chain + depth surface). D3D8 Reset fails while they are
@@ -191,6 +207,11 @@ private:
 	// occludes it, and the translucent flush afterwards blends glow over it.
 	void Render_Ground_Plane();
 
+	// Lights the preview as the game lights the surroundings of a material with Specular To Diffuse ticked.
+	void Update_Lamps();
+	void Render_Lamp_Pools();
+	void Release_Lamps();
+
 	// Confines/wraps the cursor to the pane while dragging (infinite drag).
 	void Clip_Cursor_To_View();
 	bool Wrap_Cursor_In_View(CPoint &point);
@@ -210,6 +231,13 @@ private:
 	bool				m_LightMeshInScene;
 	float				m_LightMeshScale;	// last applied gizmo scale
 	LightPlacementMode	m_LightPlacementMode;
+
+	// The strongest lamps also light the model, since the light environment holds four lights with the scene light.
+	enum { LAMP_LIGHTS = 3 };
+	std::vector<MaterialPreviewLamp>	m_Lamps;
+	std::map<TextureClass *, MaterialPreviewLampTexel>	m_LampTexels;
+	LightClass			*m_LampLights[LAMP_LIGHTS];
+	bool				m_LampLightInScene[LAMP_LIGHTS];
 
 	// Name of the currently loaded model. LoadModel re-frames the camera only
 	// when this changes, so a post-save reload of the same model keeps the view.

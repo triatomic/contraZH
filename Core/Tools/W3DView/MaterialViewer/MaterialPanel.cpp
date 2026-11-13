@@ -418,7 +418,7 @@ namespace Help
 	const char *const DIFFUSE      = "Diffuse: the color the object reflects when lit; the object's base color.";
 	const char *const SPECULAR     = "Specular: the color of the specular highlights.";
 	const char *const EMISSIVE     = "Emissive: self-illumination base color, not affected by scene light.";
-	const char *const SPEC_TO_DIFF = "Specular To Diffuse: obsolete.";
+	const char *const SPEC_TO_DIFF = "Specular To Diffuse: makes the material a lamp that lights its surroundings with its emissive color times its texture.";
 	const char *const OPACITY      = "Opacity: mesh opacity; 1 = fully opaque, 0 = fully transparent.";
 	const char *const TRANSLUCENCY = "Translucency: how much light passes through the material.";
 	const char *const SHININESS    = "Shininess: controls the tightness of the specular highlights.";
