@@ -30,7 +30,6 @@
 #include "WWMath/quat.h"		// Build_Matrix3 / Build_Quaternion / Trackball
 #include "WW3D2/hanim.h"	// animation playback (Set_Animation_Asset)
 #include "WWLib/rcfile.h"	// ResourceFileClass (embedded Light.w3d gizmo)
-#include <algorithm>
 #include <vector>	// scratch vertex buffer for the selection-tint overlay
 #include "WWMath/wwmath.h"	// DEG_TO_RADF
 #include "WW3D2/hlod.h"
@@ -93,10 +92,6 @@ CMaterialPreviewPane::CMaterialPreviewPane()
 	  m_LastRenderTicks(0)
 {
 	m_Rotation.Make_Identity();
-	for (int i = 0; i < LAMP_LIGHTS; i++) {
-		m_LampLights[i] = nullptr;
-		m_LampLightInScene[i] = false;
-	}
 	m_LastPoint.x = m_LastPoint.y = 0;
 	m_MButtonDownPoint.x = m_MButtonDownPoint.y = 0;
 }
@@ -186,8 +181,6 @@ CMaterialPreviewPane::OnDestroy()
 		m_Light->Release_Ref();
 		m_Light = nullptr;
 	}
-
-	Release_Lamps();
 
 	if (m_Camera != nullptr) {
 		m_Camera->Release_Ref();
@@ -406,9 +399,8 @@ void Gather_Mesh_Lamp(MeshClass &mesh, std::map<TextureClass *, MaterialPreviewL
 	lamps.push_back(lamp);
 }
 
-// Walks the shown level of detail only, as the game does.
-void Gather_Lamps(RenderObjClass *obj, std::map<TextureClass *, MaterialPreviewLampTexel> &texels,
-	std::vector<MaterialPreviewLamp> &lamps)
+// The meshes of the shown level of detail only, as the game walks them.
+void Collect_Meshes(RenderObjClass *obj, std::vector<MeshClass *> &meshes)
 {
 	if (obj == nullptr || !obj->Is_Not_Hidden_At_All()) {
 		return;
@@ -417,29 +409,165 @@ void Gather_Lamps(RenderObjClass *obj, std::map<TextureClass *, MaterialPreviewL
 		HLodClass *hlod = (HLodClass *)obj;
 		const int lod = hlod->Get_LOD_Level();
 		for (int i = 0; i < hlod->Get_Lod_Model_Count(lod); i++) {
-			Gather_Lamps(hlod->Peek_Lod_Model(lod, i), texels, lamps);
+			Collect_Meshes(hlod->Peek_Lod_Model(lod, i), meshes);
 		}
 		for (int i = 0; i < hlod->Get_Additional_Model_Count(); i++) {
-			Gather_Lamps(hlod->Peek_Additional_Model(i), texels, lamps);
+			Collect_Meshes(hlod->Peek_Additional_Model(i), meshes);
 		}
 		return;
 	}
 	if (obj->Class_ID() == RenderObjClass::CLASSID_MESH) {
-		Gather_Mesh_Lamp(*(MeshClass *)obj, texels, lamps);
+		meshes.push_back((MeshClass *)obj);
 		return;
 	}
 	for (int i = 0; i < obj->Get_Num_Sub_Objects(); i++) {
 		RenderObjClass *child = obj->Get_Sub_Object(i);
 		if (child != nullptr) {
-			Gather_Lamps(child, texels, lamps);
+			Collect_Meshes(child, meshes);
 			child->Release_Ref();
 		}
 	}
 }
 
-bool Brighter_Lamp(const MaterialPreviewLamp &a, const MaterialPreviewLamp &b)
+// What the lamps give a surface point, as the game's light pass shades it.
+DWORD Lamp_Light_Color(const std::vector<MaterialPreviewLamp> &lamps, const Vector3 &position, const Vector3 &normal)
 {
-	return a.color.Length2() > b.color.Length2();
+	Vector3 light(0.0F, 0.0F, 0.0F);
+	for (size_t i = 0; i < lamps.size(); i++) {
+		const MaterialPreviewLamp &lamp = lamps[i];
+		const Vector3 reach = lamp.position - position;
+		const float length = reach.Length();
+		if (length >= lamp.radius) {
+			continue;
+		}
+		const float ramp = WWMath::Clamp((lamp.radius - length) / (lamp.radius - LAMP_INNER_RADIUS), 0.0F, 1.0F);
+		const float facing = length > 0.001F ? max(Vector3::Dot_Product(normal, reach) / length, 0.0F) : 1.0F;
+		light += lamp.color * (ramp * ramp * (3.0F - 2.0F * ramp) * (facing + LAMP_AMBIENT));
+	}
+	const int r = min((int)(light.X * 255.0F + 0.5F), 255);
+	const int g = min((int)(light.Y * 255.0F + 0.5F), 255);
+	const int b = min((int)(light.Z * 255.0F + 0.5F), 255);
+	return 0xFF000000 | (r << 16) | (g << 8) | b;
+}
+
+struct LampLitVertex
+{
+	float x, y, z;
+	DWORD color;
+	float u, v;
+};
+
+struct LampLitTriangle
+{
+	Vector3 position[3];
+	Vector3 normal[3];
+	Vector2 uv[3];
+};
+
+// Keyed by texture and by whether the texture's alpha cuts the light.
+typedef std::map<std::pair<TextureClass *, bool>, std::vector<LampLitVertex> > LampLitBatches;
+
+const float LAMP_LIT_EDGE = 2.0F;
+const size_t LAMP_LIT_VERTS = 90000;
+
+bool Near_A_Lamp(const std::vector<MaterialPreviewLamp> &lamps, const Vector3 &center, float radius)
+{
+	for (size_t i = 0; i < lamps.size(); i++) {
+		const float reach = lamps[i].radius + radius;
+		if ((lamps[i].position - center).Length2() < reach * reach) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// Cuts the mesh's triangles near a lamp down to LAMP_LIT_EDGE, since vertex colours carry the falloff.
+void Light_Mesh(MeshClass &mesh, const std::vector<MaterialPreviewLamp> &lamps, float lift, LampLitBatches &batches)
+{
+	MeshModelClass *model = mesh.Peek_Model();
+	if (model == nullptr || model->Get_Flag(MeshGeometryClass::SKIN) || model->Get_Pass_Count() == 0) {
+		return;
+	}
+	const SphereClass &bounds = mesh.Get_Bounding_Sphere();
+	if (!Near_A_Lamp(lamps, bounds.Center, bounds.Radius)) {
+		return;
+	}
+	const Matrix3D &transform = mesh.Get_Transform();
+	const Vector3 *vertices = model->Get_Vertex_Array();
+	const Vector3 *normals = model->Get_Vertex_Normal_Array();
+	const Vector2 *uvs = model->Get_UV_Array(0);
+	const TriIndex *triangles = model->Get_Polygon_Array();
+	std::vector<LampLitTriangle> stack;
+	for (int polygon = 0; polygon < model->Get_Polygon_Count(); polygon++) {
+		const ShaderClass shader = model->Get_Shader(polygon, 0);
+		if (shader.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_ONE) {
+			continue;
+		}
+		const bool cutout = shader.Get_Alpha_Test() != ShaderClass::ALPHATEST_DISABLE ||
+			shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_SRC_ALPHA;
+		TextureClass *texture = uvs != nullptr ? model->Peek_Texture(polygon, 0) : nullptr;
+		std::vector<LampLitVertex> &batch = batches[std::make_pair(texture, cutout)];
+
+		LampLitTriangle whole;
+		for (int corner = 0; corner < 3; corner++) {
+			const int index = triangles[polygon][corner];
+			Matrix3D::Transform_Vector(transform, vertices[index], &whole.position[corner]);
+			Matrix3D::Rotate_Vector(transform, normals[index], &whole.normal[corner]);
+			whole.normal[corner].Normalize();
+			whole.uv[corner] = uvs != nullptr ? uvs[index] : Vector2(0.0F, 0.0F);
+		}
+		stack.assign(1, whole);
+		while (!stack.empty()) {
+			const LampLitTriangle triangle = stack.back();
+			stack.pop_back();
+			const Vector3 center = (triangle.position[0] + triangle.position[1] + triangle.position[2]) / 3.0F;
+			float radius2 = 0.0F;
+			float longest2 = 0.0F;
+			int edge = 0;
+			for (int corner = 0; corner < 3; corner++) {
+				radius2 = max(radius2, (triangle.position[corner] - center).Length2());
+				const float length2 = (triangle.position[(corner + 1) % 3] - triangle.position[corner]).Length2();
+				if (length2 > longest2) {
+					longest2 = length2;
+					edge = corner;
+				}
+			}
+			if (!Near_A_Lamp(lamps, center, sqrtf(radius2))) {
+				continue;
+			}
+			if (longest2 > LAMP_LIT_EDGE * LAMP_LIT_EDGE && batch.size() < LAMP_LIT_VERTS) {
+				const int next = (edge + 1) % 3;
+				Vector3 normal = triangle.normal[edge] + triangle.normal[next];
+				normal.Normalize();
+				LampLitTriangle first = triangle;
+				first.position[next] = (triangle.position[edge] + triangle.position[next]) * 0.5F;
+				first.normal[next] = normal;
+				first.uv[next] = (triangle.uv[edge] + triangle.uv[next]) * 0.5F;
+				LampLitTriangle second = triangle;
+				second.position[edge] = first.position[next];
+				second.normal[edge] = normal;
+				second.uv[edge] = first.uv[next];
+				stack.push_back(first);
+				stack.push_back(second);
+				continue;
+			}
+			LampLitVertex lit[3];
+			bool dark = true;
+			for (int corner = 0; corner < 3; corner++) {
+				const Vector3 position = triangle.position[corner] + triangle.normal[corner] * lift;
+				lit[corner].x = position.X;
+				lit[corner].y = position.Y;
+				lit[corner].z = position.Z;
+				lit[corner].color = Lamp_Light_Color(lamps, triangle.position[corner], triangle.normal[corner]);
+				lit[corner].u = triangle.uv[corner].X;
+				lit[corner].v = triangle.uv[corner].Y;
+				dark = dark && lit[corner].color == 0xFF000000;
+			}
+			if (!dark) {
+				batch.insert(batch.end(), lit, lit + 3);
+			}
+		}
+	}
 }
 
 // What a lamp gives flat ground at this distance from the spot under it, as the game shades it.
@@ -1026,32 +1154,55 @@ void
 CMaterialPreviewPane::Update_Lamps()
 {
 	m_Lamps.clear();
-	Gather_Lamps(m_RenderObj, m_LampTexels, m_Lamps);
-	std::sort(m_Lamps.begin(), m_Lamps.end(), Brighter_Lamp);
-	for (int i = 0; i < LAMP_LIGHTS; i++) {
-		const bool lit = m_Scene != nullptr && i < (int)m_Lamps.size();
-		if (lit) {
-			if (m_LampLights[i] == nullptr) {
-				m_LampLights[i] = new LightClass;
-				m_LampLights[i]->Set_Force_Visible(true);
-				m_LampLights[i]->Set_Flag(LightClass::NEAR_ATTENUATION, false);
-				m_LampLights[i]->Set_Flag(LightClass::FAR_ATTENUATION, true);
-				m_LampLights[i]->Set_Specular(Vector3(0, 0, 0));
-			}
-			m_LampLights[i]->Set_Position(m_Lamps[i].position);
-			m_LampLights[i]->Set_Far_Attenuation_Range(LAMP_INNER_RADIUS, m_Lamps[i].radius);
-			m_LampLights[i]->Set_Diffuse(m_Lamps[i].color);
-			m_LampLights[i]->Set_Ambient(m_Lamps[i].color * LAMP_AMBIENT);
-		}
-		if (lit != m_LampLightInScene[i]) {
-			if (lit) {
-				m_Scene->Add_Render_Object(m_LampLights[i]);
-			} else {
-				m_Scene->Remove_Render_Object(m_LampLights[i]);
-			}
-			m_LampLightInScene[i] = lit;
-		}
+	std::vector<MeshClass *> meshes;
+	Collect_Meshes(m_RenderObj, meshes);
+	for (size_t i = 0; i < meshes.size(); i++) {
+		Gather_Mesh_Lamp(*meshes[i], m_LampTexels, m_Lamps);
 	}
+}
+
+// Additive light over the model's surfaces near each lamp, drawn after the scene and lifted clear of it.
+void
+CMaterialPreviewPane::Render_Lamp_Light()
+{
+	IDirect3DDevice8 *dev = DX8Wrapper::_Get_D3D_Device8();
+	if (m_Lamps.empty() || m_RenderObj == nullptr || dev == nullptr) {
+		return;
+	}
+
+	std::vector<MeshClass *> meshes;
+	Collect_Meshes(m_RenderObj, meshes);
+	LampLitBatches batches;
+	const float lift = max(0.0015F * m_CameraDistance, 0.01F);
+	for (size_t i = 0; i < meshes.size(); i++) {
+		Light_Mesh(*meshes[i], m_Lamps, lift, batches);
+	}
+
+	VertexMaterialClass *vm = VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
+	DX8Wrapper::Set_Material(vm);
+	if (vm != nullptr) {
+		vm->Release_Ref();
+	}
+	Matrix3D identity(true);
+	DX8Wrapper::Set_Transform(D3DTS_WORLD, identity);
+
+	for (LampLitBatches::iterator it = batches.begin(); it != batches.end(); ++it) {
+		if (it->second.empty()) {
+			continue;
+		}
+		ShaderClass shader = it->first.first != nullptr ? ShaderClass::_PresetAdditiveShader : ShaderClass::_PresetAdditiveSolidShader;
+		shader.Set_Cull_Mode(ShaderClass::CULL_MODE_DISABLE);
+		if (it->first.second) {
+			shader.Set_Src_Blend_Func(ShaderClass::SRCBLEND_SRC_ALPHA);
+		}
+		DX8Wrapper::Set_Shader(shader);
+		DX8Wrapper::Set_Texture(0, it->first.first);
+		DX8Wrapper::Apply_Render_State_Changes();
+		DX8_SET_FVF(dev, D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1);
+		dev->DrawPrimitiveUP(D3DPT_TRIANGLELIST, (UINT)(it->second.size() / 3), &it->second[0], sizeof(LampLitVertex));
+	}
+
+	DX8Wrapper::Invalidate_Cached_Render_States();
 }
 
 // Additive rings over the ground plane, drawn before the scene so the object hides the part under it.
@@ -1119,23 +1270,6 @@ CMaterialPreviewPane::Render_Lamp_Pools()
 	}
 
 	DX8Wrapper::Invalidate_Cached_Render_States();
-}
-
-void
-CMaterialPreviewPane::Release_Lamps()
-{
-	for (int i = 0; i < LAMP_LIGHTS; i++) {
-		if (m_LampLights[i] != nullptr) {
-			if (m_LampLightInScene[i] && m_Scene != nullptr) {
-				m_Scene->Remove_Render_Object(m_LampLights[i]);
-			}
-			m_LampLights[i]->Release_Ref();
-			m_LampLights[i] = nullptr;
-		}
-		m_LampLightInScene[i] = false;
-	}
-	m_Lamps.clear();
-	m_LampTexels.clear();
 }
 
 // Adds/removes the light gizmo mesh so it is visible exactly while Ctrl is
@@ -1539,6 +1673,7 @@ CMaterialPreviewPane::Render()
 	Render_Ground_Plane();
 
 	WW3D::Render(m_Scene, m_Camera, FALSE, FALSE);
+	Render_Lamp_Light();
 
 	// TheSuperHackers @feature Tria Second pass: tint the normally-culled back faces,
 	// matching the main viewport (shared toggle + colour + pass logic).

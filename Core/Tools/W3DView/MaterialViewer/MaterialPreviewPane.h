@@ -210,7 +210,7 @@ private:
 	// Lights the preview as the game lights the surroundings of a material with Specular To Diffuse ticked.
 	void Update_Lamps();
 	void Render_Lamp_Pools();
-	void Release_Lamps();
+	void Render_Lamp_Light();
 
 	// Confines/wraps the cursor to the pane while dragging (infinite drag).
 	void Clip_Cursor_To_View();
@@ -232,12 +232,9 @@ private:
 	float				m_LightMeshScale;	// last applied gizmo scale
 	LightPlacementMode	m_LightPlacementMode;
 
-	// The strongest lamps also light the model, since the light environment holds four lights with the scene light.
-	enum { LAMP_LIGHTS = 3 };
+	// This frame's lamps, and the average colour of each texture they shine through.
 	std::vector<MaterialPreviewLamp>	m_Lamps;
 	std::map<TextureClass *, MaterialPreviewLampTexel>	m_LampTexels;
-	LightClass			*m_LampLights[LAMP_LIGHTS];
-	bool				m_LampLightInScene[LAMP_LIGHTS];
 
 	// Name of the currently loaded model. LoadModel re-frames the camera only
 	// when this changes, so a post-save reload of the same model keeps the view.
