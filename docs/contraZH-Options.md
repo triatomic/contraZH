@@ -481,7 +481,9 @@ A mesh lights its surroundings through its material only when it is additive. A 
 emissive without being additive, the usual way to keep thin parts such as barbed wire bright in
 shadow, emits no light. Give it an `_emi.dds` mask to make it a lamp, or tick `Specular To Diffuse`
 on its vertex material in the W3D exporter. That checkbox has no other effect in the game, and a
-ticked material lights its surroundings with its emissive colour times its texture.
+ticked material lights its surroundings with its emissive colour times its texture. W3DView's
+Material Viewer has the same checkbox on the Vertex Material tab and draws the lamp's light on
+the model while it is ticked.
 
 `PathTracingLightMaxRadius` in `GameData.ini` caps large lights without shrinking
 smaller ones. It defaults to `25`; `0` means no cap. `PathTracingLightBrightness`
