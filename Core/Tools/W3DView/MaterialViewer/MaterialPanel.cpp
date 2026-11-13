@@ -31,6 +31,7 @@
 #include <utility>
 #include <vector>
 
+#include <QtCore/QDir>
 #include <QtCore/QEvent>
 #include <QtCore/QFileInfo>
 #include <QtCore/QMap>
@@ -83,6 +84,7 @@
 
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi")
+#include <shlobj.h>
 
 #include <functional>
 
@@ -474,6 +476,21 @@ static QString Option_Help(const char *generic, const char *const *descs, int co
 		return QString::fromLatin1(generic);
 	}
 	return QString::fromLatin1(descs[value]);
+}
+
+// Opens the file's folder in Explorer with the file selected
+void Show_In_Explorer(const std::string &path)
+{
+	if (path.empty()) {
+		return;
+	}
+
+	QString native = QDir::toNativeSeparators(QFileInfo(QString::fromLocal8Bit(path.c_str())).absoluteFilePath());
+	PIDLIST_ABSOLUTE item = ::ILCreateFromPathW((const wchar_t *)native.utf16());
+	if (item != nullptr) {
+		::SHOpenFolderAndSelectItems(item, 0, nullptr, 0);
+		::ILFree(item);
+	}
 }
 
 // Tracks the active theme so popups opened from the panel (the swatch color
@@ -1988,6 +2005,12 @@ QWidget *Build_Texture_Stage_Group(const EditCtx &ctx, MeshMaterialData &mesh, c
 	thumbnail->setFrameShape(QFrame::StyledPanel);
 	thumbnail->setAlignment(Qt::AlignCenter);
 
+	// A right click shows the texture file in Explorer
+	thumbnail->setContextMenuPolicy(Qt::CustomContextMenu);
+	QObject::connect(thumbnail, &QWidget::customContextMenuRequested, [texture_ptr](const QPoint &) {
+		Show_In_Explorer(texture_ptr->resolvedPath);
+	});
+
 	auto paint_thumbnail = [thumbnail](const TextureData &tex) {
 		if (tex.previewWidth > 0 && tex.previewHeight > 0 &&
 				tex.previewPixels.size() >= (size_t)tex.previewWidth * tex.previewHeight * 4) {
@@ -1998,7 +2021,7 @@ QWidget *Build_Texture_Stage_Group(const EditCtx &ctx, MeshMaterialData &mesh, c
 			thumbnail->setText(QString());
 			thumbnail->setFixedSize(tex.previewWidth + 2, tex.previewHeight + 2);
 			thumbnail->setToolTip(tex.resolvedPath.empty()
-				? QString() : QString::fromStdString(tex.resolvedPath));
+				? QString() : QString::fromStdString(tex.resolvedPath) + QStringLiteral("\nRight-click to show in Explorer"));
 		} else {
 			thumbnail->setPixmap(QPixmap());
 			thumbnail->setText(QStringLiteral("(texture file not found)"));
