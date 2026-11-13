@@ -3,6 +3,18 @@
 Always on, no `Options.ini` key. All are retail bugs upstream still carries. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Recycled supply centers accept automatic deliveries
+
+Supply centers spawned already complete register as delivery targets during normal gameplay.
+Workers can automatically unload at recycled GLA supply stash trucks without a manual delivery
+order. Supply centers under construction still register when construction finishes.
+
+Map initialization and saved-game loading keep their existing registration paths. No per-frame
+scan is added, and the completion guard prevents duplicate registration.
+
+This changes the simulation and can change older replay playback. Multiplayer clients need
+matching engine versions.
+
 ## Garrisons stay protected when map borders change
 
 Shrinking or expanding the active map border no longer exposes enclosed occupants to ordinary
