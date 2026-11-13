@@ -88,6 +88,11 @@ protected:  // control bar embedded members
 	CStatusBar  m_wndStatusBar;
 	CToolBar    m_wndToolBar;
 
+	// Filter box for the asset tree, hosted at the end of the toolbar
+	enum { TREE_FILTER_WIDTH = 160 };
+	CEdit       m_TreeFilterEdit;
+	afx_msg void OnTreeFilterChanged();
+
 // Generated message map functions
 protected:
 	//{{AFX_MSG(CMainFrame)

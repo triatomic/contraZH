@@ -36,6 +36,9 @@
 
 
 #include "StdAfx.h"
+#include <algorithm>
+#include <math.h>
+#include <set>
 #include <uxtheme.h>
 #include <vssym32.h>
 #pragma comment(lib, "uxtheme.lib")
@@ -92,15 +95,7 @@ IMPLEMENT_DYNCREATE(CDataTreeView, CTreeView)
 //
 ////////////////////////////////////////////////////////////////////////////
 CDataTreeView::CDataTreeView ()
-        : m_hMaterialsRoot (nullptr),
-			 m_hMeshRoot  (nullptr),
-			 m_hMeshCollectionRoot (nullptr),
-			 m_hAggregateRoot (nullptr),
-			 m_hPrimitivesRoot (nullptr),
-			 m_hEmitterRoot (nullptr),
-          m_hLODRoot (nullptr),
-			 m_hSoundRoot (nullptr),
-			 m_iPrimitivesIcon (-1),
+        : m_iPrimitivesIcon (-1),
           m_iAnimationIcon (-1),
           m_iTCAnimationIcon(-1),
 			 m_iADAnimationIcon(-1),
@@ -113,9 +108,15 @@ CDataTreeView::CDataTreeView ()
 			 m_iBoneIcon (-1),
 			 m_hRightClickItem (nullptr),
 			 m_RestrictAnims (true),
-			 m_hLastMultiSelectAnchor (nullptr)
+			 m_hLastMultiSelectAnchor (nullptr),
+			 m_hSoloItem (nullptr),
+			 m_Rebuilding (false)
 
 {
+	for (int category = 0; category < CATEGORY_COUNT; category ++)
+	{
+		m_hCategoryRoots[category] = nullptr;
+	}
 }
 
 
@@ -136,7 +137,10 @@ BEGIN_MESSAGE_MAP(CDataTreeView, CTreeView)
 	ON_NOTIFY_REFLECT(NM_DBLCLK, OnDblclk)
 	ON_NOTIFY_REFLECT(NM_RCLICK, OnRClick)
 	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONDBLCLK()
+	ON_WM_TIMER()
 	ON_COMMAND(IDM_TOGGLE_MESH_VIS, OnToggleMeshVis)
+	ON_COMMAND(IDM_SHOW_ONLY_MESH, OnShowOnlyMesh)
 	ON_COMMAND(IDM_SHOW_BONES, OnShowBones)
 	ON_COMMAND(IDM_EXPORT_INFO, OnExportInfo)
 	ON_COMMAND(IDM_DUMP_W3D_INFO, OnDumpW3DInfo)
@@ -207,19 +211,35 @@ CDataTreeView::OnInitialUpdate ()
 //
 //  CreateRootNodes
 //
+//  Called once the tree is empty. A category node is made when its first
+//  asset arrives, so this only forgets the old tree.
+//
 void
 CDataTreeView::CreateRootNodes ()
 {
-	// Insert all the root nodes
-	m_hMaterialsRoot		= GetTreeCtrl ().InsertItem ("Materials", m_iMaterialIcon, m_iMaterialIcon);
-	m_hMeshRoot				= GetTreeCtrl ().InsertItem ("Mesh", m_iMeshIcon, m_iMeshIcon);
-	m_hHierarchyRoot		= GetTreeCtrl ().InsertItem ("Hierarchy", m_iHierarchyIcon, m_iHierarchyIcon);
-	m_hLODRoot				= GetTreeCtrl ().InsertItem ("H-LOD", m_iLODIcon, m_iLODIcon);
-	m_hMeshCollectionRoot = GetTreeCtrl ().InsertItem ("Mesh Collection", m_iMeshIcon, m_iMeshIcon);
-	m_hAggregateRoot		= GetTreeCtrl ().InsertItem ("Aggregate", m_iAggregateIcon, m_iAggregateIcon);
-	m_hEmitterRoot			= GetTreeCtrl ().InsertItem ("Emitter", m_iEmitterIcon, m_iEmitterIcon);
-	m_hPrimitivesRoot		= GetTreeCtrl ().InsertItem ("Primitives", m_iPrimitivesIcon, m_iPrimitivesIcon);
-	m_hSoundRoot			= GetTreeCtrl ().InsertItem ("Sounds", m_iSoundIcon, m_iSoundIcon);
+	m_OwnedMeshes.Remove_All ();
+	m_ListedTextures.Remove_All ();
+	Forget_Tree_Items ();
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Forget_Tree_Items
+//
+void
+CDataTreeView::Forget_Tree_Items ()
+{
+	for (int category = 0; category < CATEGORY_COUNT; category ++)
+	{
+		m_hCategoryRoots[category] = nullptr;
+	}
+
+	m_FolderKinds.clear ();
+	m_selectedMeshItems.Delete_All ();
+	m_hLastMultiSelectAnchor = nullptr;
+	m_hRightClickItem = nullptr;
+	m_hSoloItem = nullptr;
 }
 
 
@@ -251,382 +271,461 @@ CDataTreeView::OnCreate (LPCREATESTRUCT lpCreateStruct)
 
 ////////////////////////////////////////////////////////////////////////////
 //
-//  Load_Materials_Into_Tree
+//  Tree layout
 //
-// TheSuperHackers @feature Tria 18/04/2026 Group materials under their source W3D file name,
-// then under each render object, so that multiple imported files show cascaded material lists.
+//  Objects (hierarchies, LODs and meshes that no object owns) are the top
+//  level, in name order. Each owns up to four folders: Meshes, Skeleton,
+//  Animations and Textures. The other asset types follow in category nodes,
+//  which exist only while they have something to hold.
 //
-static void Collect_Textures_From_RenderObj (RenderObjClass *robj, HashTemplateClass<StringClass, int> &outTextures)
+////////////////////////////////////////////////////////////////////////////
+namespace
 {
-	if (robj == nullptr)
-		return;
 
-	// Try to get material info directly (works for MeshClass)
-	MaterialInfoClass *matinfo = robj->Get_Material_Info ();
-	if (matinfo != nullptr) {
-		for (int t = 0; t < matinfo->Texture_Count (); ++t) {
-			TextureClass *tex = matinfo->Peek_Texture (t);
-			if (tex != nullptr) {
-				StringClass name (tex->Get_Full_Path ());
-				if (!outTextures.Exists (name))
-					outTextures.Insert (name, 1);
-			}
-		}
-		REF_PTR_RELEASE (matinfo);
+const char * const FOLDER_NAMES[] = { "", "Meshes", "Skeleton", "Animations", "Textures" };
+const char * const CATEGORY_NAMES[] = { "Emitters", "Aggregates", "Mesh Collections", "Primitives", "Sounds", "Other Textures" };
+
+// Asset names differ in case between a prototype and the object that uses it
+StringClass Name_Key (const char *name)
+{
+	StringClass key (name);
+	::_strupr (key.Peek_Buffer ());
+	return key;
+}
+
+bool Is_Object_Type (ASSET_TYPE type)
+{
+	return type == TypeHierarchy || type == TypeLOD || type == TypeMesh;
+}
+
+void Collect_Textures (RenderObjClass *render_obj, std::map<CString, TextureClass *> &textures)
+{
+	if (render_obj == nullptr)
+	{
+		return;
 	}
 
-	// Recurse into sub-objects (HLod, collections, etc.)
-	int numSub = robj->Get_Num_Sub_Objects ();
-	for (int s = 0; s < numSub; ++s) {
-		RenderObjClass *sub = robj->Get_Sub_Object (s);
-		if (sub != nullptr) {
-			Collect_Textures_From_RenderObj (sub, outTextures);
-			sub->Release_Ref ();
+	MaterialInfoClass *material_info = render_obj->Get_Material_Info ();
+	if (material_info != nullptr)
+	{
+		for (int index = 0; index < material_info->Texture_Count (); index ++)
+		{
+			TextureClass *texture = material_info->Peek_Texture (index);
+			if (texture != nullptr)
+			{
+				textures[CString ((const char *)texture->Get_Full_Path ())] = texture;
+			}
+		}
+		REF_PTR_RELEASE (material_info);
+	}
+
+	int sub_count = render_obj->Get_Num_Sub_Objects ();
+	for (int index = 0; index < sub_count; index ++)
+	{
+		RenderObjClass *sub_obj = render_obj->Get_Sub_Object (index);
+		if (sub_obj != nullptr)
+		{
+			Collect_Textures (sub_obj, textures);
+			sub_obj->Release_Ref ();
 		}
 	}
 }
 
-void
-CDataTreeView::Load_Materials_Into_Tree ()
+int Count_Descendants (CTreeCtrl &tree, HTREEITEM hparent)
 {
-	CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
+	int count = 0;
+	for (HTREEITEM hchild = tree.GetChildItem (hparent); hchild != nullptr; hchild = tree.GetNextSiblingItem (hchild))
+	{
+		count += 1 + Count_Descendants (tree, hchild);
+	}
+	return count;
+}
 
-	// Build existing tree structure: file nodes and their child object nodes
-	// Level 1: file name -> HTREEITEM
-	HashTemplateClass<StringClass, HTREEITEM> existingFileNodes;
-	// Level 2: "filename\0objname" -> HTREEITEM
-	HashTemplateClass<StringClass, HTREEITEM> existingObjNodes;
-	// All existing texture names (for dedup)
-	HashTemplateClass<StringClass, int> allExistingTextures;
+bool Object_Entry_Less (const CDataTreeView::ObjectEntry &left, const CDataTreeView::ObjectEntry &right)
+{
+	return ::_stricmp (left.name, right.name) < 0;
+}
 
-	for (HTREEITEM hFile = GetTreeCtrl().GetChildItem(m_hMaterialsRoot); hFile; hFile = GetTreeCtrl().GetNextSiblingItem(hFile)) {
-		CString fileText = GetTreeCtrl().GetItemText(hFile);
+}	// namespace
 
-		// Check if this is a file group node (has children that are object nodes) or a direct texture
-		HTREEITEM hFirstChild = GetTreeCtrl().GetChildItem(hFile);
-		if (hFirstChild != nullptr) {
-			// This is a grouping node
-			existingFileNodes.Insert(StringClass((LPCTSTR)fileText), hFile);
 
-			for (HTREEITEM hObj = hFirstChild; hObj; hObj = GetTreeCtrl().GetNextSiblingItem(hObj)) {
-				CString objText = GetTreeCtrl().GetItemText(hObj);
-				StringClass compoundKey;
-				compoundKey.Format("%s|%s", (LPCTSTR)fileText, (LPCTSTR)objText);
-				existingObjNodes.Insert(compoundKey, hObj);
-
-				for (HTREEITEM hTex = GetTreeCtrl().GetChildItem(hObj); hTex; hTex = GetTreeCtrl().GetNextSiblingItem(hTex)) {
-					CString texText = GetTreeCtrl().GetItemText(hTex);
-					allExistingTextures.Insert(StringClass((LPCTSTR)texText), 1);
-				}
-			}
-		}
+////////////////////////////////////////////////////////////////////////////
+//
+//  Is_Object_Node
+//
+bool
+CDataTreeView::Is_Object_Node (HTREEITEM hitem) const
+{
+	if (hitem == nullptr || GetTreeCtrl ().GetParentItem (hitem) != nullptr)
+	{
+		return false;
 	}
 
-	bool needsSortRoot = false;
-
-	// Iterate all render objects and group their textures under file -> object -> textures
-	RenderObjIterator *pObjEnum = WW3DAssetManager::Get_Instance()->Create_Render_Obj_Iterator ();
-	if (pObjEnum != nullptr) {
-
-		for (pObjEnum->First (); !pObjEnum->Is_Done (); pObjEnum->Next ()) {
-
-			LPCTSTR pszObjName = pObjEnum->Current_Item_Name ();
-			// TheSuperHackers @performance Tria 2026-05-19 Removed redundant Render_Obj_Exists
-			// hash lookup - the iterator is walking the same prototype list it would query,
-			// so the name is guaranteed present.
-
-			// Collect textures used by this object
-			HashTemplateClass<StringClass, int> objTextures;
-			RenderObjClass *robj = WW3DAssetManager::Get_Instance()->Create_Render_Obj (pszObjName);
-			if (robj != nullptr) {
-				Collect_Textures_From_RenderObj (robj, objTextures);
-				robj->Release_Ref ();
-			}
-
-			// Check if any textures were found
-			HashTemplateIterator<StringClass, int> checkIte (objTextures);
-			checkIte.First ();
-			if (checkIte.Is_Done ())
-				continue;
-
-			// Determine the source W3D filename for this render object
-			StringClass objNameKey (pszObjName);
-			StringClass sourceFileName;
-			if (pdoc != nullptr) {
-				const HashTemplateClass<StringClass, StringClass> &sourceMap = pdoc->GetAssetSourceFileMap ();
-				if (sourceMap.Exists (objNameKey))
-					sourceFileName = sourceMap.Get (objNameKey);
-				else
-					sourceFileName = "Unknown";
-			} else {
-				sourceFileName = "Unknown";
-			}
-
-			// TheSuperHackers @tweak Tria 19/04/2026 Display hierarchy name (without .w3d extension)
-			// as the group node label, matching the Bones tree grouping style.
-			{
-				int len = sourceFileName.Get_Length ();
-				if (len > 4 && _stricmp ((LPCTSTR)sourceFileName + len - 4, ".w3d") == 0)
-					sourceFileName.Erase (len - 4, 4);
-			}
-
-			// Find or create the file group node (level 1)
-			HTREEITEM hFileNode = nullptr;
-			if (existingFileNodes.Exists (sourceFileName)) {
-				hFileNode = existingFileNodes.Get (sourceFileName);
-			} else {
-				hFileNode = GetTreeCtrl ().InsertItem ((LPCTSTR)sourceFileName, m_iHierarchyIcon, m_iHierarchyIcon, m_hMaterialsRoot, TVI_LAST);
-				existingFileNodes.Insert (sourceFileName, hFileNode);
-				needsSortRoot = true;
-			}
-
-			// Find or create the object node (level 2)
-			StringClass compoundKey;
-			compoundKey.Format ("%s|%s", (LPCTSTR)sourceFileName, pszObjName);
-			HTREEITEM hObjNode = nullptr;
-			if (existingObjNodes.Exists (compoundKey)) {
-				hObjNode = existingObjNodes.Get (compoundKey);
-			} else {
-				hObjNode = GetTreeCtrl ().InsertItem (pszObjName, m_iMeshIcon, m_iMeshIcon, hFileNode, TVI_LAST);
-				existingObjNodes.Insert (compoundKey, hObjNode);
-			}
-
-			// Build a set of textures already under this object node
-			HashTemplateClass<StringClass, int> existingChildren;
-			for (HTREEITEM h = GetTreeCtrl().GetChildItem(hObjNode); h; h = GetTreeCtrl().GetNextSiblingItem(h)) {
-				CString text = GetTreeCtrl().GetItemText(h);
-				existingChildren.Insert(StringClass((LPCTSTR)text), 1);
-			}
-
-			// Insert textures as children of the object node (level 3)
-			bool childNeedsSort = false;
-			HashTemplateIterator<StringClass, int> texIte (objTextures);
-			for (texIte.First (); !texIte.Is_Done (); texIte.Next ()) {
-				StringClass texName = texIte.Peek_Key ();
-				if (existingChildren.Exists (texName))
-					continue;
-
-				// Look up the TextureClass from the global hash.
-				// The hash is keyed by Get_Texture_Name() (.tga), but texName is from Get_Full_Path()
-				// which may now be .dds. Search the hash by matching Get_Full_Path() directly.
-				TextureClass *ptexture = nullptr;
-				HashTemplateClass<StringClass, TextureClass*> &texHash = WW3DAssetManager::Get_Instance()->Texture_Hash();
-				if (texHash.Exists (texName)) {
-					ptexture = texHash.Get (texName);
-				} else {
-					HashTemplateIterator<StringClass, TextureClass*> findIte (texHash);
-					for (findIte.First (); !findIte.Is_Done (); findIte.Next ()) {
-						TextureClass *candidate = findIte.Peek_Value ();
-						if (candidate != nullptr && candidate->Get_Full_Path() == texName) {
-							ptexture = candidate;
-							break;
-						}
-					}
-				}
-
-				if (ptexture == nullptr)
-					continue;
-
-				HTREEITEM hTexItem = GetTreeCtrl ().InsertItem ((LPCTSTR)texName, m_iMaterialIcon, m_iMaterialIcon, hObjNode, TVI_LAST);
-				ptexture->Add_Ref ();
-				AssetInfoClass *asset_info = new AssetInfoClass ((LPCTSTR)texName, TypeMaterial, nullptr, (DWORD)ptexture);
-				GetTreeCtrl ().SetItemData (hTexItem, (ULONG)asset_info);
-
-				existingChildren.Insert (texName, 1);
-				allExistingTextures.Insert (texName, 1);
-				childNeedsSort = true;
-			}
-
-			if (childNeedsSort)
-				GetTreeCtrl ().SortChildren (hObjNode);
-		}
-
-		SAFE_DELETE (pObjEnum);
-	}
-
-	// Add any remaining textures not claimed by a render object (e.g. standalone textures)
-	HashTemplateIterator<StringClass, TextureClass*> globalIte (WW3DAssetManager::Get_Instance()->Texture_Hash());
-	for (globalIte.First (); !globalIte.Is_Done (); globalIte.Next ()) {
-		TextureClass *ptexture = globalIte.Peek_Value ();
-		if (ptexture == nullptr)
-			continue;
-
-		StringClass texName (ptexture->Get_Full_Path ());
-		if (allExistingTextures.Exists (texName))
-			continue;
-
-		HTREEITEM hTexItem = GetTreeCtrl ().InsertItem ((LPCTSTR)texName, m_iMaterialIcon, m_iMaterialIcon, m_hMaterialsRoot, TVI_LAST);
-		ptexture->Add_Ref ();
-		AssetInfoClass *asset_info = new AssetInfoClass ((LPCTSTR)texName, TypeMaterial, nullptr, (DWORD)ptexture);
-		GetTreeCtrl ().SetItemData (hTexItem, (ULONG)asset_info);
-
-		allExistingTextures.Insert (texName, 1);
-		needsSortRoot = true;
-	}
-
-	if (needsSortRoot)
-		GetTreeCtrl ().SortChildren (m_hMaterialsRoot);
-
+	// A category node is top level too, but carries no asset
+	return GetTreeCtrl ().GetItemData (hitem) != 0;
 }
 
 
 ////////////////////////////////////////////////////////////////////////////
 //
-//  Load_Bones_Into_Tree
+//  Get_Owner_Object
 //
-// TheSuperHackers @feature Tria 22/04/2026 Populate Sub-Objects and Bones sub-folders inside each
-// Hierarchy node. Sub-objects with normal mesh geometry go into Sub-Objects (with visibility checkbox);
-// all others (no geometry, collision-only, etc.) go into Bones.
+HTREEITEM
+CDataTreeView::Get_Owner_Object (HTREEITEM hitem) const
+{
+	HTREEITEM htop = hitem;
+	while (htop != nullptr && GetTreeCtrl ().GetParentItem (htop) != nullptr)
+	{
+		htop = GetTreeCtrl ().GetParentItem (htop);
+	}
+	return Is_Object_Node (htop) ? htop : nullptr;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Get_Folder_Kind
+//
+CDataTreeView::FolderKind
+CDataTreeView::Get_Folder_Kind (HTREEITEM hitem) const
+{
+	std::map<HTREEITEM, FolderKind>::const_iterator found = m_FolderKinds.find (hitem);
+	return (found != m_FolderKinds.end ()) ? found->second : FOLDER_NONE;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Find_Folder
+//
+HTREEITEM
+CDataTreeView::Find_Folder (HTREEITEM hobject, FolderKind kind) const
+{
+	if (hobject == nullptr)
+	{
+		return nullptr;
+	}
+
+	for (HTREEITEM hchild = GetTreeCtrl ().GetChildItem (hobject); hchild != nullptr; hchild = GetTreeCtrl ().GetNextSiblingItem (hchild))
+	{
+		if (Get_Folder_Kind (hchild) == kind)
+		{
+			return hchild;
+		}
+	}
+	return nullptr;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Add_Folder
+//
+HTREEITEM
+CDataTreeView::Add_Folder (HTREEITEM hobject, FolderKind kind)
+{
+	CTreeCtrl &tree = GetTreeCtrl ();
+
+	// Folders keep the order of the enum, whichever is made first
+	HTREEITEM hafter = TVI_FIRST;
+	for (HTREEITEM hchild = tree.GetChildItem (hobject); hchild != nullptr; hchild = tree.GetNextSiblingItem (hchild))
+	{
+		FolderKind child_kind = Get_Folder_Kind (hchild);
+		if (child_kind == kind)
+		{
+			return hchild;
+		}
+		if (child_kind != FOLDER_NONE && child_kind < kind)
+		{
+			hafter = hchild;
+		}
+	}
+
+	const int icons[] = { 0, m_iMeshIcon, m_iBoneIcon, m_iAnimationIcon, m_iMaterialIcon };
+	HTREEITEM hfolder = tree.InsertItem (FOLDER_NAMES[kind], icons[kind], icons[kind], hobject, hafter);
+	m_FolderKinds[hfolder] = kind;
+
+	if (kind == FOLDER_MESHES)
+	{
+		tree.SetItemState (hfolder, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
+	}
+	return hfolder;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Update_Folder_Label
 //
 void
-CDataTreeView::Load_Bones_Into_Tree (void)
+CDataTreeView::Update_Folder_Label (HTREEITEM hfolder)
 {
-	// Build a map from hierarchy name -> its tree node under m_hHierarchyRoot
-	HashTemplateClass<StringClass, HTREEITEM> hierNodeMap;
-	for (HTREEITEM h = GetTreeCtrl ().GetChildItem (m_hHierarchyRoot); h; h = GetTreeCtrl ().GetNextSiblingItem (h)) {
-		AssetInfoClass *info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (h);
-		if (info != nullptr)
-			hierNodeMap.Insert (StringClass (info->Get_Name ()), h);
+	FolderKind kind = Get_Folder_Kind (hfolder);
+	if (kind != FOLDER_NONE)
+	{
+		CString label;
+		label.Format ("%s (%d)", FOLDER_NAMES[kind], Count_Descendants (GetTreeCtrl (), hfolder));
+		GetTreeCtrl ().SetItemText (hfolder, label);
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Get_Category_Root
+//
+HTREEITEM
+CDataTreeView::Get_Category_Root (Category category, bool create)
+{
+	if (m_hCategoryRoots[category] != nullptr || !create)
+	{
+		return m_hCategoryRoots[category];
 	}
 
-	// Track which hierarchy names we have already populated to avoid re-doing them
-	HashTemplateClass<StringClass, int> processedHierarchies;
+	CTreeCtrl &tree = GetTreeCtrl ();
 
-	RenderObjIterator *pObjEnum = WW3DAssetManager::Get_Instance ()->Create_Render_Obj_Iterator ();
-	if (pObjEnum == nullptr)
+	// It goes after the category before it, or after the last object when it is the first
+	HTREEITEM hafter = TVI_FIRST;
+	for (int index = category - 1; index >= 0 && hafter == TVI_FIRST; index --)
+	{
+		if (m_hCategoryRoots[index] != nullptr)
+		{
+			hafter = m_hCategoryRoots[index];
+		}
+	}
+	if (hafter == TVI_FIRST)
+	{
+		for (HTREEITEM hitem = tree.GetRootItem (); hitem != nullptr && tree.GetItemData (hitem) != 0; hitem = tree.GetNextSiblingItem (hitem))
+		{
+			hafter = hitem;
+		}
+	}
+
+	const int icons[CATEGORY_COUNT] = { m_iEmitterIcon, m_iAggregateIcon, m_iMeshIcon, m_iPrimitivesIcon, m_iSoundIcon, m_iMaterialIcon };
+	m_hCategoryRoots[category] = tree.InsertItem (CATEGORY_NAMES[category], icons[category], icons[category], TVI_ROOT, hafter);
+	return m_hCategoryRoots[category];
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Insert_Object_Nodes
+//
+void
+CDataTreeView::Insert_Object_Nodes (std::vector<ObjectEntry> &entries)
+{
+	if (entries.empty ())
+	{
 		return;
-
-	for (pObjEnum->First (); !pObjEnum->Is_Done (); pObjEnum->Next ()) {
-
-		LPCTSTR pszItemName = pObjEnum->Current_Item_Name ();
-		// TheSuperHackers @performance Tria 2026-05-19 Removed redundant Render_Obj_Exists
-		// hash lookup - iterator already walks the same list.
-
-		// Only HLod / DistLOD objects carry sub-objects
-		int classId = pObjEnum->Current_Item_Class_ID ();
-		if (classId != RenderObjClass::CLASSID_HLOD && classId != RenderObjClass::CLASSID_DISTLOD)
-			continue;
-
-		RenderObjClass *robj = WW3DAssetManager::Get_Instance ()->Create_Render_Obj (pszItemName);
-		if (robj == nullptr)
-			continue;
-
-		StringClass objName (pszItemName);
-
-		// Skip if already processed
-		if (processedHierarchies.Exists (objName)) {
-			robj->Release_Ref ();
-			continue;
-		}
-		processedHierarchies.Insert (objName, 1);
-
-		// Find this object's node in the Hierarchy tree
-		if (!hierNodeMap.Exists (objName)) {
-			robj->Release_Ref ();
-			continue;
-		}
-		HTREEITEM hHierNode = hierNodeMap.Get (objName);
-
-		// Find or create the Sub-Objects and Bones sub-folders
-		HTREEITEM hObjectsFolder = nullptr;
-		HTREEITEM hBonesFolder   = nullptr;
-		for (HTREEITEM hChild = GetTreeCtrl ().GetChildItem (hHierNode); hChild; hChild = GetTreeCtrl ().GetNextSiblingItem (hChild)) {
-			CString text = GetTreeCtrl ().GetItemText (hChild);
-			if (text == "Sub-Objects") hObjectsFolder = hChild;
-			else if (text == "Bones") hBonesFolder = hChild;
-		}
-		if (hObjectsFolder == nullptr) {
-			hObjectsFolder = GetTreeCtrl ().InsertItem ("Sub-Objects", m_iMeshIcon, m_iMeshIcon, hHierNode, TVI_FIRST);
-			GetTreeCtrl ().SetItemState (hObjectsFolder, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
-		}
-		if (hBonesFolder == nullptr)
-			hBonesFolder = GetTreeCtrl ().InsertItem ("Bones", m_iBoneIcon, m_iBoneIcon, hHierNode, TVI_LAST);
-
-		// Build a short-name->sub-object map for quick lookup.
-		// Sub-object names are "HIERARCHY.SUBOBJ" format; pivot names are just "SUBOBJ".
-		// Strip the hierarchy prefix when keying the map.
-		int numSubs = robj->Get_Num_Sub_Objects ();
-		HashTemplateClass<StringClass, RenderObjClass *> subObjMap;
-		for (int i = 0; i < numSubs; ++i) {
-			RenderObjClass *sub = robj->Get_Sub_Object (i);
-			if (sub == nullptr)
-				continue;
-			const char *fullName = sub->Get_Name ();
-			const char *dot = ::strchr (fullName, '.');
-			StringClass shortName (dot != nullptr ? dot + 1 : fullName);
-			subObjMap.Insert (shortName, sub);
-		}
-
-		// Iterate HTree pivots (skip pivot 0 = root).
-		// Bones and sub-objects are mixed together in the Sub-Objects folder, nested by pivot
-		// parent-child relationship. Each pivot is inserted alphabetically under its parent.
-		// Pure bones whose parent is the root (no geometry ancestry) fall into hBonesFolder.
-		const HTreeClass *htree = robj->Get_HTree ();
-		int numPivots = (htree != nullptr) ? htree->Num_Pivots () : 0;
-
-		// Map from pivot index -> HTREEITEM (for both sub-objects and bones placed in sub-objects folder).
-		DynamicVectorClass<HTREEITEM> pivotItems;
-		pivotItems.Resize (numPivots);
-		for (int i = 0; i < numPivots; ++i)
-			pivotItems[i] = nullptr;
-
-		for (int p = 1; p < numPivots; ++p) {
-			const char *pivotName = htree->Get_Bone_Name (p);
-			if (pivotName == nullptr || pivotName[0] == '\0')
-				continue;
-
-			bool hasMesh = subObjMap.Exists (StringClass (pivotName));
-			int parentIdx = htree->Get_Parent_Index (p);
-
-			// Determine where to insert: under parent's tree item if it exists, otherwise root folder.
-			// If parent is pivot 0 (hierarchy root) or has no tree item, use hObjectsFolder.
-			// Pure bones whose ancestry never reaches a sub-object go to hBonesFolder instead.
-			HTREEITEM hParentItem = nullptr;
-			if (parentIdx > 0 && pivotItems[parentIdx] != nullptr) {
-				hParentItem = pivotItems[parentIdx]; // nested under a sibling sub-object or bone
-			} else if (parentIdx == 0) {
-				hParentItem = hasMesh ? hObjectsFolder : hBonesFolder;
-			} else {
-				// Parent pivot exists but has no tree item (shouldn't happen in well-formed data).
-				hParentItem = hasMesh ? hObjectsFolder : hBonesFolder;
-			}
-
-			if (hasMesh) {
-				HTREEITEM hItem = GetTreeCtrl ().InsertItem (pivotName, m_iMeshIcon, m_iMeshIcon, hParentItem, TVI_SORT);
-				AssetInfoClass *asset_info = new AssetInfoClass (pivotName, TypeMesh);
-				GetTreeCtrl ().SetItemData (hItem, (ULONG)asset_info);
-				GetTreeCtrl ().SetItemState (hItem, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
-				pivotItems[p] = hItem;
-			} else {
-				// Pure bone — place under its parent item if parented to a sub-object/bone node,
-				// else goes to the flat Bones folder.
-				if (FindChildItem (hParentItem, pivotName) == nullptr) {
-					int iconIdx = (hParentItem == hBonesFolder) ? m_iBoneIcon : m_iBoneIcon;
-					HTREEITEM hItem = GetTreeCtrl ().InsertItem (pivotName, iconIdx, iconIdx, hParentItem, TVI_SORT);
-					AssetInfoClass *asset_info = new AssetInfoClass (pivotName, TypeBone);
-					GetTreeCtrl ().SetItemData (hItem, (ULONG)asset_info);
-					pivotItems[p] = hItem;
-				}
-			}
-		}
-
-		// Sort the top-level Sub-Objects and Bones folders alphabetically.
-		GetTreeCtrl ().SortChildren (hObjectsFolder);
-		GetTreeCtrl ().SortChildren (hBonesFolder);
-
-		// Release the refs held by the map (one Add_Ref per Get_Sub_Object call above)
-		for (int i = 0; i < numSubs; ++i) {
-			RenderObjClass *sub = robj->Get_Sub_Object (i);
-			if (sub != nullptr) {
-				sub->Release_Ref (); // release the map's ref
-				sub->Release_Ref (); // release this loop's Get_Sub_Object ref
-			}
-		}
-
-		robj->Release_Ref ();
 	}
 
-	SAFE_DELETE (pObjEnum);
+	std::sort (entries.begin (), entries.end (), Object_Entry_Less);
+
+	// The object nodes already there are in name order, so one pass over them places every new one
+	CTreeCtrl &tree = GetTreeCtrl ();
+	HTREEITEM hexisting = tree.GetRootItem ();
+	HTREEITEM hprevious = TVI_FIRST;
+	for (size_t index = 0; index < entries.size (); index ++)
+	{
+		const ObjectEntry &entry = entries[index];
+		while (hexisting != nullptr && tree.GetItemData (hexisting) != 0 &&
+				 ::_stricmp (tree.GetItemText (hexisting), entry.name) <= 0)
+		{
+			hprevious = hexisting;
+			hexisting = tree.GetNextSiblingItem (hexisting);
+		}
+
+		HTREEITEM hitem = tree.InsertItem (entry.name, entry.icon, entry.icon, TVI_ROOT, hprevious);
+		tree.SetItemData (hitem, (ULONG)new AssetInfoClass (entry.name, entry.type));
+		Populate_Object_Node (hitem);
+		hprevious = hitem;
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Populate_Object_Node
+//
+void
+CDataTreeView::Populate_Object_Node (HTREEITEM hobject)
+{
+	AssetInfoClass *object_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (hobject);
+	if (object_info == nullptr)
+	{
+		return;
+	}
+
+	RenderObjClass *render_obj = WW3DAssetManager::Get_Instance ()->Create_Render_Obj (object_info->Get_Name ());
+	if (render_obj == nullptr)
+	{
+		return;
+	}
+
+	if (object_info->Get_Type () != TypeMesh)
+	{
+		Add_Parts (hobject, render_obj);
+	}
+	Add_Textures (hobject, render_obj);
+
+	render_obj->Release_Ref ();
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Add_Parts
+//
+//  Each pivot is listed once. One that carries a part goes under Meshes,
+//  nested below the nearest pivot above it that also carries a part. The
+//  bare bones nest the same way under Skeleton.
+//
+void
+CDataTreeView::Add_Parts (HTREEITEM hobject, RenderObjClass *render_obj)
+{
+	CTreeCtrl &tree = GetTreeCtrl ();
+
+	// A part is named "OBJECT.PART" and hangs on the pivot called "PART"
+	std::map<CString, CString> part_names;
+	int sub_count = render_obj->Get_Num_Sub_Objects ();
+	for (int index = 0; index < sub_count; index ++)
+	{
+		RenderObjClass *sub_obj = render_obj->Get_Sub_Object (index);
+		if (sub_obj == nullptr)
+		{
+			continue;
+		}
+
+		CString full_name (sub_obj->Get_Name ());
+		int dot = full_name.Find ('.');
+		CString short_name = (dot >= 0) ? full_name.Mid (dot + 1) : full_name;
+		short_name.MakeUpper ();
+		if (part_names.find (short_name) == part_names.end ())
+		{
+			part_names[short_name] = full_name;
+		}
+
+		StringClass owned_key = Name_Key (full_name);
+		if (!m_OwnedMeshes.Exists (owned_key))
+		{
+			m_OwnedMeshes.Insert (owned_key, 1);
+		}
+		sub_obj->Release_Ref ();
+	}
+
+	HTREEITEM hmeshes = Add_Folder (hobject, FOLDER_MESHES);
+	HTREEITEM hskeleton = Add_Folder (hobject, FOLDER_SKELETON);
+
+	const HTreeClass *htree = render_obj->Get_HTree ();
+	int pivot_count = (htree != nullptr) ? htree->Num_Pivots () : 0;
+	std::vector<HTREEITEM> pivot_items (pivot_count, (HTREEITEM)nullptr);
+	std::vector<bool> pivot_has_part (pivot_count, false);
+	std::set<CString> placed;
+
+	// Pivot 0 is the root, and a parent always comes before its children
+	for (int pivot = 1; pivot < pivot_count; pivot ++)
+	{
+		const char *pivot_name = htree->Get_Bone_Name (pivot);
+		if (pivot_name == nullptr || pivot_name[0] == '\0')
+		{
+			continue;
+		}
+
+		CString key (pivot_name);
+		key.MakeUpper ();
+		std::map<CString, CString>::const_iterator part = part_names.find (key);
+		bool has_part = (part != part_names.end ());
+		pivot_has_part[pivot] = has_part;
+
+		int ancestor = htree->Get_Parent_Index (pivot);
+		while (ancestor > 0 && (pivot_items[ancestor] == nullptr || pivot_has_part[ancestor] != has_part))
+		{
+			ancestor = htree->Get_Parent_Index (ancestor);
+		}
+
+		HTREEITEM hparent = has_part ? hmeshes : hskeleton;
+		if (ancestor > 0)
+		{
+			hparent = pivot_items[ancestor];
+		}
+
+		if (has_part)
+		{
+			HTREEITEM hitem = tree.InsertItem (pivot_name, m_iMeshIcon, m_iMeshIcon, hparent, TVI_SORT);
+			tree.SetItemData (hitem, (ULONG)new AssetInfoClass (part->second, TypeMesh));
+			tree.SetItemState (hitem, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
+			pivot_items[pivot] = hitem;
+			placed.insert (key);
+		}
+		else if (FindChildItem (hparent, pivot_name) == nullptr)
+		{
+			HTREEITEM hitem = tree.InsertItem (pivot_name, m_iBoneIcon, m_iBoneIcon, hparent, TVI_SORT);
+			tree.SetItemData (hitem, (ULONG)new AssetInfoClass (pivot_name, TypeBone));
+			pivot_items[pivot] = hitem;
+		}
+	}
+
+	// A skin has no pivot of its own name, so it would otherwise be missing
+	for (std::map<CString, CString>::const_iterator part = part_names.begin (); part != part_names.end (); ++part)
+	{
+		if (placed.find (part->first) == placed.end ())
+		{
+			HTREEITEM hitem = tree.InsertItem (part->first, m_iMeshIcon, m_iMeshIcon, hmeshes, TVI_SORT);
+			tree.SetItemData (hitem, (ULONG)new AssetInfoClass (part->second, TypeMesh));
+			tree.SetItemState (hitem, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
+		}
+	}
+
+	HTREEITEM folders[] = { hmeshes, hskeleton };
+	for (int index = 0; index < 2; index ++)
+	{
+		if (tree.GetChildItem (folders[index]) == nullptr)
+		{
+			tree.DeleteItem (folders[index]);
+		}
+		else
+		{
+			Update_Folder_Label (folders[index]);
+		}
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Add_Textures
+//
+void
+CDataTreeView::Add_Textures (HTREEITEM hobject, RenderObjClass *render_obj)
+{
+	std::map<CString, TextureClass *> textures;
+	Collect_Textures (render_obj, textures);
+	if (textures.empty ())
+	{
+		return;
+	}
+
+	// The map is ordered by name, so the rows go in sorted
+	CTreeCtrl &tree = GetTreeCtrl ();
+	HTREEITEM hfolder = Add_Folder (hobject, FOLDER_TEXTURES);
+	for (std::map<CString, TextureClass *>::const_iterator texture = textures.begin (); texture != textures.end (); ++texture)
+	{
+		if (FindChildItem (hfolder, texture->first) != nullptr)
+		{
+			continue;
+		}
+
+		HTREEITEM hitem = tree.InsertItem (texture->first, m_iMaterialIcon, m_iMaterialIcon, hfolder, TVI_LAST);
+		texture->second->Add_Ref ();
+		tree.SetItemData (hitem, (ULONG)new AssetInfoClass (texture->first, TypeMaterial, nullptr, (DWORD)texture->second));
+
+		StringClass listed_key = Name_Key (texture->first);
+		if (!m_ListedTextures.Exists (listed_key))
+		{
+			m_ListedTextures.Insert (listed_key, 1);
+		}
+	}
+	Update_Folder_Label (hfolder);
 }
 
 
@@ -637,245 +736,149 @@ CDataTreeView::Load_Bones_Into_Tree (void)
 void
 CDataTreeView::LoadAssetsIntoTree ()
 {
+	CTreeCtrl &tree = GetTreeCtrl ();
+
 	// TheSuperHackers @performance Tria 2026-05-19 Lock all window updates while we
 	// bulk-mutate the tree. SetRedraw(FALSE) alone does not stop the control from
-	// recomputing scrollbar ranges and item layout on every insert; LockWindowUpdate
-	// prevents WM_PAINT / scrollbar / range traffic at the window-manager level. For
-	// large folder loads (4000+ files) the visible "hang then recover" pause shrinks
-	// dramatically.
-	::LockWindowUpdate (GetTreeCtrl ().GetSafeHwnd ());
+	// recomputing scrollbar ranges and item layout on every insert.
+	::LockWindowUpdate (tree.GetSafeHwnd ());
+	tree.SetRedraw (FALSE);
 
-	// Turn off repainting
-	GetTreeCtrl ().SetRedraw (FALSE);
+	// What the tree already holds, so a second load only adds
+	HashTemplateClass<StringClass, int> existing_objects;
+	for (HTREEITEM hitem = tree.GetRootItem (); hitem != nullptr; hitem = tree.GetNextSiblingItem (hitem))
+	{
+		AssetInfoClass *info = (AssetInfoClass *)tree.GetItemData (hitem);
+		if (info != nullptr)
+		{
+			existing_objects.Insert (Name_Key (info->Get_Name ()), 1);
+		}
+	}
 
+	HashTemplateClass<StringClass, int> existing_items[CATEGORY_COUNT];
+	bool category_changed[CATEGORY_COUNT] = { false };
+	for (int category = 0; category < CATEGORY_COUNT; category ++)
+	{
+		for (HTREEITEM hitem = tree.GetChildItem (m_hCategoryRoots[category]); m_hCategoryRoots[category] != nullptr && hitem != nullptr; hitem = tree.GetNextSiblingItem (hitem))
+		{
+			existing_items[category].Insert (Name_Key (tree.GetItemText (hitem)), 1);
+		}
+	}
+
+	std::vector<ObjectEntry> new_objects;
+	std::vector<CString> mesh_names;
+
+	// Objects the filter leaves out still own their parts
+	std::set<CString> filtered_objects;
 	DynamicVectorClass<CString> dist_lod_list;
 
-	// TheSuperHackers @performance Tria 18/04/2026 Build a hash set of existing tree items per parent
-	// to replace O(n) FindChildItem scans with O(1) lookups. Also use TVI_LAST instead of TVI_SORT
-	// to avoid O(n) sorted insertion per item, then sort each parent once at the end.
-	HashTemplateClass<StringClass, int> existingMeshes;
-	HashTemplateClass<StringClass, int> existingHierarchies;
-	HashTemplateClass<StringClass, int> existingLODs;
-	HashTemplateClass<StringClass, int> existingAggregates;
-	HashTemplateClass<StringClass, int> existingEmitters;
-	HashTemplateClass<StringClass, int> existingSounds;
-	HashTemplateClass<StringClass, int> existingCollections;
-	HashTemplateClass<StringClass, int> existingPrimitives;
+	RenderObjIterator *asset_iterator = WW3DAssetManager::Get_Instance ()->Create_Render_Obj_Iterator ();
+	ASSERT (asset_iterator != nullptr);
+	if (asset_iterator != nullptr)
+	{
+		for (asset_iterator->First (); asset_iterator->Is_Done () == FALSE; asset_iterator->Next ())
+		{
+			LPCTSTR name = asset_iterator->Current_Item_Name ();
 
-	// Pre-populate hash sets with items already in the tree
-	struct { HTREEITEM root; HashTemplateClass<StringClass, int> *set; } roots[] = {
-		{ m_hMeshRoot, &existingMeshes },
-		{ m_hHierarchyRoot, &existingHierarchies },
-		{ m_hLODRoot, &existingLODs },
-		{ m_hAggregateRoot, &existingAggregates },
-		{ m_hEmitterRoot, &existingEmitters },
-		{ m_hSoundRoot, &existingSounds },
-		{ m_hMeshCollectionRoot, &existingCollections },
-		{ m_hPrimitivesRoot, &existingPrimitives },
-	};
-	for (int r = 0; r < 8; ++r) {
-		for (HTREEITEM h = GetTreeCtrl().GetChildItem(roots[r].root); h; h = GetTreeCtrl().GetNextSiblingItem(h)) {
-			CString text = GetTreeCtrl().GetItemText(h);
-			roots[r].set->Insert(StringClass((LPCTSTR)text), 1);
-			// TheSuperHackers @feature Tria 19/04/2026 Scan grandchildren for grouped mesh items.
-			if (roots[r].root == m_hMeshRoot) {
-				for (HTREEITEM hChild = GetTreeCtrl().GetChildItem(h); hChild; hChild = GetTreeCtrl().GetNextSiblingItem(hChild)) {
-					CString childText = GetTreeCtrl().GetItemText(hChild);
-					roots[r].set->Insert(StringClass((LPCTSTR)childText), 1);
-				}
-			}
-		}
-	}
+			int category = -1;
+			ASSET_TYPE type = TypeUnknown;
+			int icon = -1;
+			bool is_object = false;
 
-	// Track which parent nodes received new items and need re-sorting
-	bool needsSort[8] = { false };
-
-	// TheSuperHackers @feature Tria 19/04/2026 Group mesh items under their parent object name,
-	// matching the hierarchy name style used by Bones and Materials.
-	HashTemplateClass<StringClass, HTREEITEM> meshGroupNodes;
-	for (HTREEITEM hGrp = GetTreeCtrl().GetChildItem(m_hMeshRoot); hGrp; hGrp = GetTreeCtrl().GetNextSiblingItem(hGrp)) {
-		if (GetTreeCtrl().ItemHasChildren(hGrp)) {
-			CString text = GetTreeCtrl().GetItemText(hGrp);
-			meshGroupNodes.Insert(StringClass((LPCTSTR)text), hGrp);
-		}
-	}
-
-	// Get an iterator from the asset manager that we can
-	// use to enumerate the currently loaded assets
-	RenderObjIterator *pObjEnum = WW3DAssetManager::Get_Instance()->Create_Render_Obj_Iterator ();
-	ASSERT (pObjEnum);
-	if (pObjEnum) {
-
-		// Loop through all the assets in the manager
-		for (pObjEnum->First ();
-			  pObjEnum->Is_Done () == FALSE;
-			  pObjEnum->Next ()) {
-
-			// TheSuperHackers @performance Tria 2026-05-19 Removed redundant Render_Obj_Exists
-			// hash lookup - iterator walks the same prototype list.
-			LPCTSTR pszItemName = pObjEnum->Current_Item_Name ();
+			switch (asset_iterator->Current_Item_Class_ID ())
 			{
+				case RenderObjClass::CLASSID_MESH:
+					// Placed after the objects, once it is known which of them owns it
+					mesh_names.push_back (name);
+					continue;
 
-				BOOL bInsert = FALSE;
-				HTREEITEM hParentNode = nullptr;
-				ASSET_TYPE assetType = TypeUnknown;
-				int iIconIndex = -1;
-				HashTemplateClass<StringClass, int> *pExistingSet = nullptr;
-				int sortIndex = -1;
+				case RenderObjClass::CLASSID_COLLECTION:
+					category = CATEGORY_COLLECTION;
+					type = TypeMesh;
+					icon = m_iMeshIcon;
+					break;
 
-				// What type of asset is this?
-				switch (pObjEnum->Current_Item_Class_ID ()) {
+				case RenderObjClass::CLASSID_SOUND:
+					category = CATEGORY_SOUND;
+					type = TypeSound;
+					icon = m_iSoundIcon;
+					break;
 
-					case RenderObjClass::CLASSID_COLLECTION:
-						bInsert = TRUE;
-						hParentNode = m_hMeshCollectionRoot;
-						assetType = TypeMesh;
-						iIconIndex = m_iMeshIcon;
-						pExistingSet = &existingCollections;
-						sortIndex = 6;
-						break;
+				case RenderObjClass::CLASSID_PARTICLEEMITTER:
+					category = CATEGORY_EMITTER;
+					type = TypeEmitter;
+					icon = m_iEmitterIcon;
+					break;
 
-					case RenderObjClass::CLASSID_MESH:
-						bInsert			= TRUE;
-						hParentNode		= m_hMeshRoot;
-						assetType		= TypeMesh;
-						iIconIndex		= m_iMeshIcon;
-						pExistingSet = &existingMeshes;
-						sortIndex = 0;
-						break;
+				case RenderObjClass::CLASSID_SPHERE:
+				case RenderObjClass::CLASSID_RING:
+					category = CATEGORY_PRIMITIVE;
+					type = TypePrimitives;
+					icon = m_iPrimitivesIcon;
+					break;
 
-					case RenderObjClass::CLASSID_SOUND:
-						bInsert			= TRUE;
-						hParentNode		= m_hSoundRoot;
-						assetType		= TypeSound;
-						iIconIndex		= m_iSoundIcon;
-						pExistingSet = &existingSounds;
-						sortIndex = 5;
-						break;
-
-					case RenderObjClass::CLASSID_HMODEL:
-						ASSERT (0);
-						break;
-
-					case RenderObjClass::CLASSID_PARTICLEEMITTER:
-						bInsert = TRUE;
-						hParentNode = m_hEmitterRoot;
-						assetType = TypeEmitter;
-						iIconIndex = m_iEmitterIcon;
-						pExistingSet = &existingEmitters;
-						sortIndex = 4;
-						break;
-
-					case RenderObjClass::CLASSID_SPHERE:
-					case RenderObjClass::CLASSID_RING:
-						bInsert		= TRUE;
-						hParentNode = m_hPrimitivesRoot;
-						assetType	= TypePrimitives;
-						iIconIndex	= m_iPrimitivesIcon;
-						pExistingSet = &existingPrimitives;
-						sortIndex = 7;
-						break;
-
-					case RenderObjClass::CLASSID_DISTLOD:
-						dist_lod_list.Add (pszItemName);
-					case RenderObjClass::CLASSID_HLOD:
-						bInsert = TRUE;
-						hParentNode = m_hHierarchyRoot;
-						assetType = TypeHierarchy;
-						iIconIndex = m_iHierarchyIcon;
-						pExistingSet = &existingHierarchies;
-						sortIndex = 1;
-
-						if (::Is_Real_LOD (pszItemName)) {
-							hParentNode = m_hLODRoot;
-							assetType = TypeLOD;
-							iIconIndex = m_iLODIcon;
-							pExistingSet = &existingLODs;
-							sortIndex = 2;
-						}
-						break;
-				}
-
-				if (bInsert) {
-
-					// Check to see if this object is an aggregate
-					if (::Is_Aggregate (pszItemName)) {
-						hParentNode = m_hAggregateRoot;
-						assetType = TypeAggregate;
-						iIconIndex = m_iAggregateIcon;
-						pExistingSet = &existingAggregates;
-						sortIndex = 3;
+				case RenderObjClass::CLASSID_DISTLOD:
+					dist_lod_list.Add (name);
+				case RenderObjClass::CLASSID_HLOD:
+					is_object = true;
+					type = TypeHierarchy;
+					icon = m_iHierarchyIcon;
+					if (::Is_Real_LOD (name))
+					{
+						type = TypeLOD;
+						icon = m_iLODIcon;
 					}
+					break;
 
-					StringClass itemKey(pszItemName);
+				default:
+					continue;
+			}
 
-					// If this object isn't already in the tree then add it
-					if (pExistingSet && !pExistingSet->Exists(itemKey)) {
+			if (::Is_Aggregate (name))
+			{
+				is_object = false;
+				category = CATEGORY_AGGREGATE;
+				type = TypeAggregate;
+				icon = m_iAggregateIcon;
+			}
 
-						HTREEITEM hActualParent = hParentNode;
-
-						// TheSuperHackers @feature Tria 19/04/2026 Group mesh items under their parent object name.
-						if (hParentNode == m_hMeshRoot) {
-							CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
-							StringClass groupName ("Unknown");
-							if (pdoc != nullptr) {
-								const HashTemplateClass<StringClass, StringClass> &sourceMap = pdoc->GetAssetSourceFileMap ();
-								if (sourceMap.Exists (itemKey)) {
-									groupName = sourceMap.Get (itemKey);
-									int len = groupName.Get_Length ();
-									if (len > 4 && _stricmp ((LPCTSTR)groupName + len - 4, ".w3d") == 0)
-										groupName.Erase (len - 4, 4);
-								}
-							}
-
-							if (meshGroupNodes.Exists (groupName)) {
-								hActualParent = meshGroupNodes.Get (groupName);
-							} else {
-								hActualParent = GetTreeCtrl ().InsertItem ((LPCTSTR)groupName, m_iHierarchyIcon, m_iHierarchyIcon, m_hMeshRoot, TVI_LAST);
-								meshGroupNodes.Insert (groupName, hActualParent);
-								needsSort[0] = true;
-							}
-						}
-
-						// Add this entry to the tree (unsorted, will sort at end)
-						HTREEITEM hItem = GetTreeCtrl ().InsertItem (pszItemName, iIconIndex, iIconIndex, hActualParent, TVI_LAST);
-						ASSERT (hItem != nullptr);
-
-						// Allocate a new asset information class to associate with this entry
-						AssetInfoClass *asset_info = new AssetInfoClass (pszItemName, assetType);
-						GetTreeCtrl ().SetItemData (hItem, (ULONG)asset_info);
-
-						// TheSuperHackers @feature Tria 22/04/2026 For Hierarchy nodes, create the
-						// Animations / Sub-Objects / Bones sub-folders immediately so LoadAnimationsIntoTree
-						// and Load_Bones_Into_Tree can find them without a second pass.
-						if (hParentNode == m_hHierarchyRoot || hParentNode == m_hLODRoot) {
-							GetTreeCtrl ().InsertItem ("Animations",   m_iAnimationIcon, m_iAnimationIcon, hItem, TVI_LAST);
-							HTREEITEM hSubObjFolder = GetTreeCtrl ().InsertItem ("Sub-Objects", m_iMeshIcon, m_iMeshIcon, hItem, TVI_LAST);
-							GetTreeCtrl ().SetItemState (hSubObjFolder, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
-							GetTreeCtrl ().InsertItem ("Bones",        m_iBoneIcon,      m_iBoneIcon,      hItem, TVI_LAST);
-						}
-
-						// TheSuperHackers @feature Tria 18/04/2026 Show checkbox on mesh items for visibility toggling.
-						if (hParentNode == m_hMeshRoot) {
-							GetTreeCtrl ().SetItemState (hItem, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
-						}
-
-						pExistingSet->Insert(itemKey, 1);
-						if (sortIndex >= 0) needsSort[sortIndex] = true;
-					}
+			StringClass key = Name_Key (name);
+			if (!Matches_Filter (name))
+			{
+				if (is_object)
+				{
+					filtered_objects.insert (CString ((const char *)key));
 				}
+			}
+			else if (is_object)
+			{
+				if (!existing_objects.Exists (key))
+				{
+					ObjectEntry entry = { name, type, icon };
+					new_objects.push_back (entry);
+					existing_objects.Insert (key, 1);
+				}
+			}
+			else if (!existing_items[category].Exists (key))
+			{
+				HTREEITEM hroot = Get_Category_Root ((Category)category, true);
+				HTREEITEM hitem = tree.InsertItem (name, icon, icon, hroot, TVI_LAST);
+				tree.SetItemData (hitem, (ULONG)new AssetInfoClass (name, type));
+				existing_items[category].Insert (key, 1);
+				category_changed[category] = true;
 			}
 		}
 
-		// Free the enumerator object we created earlier
-		SAFE_DELETE (pObjEnum);
+		SAFE_DELETE (asset_iterator);
 	}
 
 	// Loop through all the old-style dist lod's and convert their prototypes
 	// to the new HLOD format
-	for (int index = 0; index < dist_lod_list.Count (); index ++) {
+	for (int index = 0; index < dist_lod_list.Count (); index ++)
+	{
 		HLodClass *plod = (HLodClass *)WW3DAssetManager::Get_Instance ()->Create_Render_Obj (dist_lod_list[index]);
-		if (plod != nullptr) {
+		if (plod != nullptr)
+		{
 			HLodDefClass *definition = new HLodDefClass (*plod);
 			HLodPrototypeClass *prototype = new HLodPrototypeClass (definition);
 			WW3DAssetManager::Get_Instance ()->Remove_Prototype (dist_lod_list[index]);
@@ -883,30 +886,95 @@ CDataTreeView::LoadAssetsIntoTree ()
 		}
 	}
 
-	// Now that we've added all the hierarchies to the tree, add their animations
-	// as well.
+	Insert_Object_Nodes (new_objects);
+
+	// A mesh that no object uses is an object of its own. The viewer's light gizmo has no source file.
+	CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
+	std::vector<ObjectEntry> new_meshes;
+	for (size_t index = 0; index < mesh_names.size (); index ++)
+	{
+		if (pdoc != nullptr && !pdoc->GetAssetSourceFileMap ().Exists (StringClass (mesh_names[index])))
+		{
+			continue;
+		}
+
+		// A part is named after its object, which the filter may have left out
+		CString owner (mesh_names[index]);
+		int dot = owner.Find ('.');
+		owner = (dot >= 0) ? owner.Left (dot) : CString ();
+		owner.MakeUpper ();
+		if (!Matches_Filter (mesh_names[index]) || filtered_objects.find (owner) != filtered_objects.end ())
+		{
+			continue;
+		}
+
+		StringClass key = Name_Key (mesh_names[index]);
+		if (!m_OwnedMeshes.Exists (key) && !existing_objects.Exists (key))
+		{
+			ObjectEntry entry = { mesh_names[index], TypeMesh, m_iMeshIcon };
+			new_meshes.push_back (entry);
+		}
+	}
+	Insert_Object_Nodes (new_meshes);
+
+	// A mesh loaded before its object was listed alone until now
+	HTREEITEM hitem = tree.GetRootItem ();
+	while (hitem != nullptr)
+	{
+		HTREEITEM hnext = tree.GetNextSiblingItem (hitem);
+		AssetInfoClass *info = (AssetInfoClass *)tree.GetItemData (hitem);
+		if (info != nullptr && info->Get_Type () == TypeMesh && m_OwnedMeshes.Exists (Name_Key (info->Get_Name ())))
+		{
+			tree.DeleteItem (hitem);
+		}
+		hitem = hnext;
+	}
+
 	LoadAnimationsIntoTree ();
-	Load_Materials_Into_Tree ();
-	Load_Bones_Into_Tree ();
+
+	// Textures that no listed object uses, such as an emitter's
+	HashTemplateIterator<StringClass, TextureClass *> texture_iterator (WW3DAssetManager::Get_Instance ()->Texture_Hash ());
+	for (texture_iterator.First (); !texture_iterator.Is_Done (); texture_iterator.Next ())
+	{
+		TextureClass *texture = texture_iterator.Peek_Value ();
+		if (texture == nullptr)
+		{
+			continue;
+		}
+
+		StringClass key = Name_Key (texture->Get_Full_Path ());
+		if (!Matches_Filter (texture->Get_Full_Path ()) || m_ListedTextures.Exists (key) || existing_items[CATEGORY_TEXTURE].Exists (key))
+		{
+			continue;
+		}
+
+		HTREEITEM hroot = Get_Category_Root (CATEGORY_TEXTURE, true);
+		HTREEITEM htexture = tree.InsertItem (texture->Get_Full_Path (), m_iMaterialIcon, m_iMaterialIcon, hroot, TVI_LAST);
+		texture->Add_Ref ();
+		tree.SetItemData (htexture, (ULONG)new AssetInfoClass (texture->Get_Full_Path (), TypeMaterial, nullptr, (DWORD)texture));
+		existing_items[CATEGORY_TEXTURE].Insert (key, 1);
+		category_changed[CATEGORY_TEXTURE] = true;
+	}
 
 	// TheSuperHackers @performance Tria 18/04/2026 Sort each parent node once instead of per-insert.
-	for (int r = 0; r < 8; ++r) {
-		if (needsSort[r]) {
-			GetTreeCtrl().SortChildren(roots[r].root);
+	for (int category = 0; category < CATEGORY_COUNT; category ++)
+	{
+		if (category_changed[category])
+		{
+			tree.SortChildren (m_hCategoryRoots[category]);
 		}
 	}
 
-	// Turn repainting back on
-	GetTreeCtrl ().SetRedraw (TRUE);
+	tree.SetRedraw (TRUE);
 
 	// TheSuperHackers @performance Tria 2026-05-19 Release the window-update lock
 	// before invalidating so the final repaint actually happens.
 	::LockWindowUpdate (nullptr);
 
-	// Force the window to be repainted
 	Invalidate (FALSE);
 	UpdateWindow ();
 }
+
 
 ////////////////////////////////////////////////////////////////////////////
 //
@@ -915,125 +983,80 @@ CDataTreeView::LoadAssetsIntoTree ()
 void
 CDataTreeView::LoadAnimationsIntoTree ()
 {
-    // TheSuperHackers @performance Tria 18/04/2026 Build maps of hierarchy name to tree nodes once
-    // instead of doing O(n) linear scans per animation. Also use hash sets for child dedup and
-    // TVI_LAST instead of TVI_SORT, with a single sort pass at the end.
+	CTreeCtrl &tree = GetTreeCtrl ();
 
-    // Helper: collect child nodes grouped by hierarchy name for a given root
-    struct NodeList {
-        DynamicVectorClass<HTREEITEM> items;
-    };
+	// Skeleton name -> the nodes that can play its animations. One shared key matches all while unrestricted.
+	std::map<CString, std::vector<HTREEITEM> > targets;
+	for (int pass = 0; pass < 2; pass ++)
+	{
+		HTREEITEM hfirst = (pass == 0) ? tree.GetRootItem () : tree.GetChildItem (m_hCategoryRoots[CATEGORY_AGGREGATE]);
+		if (pass == 1 && m_hCategoryRoots[CATEGORY_AGGREGATE] == nullptr)
+		{
+			hfirst = nullptr;
+		}
 
-    // Build hierarchy name -> node list maps for the three root categories
-    HTREEITEM rootNodes[3] = { m_hHierarchyRoot, m_hAggregateRoot, m_hLODRoot };
-    HashTemplateClass<StringClass, NodeList*> rootMaps[3];
+		for (HTREEITEM hitem = hfirst; hitem != nullptr; hitem = tree.GetNextSiblingItem (hitem))
+		{
+			AssetInfoClass *info = (AssetInfoClass *)tree.GetItemData (hitem);
+			if (info == nullptr || info->Get_Type () == TypeMesh)
+			{
+				continue;
+			}
+			targets[m_RestrictAnims ? info->Get_Hierarchy_Name () : CString ("*")].push_back (hitem);
+		}
+	}
 
-    for (int r = 0; r < 3; ++r) {
-        for (HTREEITEM h = GetTreeCtrl().GetChildItem(rootNodes[r]); h; h = GetTreeCtrl().GetNextSiblingItem(h)) {
-            AssetInfoClass *info = (AssetInfoClass *)GetTreeCtrl().GetItemData(h);
-            StringClass key;
-            if (m_RestrictAnims && info) {
-                key = (LPCTSTR)info->Get_Hierarchy_Name();
-            } else {
-                key = "*";  // match-all sentinel when not restricting
-            }
-            NodeList *list = nullptr;
-            if (rootMaps[r].Exists(key)) {
-                list = rootMaps[r].Get(key);
-            } else {
-                list = new NodeList();
-                rootMaps[r].Insert(key, list);
-            }
-            list->items.Add(h);
-        }
-    }
+	std::set<HTREEITEM> changed;
 
-    // Track which hierarchy nodes got new animation children and need sorting
-    HashTemplateClass<HTREEITEM, int> nodesToSort;
+	AssetIterator *anim_iterator = WW3DAssetManager::Get_Instance ()->Create_HAnim_Iterator ();
+	ASSERT (anim_iterator != nullptr);
+	if (anim_iterator != nullptr)
+	{
+		for (anim_iterator->First (); anim_iterator->Is_Done () == FALSE; anim_iterator->Next ())
+		{
+			LPCTSTR anim_name = anim_iterator->Current_Item_Name ();
+			HAnimClass *anim = WW3DAssetManager::Get_Instance ()->Get_HAnim (anim_name);
+			ASSERT (anim != nullptr);
+			if (anim == nullptr)
+			{
+				continue;
+			}
 
-    // Get an iterator from the asset manager that we can
-    // use to enumerate the currently loaded assets
-    AssetIterator *pAnimEnum = WW3DAssetManager::Get_Instance()->Create_HAnim_Iterator ();
-    ASSERT (pAnimEnum);
-    if (pAnimEnum)
-    {
-        // Loop through all the animations in the manager
-        for (pAnimEnum->First ();
-             (pAnimEnum->Is_Done () == FALSE);
-             pAnimEnum->Next ())
-        {
-            LPCTSTR pszAnimName = pAnimEnum->Current_Item_Name ();
+			std::map<CString, std::vector<HTREEITEM> >::const_iterator found = targets.find (m_RestrictAnims ? CString (anim->Get_HName ()) : CString ("*"));
+			if (found != targets.end ())
+			{
+				for (size_t index = 0; index < found->second.size (); index ++)
+				{
+					// An object keeps its animations in a folder; an aggregate lists them directly
+					HTREEITEM htarget = found->second[index];
+					if (Is_Object_Node (htarget))
+					{
+						htarget = Add_Folder (htarget, FOLDER_ANIMATIONS);
+					}
 
-            // Get an instance of the animation object
-            HAnimClass *pHierarchyAnim = WW3DAssetManager::Get_Instance()->Get_HAnim (pszAnimName);
+					if (FindChildItem (htarget, anim_name) == nullptr)
+					{
+						HTREEITEM hanim = tree.InsertItem (anim_name, m_iAnimationIcon, m_iAnimationIcon, htarget, TVI_LAST);
+						tree.SetItemData (hanim, (ULONG)new AssetInfoClass (anim_name, TypeAnimation));
+						changed.insert (htarget);
+					}
+				}
+			}
 
-            ASSERT (pHierarchyAnim);
-            if (pHierarchyAnim)
-            {
-                // Get the name of the hierarchy that this animation belongs to
-                LPCTSTR pszHierarchyName = pHierarchyAnim->Get_HName ();
-                StringClass lookupKey;
-                if (m_RestrictAnims) {
-                    lookupKey = pszHierarchyName;
-                } else {
-                    lookupKey = "*";
-                }
+			REF_PTR_RELEASE (anim);
+		}
 
-                // Insert animation into matching nodes across all three root categories
-                for (int r = 0; r < 3; ++r) {
-                    if (!rootMaps[r].Exists(lookupKey)) continue;
-                    NodeList *list = rootMaps[r].Get(lookupKey);
-                    for (int i = 0; i < list->items.Count(); ++i) {
-                        HTREEITEM hNode = list->items[i];
+		delete anim_iterator;
+		anim_iterator = nullptr;
+	}
 
-                        // TheSuperHackers @feature Tria 22/04/2026 For Hierarchy/LOD nodes, put
-                        // animations under their Animations sub-folder. Aggregates get them directly.
-                        HTREEITEM hTarget = hNode;
-                        if (r != 1) { // r==1 is Aggregate — no sub-folders
-                            HTREEITEM hAnimFolder = FindChildItem (hNode, "Animations");
-                            if (hAnimFolder != nullptr)
-                                hTarget = hAnimFolder;
-                        }
-
-                        // Check if animation already exists under the target node
-                        HTREEITEM hAnimationNode = FindChildItem (hTarget, pszAnimName);
-                        if (hAnimationNode == nullptr)
-                        {
-                            hAnimationNode = GetTreeCtrl ().InsertItem (pszAnimName, m_iAnimationIcon, m_iAnimationIcon, hTarget, TVI_LAST);
-                            ASSERT (hAnimationNode != nullptr);
-                            GetTreeCtrl ().SetItemData (hAnimationNode, (ULONG)new AssetInfoClass (pszAnimName, TypeAnimation));
-                            if (!nodesToSort.Exists(hTarget)) {
-                                nodesToSort.Insert(hTarget, 1);
-                            }
-                        }
-                    }
-                }
-
-                // Release our hold on this animation...
-					 REF_PTR_RELEASE (pHierarchyAnim);
-            }
-        }
-
-        // Free the object
-        delete pAnimEnum;
-        pAnimEnum = nullptr;
-    }
-
-    // Sort nodes that received new animation children
-    HashTemplateIterator<HTREEITEM, int> sortIte(nodesToSort);
-    for (sortIte.First(); !sortIte.Is_Done(); sortIte.Next()) {
-        GetTreeCtrl().SortChildren(sortIte.Peek_Key());
-    }
-
-    // Clean up node lists
-    for (int r = 0; r < 3; ++r) {
-        HashTemplateIterator<StringClass, NodeList*> ite(rootMaps[r]);
-        for (ite.First(); !ite.Is_Done(); ite.Next()) {
-            delete ite.Peek_Value();
-        }
-    }
-
+	for (std::set<HTREEITEM>::const_iterator htarget = changed.begin (); htarget != changed.end (); ++htarget)
+	{
+		tree.SortChildren (*htarget);
+		Update_Folder_Label (*htarget);
+	}
 }
+
 
 ////////////////////////////////////////////////////////////////////////////
 //
@@ -1042,143 +1065,56 @@ CDataTreeView::LoadAnimationsIntoTree ()
 void
 CDataTreeView::LoadAnimationsIntoTree (HTREEITEM hItem)
 {
-    // Get the data associated with this item
-    AssetInfoClass *asset_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (hItem);
-    ASSERT (asset_info != nullptr);
+	AssetInfoClass *asset_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (hItem);
+	ASSERT (asset_info != nullptr);
+	if (asset_info == nullptr)
+	{
+		return;
+	}
 
-    // Get an iterator from the asset manager that we can
-    // use to enumerate the currently loaded assets
-    AssetIterator *pAnimEnum = WW3DAssetManager::Get_Instance()->Create_HAnim_Iterator ();
-    ASSERT (pAnimEnum);
-    if (pAnimEnum)
-    {
-        // Loop through all the animations in the manager
-        for (pAnimEnum->First ();
-             (pAnimEnum->Is_Done () == FALSE);
-             pAnimEnum->Next ())
-        {
-            LPCTSTR pszAnimName = pAnimEnum->Current_Item_Name ();
+	HTREEITEM htarget = nullptr;
 
-            // Get an instance of the animation object
-            HAnimClass *pHierarchyAnim = WW3DAssetManager::Get_Instance()->Get_HAnim (pszAnimName);
-
-            ASSERT (pHierarchyAnim);
-            if (pHierarchyAnim)
-            {
-                // Get the name of the hierarchy that this animation belongs to
-                LPCTSTR pszHierarchyName = pHierarchyAnim->Get_HName ();
-
-                // Does the item match the hierarchy name?
-                if (::lstrcmp (asset_info->Get_Hierarchy_Name (), pszHierarchyName) == 0)
-                {
-                    // Is this animation already loaded into the tree?
-                    HTREEITEM hAnimationNode = FindChildItem (hItem, pszAnimName);
-                    if (hAnimationNode == nullptr)
-                    {
-                        // Add this animation as a child of the hierarchy
-                        hAnimationNode = GetTreeCtrl ().InsertItem (pszAnimName, m_iAnimationIcon, m_iAnimationIcon, hItem, TVI_SORT);
-                        ASSERT (hAnimationNode != nullptr);
-
-                        // Associate the items name with its entry
-                        GetTreeCtrl ().SetItemData (hAnimationNode, (ULONG)new AssetInfoClass (pszAnimName, TypeAnimation));
-                    }
-                }
-
-                // Release our hold on the animation object
-                REF_PTR_RELEASE (pHierarchyAnim);
-            }
-        }
-
-        // Free the object
-        delete pAnimEnum;
-        pAnimEnum = nullptr;
-    }
-}
-
-
-////////////////////////////////////////////////////////////////////////////
-//
-//  Determine_Tree_Location
-//
-ASSET_TYPE
-CDataTreeView::Determine_Tree_Location
-(
-	RenderObjClass &render_obj,
-	HTREEITEM &hroot,
-	int &icon_index
-)
-{
-	ASSET_TYPE type = TypeUnknown;
-
-	// What class does this render object belong to?
-	switch (render_obj.Class_ID ()) {
-
-		case RenderObjClass::CLASSID_COLLECTION:
-			hroot				= m_hMeshCollectionRoot;
-			type				= TypeMesh;
-			icon_index		= m_iMeshIcon;
-			break;
-
-		case RenderObjClass::CLASSID_MESH:
-			hroot = m_hMeshRoot;
-			type = TypeMesh;
-			icon_index = m_iMeshIcon;
-			break;
-
-		case RenderObjClass::CLASSID_SOUND:
-			hroot				= m_hSoundRoot;
-			type				= TypeSound;
-			icon_index		= m_iSoundIcon;
-			break;
-
-		case RenderObjClass::CLASSID_HMODEL:
-			// Shouldn't happen
-			ASSERT (0);
-			break;
-
-		case RenderObjClass::CLASSID_PARTICLEEMITTER:
-			hroot				= m_hEmitterRoot;
-			type				= TypeEmitter;
-			icon_index		= m_iEmitterIcon;
-			break;
-
-		case RenderObjClass::CLASSID_SPHERE:
-		case RenderObjClass::CLASSID_RING:
-			hroot				= m_hPrimitivesRoot;
-			type				= TypePrimitives;
-			icon_index		= m_iPrimitivesIcon;
-			break;
-
-		case RenderObjClass::CLASSID_DISTLOD:
-		case RenderObjClass::CLASSID_HLOD:
-         hroot				= m_hHierarchyRoot;
-         type				= TypeHierarchy;
-         icon_index		= m_iHierarchyIcon;
-
-			//
-			// Determine if this is a true LOD or a simple hierarchy
-			//
-			if (((HLodClass &)render_obj).Get_LOD_Count () > 1) {
-				hroot			= m_hLODRoot;
-				type			= TypeLOD;
-				icon_index	= m_iLODIcon;
+	AssetIterator *anim_iterator = WW3DAssetManager::Get_Instance ()->Create_HAnim_Iterator ();
+	ASSERT (anim_iterator != nullptr);
+	if (anim_iterator != nullptr)
+	{
+		for (anim_iterator->First (); anim_iterator->Is_Done () == FALSE; anim_iterator->Next ())
+		{
+			LPCTSTR anim_name = anim_iterator->Current_Item_Name ();
+			HAnimClass *anim = WW3DAssetManager::Get_Instance ()->Get_HAnim (anim_name);
+			ASSERT (anim != nullptr);
+			if (anim == nullptr)
+			{
+				continue;
 			}
-			break;
+
+			if (::lstrcmp (asset_info->Get_Hierarchy_Name (), anim->Get_HName ()) == 0)
+			{
+				// The folder is made for the first animation, so an object without any has none
+				if (htarget == nullptr)
+				{
+					htarget = Is_Object_Node (hItem) ? Add_Folder (hItem, FOLDER_ANIMATIONS) : hItem;
+				}
+
+				if (FindChildItem (htarget, anim_name) == nullptr)
+				{
+					HTREEITEM hanim = GetTreeCtrl ().InsertItem (anim_name, m_iAnimationIcon, m_iAnimationIcon, htarget, TVI_SORT);
+					GetTreeCtrl ().SetItemData (hanim, (ULONG)new AssetInfoClass (anim_name, TypeAnimation));
+				}
+			}
+
+			REF_PTR_RELEASE (anim);
+		}
+
+		delete anim_iterator;
+		anim_iterator = nullptr;
 	}
 
-	//
-	// Is this an aggregate?
-	//
-	if (render_obj.Get_Base_Model_Name () != nullptr) {
-		hroot			= m_hAggregateRoot;
-		type			= TypeAggregate;
-		icon_index	= m_iAggregateIcon;
+	if (htarget != nullptr)
+	{
+		Update_Folder_Label (htarget);
 	}
-
-	// Return the type of node
-	return type;
 }
-
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1197,42 +1133,41 @@ CDataTreeView::Determine_Tree_Location
 	switch (type) {
 
 		case TypeMesh:
-			hroot			= m_hMeshRoot;
+			hroot			= TVI_ROOT;
 			icon_index	= m_iMeshIcon;
 			break;
 
+		case TypeHierarchy:
+			hroot			= TVI_ROOT;
+			icon_index	= m_iHierarchyIcon;
+			break;
+
+		case TypeLOD:
+			hroot			= TVI_ROOT;
+			icon_index	= m_iLODIcon;
+			break;
+
 		case TypeSound:
-			hroot			= m_hSoundRoot;
+			hroot			= Get_Category_Root (CATEGORY_SOUND, true);
 			icon_index	= m_iSoundIcon;
 			break;
 
 		case TypeAggregate:
-			hroot			= m_hAggregateRoot;
+			hroot			= Get_Category_Root (CATEGORY_AGGREGATE, true);
 			icon_index	= m_iAggregateIcon;
 			break;
 
-		case TypeHierarchy:
-			// Shouldn't happen
-			ASSERT (0);
-			break;
-
 		case TypeEmitter:
-			hroot			= m_hEmitterRoot;
+			hroot			= Get_Category_Root (CATEGORY_EMITTER, true);
 			icon_index	= m_iEmitterIcon;
 			break;
 
 		case TypePrimitives:
-			hroot			= m_hPrimitivesRoot;
+			hroot			= Get_Category_Root (CATEGORY_PRIMITIVE, true);
 			icon_index	= m_iPrimitivesIcon;
-			break;
-
-		case TypeLOD:
-			hroot			= m_hLODRoot;
-			icon_index	= m_iLODIcon;
 			break;
 	}
 }
-
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1262,59 +1197,35 @@ CDataTreeView::Add_Asset_To_Tree
 		int icon_index = 0;
 		Determine_Tree_Location (type, hparent, icon_index);
 
-		// TheSuperHackers @feature Tria 19/04/2026 For mesh items, resolve to the proper group node.
-		if (type == TypeMesh && hparent == m_hMeshRoot) {
-			CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
-			StringClass groupName ("Unknown");
-			if (pdoc != nullptr) {
-				StringClass nameKey (name);
-				const HashTemplateClass<StringClass, StringClass> &sourceMap = pdoc->GetAssetSourceFileMap ();
-				if (sourceMap.Exists (nameKey)) {
-					groupName = sourceMap.Get (nameKey);
-					int len = groupName.Get_Length ();
-					if (len > 4 && _stricmp ((LPCTSTR)groupName + len - 4, ".w3d") == 0)
-						groupName.Erase (len - 4, 4);
-				}
-			}
-
-			// Find existing group node or create one
-			HTREEITEM hGroupNode = nullptr;
-			for (HTREEITEM h = GetTreeCtrl().GetChildItem(m_hMeshRoot); h; h = GetTreeCtrl().GetNextSiblingItem(h)) {
-				CString text = GetTreeCtrl().GetItemText(h);
-				if (StringClass((LPCTSTR)text) == groupName) {
-					hGroupNode = h;
-					break;
-				}
-			}
-			if (hGroupNode == nullptr) {
-				hGroupNode = GetTreeCtrl ().InsertItem ((LPCTSTR)groupName, m_iHierarchyIcon, m_iHierarchyIcon, m_hMeshRoot, TVI_SORT);
-			}
-			hparent = hGroupNode;
-		}
-
 		// Is this asset already in the tree?
 		HTREEITEM htree_item = FindChildItem (hparent, name);
-		if (htree_item == nullptr) {
+		if (htree_item == nullptr && hparent != nullptr) {
 
-			// Add this object to the tree
-			htree_item = GetTreeCtrl ().InsertItem (name,
-																 icon_index,
-																 icon_index,
-																 hparent,
-																 TVI_SORT);
+			if (Is_Object_Type (type)) {
 
-			// Associate the render object with its entry in the tree
-			AssetInfoClass *asset_info = new AssetInfoClass (name, type);
-			GetTreeCtrl ().SetItemData (htree_item, (ULONG)asset_info);
+				// An object node also gets its folders, and its place in the name order
+				std::vector<ObjectEntry> entries;
+				ObjectEntry entry = { name, type, icon_index };
+				entries.push_back (entry);
+				Insert_Object_Nodes (entries);
+				htree_item = FindChildItem (hparent, name);
 
-			// TheSuperHackers @feature Tria 18/04/2026 Show checkbox on mesh items for visibility toggling.
-			// TheSuperHackers @bugfix Tria 22/04/2026 Also set checked for meshes nested under a group node (child of MeshRoot).
-			if (type == TypeMesh && (hparent == m_hMeshRoot || GetTreeCtrl ().GetParentItem (hparent) == m_hMeshRoot)) {
-				GetTreeCtrl ().SetItemState (htree_item, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
+			} else {
+
+				// Add this object to the tree
+				htree_item = GetTreeCtrl ().InsertItem (name,
+																	 icon_index,
+																	 icon_index,
+																	 hparent,
+																	 TVI_SORT);
+
+				// Associate the render object with its entry in the tree
+				GetTreeCtrl ().SetItemData (htree_item, (ULONG)new AssetInfoClass (name, type));
 			}
 
 			// Load the object's animations into the tree (if necessary)
-			if (asset_info->Can_Asset_Have_Animations ()) {
+			AssetInfoClass *asset_info = (htree_item != nullptr) ? (AssetInfoClass *)GetTreeCtrl ().GetItemData (htree_item) : nullptr;
+			if (asset_info != nullptr && asset_info->Can_Asset_Have_Animations ()) {
 				LoadAnimationsIntoTree (htree_item);
 			}
 
@@ -1323,7 +1234,7 @@ CDataTreeView::Add_Asset_To_Tree
 		}
 
 		// Select the instance (if requested)
-		if (bselect) {
+		if (bselect && htree_item != nullptr) {
 			GetTreeCtrl ().SelectItem (htree_item);
 			GetTreeCtrl ().EnsureVisible (htree_item);
 		}
@@ -1540,6 +1451,12 @@ CDataTreeView::OnSelChanged
     LRESULT* pResult
 )
 {
+	(*pResult) = 0;
+	if (m_Rebuilding)
+	{
+		return;
+	}
+
 	// Display the new selection
 	NM_TREEVIEW* pNMTreeView = (NM_TREEVIEW*)pNMHDR;
 	Display_Asset (pNMTreeView->itemNew.hItem);
@@ -1562,6 +1479,342 @@ CDataTreeView::OnSelChanged
 
 ////////////////////////////////////////////////////////////////////////////
 //
+//  Is_Owner_Shown
+//
+bool
+CDataTreeView::Is_Owner_Shown (HTREEITEM hitem) const
+{
+	HTREEITEM hobject = Get_Owner_Object (hitem);
+	AssetInfoClass *object_info = (hobject != nullptr) ? (AssetInfoClass *)GetTreeCtrl ().GetItemData (hobject) : nullptr;
+	CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
+	if (object_info == nullptr || pdoc == nullptr)
+	{
+		return false;
+	}
+
+	RenderObjClass *displayed = pdoc->GetDisplayedObject ();
+	return displayed != nullptr && ::lstrcmpi (displayed->Get_Name (), object_info->Get_Name ()) == 0;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Show_Owner_Object
+//
+//  The folders and parts of an object act on the object in the viewport, so
+//  their object is put there first when another one is showing.
+//
+HTREEITEM
+CDataTreeView::Show_Owner_Object (HTREEITEM hitem)
+{
+	HTREEITEM hobject = Get_Owner_Object (hitem);
+	CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
+	if (hobject == nullptr || pdoc == nullptr || Is_Owner_Shown (hitem))
+	{
+		return hobject;
+	}
+
+	RenderObjClass *render_obj = Create_Render_Obj_To_Display (hobject);
+	pdoc->DisplayObject (render_obj);
+	REF_PTR_RELEASE (render_obj);
+	Reset_Mesh_Checks (hobject);
+
+	CMainFrame *main_wnd = (CMainFrame *)::AfxGetMainWnd ();
+	AssetInfoClass *object_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (hobject);
+	if (main_wnd != nullptr && object_info != nullptr)
+	{
+		main_wnd->OnSelectionChanged (object_info->Get_Type ());
+	}
+	return hobject;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Reset_Mesh_Checks
+//
+//  A freshly made render object shows every part.
+//
+void
+CDataTreeView::Reset_Mesh_Checks (HTREEITEM hobject)
+{
+	m_hSoloItem = nullptr;
+
+	HTREEITEM hmeshes = Find_Folder (hobject, FOLDER_MESHES);
+	if (hmeshes == nullptr)
+	{
+		return;
+	}
+
+	GetTreeCtrl ().SetItemState (hmeshes, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
+
+	std::vector<HTREEITEM> rows;
+	Get_Mesh_Rows (hobject, rows);
+	for (size_t index = 0; index < rows.size (); index ++)
+	{
+		GetTreeCtrl ().SetItemState (rows[index], INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Get_Mesh_Rows
+//
+void
+CDataTreeView::Get_Mesh_Rows (HTREEITEM hobject, std::vector<HTREEITEM> &rows) const
+{
+	// Parts nest, and the bones nested among them are not parts
+	std::vector<HTREEITEM> pending;
+	pending.push_back (Find_Folder (hobject, FOLDER_MESHES));
+	while (!pending.empty ())
+	{
+		HTREEITEM hparent = pending.back ();
+		pending.pop_back ();
+		if (hparent == nullptr)
+		{
+			continue;
+		}
+
+		for (HTREEITEM hchild = GetTreeCtrl ().GetChildItem (hparent); hchild != nullptr; hchild = GetTreeCtrl ().GetNextSiblingItem (hchild))
+		{
+			AssetInfoClass *info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (hchild);
+			if (info != nullptr && info->Get_Type () == TypeMesh)
+			{
+				rows.push_back (hchild);
+			}
+			pending.push_back (hchild);
+		}
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Sync_Mesh_Checks
+//
+//  Sets the eyes from the object in the viewport, for rows that were just rebuilt.
+//
+void
+CDataTreeView::Sync_Mesh_Checks ()
+{
+	CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
+	RenderObjClass *displayed = (pdoc != nullptr) ? pdoc->GetDisplayedObject () : nullptr;
+	if (displayed == nullptr)
+	{
+		return;
+	}
+
+	HTREEITEM hobject = FindChildItem (TVI_ROOT, displayed->Get_Name ());
+	if (!Is_Object_Node (hobject))
+	{
+		return;
+	}
+
+	std::vector<HTREEITEM> rows;
+	Get_Mesh_Rows (hobject, rows);
+	for (size_t index = 0; index < rows.size (); index ++)
+	{
+		AssetInfoClass *info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (rows[index]);
+		RenderObjClass *sub_obj = displayed->Get_Sub_Object_By_Name (info->Get_Name (), nullptr);
+		if (sub_obj != nullptr)
+		{
+			GetTreeCtrl ().SetItemState (rows[index], INDEXTOSTATEIMAGEMASK (sub_obj->Is_Hidden () ? 1 : 2), TVIS_STATEIMAGEMASK);
+			sub_obj->Release_Ref ();
+		}
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Matches_Filter
+//
+bool
+CDataTreeView::Matches_Filter (LPCTSTR name) const
+{
+	if (m_Filter.IsEmpty ())
+	{
+		return true;
+	}
+
+	CString upper (name);
+	upper.MakeUpper ();
+	return upper.Find (m_Filter) >= 0;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Request_Filter
+//
+//  The filter is applied a moment after the last keystroke, because each
+//  change rebuilds the tree.
+//
+void
+CDataTreeView::Request_Filter (LPCTSTR text)
+{
+	m_PendingFilter = text;
+	SetTimer (FILTER_TIMER_ID, FILTER_DELAY_MS, nullptr);
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  OnTimer
+//
+void
+CDataTreeView::OnTimer (UINT_PTR nIDEvent)
+{
+	if (nIDEvent == FILTER_TIMER_ID)
+	{
+		KillTimer (FILTER_TIMER_ID);
+		Set_Filter (m_PendingFilter);
+		return;
+	}
+
+	CTreeView::OnTimer (nIDEvent);
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Set_Filter
+//
+//  Shows only the objects and assets whose name holds the text. A tree
+//  control cannot hide a row, so the tree is rebuilt from the asset manager.
+//  The viewport is left alone.
+//
+void
+CDataTreeView::Set_Filter (LPCTSTR text)
+{
+	CString filter (text);
+	filter.Trim ();
+	filter.MakeUpper ();
+	if (filter == m_Filter)
+	{
+		return;
+	}
+	m_Filter = filter;
+
+	// The selection comes back by name, or by its object's name when it was a folder
+	CTreeCtrl &tree = GetTreeCtrl ();
+	CString selected_name;
+	HTREEITEM hselected = tree.GetSelectedItem ();
+	AssetInfoClass *selected_info = (hselected != nullptr) ? (AssetInfoClass *)tree.GetItemData (hselected) : nullptr;
+	if (selected_info == nullptr && Get_Owner_Object (hselected) != nullptr)
+	{
+		selected_info = (AssetInfoClass *)tree.GetItemData (Get_Owner_Object (hselected));
+	}
+	if (selected_info != nullptr)
+	{
+		selected_name = selected_info->Get_Name ();
+	}
+
+	// With nothing selected, the object in the viewport is the one to come back to
+	CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
+	if (selected_name.IsEmpty () && pdoc != nullptr && pdoc->GetDisplayedObject () != nullptr)
+	{
+		selected_name = pdoc->GetDisplayedObject ()->Get_Name ();
+	}
+
+	// Selection changes made by the rebuild must not reach the viewport
+	m_Rebuilding = true;
+	tree.SetRedraw (FALSE);
+	Free_All_Asset_Data ();
+	tree.DeleteAllItems ();
+	Forget_Tree_Items ();
+	LoadAssetsIntoTree ();
+	Sync_Mesh_Checks ();
+
+	HTREEITEM hitem = Find_Asset_Item_By_Name (selected_name);
+	if (hitem != nullptr)
+	{
+		tree.SelectItem (hitem);
+		tree.EnsureVisible (hitem);
+	}
+	tree.SetRedraw (TRUE);
+	tree.Invalidate ();
+	m_Rebuilding = false;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Show_Only_Mesh
+//
+//  Hides every other part of the object and frames the camera on this one.
+//  A second call on the same row brings the whole object back.
+//
+void
+CDataTreeView::Show_Only_Mesh (HTREEITEM hitem)
+{
+	CTreeCtrl &tree = GetTreeCtrl ();
+	CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
+	AssetInfoClass *asset_info = (hitem != nullptr) ? (AssetInfoClass *)tree.GetItemData (hitem) : nullptr;
+	if (pdoc == nullptr || asset_info == nullptr || asset_info->Get_Type () != TypeMesh || !Is_Mesh_Sub_Object (hitem))
+	{
+		return;
+	}
+
+	// Showing the object resets the solo row, so remember whether this row was it
+	bool restore = (m_hSoloItem == hitem) && Is_Owner_Shown (hitem);
+	HTREEITEM hobject = Show_Owner_Object (hitem);
+	HTREEITEM hmeshes = Find_Folder (hobject, FOLDER_MESHES);
+	RenderObjClass *displayed = pdoc->GetDisplayedObject ();
+	CGraphicView *view = pdoc->GetGraphicView ();
+	if (hmeshes == nullptr || displayed == nullptr)
+	{
+		return;
+	}
+
+	for (HTREEITEM hchild = tree.GetChildItem (hmeshes); hchild != nullptr; hchild = tree.GetNextSiblingItem (hchild))
+	{
+		Set_Mesh_Visibility_Recursive (hchild, restore);
+	}
+	tree.SetItemState (hmeshes, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
+
+	if (restore)
+	{
+		m_hSoloItem = nullptr;
+		if (view != nullptr)
+		{
+			view->Reset_Camera_To_Display_Object (*displayed);
+		}
+		return;
+	}
+
+	Set_Mesh_Visibility (hitem, true);
+	m_hSoloItem = hitem;
+
+	RenderObjClass *sub_obj = displayed->Get_Sub_Object_By_Name (asset_info->Get_Name (), nullptr);
+	if (sub_obj != nullptr)
+	{
+		SphereClass sphere = sub_obj->Get_Bounding_Sphere ();
+		if (view != nullptr && sphere.Radius > 0.0F)
+		{
+			view->Reset_Camera_To_Display_Sphere (sphere);
+		}
+		sub_obj->Release_Ref ();
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  OnShowOnlyMesh
+//
+void
+CDataTreeView::OnShowOnlyMesh ()
+{
+	HTREEITEM hitem = m_hRightClickItem;
+	m_hRightClickItem = nullptr;
+	Show_Only_Mesh (hitem);
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
 //  Display_Asset
 //
 void
@@ -1575,6 +1828,21 @@ CDataTreeView::Display_Asset (HTREEITEM htree_item)
 		htree_item = GetTreeCtrl ().GetSelectedItem ();
 	}
 
+	CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
+	ASSERT (pdoc != nullptr);
+	if (pdoc == nullptr) {
+		return;
+	}
+
+	CMainFrame *main_wnd = (CMainFrame *)::AfxGetMainWnd ();
+
+	// A folder shows its object and drops any part highlight
+	if (htree_item != nullptr && Get_Folder_Kind (htree_item) != FOLDER_NONE) {
+		Show_Owner_Object (htree_item);
+		pdoc->ClearSelectedItem ();
+		return;
+	}
+
 	//
 	// Get the object associated with this entry
 	//
@@ -1583,165 +1851,99 @@ CDataTreeView::Display_Asset (HTREEITEM htree_item)
 		asset_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (htree_item);
 	}
 
-	if (asset_info != nullptr) {
+	if (asset_info == nullptr) {
 
-		// Get the current document, so we can get a pointer to the scene
-		CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
-		ASSERT (pdoc != nullptr);
-		if (pdoc != nullptr) {
+		// A category node, or nothing at all
+		pdoc->DisplayObject ((RenderObjClass *)nullptr);
+		if (main_wnd != nullptr) {
+			main_wnd->OnSelectionChanged (TypeUnknown);
+		}
+		return;
+	}
 
-			// What type of asset is it?
-			switch (asset_info->Get_Type ())
-			{
-				case TypeCompressedAnimation:
-				case TypeAnimation:
-				{
-					// TheSuperHackers @feature Tria 22/04/2026 Animations are now under an
-					// "Animations" sub-folder; walk up past it to reach the hierarchy node.
-					HTREEITEM hParentItem = GetTreeCtrl ().GetParentItem (htree_item);
-					if (hParentItem != nullptr) {
-						CString folderText = GetTreeCtrl ().GetItemText (hParentItem);
-						if (folderText == "Animations") {
-							hParentItem = GetTreeCtrl ().GetParentItem (hParentItem);
-						}
-					}
-					if (hParentItem != nullptr) {
-
-						// Ask the document to start playing the animation for this object
-						RenderObjClass *prender_obj = Create_Render_Obj_To_Display (hParentItem);
-						pdoc->PlayAnimation (prender_obj,
-						asset_info->Get_Name ());
-						REF_PTR_RELEASE (prender_obj);
-					}
-				}
-				break;
-
-				case TypeEmitter:
-				{
-					// Ask the document to display this object
-					ParticleEmitterClass *emitter = (ParticleEmitterClass *)Create_Render_Obj_To_Display (htree_item);
-					pdoc->Display_Emitter (emitter);
-					REF_PTR_RELEASE (emitter);
-				}
-				break;
-
-				case TypeHierarchy:
-				{
-					// Display the hierarchy object and clear any sub-item selection.
-					RenderObjClass *prender_obj = Create_Render_Obj_To_Display (htree_item);
-					pdoc->DisplayObject (prender_obj);
-					REF_PTR_RELEASE (prender_obj);
-				}
-				break;
-
-				case TypeBone:
-				{
-					// TheSuperHackers @feature Tria 23/04/2026 Selecting a bone in the tree highlights
-					// it in the viewport — no object switch, just update the selection tracker.
-					pdoc->SetSelectedItem (asset_info->Get_Name (), TypeBone);
-					return;
-				}
-
-				case TypeMesh:
-				{
-					// TheSuperHackers @feature Tria 23/04/2026 Selecting a sub-object under a hierarchy
-					// Sub-Objects folder highlights its pivot in the viewport. Items under the flat Mesh
-					// root still call DisplayObject as before.
-					// Walk up to check if this item is anywhere inside a Sub-Objects folder
-					// (handles nested sub-objects at any depth).
-					bool isHierarchySubObj = false;
-					for (HTREEITEM hAnc = GetTreeCtrl ().GetParentItem (htree_item); hAnc != nullptr; hAnc = GetTreeCtrl ().GetParentItem (hAnc)) {
-						CString text = GetTreeCtrl ().GetItemText (hAnc);
-						if (text == "Sub-Objects") { isHierarchySubObj = true; break; }
-					}
-					if (isHierarchySubObj) {
-						pdoc->SetSelectedItem (asset_info->Get_Name (), TypeMesh);
-						return;
-					}
-					// Standalone mesh item — display it directly
-					RenderObjClass *prender_obj = Create_Render_Obj_To_Display (htree_item);
-					pdoc->DisplayObject (prender_obj);
-					REF_PTR_RELEASE (prender_obj);
-				}
-				break;
-
-				default:
-				{
-					// Ask the document to display this object
-					RenderObjClass *prender_obj = Create_Render_Obj_To_Display (htree_item);
-					pdoc->DisplayObject (prender_obj);
-					REF_PTR_RELEASE (prender_obj);
-				}
-				break;
+	// What type of asset is it?
+	switch (asset_info->Get_Type ())
+	{
+		case TypeCompressedAnimation:
+		case TypeAnimation:
+		{
+			// An object keeps its animations in a folder; an aggregate lists them directly
+			HTREEITEM hparent = GetTreeCtrl ().GetParentItem (htree_item);
+			if (Get_Folder_Kind (hparent) == FOLDER_ANIMATIONS) {
+				hparent = GetTreeCtrl ().GetParentItem (hparent);
 			}
+			if (hparent != nullptr) {
 
-			// Get the main window of our app
-			CMainFrame *pCMainWnd = (CMainFrame *)::AfxGetMainWnd ();
-			if (pCMainWnd != nullptr) {
-
-				// Let the main window know our selection type has changed
-				pCMainWnd->OnSelectionChanged (asset_info->Get_Type ());
-
-				if (asset_info->Get_Type () == TypeAggregate) {
-					pCMainWnd->Update_Emitters_List ();
-				} else {
-
-					::EnableMenuItem (::GetSubMenu (::GetMenu (*pCMainWnd), 3), 3, MF_BYPOSITION | MF_DISABLED | MF_GRAYED);
-					HMENU hsub_menu = pCMainWnd->Get_Emitters_List_Menu ();
-					int index = 0;
-					while (::RemoveMenu (hsub_menu, index, MF_BYPOSITION)) {
-						//index ++;
-					}
-				}
+				// Ask the document to start playing the animation for this object
+				RenderObjClass *prender_obj = Create_Render_Obj_To_Display (hparent);
+				pdoc->PlayAnimation (prender_obj, asset_info->Get_Name ());
+				REF_PTR_RELEASE (prender_obj);
+				Reset_Mesh_Checks (hparent);
 			}
 		}
-	} else {
+		break;
 
-		CW3DViewDoc* pdoc = (CW3DViewDoc *)GetDocument ();
-		ASSERT (pdoc != nullptr);
-		if (pdoc != nullptr) {
+		case TypeEmitter:
+		{
+			// Ask the document to display this object
+			ParticleEmitterClass *emitter = (ParticleEmitterClass *)Create_Render_Obj_To_Display (htree_item);
+			pdoc->Display_Emitter (emitter);
+			REF_PTR_RELEASE (emitter);
+		}
+		break;
 
-			// TheSuperHackers @feature Tria 23/04/2026 Clicking a Sub-Objects or Bones folder header
-			// just clears the per-item selection without switching the displayed object.
-			if (htree_item != nullptr) {
-				CString itemText = GetTreeCtrl ().GetItemText (htree_item);
-				if (itemText == "Sub-Objects" || itemText == "Bones") {
-					pdoc->ClearSelectedItem ();
-					return;
-				}
+		case TypeBone:
+		{
+			// TheSuperHackers @feature Tria 23/04/2026 Selecting a bone in the tree highlights
+			// it in the viewport.
+			Show_Owner_Object (htree_item);
+			pdoc->SetSelectedItem (asset_info->Get_Name (), TypeBone);
+			return;
+		}
+
+		case TypeMesh:
+		{
+			// A part highlights on its object. The row's label is the pivot it hangs on.
+			if (Is_Mesh_Sub_Object (htree_item)) {
+				Show_Owner_Object (htree_item);
+				pdoc->SetSelectedItem (GetTreeCtrl ().GetItemText (htree_item), TypeMesh);
+				return;
 			}
 
-			// TheSuperHackers @feature Tria 22/04/2026 When the user clicks a Hierarchy child node
-			// (direct child of Hierarchy root, no asset_info yet assigned), display its render object.
-			if (htree_item != nullptr && GetTreeCtrl ().GetParentItem (htree_item) == m_hHierarchyRoot) {
-				CString groupLabel = GetTreeCtrl ().GetItemText (htree_item);
-				RenderObjClass *prender_obj = WW3DAssetManager::Get_Instance ()->Create_Render_Obj ((LPCTSTR)groupLabel);
-				if (prender_obj != nullptr) {
-					if (::GetCurrentDocument ()->GetScene ()->Are_LODs_Switching () == false)
-						Set_Highest_LOD (prender_obj);
-					pdoc->DisplayObject (prender_obj);
-					REF_PTR_RELEASE (prender_obj);
+			// A mesh that is its own object, or one in a collection
+			RenderObjClass *prender_obj = Create_Render_Obj_To_Display (htree_item);
+			pdoc->DisplayObject (prender_obj);
+			REF_PTR_RELEASE (prender_obj);
+		}
+		break;
 
-					// Reset checkboxes on all Sub-Objects sub-folder children to checked (visible).
-					HTREEITEM hObjectsFolder = FindChildItem (htree_item, "Sub-Objects");
-					if (hObjectsFolder != nullptr) {
-						for (HTREEITEM hChild = GetTreeCtrl ().GetChildItem (hObjectsFolder); hChild; hChild = GetTreeCtrl ().GetNextSiblingItem (hChild))
-							GetTreeCtrl ().SetItemState (hChild, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
-					}
-
-					CMainFrame *main_wnd = (CMainFrame *)::AfxGetMainWnd ();
-					if (main_wnd != nullptr)
-						main_wnd->OnSelectionChanged (TypeHierarchy);
-					return;
-				}
+		default:
+		{
+			// Ask the document to display this object
+			RenderObjClass *prender_obj = Create_Render_Obj_To_Display (htree_item);
+			pdoc->DisplayObject (prender_obj);
+			REF_PTR_RELEASE (prender_obj);
+			if (Is_Object_Node (htree_item)) {
+				Reset_Mesh_Checks (htree_item);
 			}
+		}
+		break;
+	}
 
-			// Reset the display
-			pdoc->DisplayObject ((RenderObjClass *)nullptr);
+	if (main_wnd != nullptr) {
 
-			CMainFrame *main_wnd = (CMainFrame *)::AfxGetMainWnd ();
-			if (main_wnd != nullptr) {
-				main_wnd->OnSelectionChanged (TypeUnknown);
+		// Let the main window know our selection type has changed
+		main_wnd->OnSelectionChanged (asset_info->Get_Type ());
+
+		if (asset_info->Get_Type () == TypeAggregate) {
+			main_wnd->Update_Emitters_List ();
+		} else {
+
+			::EnableMenuItem (::GetSubMenu (::GetMenu (*main_wnd), 3), 3, MF_BYPOSITION | MF_DISABLED | MF_GRAYED);
+			HMENU hsub_menu = main_wnd->Get_Emitters_List_Menu ();
+			int index = 0;
+			while (::RemoveMenu (hsub_menu, index, MF_BYPOSITION)) {
+				//index ++;
 			}
 		}
 	}
@@ -1769,76 +1971,49 @@ CDataTreeView::OnRClick (NMHDR *pNMHDR, LRESULT *pResult)
 	UINT uFlags = 0;
 	HTREEITEM hItem = GetTreeCtrl ().HitTest (clientPt, &uFlags);
 	if (hItem == nullptr)
-		return;
-
-	CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
-	if (pdoc == nullptr)
-		return;
-
-	// TheSuperHackers @feature Tria 19/04/2026 Right-click on Hierarchy root or any hierarchy item
-	// to export texture and mesh info for the selected object.
-	if (hItem == m_hHierarchyRoot || GetTreeCtrl ().GetParentItem (hItem) == m_hHierarchyRoot) {
-		// Only offer menu on actual hierarchy items, not the root label
-		if (hItem != m_hHierarchyRoot) {
-			m_hRightClickItem = hItem;
-			CMenu menu;
-			menu.CreatePopupMenu ();
-			menu.AppendMenu (MF_STRING, IDM_DUMP_W3D_INFO, "Dump W3D Info");
-			menu.AppendMenu (MF_STRING, IDM_EXPORT_INFO,   "Export Info");
-			menu.AppendMenu (MF_SEPARATOR);
-			menu.AppendMenu (MF_STRING, IDM_MATVIEWER_FROM_TREE, "Open in Material Viewer");
-			menu.TrackPopupMenu (TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, this);
-		}
-		return;
-	}
-
-	// Only act on mesh sub-object items (under Objects sub-folder or direct Mesh root children)
-	if (!Is_Mesh_Sub_Object (hItem)) {
-
-		// TheSuperHackers @feature Standalone mesh assets (e.g. under the Mesh
-		// category root) still get the Material Viewer entry.
-		AssetInfoClass *standalone_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (hItem);
-		if (standalone_info != nullptr && standalone_info->Get_Type () == TypeMesh) {
-			m_hRightClickItem = hItem;
-			CMenu menu;
-			menu.CreatePopupMenu ();
-			menu.AppendMenu (MF_STRING, IDM_MATVIEWER_FROM_TREE, "Open in Material Viewer");
-			menu.TrackPopupMenu (TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, this);
-		}
+	{
 		return;
 	}
 
 	AssetInfoClass *asset_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (hItem);
 	if (asset_info == nullptr)
+	{
 		return;
+	}
 
-	// Store the right-clicked item for OnToggleMeshVis / OnOpenInMaterialViewer
-	m_hRightClickItem = hItem;
-
-	// Build context menu: the visibility toggle only applies when the mesh is a
-	// sub-object of the currently displayed model; the Material Viewer entry is
-	// always available.
 	CMenu menu;
 	menu.CreatePopupMenu ();
 
-	RenderObjClass *pDisplayed = pdoc->GetDisplayedObject ();
-	if (pDisplayed != nullptr) {
-		const char *meshName = asset_info->Get_Name ();
-		int subIndex = -1;
-		RenderObjClass *pSubObj = pDisplayed->Get_Sub_Object_By_Name (meshName, &subIndex);
-		if (pSubObj != nullptr) {
-			if (pSubObj->Is_Hidden ()) {
-				menu.AppendMenu (MF_STRING, IDM_TOGGLE_MESH_VIS, "Show Mesh");
-			} else {
-				menu.AppendMenu (MF_STRING, IDM_TOGGLE_MESH_VIS, "Hide Mesh");
-			}
-			menu.AppendMenu (MF_SEPARATOR);
-			pSubObj->Release_Ref ();
-		}
+	if (Is_Mesh_Sub_Object (hItem) && asset_info->Get_Type () == TypeMesh)
+	{
+		// The commands act on the object in the viewport, so selecting the row brings its object up
+		GetTreeCtrl ().SelectItem (hItem);
+
+		bool hidden = ((GetTreeCtrl ().GetItemState (hItem, TVIS_STATEIMAGEMASK) >> 12) & 0xF) != 2;
+		menu.AppendMenu (MF_STRING, IDM_TOGGLE_MESH_VIS, hidden ? "Show Mesh" : "Hide Mesh");
+		menu.AppendMenu (MF_STRING, IDM_SHOW_ONLY_MESH, (m_hSoloItem == hItem) ? "Show All Meshes" : "Show Only This Mesh");
+		menu.AppendMenu (MF_SEPARATOR);
+		menu.AppendMenu (MF_STRING, IDM_MATVIEWER_FROM_TREE, "Open in Material Viewer");
+	}
+	else if (asset_info->Get_Type () == TypeHierarchy || asset_info->Get_Type () == TypeLOD)
+	{
+		// TheSuperHackers @feature Tria 19/04/2026 Export texture and mesh info for the object.
+		menu.AppendMenu (MF_STRING, IDM_DUMP_W3D_INFO, "Dump W3D Info");
+		menu.AppendMenu (MF_STRING, IDM_EXPORT_INFO,   "Export Info");
+		menu.AppendMenu (MF_SEPARATOR);
+		menu.AppendMenu (MF_STRING, IDM_MATVIEWER_FROM_TREE, "Open in Material Viewer");
+	}
+	else if (asset_info->Get_Type () == TypeMesh)
+	{
+		menu.AppendMenu (MF_STRING, IDM_MATVIEWER_FROM_TREE, "Open in Material Viewer");
+	}
+	else
+	{
+		return;
 	}
 
-	menu.AppendMenu (MF_STRING, IDM_MATVIEWER_FROM_TREE, "Open in Material Viewer");
-
+	// Store the right-clicked item for the command handlers
+	m_hRightClickItem = hItem;
 	menu.TrackPopupMenu (TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, this);
 }
 
@@ -1847,39 +2022,25 @@ CDataTreeView::OnRClick (NMHDR *pNMHDR, LRESULT *pResult)
 //
 //  Is_Mesh_Sub_Object
 //
-// TheSuperHackers @feature Tria 22/04/2026 Returns true if the given tree item is a mesh
-// sub-object that supports visibility toggling. This covers items under the standalone Mesh root
-// group nodes and items under the Objects sub-folder of Hierarchy nodes.
+// TheSuperHackers @feature Tria 22/04/2026 Returns true if the given tree item is a part
+// of an object, which supports visibility toggling.
 //
 bool
 CDataTreeView::Is_Mesh_Sub_Object (HTREEITEM hItem) const
 {
 	if (hItem == nullptr)
+	{
 		return false;
-	HTREEITEM hParent = GetTreeCtrl ().GetParentItem (hItem);
-	if (hParent == nullptr)
-		return false;
-
-	// Direct child of m_hMeshRoot or grandchild (under a group node)
-	if (hParent == m_hMeshRoot)
-		return true;
-	if (GetTreeCtrl ().GetParentItem (hParent) == m_hMeshRoot)
-		return true;
-
-	// Walk up the tree looking for a "Sub-Objects" folder whose parent is a hierarchy node.
-	// This handles sub-objects nested at any depth under the Sub-Objects folder.
-	HTREEITEM hAncestor = hParent;
-	while (hAncestor != nullptr) {
-		CString text = GetTreeCtrl ().GetItemText (hAncestor);
-		if (text == "Sub-Objects") {
-			HTREEITEM hHierNode = GetTreeCtrl ().GetParentItem (hAncestor);
-			if (hHierNode != nullptr && GetTreeCtrl ().GetParentItem (hHierNode) == m_hHierarchyRoot)
-				return true;
-			break;
-		}
-		hAncestor = GetTreeCtrl ().GetParentItem (hAncestor);
 	}
 
+	// Parts nest, so the folder can be several levels up
+	for (HTREEITEM hancestor = GetTreeCtrl ().GetParentItem (hItem); hancestor != nullptr; hancestor = GetTreeCtrl ().GetParentItem (hancestor))
+	{
+		if (Get_Folder_Kind (hancestor) == FOLDER_MESHES)
+		{
+			return true;
+		}
+	}
 	return false;
 }
 
@@ -1901,27 +2062,42 @@ CDataTreeView::OnLButtonDown (UINT nFlags, CPoint point)
 	UINT uFlags = 0;
 	HTREEITEM hItem = GetTreeCtrl ().HitTest (point, &uFlags);
 
-	// Allow clicking the state icon on the Sub-Objects folder itself to cascade to all children.
-	if (hItem != nullptr && (uFlags & TVHT_ONITEMSTATEICON)) {
-		CString itemText = GetTreeCtrl ().GetItemText (hItem);
-		if (itemText == "Sub-Objects") {
-			// Determine target visibility from first child's state.
-			HTREEITEM hFirst = GetTreeCtrl ().GetChildItem (hItem);
-			bool newVisible = true;
-			if (hFirst != nullptr) {
-				UINT st = GetTreeCtrl ().GetItemState (hFirst, TVIS_STATEIMAGEMASK);
-				newVisible = ((st >> 12) & 0xF) != 2; // invert current first child state
-			}
-			for (HTREEITEM hChild = GetTreeCtrl ().GetChildItem (hItem); hChild; hChild = GetTreeCtrl ().GetNextSiblingItem (hChild))
-				Set_Mesh_Visibility_Recursive (hChild, newVisible);
-			return;
+	bool on_state_icon = (hItem != nullptr) && ((uFlags & TVHT_ONITEMSTATEICON) != 0);
+	bool is_meshes_folder = (hItem != nullptr) && (Get_Folder_Kind (hItem) == FOLDER_MESHES);
+
+	// The eye acts on the object in the viewport, so selecting the row brings its object up
+	if (on_state_icon && (is_meshes_folder || Is_Mesh_Sub_Object (hItem)) && !Is_Owner_Shown (hItem))
+	{
+		DynamicVectorClass<HTREEITEM> selected = m_selectedMeshItems;
+		GetTreeCtrl ().SelectItem (hItem);
+		m_selectedMeshItems = selected;
+	}
+
+	// Allow clicking the state icon on the Meshes folder itself to cascade to all children.
+	if (on_state_icon && is_meshes_folder)
+	{
+		// Determine target visibility from first child's state.
+		HTREEITEM hFirst = GetTreeCtrl ().GetChildItem (hItem);
+		bool newVisible = true;
+		if (hFirst != nullptr)
+		{
+			UINT st = GetTreeCtrl ().GetItemState (hFirst, TVIS_STATEIMAGEMASK);
+			newVisible = ((st >> 12) & 0xF) != 2; // invert current first child state
 		}
+		for (HTREEITEM hChild = GetTreeCtrl ().GetChildItem (hItem); hChild; hChild = GetTreeCtrl ().GetNextSiblingItem (hChild))
+		{
+			Set_Mesh_Visibility_Recursive (hChild, newVisible);
+		}
+		GetTreeCtrl ().SetItemState (hItem, INDEXTOSTATEIMAGEMASK (newVisible ? 2 : 1), TVIS_STATEIMAGEMASK);
+		m_hSoloItem = nullptr;
+		return;
 	}
 
 	if (hItem != nullptr && Is_Mesh_Sub_Object (hItem)) {
 		if (uFlags & TVHT_ONITEMSTATEICON) {
 			// Toggling the checkbox — apply to multi-select set if populated, else single/group toggle.
 			Toggle_Mesh_Visibility (hItem);
+			m_hSoloItem = nullptr;
 			return; // eat the click
 		}
 
@@ -1931,37 +2107,45 @@ CDataTreeView::OnLButtonDown (UINT nFlags, CPoint point)
 			HTREEITEM hParent = GetTreeCtrl ().GetParentItem (hItem);
 			HTREEITEM hAnchorParent = GetTreeCtrl ().GetParentItem (m_hLastMultiSelectAnchor);
 			if (hParent != nullptr && hParent == hAnchorParent) {
-				m_selectedMeshItems.Delete_All ();
+				DynamicVectorClass<HTREEITEM> range;
 				bool inRange = false;
 				for (HTREEITEM hSib = GetTreeCtrl ().GetChildItem (hParent); hSib; hSib = GetTreeCtrl ().GetNextSiblingItem (hSib)) {
 					bool isEndpoint = (hSib == hItem || hSib == m_hLastMultiSelectAnchor);
 					if (isEndpoint)
 						inRange = !inRange;
 					if (inRange || isEndpoint)
-						m_selectedMeshItems.Add (hSib);
+						range.Add (hSib);
 					if (isEndpoint && !inRange)
 						break;
 				}
+
+				// Selecting the row clears the set and the anchor, so both go back afterwards
+				HTREEITEM hAnchor = m_hLastMultiSelectAnchor;
 				GetTreeCtrl ().SelectItem (hItem);
+				m_selectedMeshItems = range;
+				m_hLastMultiSelectAnchor = hAnchor;
 				return;
 			}
 		}
 
 		if ((uFlags & TVHT_ONITEM) && (nFlags & MK_CONTROL)) {
 			// Ctrl+click on the item label: add/remove from multi-select set.
+			DynamicVectorClass<HTREEITEM> selected = m_selectedMeshItems;
 			bool found = false;
-			for (int i = 0; i < m_selectedMeshItems.Count (); ++i) {
-				if (m_selectedMeshItems[i] == hItem) {
-					m_selectedMeshItems.Delete (i);
+			for (int i = 0; i < selected.Count (); ++i) {
+				if (selected[i] == hItem) {
+					selected.Delete (i);
 					found = true;
 					break;
 				}
 			}
 			if (!found)
-				m_selectedMeshItems.Add (hItem);
-			m_hLastMultiSelectAnchor = hItem;
-			// Highlight the item visually but don't change tree selection.
+				selected.Add (hItem);
+
+			// Selecting the row clears the set and the anchor, so both go back afterwards
 			GetTreeCtrl ().SelectItem (hItem);
+			m_selectedMeshItems = selected;
+			m_hLastMultiSelectAnchor = hItem;
 			return;
 		}
 	}
@@ -1969,10 +2153,44 @@ CDataTreeView::OnLButtonDown (UINT nFlags, CPoint point)
 	// Any non-Ctrl/Shift click clears the multi-select set and updates the anchor.
 	if (!(nFlags & MK_CONTROL) && !(nFlags & MK_SHIFT)) {
 		m_selectedMeshItems.Delete_All ();
-		m_hLastMultiSelectAnchor = (hItem != nullptr && Is_Mesh_Sub_Object (hItem) && (uFlags & TVHT_ONITEM)) ? hItem : nullptr;
 	}
 
 	CTreeView::OnLButtonDown (nFlags, point);
+
+	// Selecting the row clears the anchor, so it is set after the click went through
+	if (!(nFlags & MK_CONTROL) && !(nFlags & MK_SHIFT)) {
+		m_hLastMultiSelectAnchor = (hItem != nullptr && Is_Mesh_Sub_Object (hItem) && (uFlags & TVHT_ONITEM)) ? hItem : nullptr;
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  OnLButtonDblClk
+//
+void
+CDataTreeView::OnLButtonDblClk (UINT nFlags, CPoint point)
+{
+	UINT uFlags = 0;
+	HTREEITEM hItem = GetTreeCtrl ().HitTest (point, &uFlags);
+	bool is_part = (hItem != nullptr) && Is_Mesh_Sub_Object (hItem);
+
+	// The second click of a fast pair on an eye is one more toggle
+	if (hItem != nullptr && (uFlags & TVHT_ONITEMSTATEICON) && (is_part || Get_Folder_Kind (hItem) == FOLDER_MESHES))
+	{
+		OnLButtonDown (nFlags, point);
+		return;
+	}
+
+	// A double click on a part shows it alone. Passing it on would also expand the row.
+	AssetInfoClass *asset_info = (hItem != nullptr) ? (AssetInfoClass *)GetTreeCtrl ().GetItemData (hItem) : nullptr;
+	if (is_part && (uFlags & (TVHT_ONITEMLABEL | TVHT_ONITEMICON)) && asset_info != nullptr && asset_info->Get_Type () == TypeMesh)
+	{
+		Show_Only_Mesh (hItem);
+		return;
+	}
+
+	CTreeView::OnLButtonDblClk (nFlags, point);
 }
 
 
@@ -2429,6 +2647,12 @@ CDataTreeView::OnDeleteItem
 	// Free the asset information object
 	SAFE_DELETE (asset_info);
 
+	// Forget what the tree no longer has
+	m_FolderKinds.erase (pNMTreeView->itemOld.hItem);
+	if (m_hSoloItem == pNMTreeView->itemOld.hItem) {
+		m_hSoloItem = nullptr;
+	}
+
 	// TheSuperHackers @performance Tria 25/04/2026 Removed redundant SetItemData(... 0).
 	// The tree item is being destroyed by the control - setting its data sends a
 	// TVM_SETITEM back into the control mid-teardown, which is pointless and adds
@@ -2722,14 +2946,15 @@ CDataTreeView::Build_Render_Object_List
 		  (htree_item != nullptr);
 		  htree_item = GetTreeCtrl ().GetNextSiblingItem (htree_item)) {
 
-		// Determine if this is an asset type we want to add to the list
+		// A part's label is only its pivot, so the name comes from the asset
 		AssetInfoClass *asset_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (htree_item);
 		if ((asset_info != nullptr) &&
 			 (asset_info->Get_Type () != TypeAnimation) &&
 			 (asset_info->Get_Type () != TypeCompressedAnimation) &&
-			 (asset_info->Get_Type () != TypeMaterial))
+			 (asset_info->Get_Type () != TypeMaterial) &&
+			 (asset_info->Get_Type () != TypeBone))
 		{
-			asset_list.Add (GetTreeCtrl ().GetItemText (htree_item));
+			asset_list.Add (asset_info->Get_Name ());
 		}
 
 		// If this item has children, then add the children recursively
@@ -2894,9 +3119,15 @@ CDataTreeView::Select_Prev ()
 void
 CDataTreeView::Reload_Lightmap_Models ()
 {
-	Free_Child_Models (m_hMeshCollectionRoot);
-	Free_Child_Models (m_hHierarchyRoot);
-	Free_Child_Models (m_hMeshRoot);
+	// Every object node, and the mesh collections
+	CTreeCtrl &tree = GetTreeCtrl ();
+	for (HTREEITEM hitem = tree.GetRootItem (); hitem != nullptr; hitem = tree.GetNextSiblingItem (hitem))
+	{
+		if (tree.GetItemData (hitem) != 0 || hitem == m_hCategoryRoots[CATEGORY_COLLECTION])
+		{
+			Free_Child_Models (hitem);
+		}
+	}
 }
 
 
@@ -2909,24 +3140,23 @@ void
 CDataTreeView::Free_Child_Models (HTREEITEM parent_item)
 {
 	//
+	// The node itself, when it is a model
+	//
+	AssetInfoClass *asset_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (parent_item);
+	if (asset_info != nullptr &&
+		 (asset_info->Get_Type () == TypeMesh || asset_info->Get_Type () == TypeHierarchy))
+	{
+		WW3DAssetManager::Get_Instance ()->Remove_Prototype (asset_info->Get_Name ());
+	}
+
+	//
 	// Loop through all the children of this node
 	//
 	for (	HTREEITEM tree_item = GetTreeCtrl ().GetChildItem (parent_item);
 			tree_item != nullptr;
 			tree_item = GetTreeCtrl ().GetNextSiblingItem (tree_item))
 	{
-		//
-		// Get the data associated with this item
-		//
-		AssetInfoClass *asset_info = (AssetInfoClass *)GetTreeCtrl ().GetItemData (tree_item);
-		if (asset_info  != nullptr) {
-			WW3DAssetManager::Get_Instance ()->Remove_Prototype (asset_info->Get_Name ());
-		}
-
-		// TheSuperHackers @feature Tria 19/04/2026 Recurse into group nodes for grouped mesh items.
-		if (GetTreeCtrl ().ItemHasChildren (tree_item)) {
-			Free_Child_Models (tree_item);
-		}
+		Free_Child_Models (tree_item);
 	}
 }
 
@@ -2978,72 +3208,135 @@ CDataTreeView::Restrict_Anims (bool onoff)
 	}
 }
 
-// TheSuperHackers @feature Themed checkbox state icons that respect dark mode.
-// State 1 = unchecked (hidden), state 2 = checked (visible/shown).
+// TheSuperHackers @feature Eye state icons for part visibility, drawn for the current theme.
+// State 1 = hidden (closed eye), state 2 = shown (open eye).
 // Index 0 is a reserved transparent dummy; comctl32 treats state image index 0 as
 // "no image".
 void CDataTreeView::RebuildStateImageList (void)
 {
-    const bool isDark = W3DDarkMode::IsDark ();
-    const COLORREF bgColor = isDark
-        ? W3DDarkMode::GetCtrlBackgroundColor ()
-        : 0x00FFFFFF; // light path keeps the original opaque white
-    // Pre-multiply into a 32-bit BGR (no alpha) DIB pixel.
-    const DWORD bgPixel = 0xFF000000u
-        | (static_cast<DWORD> (GetRValue (bgColor)) << 16)
-        | (static_cast<DWORD> (GetGValue (bgColor)) << 8)
-        |  static_cast<DWORD> (GetBValue (bgColor));
+    // GDI does not antialias, so each eye is drawn large and averaged down
+    const int SIZE  = 16;
+    const int SCALE = 4;
+    const int BIG   = SIZE * SCALE;
 
-    HTHEME hTheme = ::OpenThemeData (GetSafeHwnd (), L"BUTTON");
+    const bool isDark = W3DDarkMode::IsDark ();
+    const COLORREF bgColor = isDark ? W3DDarkMode::GetCtrlBackgroundColor () : RGB (255, 255, 255);
+    const COLORREF fgColor = isDark ? W3DDarkMode::GetTextColor () : RGB (48, 48, 48);
+    const COLORREF dimColor = RGB ((GetRValue (fgColor) + GetRValue (bgColor)) / 2,
+                                   (GetGValue (fgColor) + GetGValue (bgColor)) / 2,
+                                   (GetBValue (fgColor) + GetBValue (bgColor)) / 2);
 
     CImageList stateImageList;
-    stateImageList.Create (16, 16, ILC_COLOR32, 3, 1);
+    stateImageList.Create (SIZE, SIZE, ILC_COLOR32, 3, 1);
 
     BITMAPINFO bmi = {};
     bmi.bmiHeader.biSize        = sizeof (BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth       = 16;
-    bmi.bmiHeader.biHeight      = -16; // top-down
+    bmi.bmiHeader.biWidth       = SIZE;
+    bmi.bmiHeader.biHeight      = -SIZE; // top-down
     bmi.bmiHeader.biPlanes      = 1;
     bmi.bmiHeader.biBitCount    = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
 
-    auto buildOne = [&] (int themeState, int dfcsFlags) {
-        void *pvBits = nullptr;
-        HBITMAP hBmp = ::CreateDIBSection (nullptr, &bmi, DIB_RGB_COLORS, &pvBits, nullptr, 0);
-        if (hBmp && pvBits) {
-            DWORD *p = static_cast<DWORD *> (pvBits);
-            for (int i = 0; i < 16 * 16; i++) p[i] = bgPixel;
-            HDC hDC = ::CreateCompatibleDC (nullptr);
-            HBITMAP hOld = (HBITMAP)::SelectObject (hDC, hBmp);
-            RECT rc = { 1, 1, 15, 15 };
-            if (hTheme)
-                ::DrawThemeBackground (hTheme, hDC, BP_CHECKBOX, themeState, &rc, nullptr);
-            else
-                ::DrawFrameControl (hDC, &rc, DFC_BUTTON, dfcsFlags);
-            ::SelectObject (hDC, hOld);
-            ::DeleteDC (hDC);
-            ::ImageList_Add (stateImageList.GetSafeHandle (), hBmp, nullptr);
-            ::DeleteObject (hBmp);
-        }
-    };
+    BITMAPINFO bigInfo = bmi;
+    bigInfo.bmiHeader.biWidth  = BIG;
+    bigInfo.bmiHeader.biHeight = -BIG;
 
-    // Index 0 — reserved dummy (transparent).
+    for (int state = 0; state < 3; state++)
     {
         void *pvBits = nullptr;
         HBITMAP hBmp = ::CreateDIBSection (nullptr, &bmi, DIB_RGB_COLORS, &pvBits, nullptr, 0);
-        if (hBmp && pvBits) {
-            DWORD *p = static_cast<DWORD *> (pvBits);
-            for (int i = 0; i < 16 * 16; i++) p[i] = 0x00000000;
-            ::ImageList_Add (stateImageList.GetSafeHandle (), hBmp, nullptr);
-            ::DeleteObject (hBmp);
+        if (hBmp == nullptr || pvBits == nullptr)
+        {
+            continue;
         }
+
+        DWORD *pixels = static_cast<DWORD *> (pvBits);
+        for (int i = 0; i < SIZE * SIZE; i++)
+        {
+            pixels[i] = 0x00000000;
+        }
+
+        void *pvBigBits = nullptr;
+        HBITMAP hBigBmp = (state != 0) ? ::CreateDIBSection (nullptr, &bigInfo, DIB_RGB_COLORS, &pvBigBits, nullptr, 0) : nullptr;
+        if (hBigBmp != nullptr && pvBigBits != nullptr)
+        {
+            const bool shown = (state == 2);
+            const COLORREF color = shown ? fgColor : dimColor;
+
+            HDC hDC = ::CreateCompatibleDC (nullptr);
+            HGDIOBJ hOldBmp = ::SelectObject (hDC, hBigBmp);
+            HBRUSH hBackground = ::CreateSolidBrush (bgColor);
+            RECT rect = { 0, 0, BIG, BIG };
+            ::FillRect (hDC, &rect, hBackground);
+            ::DeleteObject (hBackground);
+
+            // The lids are two arcs that meet at the corners of the eye
+            const int POINTS = 17;
+            POINT upper[POINTS];
+            POINT lower[POINTS];
+            for (int i = 0; i < POINTS; i++)
+            {
+                const float t = (float)i / (float)(POINTS - 1);
+                const int x = 6 + (int)(t * (float)(BIG - 12));
+                const int lift = (int)(::sin (t * 3.14159265F) * (float)BIG * 0.27F);
+                upper[i].x = x;
+                upper[i].y = BIG / 2 - lift;
+                lower[i].x = x;
+                lower[i].y = BIG / 2 + lift;
+            }
+
+            HPEN hPen = ::CreatePen (PS_SOLID, SCALE + 2, color);
+            HBRUSH hPupil = ::CreateSolidBrush (color);
+            HGDIOBJ hOldPen = ::SelectObject (hDC, hPen);
+            HGDIOBJ hOldBrush = ::SelectObject (hDC, hPupil);
+
+            ::Polyline (hDC, lower, POINTS);
+            if (shown)
+            {
+                ::Polyline (hDC, upper, POINTS);
+                const int radius = BIG / 7;
+                ::Ellipse (hDC, BIG / 2 - radius, BIG / 2 - radius, BIG / 2 + radius, BIG / 2 + radius);
+            }
+            ::GdiFlush ();
+
+            ::SelectObject (hDC, hOldBrush);
+            ::SelectObject (hDC, hOldPen);
+            ::SelectObject (hDC, hOldBmp);
+            ::DeleteObject (hPupil);
+            ::DeleteObject (hPen);
+            ::DeleteDC (hDC);
+
+            const DWORD *big = static_cast<const DWORD *> (pvBigBits);
+            for (int y = 0; y < SIZE; y++)
+            {
+                for (int x = 0; x < SIZE; x++)
+                {
+                    DWORD red = 0;
+                    DWORD green = 0;
+                    DWORD blue = 0;
+                    for (int sy = 0; sy < SCALE; sy++)
+                    {
+                        for (int sx = 0; sx < SCALE; sx++)
+                        {
+                            const DWORD sample = big[(y * SCALE + sy) * BIG + (x * SCALE + sx)];
+                            red   += (sample >> 16) & 0xFF;
+                            green += (sample >> 8) & 0xFF;
+                            blue  += sample & 0xFF;
+                        }
+                    }
+                    const DWORD samples = SCALE * SCALE;
+                    pixels[y * SIZE + x] = 0xFF000000u | ((red / samples) << 16) | ((green / samples) << 8) | (blue / samples);
+                }
+            }
+        }
+        if (hBigBmp != nullptr)
+        {
+            ::DeleteObject (hBigBmp);
+        }
+
+        ::ImageList_Add (stateImageList.GetSafeHandle (), hBmp, nullptr);
+        ::DeleteObject (hBmp);
     }
-
-    buildOne (CBS_UNCHECKEDNORMAL, DFCS_BUTTONCHECK);
-    buildOne (CBS_CHECKEDNORMAL,   DFCS_BUTTONCHECK | DFCS_CHECKED);
-
-    if (hTheme)
-        ::CloseThemeData (hTheme);
 
     // SetImageList returns the previous image list; let MFC clean it up via the
     // owning CImageList wrapper going out of scope.

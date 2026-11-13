@@ -24,6 +24,10 @@
 #include "AfxCView.h"
 #include "AssetTypes.h"
 #include "WWLib/Vector.h"
+#include "WWLib/hashtemplate.h"
+#include "WWLib/wwstring.h"
+#include <map>
+#include <vector>
 
 // Forward declarations
 class RenderObjClass;
@@ -73,7 +77,10 @@ protected:
 	afx_msg void OnDblclk(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnRClick(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnToggleMeshVis();
+	afx_msg void OnShowOnlyMesh();
 	afx_msg void OnShowBones();
 	afx_msg void OnExportInfo();
 	afx_msg void OnDumpW3DInfo();
@@ -116,9 +123,19 @@ protected:
 		//
 		//	Texture insertion methods
 		//
-		void					Load_Materials_Into_Tree ();
-		void					Load_Bones_Into_Tree ();
 		void					Toggle_Mesh_Visibility (HTREEITEM hItem);
+
+		// Narrows the tree to the names that hold the text, a moment after the last call
+		void					Request_Filter (LPCTSTR text);
+		void					Set_Filter (LPCTSTR text);
+
+		// An object node waiting to be inserted
+		struct ObjectEntry
+		{
+			CString			name;
+			ASSET_TYPE		type;
+			int				icon;
+		};
 
 		//
 		//	Display methods
@@ -165,7 +182,6 @@ protected:
 		///////////////////////////////////////////////////////////////////////
 		//	Protected methods
 		///////////////////////////////////////////////////////////////////////
-		ASSET_TYPE			Determine_Tree_Location (RenderObjClass &render_obj, HTREEITEM &hroot, int &icon_index);
 		void					Determine_Tree_Location (ASSET_TYPE type, HTREEITEM &hroot, int &icon_index);
 		RenderObjClass *	Create_Render_Obj_To_Display (HTREEITEM htree_item);
 		void					Add_Emitters_To_Menu (HMENU hmenu, RenderObjClass &render_obj);
@@ -174,21 +190,76 @@ protected:
 		void					Set_Mesh_Visibility (HTREEITEM hItem, bool visible);
 		void					Set_Mesh_Visibility_Recursive (HTREEITEM hItem, bool visible);
 
+		// The folders of an object node, in display order
+		enum FolderKind
+		{
+			FOLDER_NONE = 0,
+			FOLDER_MESHES,
+			FOLDER_SKELETON,
+			FOLDER_ANIMATIONS,
+			FOLDER_TEXTURES,
+		};
+
+		// The top level nodes for the assets that are not objects, in display order
+		enum Category
+		{
+			CATEGORY_EMITTER = 0,
+			CATEGORY_AGGREGATE,
+			CATEGORY_COLLECTION,
+			CATEGORY_PRIMITIVE,
+			CATEGORY_SOUND,
+			CATEGORY_TEXTURE,
+			CATEGORY_COUNT,
+		};
+
+		bool					Is_Object_Node (HTREEITEM hitem) const;
+		HTREEITEM			Get_Owner_Object (HTREEITEM hitem) const;
+		FolderKind			Get_Folder_Kind (HTREEITEM hitem) const;
+		HTREEITEM			Find_Folder (HTREEITEM hobject, FolderKind kind) const;
+		HTREEITEM			Add_Folder (HTREEITEM hobject, FolderKind kind);
+		void					Update_Folder_Label (HTREEITEM hfolder);
+		HTREEITEM			Get_Category_Root (Category category, bool create);
+		void					Insert_Object_Nodes (std::vector<ObjectEntry> &entries);
+		void					Populate_Object_Node (HTREEITEM hobject);
+		void					Add_Parts (HTREEITEM hobject, RenderObjClass *render_obj);
+		void					Add_Textures (HTREEITEM hobject, RenderObjClass *render_obj);
+		bool					Is_Owner_Shown (HTREEITEM hitem) const;
+		HTREEITEM			Show_Owner_Object (HTREEITEM hitem);
+		void					Reset_Mesh_Checks (HTREEITEM hobject);
+		void					Show_Only_Mesh (HTREEITEM hitem);
+		void					Get_Mesh_Rows (HTREEITEM hobject, std::vector<HTREEITEM> &rows) const;
+		void					Sync_Mesh_Checks ();
+		void					Forget_Tree_Items ();
+		bool					Matches_Filter (LPCTSTR name) const;
+
+		enum
+		{
+			FILTER_TIMER_ID = 0x7F17,
+			FILTER_DELAY_MS = 200,
+		};
+
 	private:
 
 		///////////////////////////////////////////////////////
 		//
 		//	Private member data
 		//
-		HTREEITEM	m_hMaterialsRoot;
-		HTREEITEM	m_hMeshRoot;
-		HTREEITEM	m_hAggregateRoot;
-		HTREEITEM	m_hLODRoot;
-		HTREEITEM	m_hMeshCollectionRoot;
-		HTREEITEM	m_hEmitterRoot;
-		HTREEITEM	m_hPrimitivesRoot;
-		HTREEITEM	m_hHierarchyRoot;
-		HTREEITEM	m_hSoundRoot;
+		HTREEITEM	m_hCategoryRoots[CATEGORY_COUNT];
+		std::map<HTREEITEM, FolderKind>		m_FolderKinds;
+
+		// Parts that an object node lists, so they are not also listed alone
+		HashTemplateClass<StringClass, int>	m_OwnedMeshes;
+
+		// Textures listed under an object; the rest go under Other Textures
+		HashTemplateClass<StringClass, int>	m_ListedTextures;
+
+		// The part that Show Only This Mesh left visible
+		HTREEITEM	m_hSoloItem;
+
+		// Upper case; empty shows everything
+		CString		m_Filter;
+		CString		m_PendingFilter;
+		bool			m_Rebuilding;
 		// TheSuperHackers @feature Owns the TVSIL_NORMAL image list so we can swap
 		// between dark and light icon variants on theme change.
 		CImageList	m_normalImageList;

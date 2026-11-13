@@ -400,6 +400,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_MESSAGE(WM_W3DVIEW_THEME_CHANGED, OnW3DViewThemeChanged)
 	// TheSuperHackers @feature W3D Material Viewer window.
 	ON_COMMAND(IDM_MATERIAL_VIEWER, OnMaterialViewer)
+	ON_EN_CHANGE(IDC_TREE_FILTER, OnTreeFilterChanged)
 	// TheSuperHackers @feature F5 refreshes the viewport (re-displays the current asset).
 	ON_COMMAND(IDM_REFRESH_VIEWPORT, OnRefreshViewport)
 
@@ -510,6 +511,24 @@ CMainFrame::OnCreate (LPCREATESTRUCT lpCreateStruct)
 		if (W3DDarkMode::IsDark () && m_toolbarImgDark.GetSafeHandle ()) {
 			m_wndToolBar.GetToolBarCtrl ().SetImageList (&m_toolbarImgDark);
 		}
+	}
+
+	// The filter box for the asset tree sits at the end of the toolbar, in a
+	// separator wide enough to hold it
+	{
+		CToolBarCtrl &bar = m_wndToolBar.GetToolBarCtrl ();
+		TBBUTTON slot = { 0 };
+		slot.iBitmap = TREE_FILTER_WIDTH;
+		slot.idCommand = IDC_TREE_FILTER;
+		slot.fsStyle = TBSTYLE_SEP;
+		bar.AddButtons (1, &slot);
+
+		CRect rect;
+		bar.GetItemRect (bar.GetButtonCount () - 1, &rect);
+		rect.DeflateRect (4, 1);
+		m_TreeFilterEdit.Create (WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL, rect, &m_wndToolBar, IDC_TREE_FILTER);
+		m_TreeFilterEdit.SetFont (CFont::FromHandle ((HFONT)::GetStockObject (DEFAULT_GUI_FONT)));
+		m_TreeFilterEdit.SendMessage (EM_SETCUEBANNER, FALSE, (LPARAM)L"Filter assets");
 	}
 
 	if (!m_wndStatusBar.Create(this) ||
@@ -3673,12 +3692,60 @@ CMainFrame::OnCmdMsg
 
 ////////////////////////////////////////////////////////////////////////////
 //
+//  OnTreeFilterChanged
+//
+////////////////////////////////////////////////////////////////////////////
+void
+CMainFrame::OnTreeFilterChanged ()
+{
+	// The box exists before the panes do
+	if (!::IsWindow (m_wndSplitter.m_hWnd) || !::IsWindow (m_TreeFilterEdit.m_hWnd))
+	{
+		return;
+	}
+
+	CDataTreeView *tree = (CDataTreeView *)m_wndSplitter.GetPane (0, 0);
+	if (tree != nullptr)
+	{
+		CString text;
+		m_TreeFilterEdit.GetWindowText (text);
+		tree->Request_Filter (text);
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
 //  PreTranslateMessage
 //
 ////////////////////////////////////////////////////////////////////////////
 BOOL
 CMainFrame::PreTranslateMessage (MSG *pMsg)
 {
+	// Keys typed into the filter box are text. The accelerators would take the digits and arrows.
+	if (pMsg->message >= WM_KEYFIRST && pMsg->message <= WM_KEYLAST &&
+		 m_TreeFilterEdit.m_hWnd != nullptr && pMsg->hwnd == m_TreeFilterEdit.m_hWnd)
+	{
+		if (pMsg->message == WM_KEYDOWN && (pMsg->wParam == VK_RETURN || pMsg->wParam == VK_ESCAPE))
+		{
+			// Escape clears the filter; both hand the keyboard back to the tree
+			if (pMsg->wParam == VK_ESCAPE)
+			{
+				m_TreeFilterEdit.SetWindowText ("");
+			}
+			CWnd *tree = ::IsWindow (m_wndSplitter.m_hWnd) ? m_wndSplitter.GetPane (0, 0) : nullptr;
+			if (tree != nullptr)
+			{
+				tree->SetFocus ();
+			}
+			return TRUE;
+		}
+
+		::TranslateMessage (pMsg);
+		::DispatchMessage (pMsg);
+		return TRUE;
+	}
+
 	// 7 toggles the poly and vertex totals. Keys from other windows pass through here too.
 	if (::GetActiveWindow () == m_hWnd && ViewportStats::Is_Toggle_Key (pMsg))
 	{
