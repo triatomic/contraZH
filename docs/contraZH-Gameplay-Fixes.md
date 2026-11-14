@@ -11,6 +11,18 @@ to curved and linear flight paths, including projectiles that tumble or keep a f
 
 Changes the simulation and older replay playback for affected shots.
 
+## Recycled supply centers accept automatic deliveries
+
+Supply centers spawned already complete register as delivery targets during normal gameplay.
+Workers can automatically unload at recycled GLA supply stash trucks without a manual delivery
+order. Supply centers under construction still register when construction finishes.
+
+Map initialization and saved-game loading keep their existing registration paths. No per-frame
+scan is added, and the completion guard prevents duplicate registration.
+
+This changes the simulation and can change older replay playback. Multiplayer clients need
+matching engine versions.
+
 ## Garrisons stay protected when map borders change
 
 Shrinking or expanding the active map border no longer exposes enclosed occupants to ordinary
