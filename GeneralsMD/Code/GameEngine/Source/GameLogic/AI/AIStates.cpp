@@ -6203,6 +6203,7 @@ void AIAttackState::onExit( StateExitType status )
 	obj->clearModelConditionState( MODELCONDITION_ATTACKING );
 
 	obj->clearLeechRangeModeForAllWeapons();
+	obj->releaseWeaponLock(LOCKED_TEMPORARILY);
 
 	AIUpdateInterface *ai = obj->getAI();
 	if (ai)
