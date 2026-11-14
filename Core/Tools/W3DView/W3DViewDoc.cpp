@@ -697,6 +697,15 @@ CW3DViewDoc::DisplayObject
 	// Clear any per-item selection when a new object is loaded.
 	ClearSelectedItem ();
 
+	// The object already on show stays in the scene. Taking it out strips its parts and can free it.
+	if (pCModel != nullptr && pCModel == m_pCRenderObj.Peek() && add_ghost == false)
+	{
+		SAFE_DELETE (m_pCAnimCombo);
+		m_pCAnimation.Clear();
+		pCModel->Set_Animation ();
+		return;
+	}
+
     // Data OK?
     if (m_pCScene)
     {

@@ -381,6 +381,9 @@ public:
 
 	// Seeks through the frame scrubber, whether or not its window is open
 	bool	Go_To_Animation_Frame (int frame)	{ return m_frameScrubberDlg.Go_To_Frame (frame); }
+
+	// Runs the commands still in the queue, such as the start that PlayAnimation posts
+	void	Run_Posted_Commands ();
 	void	RestoreOriginalSize ();
 	void	Select_Device (bool show_dlg = true);
 

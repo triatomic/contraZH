@@ -600,35 +600,10 @@ std::string Handle_Set_Animation_Frame(const std::vector<std::string> &lines)
 		}
 		animation->Release_Ref();
 
-		// Showing an object strips the one it replaces, so the animation needs a new instance.
-		RenderObjClass *instance = WW3DAssetManager::Get_Instance()->Create_Render_Obj(displayed->Get_Name());
-		if (instance == nullptr) {
-			return Make_Error("not_ready", "Could not create the displayed object again.");
-		}
+		document->PlayAnimation(displayed, name.c_str(), false, false);
 
-		// The new instance keeps the meshes that were hidden on the old one.
-		int sub_count = displayed->Get_Num_Sub_Objects();
-		for (int index = 0; index < sub_count; index++) {
-			RenderObjClass *part = displayed->Get_Sub_Object(index);
-			if (part == nullptr) {
-				continue;
-			}
-			RenderObjClass *twin = part->Is_Hidden() ? instance->Get_Sub_Object_By_Name(part->Get_Name(), nullptr) : nullptr;
-			if (twin != nullptr) {
-				twin->Set_Hidden(true);
-				twin->Release_Ref();
-			}
-			part->Release_Ref();
-		}
-
-		document->PlayAnimation(instance, name.c_str(), false, false);
-		instance->Release_Ref();
-
-		// PlayAnimation posts the start command; it must run before the seek pauses playback.
-		MSG message;
-		while (::PeekMessage(&message, frame->m_hWnd, WM_COMMAND, WM_COMMAND, PM_REMOVE)) {
-			::DispatchMessage(&message);
-		}
+		// The start that PlayAnimation posts must run before the seek pauses playback.
+		frame->Run_Posted_Commands();
 		current = document->GetCurrentAnimation();
 	}
 

@@ -1880,6 +1880,21 @@ CMainFrame::CaptureReloadState (void)
 
 ////////////////////////////////////////////////////////////////////////////
 //
+//  Run_Posted_Commands
+//
+////////////////////////////////////////////////////////////////////////////
+void
+CMainFrame::Run_Posted_Commands (void)
+{
+	MSG message;
+	while (::PeekMessage (&message, m_hWnd, WM_COMMAND, WM_COMMAND, PM_REMOVE)) {
+		::DispatchMessage (&message);
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
 //  RestoreReloadState
 //
 //  Called from OnLoadNextFile after the last file batch has loaded and the
@@ -1928,6 +1943,9 @@ CMainFrame::RestoreReloadState (void)
 			RenderObjClass *pmodel = doc->GetDisplayedObject ();
 			if (pmodel != nullptr) {
 				doc->PlayAnimation (pmodel, m_reloadRestore.animationName);
+
+				// The posted start would otherwise arrive later and undo a paused or stopped state
+				Run_Posted_Commands ();
 			}
 		}
 	}
