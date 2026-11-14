@@ -552,8 +552,132 @@ CDataTreeView::Insert_Object_Nodes (std::vector<ObjectEntry> &entries)
 		HTREEITEM hitem = tree.InsertItem (entry.name, entry.icon, entry.icon, TVI_ROOT, hprevious);
 		tree.SetItemData (hitem, (ULONG)new AssetInfoClass (entry.name, entry.type));
 		Populate_Object_Node (hitem);
+		if (entry.parts_only && !Keep_Matching_Parts (hitem))
+		{
+			tree.DeleteItem (hitem);
+			continue;
+		}
 		hprevious = hitem;
 	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Has_Matching_Part
+//
+//  Whether the filter matches a mesh or a bone of the named object.
+//
+bool
+CDataTreeView::Has_Matching_Part (LPCTSTR object_name) const
+{
+	RenderObjClass *render_obj = WW3DAssetManager::Get_Instance ()->Create_Render_Obj (object_name);
+	if (render_obj == nullptr)
+	{
+		return false;
+	}
+
+	bool found = false;
+	int sub_count = render_obj->Get_Num_Sub_Objects ();
+	for (int index = 0; index < sub_count && !found; index ++)
+	{
+		RenderObjClass *sub_obj = render_obj->Get_Sub_Object (index);
+		if (sub_obj != nullptr)
+		{
+			found = Matches_Filter (sub_obj->Get_Name ());
+			sub_obj->Release_Ref ();
+		}
+	}
+
+	const HTreeClass *htree = render_obj->Get_HTree ();
+	int pivot_count = (htree != nullptr) ? htree->Num_Pivots () : 0;
+	for (int pivot = 1; pivot < pivot_count && !found; pivot ++)
+	{
+		const char *pivot_name = htree->Get_Bone_Name (pivot);
+		found = (pivot_name != nullptr && pivot_name[0] != '\0' && Matches_Filter (pivot_name));
+	}
+
+	render_obj->Release_Ref ();
+	return found;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Keep_Matching_Parts
+//
+//  Narrows an object's Meshes and Skeleton folders to the rows the filter
+//  matches and opens them. Returns false when no row is left.
+//
+bool
+CDataTreeView::Keep_Matching_Parts (HTREEITEM hobject)
+{
+	CTreeCtrl &tree = GetTreeCtrl ();
+
+	bool any = false;
+	const FolderKind kinds[] = { FOLDER_MESHES, FOLDER_SKELETON };
+	for (int index = 0; index < 2; index ++)
+	{
+		HTREEITEM hfolder = Find_Folder (hobject, kinds[index]);
+		if (hfolder == nullptr)
+		{
+			continue;
+		}
+
+		if (Prune_Rows (hfolder))
+		{
+			Update_Folder_Label (hfolder);
+			tree.Expand (hfolder, TVE_EXPAND);
+			any = true;
+		}
+		else
+		{
+			tree.DeleteItem (hfolder);
+		}
+	}
+
+	if (any)
+	{
+		tree.Expand (hobject, TVE_EXPAND);
+	}
+	return any;
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Prune_Rows
+//
+//  A row stays when the filter matches it or a row nested below it.
+//
+bool
+CDataTreeView::Prune_Rows (HTREEITEM hparent)
+{
+	CTreeCtrl &tree = GetTreeCtrl ();
+
+	bool any = false;
+	HTREEITEM hchild = tree.GetChildItem (hparent);
+	while (hchild != nullptr)
+	{
+		HTREEITEM hnext = tree.GetNextSiblingItem (hchild);
+		AssetInfoClass *info = (AssetInfoClass *)tree.GetItemData (hchild);
+		bool has_match_below = Prune_Rows (hchild);
+		if (has_match_below || Matches_Filter (tree.GetItemText (hchild)) ||
+			 (info != nullptr && Matches_Filter (info->Get_Name ())))
+		{
+			if (has_match_below)
+			{
+				tree.Expand (hchild, TVE_EXPAND);
+			}
+			any = true;
+		}
+		else
+		{
+			tree.DeleteItem (hchild);
+		}
+		hchild = hnext;
+	}
+	return any;
 }
 
 
@@ -896,13 +1020,21 @@ CDataTreeView::LoadAssetsIntoTree ()
 				if (is_object)
 				{
 					filtered_objects.insert (CString ((const char *)key));
+
+					// It stays if one of its meshes or bones matches
+					if (!existing_objects.Exists (key) && Has_Matching_Part (name))
+					{
+						ObjectEntry entry = { name, type, icon, true };
+						new_objects.push_back (entry);
+						existing_objects.Insert (key, 1);
+					}
 				}
 			}
 			else if (is_object)
 			{
 				if (!existing_objects.Exists (key))
 				{
-					ObjectEntry entry = { name, type, icon };
+					ObjectEntry entry = { name, type, icon, false };
 					new_objects.push_back (entry);
 					existing_objects.Insert (key, 1);
 				}
@@ -959,7 +1091,7 @@ CDataTreeView::LoadAssetsIntoTree ()
 		StringClass key = Name_Key (mesh_names[index]);
 		if (!m_OwnedMeshes.Exists (key) && !existing_objects.Exists (key))
 		{
-			ObjectEntry entry = { mesh_names[index], TypeMesh, m_iMeshIcon };
+			ObjectEntry entry = { mesh_names[index], TypeMesh, m_iMeshIcon, false };
 			new_meshes.push_back (entry);
 		}
 	}
@@ -1816,6 +1948,18 @@ CDataTreeView::Show_Only_Mesh (HTREEITEM hitem)
 		return;
 	}
 
+	// The filter can leave a part without a row
+	int sub_count = displayed->Get_Num_Sub_Objects ();
+	for (int index = 0; index < sub_count; index ++)
+	{
+		RenderObjClass *part = displayed->Get_Sub_Object (index);
+		if (part != nullptr)
+		{
+			part->Set_Hidden (!restore);
+			part->Release_Ref ();
+		}
+	}
+
 	for (HTREEITEM hchild = tree.GetChildItem (hmeshes); hchild != nullptr; hchild = tree.GetNextSiblingItem (hchild))
 	{
 		Set_Mesh_Visibility_Recursive (hchild, restore);
@@ -2305,6 +2449,28 @@ CDataTreeView::Set_Mesh_Visibility (HTREEITEM hItem, bool visible)
 	pSubObj->Release_Ref ();
 
 	GetTreeCtrl ().SetItemState (hItem, INDEXTOSTATEIMAGEMASK (visible ? 2 : 1), TVIS_STATEIMAGEMASK);
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Set_Displayed_Part_Hidden
+//
+bool
+CDataTreeView::Set_Displayed_Part_Hidden (LPCTSTR name, bool hidden)
+{
+	CW3DViewDoc *pdoc = (CW3DViewDoc *)GetDocument ();
+	RenderObjClass *displayed = (pdoc != nullptr) ? pdoc->GetDisplayedObject () : nullptr;
+	RenderObjClass *part = (displayed != nullptr) ? displayed->Get_Sub_Object_By_Name (name, nullptr) : nullptr;
+	if (part == nullptr)
+	{
+		return false;
+	}
+
+	part->Set_Hidden (hidden);
+	part->Release_Ref ();
+	Sync_Mesh_Checks ();
+	return true;
 }
 
 

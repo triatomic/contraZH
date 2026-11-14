@@ -125,6 +125,9 @@ protected:
 		//
 		void					Toggle_Mesh_Visibility (HTREEITEM hItem);
 
+		// Hides or shows a part of the displayed object by its full name, and updates its eye
+		bool					Set_Displayed_Part_Hidden (LPCTSTR name, bool hidden);
+
 		// Narrows the tree to the names that hold the text, a moment after the last call
 		void					Request_Filter (LPCTSTR text);
 		void					Set_Filter (LPCTSTR text);
@@ -135,6 +138,9 @@ protected:
 			CString			name;
 			ASSET_TYPE		type;
 			int				icon;
+
+			// The filter missed the name, so the node stays only for its matching meshes and bones
+			bool				parts_only;
 		};
 
 		//
@@ -232,6 +238,9 @@ protected:
 		void					Sync_Mesh_Checks ();
 		void					Forget_Tree_Items ();
 		bool					Matches_Filter (LPCTSTR name) const;
+		bool					Has_Matching_Part (LPCTSTR object_name) const;
+		bool					Keep_Matching_Parts (HTREEITEM hobject);
+		bool					Prune_Rows (HTREEITEM hparent);
 
 		enum
 		{
