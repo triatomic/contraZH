@@ -78,28 +78,103 @@ repository root in `PYTHONPATH`.
 ## Commands
 
 The user types a request to the assistant in plain words, and the assistant picks the tool and
-fills in its input. These requests cover what the server can do.
-
-| The user types | Tool called |
-|---|---|
-| `Is W3DView running? What model is it showing?` | `get_viewer_state` |
-| `How many polys and vertices does the model in W3DView have?` | `get_viewer_state` |
-| `Read the materials of the model open in W3DView.` | `read_model` |
-| `Read C:\Mod\Art\W3D\UVDScorp.w3d and list its meshes and textures.` | `read_model` |
-| `What shader and textures does the TURRET01 mesh of UVDScorp.w3d use?` | `read_model` |
-| `Which meshes of this model are hidden or cast no shadow?` | `read_model` |
-| `Open C:\Mod\Art\W3D\UVDScorp.w3d in W3DView.` | `open_model` |
-| `Find the turret meshes of the model in W3DView.` | `find_meshes` |
-| `Hide the treads and the armor.` | `set_mesh_visibility` |
-| `Show only the barrel.` | `set_mesh_visibility` |
-| `Show every mesh again.` | `set_mesh_visibility` |
-| `Hide the armor and screenshot the model from the left.` | `set_mesh_visibility`, then `capture_views` |
-| `Screenshot the model from the front, left and top.` | `capture_views` |
-| `Show me the back right corner of the model, zoom unchanged.` | `capture_views` |
-| `Open UVDScorp.w3d and show it from all six sides.` | `open_model`, then `capture_views` |
+fills in its input. Each table below lists requests for one subject, the tool the assistant calls,
+and the result field that holds the answer.
 
 A request that names a file needs its full path, unless the file sits in a folder W3DView already
-searches. A request that names no file refers to the model in the viewport.
+searches. A request that names no file refers to the model in the viewport. A request can name one
+mesh, such as `TURRET01`, or ask about every mesh of the model.
+
+### Viewer and counts
+
+| The user types | Tool | Answer is in |
+|---|---|---|
+| `Is W3DView running?` | `get_viewer_state` | `viewers` |
+| `What model is W3DView showing?` | `get_viewer_state` | `selected.displayedObject`, `selected.sourceFile` |
+| `How many polys does the model have?` | `get_viewer_state` | `selected.polygons` |
+| `How many vertices does the model have?` | `get_viewer_state` | `selected.vertices` |
+| `How many meshes does UVDScorp.w3d have?` | `read_model` | `meshCount` |
+| `How many polys and vertices does each mesh have?` | `read_model` | `meshCounts` |
+| `Which mesh has the most polys?` | `read_model` | `meshCounts` |
+| `Open C:\Mod\Art\W3D\UVDScorp.w3d in W3DView.` | `open_model` | `displayedObject` |
+
+### Passes and shaders
+
+| The user types | Tool | Answer is in |
+|---|---|---|
+| `How many passes does TURRET01 use?` | `read_model` | `passCount` |
+| `How many passes does each mesh use?` | `read_model` | `passCount` of every mesh |
+| `Which meshes use more than one pass?` | `read_model` | `passCount` of every mesh |
+| `What shader is used per pass on TURRET01?` | `read_model` | `passes[].shader` |
+| `What blend mode does pass 2 of TURRET01 use?` | `read_model` | `passes[1].shader.srcBlend`, `destBlend` |
+| `Which meshes are alpha blended or additive?` | `read_model` | `passes[].shader.srcBlend`, `destBlend` |
+| `Which meshes use alpha test?` | `read_model` | `passes[].shader.alphaTest` |
+| `Does TURRET01 write depth, and what is its depth compare?` | `read_model` | `passes[].shader.depthWrite`, `depthCompare` |
+| `What are the primary and secondary gradients of each pass?` | `read_model` | `passes[].shader.priGradient`, `secGradient` |
+| `What detail colour and detail alpha functions does pass 1 use?` | `read_model` | `passes[0].shader.detailColorFunc`, `detailAlphaFunc` |
+
+### Vertex materials and mapping
+
+| The user types | Tool | Answer is in |
+|---|---|---|
+| `What vertex material does each pass of TURRET01 use?` | `read_model` | `passes[].vertexMaterial.name` |
+| `What are the ambient, diffuse, specular and emissive colours of TURRET01?` | `read_model` | `passes[].vertexMaterial.ambient`, `diffuse`, `specular`, `emissive` |
+| `What are the opacity, translucency and shininess of TURRET01?` | `read_model` | `passes[].vertexMaterial.opacity`, `translucency`, `shininess` |
+| `Which meshes have Specular To Diffuse ticked?` | `read_model` | `passes[].vertexMaterial.specularToDiffuse` |
+| `What is the stage 0 mapping type of TREADSL02, and what are its args?` | `read_model` | `passes[].vertexMaterial.stage0Mapping.type`, `args` |
+| `What is the stage 1 mapping of each pass, with its args?` | `read_model` | `passes[].vertexMaterial.stage1Mapping.type`, `args` |
+| `Which UV channel does stage 0 and stage 1 use on TURRET01?` | `read_model` | `stage0Mapping.uvChannel`, `stage1Mapping.uvChannel` |
+| `Which meshes scroll their texture?` | `read_model` | `stage0Mapping.type` of `LINEAR_OFFSET` and its `args` |
+| `Does TURRET01 have vertex colours or vertex alpha?` | `read_model` | `passes[].vertexColors` |
+
+### Textures
+
+| The user types | Tool | Answer is in |
+|---|---|---|
+| `Which textures does UVDScorp.w3d use, and where are the files?` | `read_model` | `texturesUsed` |
+| `Is any texture of this model missing?` | `read_model` | `texturesUsed` entries that are `null` |
+| `What texture is on stage 0 and stage 1 of each pass of TURRET01?` | `read_model` | `passes[].stage0Texture.name`, `stage1Texture.name` |
+| `Which meshes use Scorpion.tga?` | `read_model` | `textures` of every mesh |
+| `Is the texture of TREADSL02 clamped in U or V?` | `read_model` | `stage0Texture.clampU`, `clampV` |
+| `Is any texture animated, and with how many frames and what rate?` | `read_model` | `stage0Texture.animType`, `frameCount`, `frameRate` |
+| `Which textures have No LOD, Publish or Alpha Bitmap set?` | `read_model` | `stage0Texture.noLod`, `publish`, `alphaBitmap` |
+
+### W3D properties
+
+| The user types | Tool | Answer is in |
+|---|---|---|
+| `What are the W3D properties of TURRET01?` | `read_model` | `w3dProperties` |
+| `Which meshes are hidden in the file?` | `read_model` | `w3dProperties.hidden` |
+| `Which meshes are two-sided?` | `read_model` | `w3dProperties.twoSided` |
+| `Which meshes cast a shadow?` | `read_model` | `w3dProperties.castShadow` |
+| `Which meshes have collision, and of which types?` | `read_model` | `w3dProperties.collision` |
+| `What is the geometry type of each mesh?` | `read_model` | `w3dProperties.geometryType` |
+| `What is the sort level of TURRET01?` | `read_model` | `w3dProperties.sortLevel` |
+| `What is the user text of TURRET01?` | `read_model` | `w3dProperties.userText` |
+
+### Meshes in the viewport
+
+| The user types | Tool | Answer is in |
+|---|---|---|
+| `Find the turret meshes of the model.` | `find_meshes` | `matches` |
+| `Which meshes are hidden in the viewport right now?` | `find_meshes` | `matches[].hidden` |
+| `Hide the treads and the armor.` | `set_mesh_visibility` with `hide` | `hidden` |
+| `Show the armor again.` | `set_mesh_visibility` with `show` | `visible` |
+| `Show only the barrel.` | `set_mesh_visibility` with `show_only` | `visible` |
+| `Show every mesh again.` | `set_mesh_visibility` with `show_all` | `visible` |
+
+### Screenshots
+
+| The user types | Tool | Answer is in |
+|---|---|---|
+| `Screenshot the model from the front, left and top.` | `capture_views` | The returned images |
+| `Show me the back right top corner of the model.` | `capture_views` | The returned images |
+| `Screenshot the front without changing the zoom.` | `capture_views` with `fit` false | The returned images |
+| `Screenshot the model from all six sides at 512 pixels.` | `capture_views` with `max_size` 512 | The returned images |
+| `Hide the armor and screenshot the model from the left.` | `set_mesh_visibility`, then `capture_views` | The returned images |
+| `Open UVDScorp.w3d and show it from all six sides.` | `open_model`, then `capture_views` | The returned images |
+
+### Tool inputs
 
 The tool inputs those requests turn into look like this.
 
