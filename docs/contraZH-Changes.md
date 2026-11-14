@@ -36,5 +36,5 @@ version - see [Rendering](contraZH-Options.md#rendering) for the renamed `Anisot
 * [ChatCommands.ini](contraZH-ChatCommands.md) - new chat command fields: health, ownership, EMP, crew kill, player control and typed spawns
 * [Extend Blocks](contraZH-Extend.md) - inheriting Armor, Locomotor, Weapon, Object, OCL, FXList and ParticleSystem entries
 * [Animation2D.ini](contraZH-Animation2D.md) - direct textures in Animation2D.ini
-* [Debug and Cheat Features](contraZH-Debug-and-Cheats.md) - debug overlays and cheat hotkeys in cheat builds
+* [Debug and Cheat Features](contraZH-Debug-and-Cheats.md) - debug overlays, cheat hotkeys and the debug panel with its Cheats tab in cheat builds
 * [Generals Online (experimental)](contraZH-Generals-Online.md) - the experimental Generals Online build
