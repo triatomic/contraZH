@@ -27,7 +27,7 @@ version - see [Rendering](contraZH-Options.md#rendering) for the renamed `Anisot
 * [Commandline Options](contraZH-Commandline-Options.md) - all game launch options, arguments and build requirements
 * [Objects & Modules](contraZH-Objects-and-Modules.md) - new object keys, module parameters and behavior modules
 * [GameData.ini](contraZH-GameData.md) - new GameData.ini keys and simulation rules
-* [SpecialPower.ini](contraZH-SpecialPowers.md) - new SpecialPower.ini keys
+* [SpecialPower.ini](contraZH-SpecialPowers.md) - enum behavior reference, Contra superweapon enums, EVA events and new SpecialPower.ini keys
 * [Weapon.ini](contraZH-Weapons.md) - new Weapon.ini keys
 * [Locomotors](contraZH-Locomotors.md) - terrain-following projectiles and slope collision limits
 * [CommandButtons & Selection](contraZH-CommandButtons.md) - new command buttons and options, queue reorder, auto queue and structure multi-select
