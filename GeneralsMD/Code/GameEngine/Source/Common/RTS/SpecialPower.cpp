@@ -31,6 +31,8 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/IniNameRegistry.h"
+#include "GameClient/Eva.h"
 #include "Common/Player.h"
 #include "Common/Science.h"
 #include "Common/SpecialPower.h"
@@ -232,6 +234,25 @@ const char* const SpecialPowerMaskType::s_bitNameList[] =
 };
 static_assert(ARRAY_SIZE(SpecialPowerMaskType::s_bitNameList) == SpecialPowerMaskType::NumBits + 1, "Incorrect array size");
 
+static void parseSpecialPowerIdentity(INI* ini, void*, void* store, const void*)
+{
+	static IniNameRegistry names(SpecialPowerMaskType::getBitNames(), SPECIALPOWER_COUNT);
+	const char* token = ini->getNextToken();
+	Int id = names.resolve(token);
+	if (id < 0)
+	{
+		DEBUG_LOG(("Invalid or colliding SpecialPower Enum '%s'", token));
+		throw INI_INVALID_DATA;
+	}
+	*static_cast<SpecialPowerType*>(store) = static_cast<SpecialPowerType>(id);
+}
+
+static void parseSpecialPowerEva(INI* ini, void*, void* store, const void*)
+{
+	const char* token = ini->getNextToken();
+	*static_cast<EvaMessage*>(store) = stricmp(token, "None") == 0 ? EVA_None : Eva::nameToMessage(token);
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void SpecialPowerStore::parseSpecialPowerDefinition( INI *ini )
@@ -305,7 +326,7 @@ void SpecialPowerStore::parseSpecialPowerDefinition( INI *ini )
 	{ "PublicTimer",							INI::parseBool,										nullptr, offsetof( SpecialPowerTemplate, m_publicTimer ) },
 	{ "OwnerOnlyTimer",						INI::parseBool,										nullptr, offsetof( SpecialPowerTemplate, m_ownerOnlyTimer ) },
 	{ "FlashingTimer",						INI::parseBool,										nullptr, offsetof( SpecialPowerTemplate, m_flashingTimer ) },
-	{ "Enum",											INI::parseIndexList,							SpecialPowerMaskType::getBitNames(), offsetof( SpecialPowerTemplate, m_type ) },
+	{ "Enum",											parseSpecialPowerIdentity,			nullptr, offsetof( SpecialPowerTemplate, m_type ) },
 	{ "DetectionTime",						INI::parseDurationUnsignedInt,		nullptr,	offsetof( SpecialPowerTemplate, m_detectionTime ) },
 	{ "SharedSyncedTimer",				INI::parseBool,										nullptr, offsetof( SpecialPowerTemplate, m_sharedNSync ) },
 	{ "ViewObjectDuration",				INI::parseDurationUnsignedInt,		nullptr,	offsetof( SpecialPowerTemplate, m_viewObjectDuration ) },
@@ -314,15 +335,15 @@ void SpecialPowerStore::parseSpecialPowerDefinition( INI *ini )
 	{ "ShortcutPower",						INI::parseBool,										nullptr, offsetof( SpecialPowerTemplate, m_shortcutPower ) },
 	{ "AcademyClassify",					INI::parseIndexList,			TheAcademyClassificationTypeNames, offsetof( SpecialPowerTemplate, m_academyClassificationType ) },
 	{ "BehaviorEnum",						INI::parseIndexList,			SpecialPowerMaskType::getBitNames(), offsetof(SpecialPowerTemplate, m_type_behavior) },
-	{ "EvaDetectedOwn",						INI::parseEvaNameIndexList,			TheEvaMessageNames, offsetof(SpecialPowerTemplate, m_eva_detected_own) },
-	{ "EvaDetectedAlly",						INI::parseEvaNameIndexList,			TheEvaMessageNames, offsetof(SpecialPowerTemplate, m_eva_detected_ally) },
-	{ "EvaDetectedEnemy",						INI::parseEvaNameIndexList,			TheEvaMessageNames, offsetof(SpecialPowerTemplate, m_eva_detected_enemy) },
-	{ "EvaLaunchedOwn",						INI::parseEvaNameIndexList,			TheEvaMessageNames, offsetof(SpecialPowerTemplate, m_eva_launched_own) },
-	{ "EvaLaunchedAlly",						INI::parseEvaNameIndexList,			TheEvaMessageNames, offsetof(SpecialPowerTemplate, m_eva_launched_ally) },
-	{ "EvaLaunchedEnemy",						INI::parseEvaNameIndexList,			TheEvaMessageNames, offsetof(SpecialPowerTemplate, m_eva_launched_enemy) },
-	{ "EvaReadyOwn",						INI::parseEvaNameIndexList,			TheEvaMessageNames, offsetof(SpecialPowerTemplate, m_eva_ready_own) },
-	{ "EvaReadyAlly",						INI::parseEvaNameIndexList,			TheEvaMessageNames, offsetof(SpecialPowerTemplate, m_eva_ready_ally) },
-	{ "EvaReadyEnemy",						INI::parseEvaNameIndexList,			TheEvaMessageNames, offsetof(SpecialPowerTemplate, m_eva_ready_enemy) },
+	{ "EvaDetectedOwn",						parseSpecialPowerEva,				nullptr, offsetof(SpecialPowerTemplate, m_eva_detected_own) },
+	{ "EvaDetectedAlly",						parseSpecialPowerEva,				nullptr, offsetof(SpecialPowerTemplate, m_eva_detected_ally) },
+	{ "EvaDetectedEnemy",						parseSpecialPowerEva,				nullptr, offsetof(SpecialPowerTemplate, m_eva_detected_enemy) },
+	{ "EvaLaunchedOwn",						parseSpecialPowerEva,				nullptr, offsetof(SpecialPowerTemplate, m_eva_launched_own) },
+	{ "EvaLaunchedAlly",						parseSpecialPowerEva,				nullptr, offsetof(SpecialPowerTemplate, m_eva_launched_ally) },
+	{ "EvaLaunchedEnemy",						parseSpecialPowerEva,				nullptr, offsetof(SpecialPowerTemplate, m_eva_launched_enemy) },
+	{ "EvaReadyOwn",						parseSpecialPowerEva,				nullptr, offsetof(SpecialPowerTemplate, m_eva_ready_own) },
+	{ "EvaReadyAlly",						parseSpecialPowerEva,				nullptr, offsetof(SpecialPowerTemplate, m_eva_ready_ally) },
+	{ "EvaReadyEnemy",						parseSpecialPowerEva,				nullptr, offsetof(SpecialPowerTemplate, m_eva_ready_enemy) },
 	{ "NeedsTargetDesignator",						INI::parseBool,										nullptr, offsetof(SpecialPowerTemplate, m_needsTargetDesignator) },
 	{ "Cost",											INI::parseInt,									NULL, offsetof(SpecialPowerTemplate, m_cost) },
 	{ "StartCooldownOnFirstShot",	INI::parseBool,										nullptr, offsetof(SpecialPowerTemplate, m_startCooldownOnFirstShot) },
