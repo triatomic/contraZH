@@ -21,8 +21,9 @@ still hides every other mesh, including the ones the filter left without a row.
 
 ## MCP server
 
-The assistant reads a model's meshes and materials, opens a model in the viewer, searches and hides
-its meshes, and takes screenshots of it from chosen sides.
+The assistant reads a model's meshes and materials, opens a model in the viewer, lists its
+animations and jumps to a frame, searches and hides its meshes, and takes screenshots of it from
+chosen sides.
 
 The server has two halves.
 
@@ -31,7 +32,8 @@ The server has two halves.
 assistant and passes each tool call to the bridge.
 
 The bridge never writes a `.w3d` file. Its only effects on the viewer are loading a model, hiding
-or showing meshes in the viewport, and moving the camera for a screenshot. It puts the camera back.
+or showing meshes in the viewport, pausing on an animation frame, and moving the camera for a
+screenshot. It puts the camera back.
 
 ## Requirements
 
@@ -131,10 +133,14 @@ mesh, such as `TURRET01`, or ask about every mesh of the model.
 
 | The user types | Tool | Answer is in |
 |---|---|---|
-| `Which textures does UVDScorp.w3d use, and where are the files?` | `read_model` | `texturesUsed` |
-| `Is any texture of this model missing?` | `read_model` | `texturesUsed` entries that are `null` |
+| `Which textures does UVDScorp.w3d use, and where are the files?` | `read_textures` | `textures[].name`, `path` |
+| `Which folders do this model's textures come from?` | `read_textures` | `textureDirectories` |
+| `What is the path of the texture on TURRET01?` | `read_textures` | `meshes[].textures[].path` |
+| `Which textures does each mesh use, on which pass and stage?` | `read_textures` | `meshes[].textures` |
+| `Which meshes use Scorpion.tga?` | `read_textures` | `textures[].usedBy` |
+| `Is any texture of this model missing?` | `read_textures` | `missingTextures` |
+| `Which texture paths is W3DView searching?` | `read_textures` | `texturePaths` |
 | `What texture is on stage 0 and stage 1 of each pass of TURRET01?` | `read_model` | `passes[].stage0Texture.name`, `stage1Texture.name` |
-| `Which meshes use Scorpion.tga?` | `read_model` | `textures` of every mesh |
 | `Is the texture of TREADSL02 clamped in U or V?` | `read_model` | `stage0Texture.clampU`, `clampV` |
 | `Is any texture animated, and with how many frames and what rate?` | `read_model` | `stage0Texture.animType`, `frameCount`, `frameRate` |
 | `Which textures have No LOD, Publish or Alpha Bitmap set?` | `read_model` | `stage0Texture.noLod`, `publish`, `alphaBitmap` |
@@ -151,6 +157,21 @@ mesh, such as `TURRET01`, or ask about every mesh of the model.
 | `What is the geometry type of each mesh?` | `read_model` | `w3dProperties.geometryType` |
 | `What is the sort level of TURRET01?` | `read_model` | `w3dProperties.sortLevel` |
 | `What is the user text of TURRET01?` | `read_model` | `w3dProperties.userText` |
+
+### Animations
+
+| The user types | Tool | Answer is in |
+|---|---|---|
+| `Does the model in W3DView have animations?` | `list_animations` | `hasAnimations` |
+| `How many animations does the model have, and what are they called?` | `list_animations` | `animationCount`, `animations[].name` |
+| `How many frames does the A2 animation have?` | `list_animations` | `animations[].frames` |
+| `What is the frame rate and length of each animation?` | `list_animations` | `animations[].frameRate`, `seconds` |
+| `Which animation and frame is W3DView showing now?` | `list_animations` | `current` |
+| `Jump to frame 50.` | `set_animation_frame` | `current.frame` |
+| `Go to frame 20 of the A2 animation.` | `set_animation_frame` with `animation` | `current` |
+| `Jump to frame 50 and take a screenshot.` | `set_animation_frame`, then `capture_views` | The returned images |
+| `Screenshot frames 0, 50 and 100 of the animation from the front.` | `set_animation_frame`, then `capture_views`, for each frame | The returned images |
+| `Load C:\Mod\Art\W3D\AVScorp_A.w3d so its animation shows on the model.` | `open_model` | `displayedObject` |
 
 ### Meshes in the viewport
 
@@ -191,7 +212,27 @@ The tool inputs those requests turn into look like this.
 ```
 
 ```json
+{ "name": "read_textures", "arguments": { "path": "C:\\Mod\\Art\\W3D\\UVDScorp.w3d" } }
+```
+
+```json
+{ "name": "read_textures", "arguments": { "mesh": "TURRET01" } }
+```
+
+```json
 { "name": "open_model", "arguments": { "path": "C:\\Mod\\Art\\W3D\\UVDScorp.w3d" } }
+```
+
+```json
+{ "name": "list_animations", "arguments": {} }
+```
+
+```json
+{ "name": "set_animation_frame", "arguments": { "frame": 50 } }
+```
+
+```json
+{ "name": "set_animation_frame", "arguments": { "frame": 20, "animation": "A2" } }
 ```
 
 ```json
@@ -229,7 +270,10 @@ one viewer is running. With several open, call `get_viewer_state` first and pass
 |---|---|---|
 | `get_viewer_state` | none | Lists running viewers that have the bridge on, and the model the selected one displays. |
 | `read_model` | `path`, `mesh` | Reads a `.w3d` file's meshes, counts, W3D properties, passes and materials. |
+| `read_textures` | `path`, `mesh` | Reads the textures each mesh uses and the path of each texture file. |
 | `open_model` | `path` | Loads a `.w3d` file and displays its top-level object. |
+| `list_animations` | none | Lists the displayed model's animations with their frame counts. |
+| `set_animation_frame` | `frame`, `animation` | Jumps the displayed model to a frame of an animation and pauses there. |
 | `find_meshes` | `query` | Searches the meshes of the displayed model by name. |
 | `set_mesh_visibility` | `action`, `meshes` | Hides or shows meshes of the displayed model. |
 | `capture_views` | `views`, `fit`, `max_size` | Screenshots the displayed model from view cube sides. |
@@ -243,6 +287,7 @@ one viewer is running. With several open, call `get_viewer_state` first and pass
 | `selected.sourceFile` | File the object was loaded from. |
 | `selected.polygons` | Polygon total of the displayed object. |
 | `selected.vertices` | Vertex total of the displayed object. |
+| `selected.texturePaths` | The folders set under File > Texture Path, which W3DView searches for textures. |
 
 The two totals are the ones the `7` key draws in the viewport.
 
@@ -265,6 +310,8 @@ The result describes the file first.
 | `totalPolygons`, `totalVertices` | Sums over every mesh in the file, hidden and collision meshes included. |
 | `meshCounts` | `name`, `polygons` and `vertices` of each mesh. |
 | `texturesUsed` | Each texture name with the file it resolves to, or `null` when it is missing. |
+| `textureDirectories` | The folders those files sit in. |
+| `texturePaths` | The folders set under File > Texture Path. |
 | `meshes` | One entry per mesh, described below. |
 
 Each mesh has these fields.
@@ -355,10 +402,79 @@ channel number. `uvChannel` numbers the mesh's distinct coordinate sets from 1 i
 stages with the same number were exported from one channel. A stage without coordinates reports
 `null`.
 
+### read_textures
+
+`read_textures` answers which textures a model's meshes use and where each file is. It takes the
+same `path` and `mesh` arguments as `read_model`, and it reads the file the same way.
+
+| Field | Meaning |
+|---|---|
+| `file`, `resolvedPath` | The path asked for and the file W3DView opened. |
+| `texturePaths` | The folders set under File > Texture Path, which W3DView searches. |
+| `textureDirectories` | The folders the model's textures were found in. |
+| `missingTextures` | Names of the textures W3DView could not find. |
+| `textures` | Each texture's `name`, full `path`, `directory`, and the meshes it is `usedBy`. |
+| `meshes` | Each mesh's `name` and its `textures`. |
+
+Each entry of a mesh's `textures` has these fields.
+
+| Field | Meaning |
+|---|---|
+| `name` | File name as the model stores it. |
+| `path` | The file W3DView found, or `null` when it is missing. |
+| `pass` | The pass that uses the texture, counted from 1. |
+| `stage` | The stage it sits on, 0 or 1. |
+
+A texture that sits in a mesh's texture table without a pass using it reports `null` for `pass`
+and `stage`. The stored name and the found file can differ in extension, because W3DView falls back
+from `.tga` to `.dds` as the game does.
+
 ### open_model
 
 `open_model` takes an absolute `path`. It loads the file as File > Open does, selects the top-level
 object in the asset tree, and returns the same fields as `selected` in `get_viewer_state`.
+
+A file that holds animations alone has no object to show. `open_model` loads its animations and
+leaves the model in the viewport as it is, so `list_animations` then lists them.
+
+### list_animations
+
+`list_animations` lists the animations W3DView has loaded for the skeleton of the model in the
+viewport. An animation kept in its own `.w3d` file is not listed until that file is loaded, which
+`open_model` does.
+
+| Field | Meaning |
+|---|---|
+| `displayedObject` | Name of the object in the viewport. |
+| `hierarchy` | Name of its skeleton. An animation belongs to the model when it names the same skeleton. |
+| `hasAnimations` | Whether any animation is loaded for the model. |
+| `animationCount` | How many are loaded. |
+| `animations` | Each animation's `name`, `frames`, `lastFrame`, `frameRate` and length in `seconds`. |
+| `current` | The animation now on the model, or `null`. |
+
+An animation name is `Skeleton.Animation`, such as `ABAFSW_A2.ABAFSW_A2`. `frames` is the frame
+count, and frames are numbered from 0 to `lastFrame`.
+
+`current` holds the `name` of the animation on the model, the `frame` it is on, its `frames`, and
+the `state`, which is `playing`, `paused` or `stopped`.
+
+### set_animation_frame
+
+`set_animation_frame` moves the model to one frame and pauses playback there, through the frame
+scrubber. The frame holds until playback is started again, so a `capture_views` call after it
+screenshots that frame.
+
+| Argument | Meaning |
+|---|---|
+| `frame` | The frame to stop on, from 0 to the animation's `lastFrame`. |
+| `animation` | Animation name or part of it, ignoring case. Leave it out to stay on the animation already on the model. |
+
+The result has the same fields as `list_animations`, with `current` on the new frame.
+
+Naming an animation that is not on the model starts it first. Meshes hidden with
+`set_mesh_visibility` stay hidden across that. A `frame` outside the animation, a name that matches
+nothing, or a name that matches several animations changes nothing and returns an error that lists
+the choices.
 
 ### find_meshes
 
