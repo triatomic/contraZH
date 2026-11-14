@@ -5,10 +5,24 @@ W3DView is the model viewer. The contraZH build carries the
 [contraZH Changes](contraZH-Changes.md), and it can be driven by an AI assistant through a Model
 Context Protocol (MCP) server.
 
+## Asset filter
+
+The **Filter assets** box on the toolbar narrows the asset tree to the names that hold the typed
+text, ignoring case.
+
+| The text matches | The tree shows |
+|---|---|
+| An object's name | The object with all of its folders. |
+| A mesh or a bone of an object | The object, opened, with only the matching rows under Meshes and Skeleton. A row that a match is nested under stays too. |
+| An emitter, aggregate, primitive, sound or loose texture | That asset under its category. |
+
+The filter changes the tree only. The model in the viewport stays as it is, and Show Only This Mesh
+still hides every other mesh, including the ones the filter left without a row.
+
 ## MCP server
 
-The assistant reads a model's meshes and materials, opens a model in the viewer, and takes
-screenshots of it from chosen sides.
+The assistant reads a model's meshes and materials, opens a model in the viewer, searches and hides
+its meshes, and takes screenshots of it from chosen sides.
 
 The server has two halves.
 
@@ -16,8 +30,8 @@ The server has two halves.
 * A Python program, `tools/w3dview_mcp` in the contraZH repository, speaks MCP over stdio to the
 assistant and passes each tool call to the bridge.
 
-The bridge never writes a `.w3d` file. Its only effects on the viewer are loading a model and
-moving the camera for a screenshot, and it puts the camera back.
+The bridge never writes a `.w3d` file. Its only effects on the viewer are loading a model, hiding
+or showing meshes in the viewport, and moving the camera for a screenshot. It puts the camera back.
 
 ## Requirements
 
@@ -75,6 +89,11 @@ fills in its input. These requests cover what the server can do.
 | `What shader and textures does the TURRET01 mesh of UVDScorp.w3d use?` | `read_model` |
 | `Which meshes of this model are hidden or cast no shadow?` | `read_model` |
 | `Open C:\Mod\Art\W3D\UVDScorp.w3d in W3DView.` | `open_model` |
+| `Find the turret meshes of the model in W3DView.` | `find_meshes` |
+| `Hide the treads and the armor.` | `set_mesh_visibility` |
+| `Show only the barrel.` | `set_mesh_visibility` |
+| `Show every mesh again.` | `set_mesh_visibility` |
+| `Hide the armor and screenshot the model from the left.` | `set_mesh_visibility`, then `capture_views` |
 | `Screenshot the model from the front, left and top.` | `capture_views` |
 | `Show me the back right corner of the model, zoom unchanged.` | `capture_views` |
 | `Open UVDScorp.w3d and show it from all six sides.` | `open_model`, then `capture_views` |
@@ -101,6 +120,22 @@ The tool inputs those requests turn into look like this.
 ```
 
 ```json
+{ "name": "find_meshes", "arguments": { "query": "turret" } }
+```
+
+```json
+{ "name": "set_mesh_visibility", "arguments": { "action": "hide", "meshes": ["tread", "armor"] } }
+```
+
+```json
+{ "name": "set_mesh_visibility", "arguments": { "action": "show_only", "meshes": ["barrel"] } }
+```
+
+```json
+{ "name": "set_mesh_visibility", "arguments": { "action": "show_all" } }
+```
+
+```json
 { "name": "capture_views", "arguments": { "views": ["front", "left", "top"] } }
 ```
 
@@ -120,6 +155,8 @@ one viewer is running. With several open, call `get_viewer_state` first and pass
 | `get_viewer_state` | none | Lists running viewers that have the bridge on, and the model the selected one displays. |
 | `read_model` | `path`, `mesh` | Reads a `.w3d` file's meshes, counts, W3D properties, passes and materials. |
 | `open_model` | `path` | Loads a `.w3d` file and displays its top-level object. |
+| `find_meshes` | `query` | Searches the meshes of the displayed model by name. |
+| `set_mesh_visibility` | `action`, `meshes` | Hides or shows meshes of the displayed model. |
 | `capture_views` | `views`, `fit`, `max_size` | Screenshots the displayed model from view cube sides. |
 
 ### get_viewer_state
@@ -247,6 +284,42 @@ stages with the same number were exported from one channel. A stage without coor
 
 `open_model` takes an absolute `path`. It loads the file as File > Open does, selects the top-level
 object in the asset tree, and returns the same fields as `selected` in `get_viewer_state`.
+
+### find_meshes
+
+`find_meshes` looks through the meshes of the model in the viewport. `query` is text the mesh name
+must contain, ignoring case, and leaving it out lists every mesh.
+
+| Field | Meaning |
+|---|---|
+| `displayedObject` | Name of the object in the viewport. |
+| `meshCount` | Number of meshes the object has. |
+| `matches` | Each matching mesh's `name`, `polygons`, `vertices` and whether it is `hidden`. |
+
+A mesh name is `Object.Mesh`, such as `UVDSCORP.TURRET01`.
+
+### set_mesh_visibility
+
+`set_mesh_visibility` hides or shows meshes of the model in the viewport. The eye beside each mesh
+in the asset tree follows. The `.w3d` file is not changed, and opening another model starts with
+every mesh shown again.
+
+| Argument | Meaning |
+|---|---|
+| `action` | One of the four actions below. |
+| `meshes` | List of names or parts of names, ignoring case. A mesh matches when its name contains any entry. |
+
+| Action | Effect |
+|---|---|
+| `hide` | Hides the matching meshes. |
+| `show` | Shows the matching meshes. |
+| `show_only` | Shows the matching meshes and hides every other mesh. |
+| `show_all` | Shows every mesh. It needs no `meshes`. |
+
+The result lists the meshes that were `changed`, and every mesh that is now `hidden` or `visible`.
+A call whose `meshes` match nothing changes nothing and returns the mesh names to choose from.
+
+A screenshot from `capture_views` leaves hidden meshes out.
 
 ### capture_views
 
