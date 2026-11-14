@@ -443,6 +443,57 @@ std::string Handle_Open_Model(const std::string &path)
 	return Handle_Get_State();
 }
 
+// Every part of the displayed object, with its counts and whether it is hidden.
+std::string Handle_List_Meshes()
+{
+	CW3DViewDoc *document = ::GetCurrentDocument();
+	RenderObjClass *displayed = (document != nullptr) ? document->GetDisplayedObject() : nullptr;
+	if (displayed == nullptr) {
+		return Make_Error("no_model", "W3DView displays no model. Open one first.");
+	}
+
+	std::string out = "{";
+	Add_String(out, "displayedObject", displayed->Get_Name());
+	Add_Key(out, "meshes");
+	out += '[';
+	int sub_count = displayed->Get_Num_Sub_Objects();
+	for (int index = 0; index < sub_count; index++) {
+		RenderObjClass *part = displayed->Get_Sub_Object(index);
+		if (part == nullptr) {
+			continue;
+		}
+		out += '{';
+		Add_String(out, "name", part->Get_Name());
+		Add_Bool(out, "hidden", part->Is_Hidden() != 0);
+		Add_Int(out, "polygons", part->Get_Num_Polys());
+		Add_Int(out, "vertices", ViewportStats::Count_Vertices(part));
+		Close(out, '}');
+		part->Release_Ref();
+	}
+	Close(out, ']');
+	Close(out, '}');
+	out.erase(out.size() - 1);
+	return Make_Result(out);
+}
+
+// Line 1 is the hidden flag. Each later line is the full name of a part of the displayed object.
+std::string Handle_Set_Meshes_Hidden(const std::vector<std::string> &lines)
+{
+	CW3DViewDoc *document = ::GetCurrentDocument();
+	CDataTreeView *tree = (document != nullptr) ? document->GetDataTreeView() : nullptr;
+	if (tree == nullptr) {
+		return Make_Error("not_ready", "W3DView has no document yet.");
+	}
+
+	const bool hidden = lines.size() > 1 && lines[1] == "1";
+	for (size_t i = 2; i < lines.size(); i++) {
+		if (!lines[i].empty() && !tree->Set_Displayed_Part_Hidden(lines[i].c_str(), hidden)) {
+			return Make_Error("not_found", "The displayed object has no part named " + lines[i] + ".");
+		}
+	}
+	return Handle_List_Meshes();
+}
+
 std::wstring Widen(const std::string &text)
 {
 	std::wstring wide(text.size(), L'\0');
@@ -610,6 +661,12 @@ std::string Handle_Request_Text(const std::string &request)
 	}
 	if (command == "capture_views") {
 		return Handle_Capture_Views(lines);
+	}
+	if (command == "list_meshes") {
+		return Handle_List_Meshes();
+	}
+	if (command == "set_meshes_hidden") {
+		return Handle_Set_Meshes_Hidden(lines);
 	}
 	return Make_Error("unknown_command", "Unknown command " + command + ".");
 }

@@ -27,8 +27,9 @@ INSTRUCTIONS = (
     "Inspect W3D models through a running W3DView (W3DViewZH.exe). read_model "
     "reports each mesh's W3D export properties, pass count, vertex materials, "
     "shaders, textures and stage mappings straight from the .w3d file. "
-    "open_model displays a file, and capture_views returns screenshots of the "
-    "displayed model from view cube sides. Front is +X, left is -Y, top is +Z."
+    "open_model displays a file, find_meshes searches the displayed model's meshes, "
+    "set_mesh_visibility hides or shows them, and capture_views returns screenshots "
+    "of the displayed model from view cube sides. Front is +X, left is -Y, top is +Z."
 )
 
 _PID = {
@@ -83,6 +84,50 @@ TOOL_DEFINITIONS = [
                 "pid": _PID,
             },
             "required": ["path"],
+        },
+    },
+    {
+        "name": "find_meshes",
+        "description": (
+            "Search the meshes of the displayed model by name. Returns each match's name, "
+            "polygon and vertex counts, and whether it is hidden."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Text the mesh name must contain, ignoring case. Omit to list every mesh.",
+                },
+                "pid": _PID,
+            },
+        },
+    },
+    {
+        "name": "set_mesh_visibility",
+        "description": (
+            "Hide or show meshes of the displayed model in the viewport. The .w3d file is "
+            "not changed. Screenshots taken afterwards leave hidden meshes out."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["hide", "show", "show_only", "show_all"],
+                    "description": (
+                        "hide or show the matching meshes; show_only shows them and hides "
+                        "every other mesh; show_all shows every mesh and needs no meshes."
+                    ),
+                },
+                "meshes": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Names or parts of names, ignoring case. A mesh matches when its name contains any entry.",
+                },
+                "pid": _PID,
+            },
+            "required": ["action"],
         },
     },
     {
@@ -153,6 +198,59 @@ class McpServer:
             raise BridgeError("bad_argument", "open_model needs a path.")
         return [_text(self.bridge.call("open_model", [path], pid=arguments.get("pid")))]
 
+    def _find_meshes(self, arguments: Mapping[str, Any]) -> list[dict[str, Any]]:
+        result = self.bridge.call("list_meshes", pid=arguments.get("pid"))
+        query = str(arguments.get("query") or "").lower()
+        matches = [mesh for mesh in result["meshes"] if query in mesh["name"].lower()]
+        return [
+            _text(
+                {
+                    "displayedObject": result["displayedObject"],
+                    "meshCount": len(result["meshes"]),
+                    "matches": matches,
+                }
+            )
+        ]
+
+    def _set_mesh_visibility(self, arguments: Mapping[str, Any]) -> list[dict[str, Any]]:
+        action = arguments.get("action")
+        if action not in ("hide", "show", "show_only", "show_all"):
+            raise BridgeError("bad_argument", "action must be hide, show, show_only or show_all.")
+        queries = arguments.get("meshes") or []
+        if not isinstance(queries, list) or not all(isinstance(query, str) for query in queries):
+            raise BridgeError("bad_argument", "meshes must be a list of strings.")
+        queries = [query.lower() for query in queries if query]
+
+        pid = arguments.get("pid")
+        names = [mesh["name"] for mesh in self.bridge.call("list_meshes", pid=pid)["meshes"]]
+        matched = [name for name in names if any(query in name.lower() for query in queries)]
+        if action != "show_all" and not matched:
+            raise BridgeError(
+                "no_match", f"No mesh name contains any of {queries}. Meshes: {names}"
+            )
+
+        if action == "show_all":
+            result = self.bridge.call("set_meshes_hidden", ["0", *names], pid=pid)
+        elif action == "show_only":
+            others = [name for name in names if name not in matched]
+            self.bridge.call("set_meshes_hidden", ["1", *others], pid=pid)
+            result = self.bridge.call("set_meshes_hidden", ["0", *matched], pid=pid)
+        else:
+            result = self.bridge.call(
+                "set_meshes_hidden", ["1" if action == "hide" else "0", *matched], pid=pid
+            )
+
+        return [
+            _text(
+                {
+                    "displayedObject": result["displayedObject"],
+                    "changed": names if action == "show_all" else matched,
+                    "hidden": [mesh["name"] for mesh in result["meshes"] if mesh["hidden"]],
+                    "visible": [mesh["name"] for mesh in result["meshes"] if not mesh["hidden"]],
+                }
+            )
+        ]
+
     def _capture_views(self, arguments: Mapping[str, Any]) -> list[dict[str, Any]]:
         views = arguments.get("views") or DEFAULT_VIEWS
         if not isinstance(views, list) or not all(isinstance(view, str) for view in views):
@@ -199,6 +297,8 @@ class McpServer:
             "get_viewer_state": self._get_viewer_state,
             "read_model": self._read_model,
             "open_model": self._open_model,
+            "find_meshes": self._find_meshes,
+            "set_mesh_visibility": self._set_mesh_visibility,
             "capture_views": self._capture_views,
         }
         handler = handlers.get(name)
