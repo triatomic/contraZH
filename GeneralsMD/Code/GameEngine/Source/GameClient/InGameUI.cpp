@@ -33,6 +33,7 @@
 #define DEFINE_RADIUSCURSOR_NAMES
 
 #include "Common/IniNameRegistry.h"
+#include "Common/INIException.h"
 #include "Common/ActionManager.h"
 #include "Common/ChatCommand.h"
 #include "Common/DrawModule.h"
@@ -981,8 +982,9 @@ void InGameUI::validateCustomRadiusCursors() const
 	{
 		if (m_customRadiusCursors.find(it->first) == m_customRadiusCursors.end())
 		{
-			DEBUG_LOG(("RadiusCursor '%s' is referenced but has no definition", it->second.c_str()));
-			throw INI_INVALID_DATA;
+			AsciiString message;
+			message.format("RadiusCursor '%s' is referenced but has no definition", it->second.c_str());
+			throw INIException(message.str());
 		}
 	}
 }

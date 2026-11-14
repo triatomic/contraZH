@@ -247,6 +247,12 @@ static void parseSpecialPowerIdentity(INI* ini, void*, void* store, const void*)
 	static IniNameRegistry names(SpecialPowerMaskType::getBitNames(), SPECIALPOWER_COUNT);
 	const char* token = ini->getNextToken();
 	Int id = names.resolve(token);
+
+	// Every built-in name contains SPECIAL_, so an unknown one is a typo, not a custom identity.
+	if (id >= SPECIALPOWER_COUNT && strstr(names.getName(id), "special_"))
+	{
+		id = -1;
+	}
 	if (id < 0)
 	{
 		DEBUG_LOG(("Invalid or colliding SpecialPower Enum '%s'", token));

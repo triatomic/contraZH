@@ -29,6 +29,7 @@
 #include "GameClient/Eva.h"
 
 #include "Common/IniNameRegistry.h"
+#include "Common/INIException.h"
 #include "Common/GameUtility.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -894,8 +895,9 @@ void Eva::validateCustomEvents() const
 		}
 		if (!found)
 		{
-			DEBUG_LOG(("EvaEvent '%s' is referenced but has no definition", name->second.c_str()));
-			throw INI_INVALID_DATA;
+			AsciiString message;
+			message.format("EvaEvent '%s' is referenced but has no definition", name->second.c_str());
+			throw INIException(message.str());
 		}
 	}
 }

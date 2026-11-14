@@ -251,6 +251,7 @@ be defined in INI without rebuilding the executable. The three name lists remain
 
 An unknown `Enum` name declares a custom identity. Templates using the same name share that
 identity, regardless of capitalization. Use a mod-specific prefix to avoid accidental reuse.
+Unknown names containing `SPECIAL_` are rejected as misspelled built-in enums.
 
 ```ini
 SpecialPower SpecialAbilityCustomTeleport
@@ -341,8 +342,9 @@ A custom cursor changes the decal, not target legality or the power's effects.
   registry; a power, event and cursor can use the same name without sharing an identity.
 * A hash collision between different names is rejected during loading. Rename one definition
   if the engine reports a collision; the engine never silently aliases the two names.
-* Startup validation rejects referenced custom EVA events and cursors that have no definition.
-  Defining a custom power identity needs no separate registration block.
+* Startup validation rejects referenced custom EVA events and cursors that have no definition,
+  and the error names the missing event or cursor. Defining a custom power identity needs no
+  separate registration block.
 * Normal matching mod-data requirements still apply to multiplayer and replays. Stable custom
   IDs do not make different definitions compatible, or make these definitions work in older builds.
 * Existing saves keep the same built-in mask format. Saves using custom powers require those
