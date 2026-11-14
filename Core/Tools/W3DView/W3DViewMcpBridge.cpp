@@ -21,12 +21,16 @@
 
 #include "DataTreeView.h"
 #include "GraphicView.h"
+#include "MainFrm.h"
 #include "MaterialViewer/W3dMaterialParser.h"
 #include "Utils.h"
 #include "ViewportOverlay.h"
 #include "W3DViewDoc.h"
+#include "WW3D2/assetmgr.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/hanim.h"
+#include "WW3D2/htree.h"
 #include "WW3D2/rendobj.h"
 #include "WW3D2/surfaceclass.h"
 #include "WWLib/ffactory.h"
@@ -347,6 +351,20 @@ void Get_Displayed_Model(std::string &object_name, std::string &source_file)
 	}
 }
 
+// The folders set under File > Texture Path, which W3DView searches for textures.
+void Add_Texture_Paths(std::string &out)
+{
+	Add_Key(out, "texturePaths");
+	out += '[';
+	CW3DViewDoc *document = ::GetCurrentDocument();
+	int count = (document != nullptr) ? document->Get_Texture_Path_Count() : 0;
+	for (int index = 0; index < count; index++) {
+		Append_String(out, (const char *)document->Get_Texture_Path(index));
+		out += ',';
+	}
+	Close(out, ']');
+}
+
 std::string Handle_Get_State()
 {
 	std::string object_name;
@@ -363,6 +381,7 @@ std::string Handle_Get_State()
 	RenderObjClass *object = (document != nullptr) ? document->GetDisplayedObject() : nullptr;
 	Add_Int(out, "polygons", (object != nullptr) ? object->Get_Num_Polys() : 0);
 	Add_Int(out, "vertices", ViewportStats::Count_Vertices(object));
+	Add_Texture_Paths(out);
 
 	Close(out, '}');
 	out.erase(out.size() - 1);
@@ -405,6 +424,7 @@ std::string Handle_Read_Model(const std::string &requested_path)
 	Add_String(out, "file", document.filePath);
 	Add_String(out, "resolvedPath", document.resolvedDiskPath);
 	Add_String(out, "topLevelName", document.topLevelName);
+	Add_Texture_Paths(out);
 	Add_Key(out, "meshes");
 	out += '[';
 	for (size_t i = 0; i < document.meshes.size(); i++) {
@@ -425,13 +445,18 @@ std::string Handle_Open_Model(const std::string &path)
 		return Make_Error("not_ready", "W3DView has no document yet.");
 	}
 
-	MaterialDocument parsed;
-	if (!ParseMaterialDocument(path.c_str(), parsed)) {
-		return Make_Error("read_failed", "Could not open " + path + ", or it holds no meshes.");
+	if (!File_Exists(path)) {
+		return Make_Error("read_failed", "Could not open " + path + ".");
 	}
 
 	document->LoadAssetsFromFile(path.c_str());
 	tree->LoadAssetsIntoTree();
+
+	// A file of animations alone has nothing to show, so the viewport keeps its model.
+	MaterialDocument parsed;
+	if (!ParseMaterialDocument(path.c_str(), parsed)) {
+		return Handle_Get_State();
+	}
 
 	HTREEITEM item = tree->Find_Asset_Item_By_Name(parsed.topLevelName.c_str());
 	if (item == nullptr) {
@@ -492,6 +517,140 @@ std::string Handle_Set_Meshes_Hidden(const std::vector<std::string> &lines)
 		}
 	}
 	return Handle_List_Meshes();
+}
+
+const char *Animation_State_Name(CGraphicView *view)
+{
+	if (view == nullptr) {
+		return "stopped";
+	}
+	switch (view->GetAnimationState()) {
+		case CGraphicView::AnimPlaying:
+			return "playing";
+		case CGraphicView::AnimPaused:
+			return "paused";
+		default:
+			return "stopped";
+	}
+}
+
+// The loaded animations made for the displayed object's skeleton, and the one in use.
+std::string Handle_List_Animations()
+{
+	CW3DViewDoc *document = ::GetCurrentDocument();
+	RenderObjClass *displayed = (document != nullptr) ? document->GetDisplayedObject() : nullptr;
+	if (displayed == nullptr) {
+		return Make_Error("no_model", "W3DView displays no model. Open one first.");
+	}
+
+	const HTreeClass *htree = displayed->Get_HTree();
+	const std::string hierarchy = (htree != nullptr) ? htree->Get_Name() : "";
+
+	std::string out = "{";
+	Add_String(out, "displayedObject", displayed->Get_Name());
+	Add_String(out, "hierarchy", hierarchy);
+	Add_Key(out, "animations");
+	out += '[';
+
+	AssetIterator *iterator = WW3DAssetManager::Get_Instance()->Create_HAnim_Iterator();
+	for (iterator->First(); !hierarchy.empty() && !iterator->Is_Done(); iterator->Next()) {
+		HAnimClass *animation = WW3DAssetManager::Get_Instance()->Get_HAnim(iterator->Current_Item_Name());
+		if (animation == nullptr) {
+			continue;
+		}
+		if (::_stricmp(animation->Get_HName(), hierarchy.c_str()) == 0) {
+			out += '{';
+			Add_String(out, "name", animation->Get_Name());
+			Add_Int(out, "frames", animation->Get_Num_Frames());
+			Add_Float(out, "frameRate", animation->Get_Frame_Rate());
+			Add_Float(out, "seconds", animation->Get_Total_Time());
+			Close(out, '}');
+		}
+		animation->Release_Ref();
+	}
+	delete iterator;
+	Close(out, ']');
+
+	HAnimClass *current = document->GetCurrentAnimation();
+	Add_String(out, "currentAnimation", (current != nullptr) ? current->Get_Name() : "");
+	Add_Int(out, "currentFrame", (current != nullptr) ? document->GetCurrentFrame() : 0);
+	Add_Int(out, "currentFrames", (current != nullptr) ? current->Get_Num_Frames() : 0);
+	Add_String(out, "state", Animation_State_Name(document->GetGraphicView()));
+	Close(out, '}');
+	out.erase(out.size() - 1);
+	return Make_Result(out);
+}
+
+// Line 1 is an animation name, or empty for the one in use. Line 2 is the frame to stop on.
+std::string Handle_Set_Animation_Frame(const std::vector<std::string> &lines)
+{
+	CW3DViewDoc *document = ::GetCurrentDocument();
+	CMainFrame *frame = (CMainFrame *)::AfxGetMainWnd();
+	RenderObjClass *displayed = (document != nullptr) ? document->GetDisplayedObject() : nullptr;
+	if (displayed == nullptr || frame == nullptr) {
+		return Make_Error("no_model", "W3DView displays no model. Open one first.");
+	}
+
+	const std::string name = lines.size() > 1 ? lines[1] : std::string();
+	HAnimClass *current = document->GetCurrentAnimation();
+	if (!name.empty() && (current == nullptr || ::_stricmp(current->Get_Name(), name.c_str()) != 0)) {
+		HAnimClass *animation = WW3DAssetManager::Get_Instance()->Get_HAnim(name.c_str());
+		if (animation == nullptr) {
+			return Make_Error("not_found", "No loaded animation is named " + name + ".");
+		}
+		animation->Release_Ref();
+
+		// Showing an object strips the one it replaces, so the animation needs a new instance.
+		RenderObjClass *instance = WW3DAssetManager::Get_Instance()->Create_Render_Obj(displayed->Get_Name());
+		if (instance == nullptr) {
+			return Make_Error("not_ready", "Could not create the displayed object again.");
+		}
+
+		// The new instance keeps the meshes that were hidden on the old one.
+		int sub_count = displayed->Get_Num_Sub_Objects();
+		for (int index = 0; index < sub_count; index++) {
+			RenderObjClass *part = displayed->Get_Sub_Object(index);
+			if (part == nullptr) {
+				continue;
+			}
+			RenderObjClass *twin = part->Is_Hidden() ? instance->Get_Sub_Object_By_Name(part->Get_Name(), nullptr) : nullptr;
+			if (twin != nullptr) {
+				twin->Set_Hidden(true);
+				twin->Release_Ref();
+			}
+			part->Release_Ref();
+		}
+
+		document->PlayAnimation(instance, name.c_str(), false, false);
+		instance->Release_Ref();
+
+		// PlayAnimation posts the start command; it must run before the seek pauses playback.
+		MSG message;
+		while (::PeekMessage(&message, frame->m_hWnd, WM_COMMAND, WM_COMMAND, PM_REMOVE)) {
+			::DispatchMessage(&message);
+		}
+		current = document->GetCurrentAnimation();
+	}
+
+	if (current == nullptr) {
+		return Make_Error("no_animation", "No animation is playing. Name one to start it.");
+	}
+
+	const int frame_count = current->Get_Num_Frames();
+	const int target = lines.size() > 2 ? ::atoi(lines[2].c_str()) : 0;
+	if (target < 0 || target >= frame_count) {
+		char range[96];
+		::sprintf_s(range, "Frame %d is outside 0 to %d.", target, frame_count - 1);
+		return Make_Error("bad_frame", range);
+	}
+
+	frame->Go_To_Animation_Frame(target);
+
+	CGraphicView *view = document->GetGraphicView();
+	if (view != nullptr) {
+		view->RepaintView(FALSE);
+	}
+	return Handle_List_Animations();
 }
 
 std::wstring Widen(const std::string &text)
@@ -661,6 +820,12 @@ std::string Handle_Request_Text(const std::string &request)
 	}
 	if (command == "capture_views") {
 		return Handle_Capture_Views(lines);
+	}
+	if (command == "list_animations") {
+		return Handle_List_Animations();
+	}
+	if (command == "set_animation_frame") {
+		return Handle_Set_Animation_Frame(lines);
 	}
 	if (command == "list_meshes") {
 		return Handle_List_Meshes();

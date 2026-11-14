@@ -29,6 +29,9 @@ public:
 
 	void UpdateSlider (int iCurrentFrame, int iTotalFrames);
 
+	// Pauses playback and seeks, as typing a frame in the box does. False without an animation.
+	bool Go_To_Frame (int iFrame);
+
 protected:
 	virtual BOOL OnInitDialog ();
 	virtual void OnCancel ();

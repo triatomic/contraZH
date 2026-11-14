@@ -279,6 +279,86 @@ def decode_mesh(mesh: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _directory(path: str | None) -> str | None:
+    if not path:
+        return None
+    return path.replace("/", "\\").rpartition("\\")[0] or None
+
+
+def texture_directories(paths: Sequence[str | None]) -> list[str]:
+    """The distinct folders the found textures sit in, in first-use order."""
+    directories: list[str] = []
+    for path in paths:
+        directory = _directory(path)
+        if directory and directory.lower() not in (known.lower() for known in directories):
+            directories.append(directory)
+    return directories
+
+
+def decode_textures(raw: Mapping[str, Any], mesh_filter: str | None = None) -> dict[str, Any]:
+    """Which textures each mesh uses, on which pass and stage, and where each file is."""
+    wanted = (mesh_filter or "").lower()
+    textures: dict[str, dict[str, Any]] = {}
+    meshes = []
+
+    for mesh in raw["meshes"]:
+        table = mesh["textures"]
+        used: list[dict[str, Any]] = []
+        placed = set()
+        for pass_index, raw_pass in enumerate(mesh["passes"]):
+            for stage, key in enumerate(("stage0TextureIds", "stage1TextureIds")):
+                for index in raw_pass[key]:
+                    if 0 <= index < len(table):
+                        placed.add(index)
+                        used.append(
+                            {
+                                "name": table[index]["name"],
+                                "path": table[index]["resolvedPath"] or None,
+                                "pass": pass_index + 1,
+                                "stage": stage,
+                            }
+                        )
+        # A texture can sit in the mesh's table without any pass using it.
+        for index, texture in enumerate(table):
+            if index not in placed:
+                used.append(
+                    {
+                        "name": texture["name"],
+                        "path": texture["resolvedPath"] or None,
+                        "pass": None,
+                        "stage": None,
+                    }
+                )
+
+        for texture in table:
+            entry = textures.setdefault(
+                texture["name"],
+                {
+                    "name": texture["name"],
+                    "path": texture["resolvedPath"] or None,
+                    "directory": _directory(texture["resolvedPath"]),
+                    "usedBy": [],
+                },
+            )
+            if mesh["name"] not in entry["usedBy"]:
+                entry["usedBy"].append(mesh["name"])
+
+        if wanted in mesh["name"].lower():
+            meshes.append({"name": mesh["name"], "textures": used})
+
+    return {
+        "file": raw["file"],
+        "resolvedPath": raw["resolvedPath"],
+        "texturePaths": raw.get("texturePaths", []),
+        "textureDirectories": texture_directories(
+            [texture["path"] for texture in textures.values()]
+        ),
+        "missingTextures": [name for name, texture in textures.items() if not texture["path"]],
+        "textures": list(textures.values()),
+        "meshes": meshes,
+    }
+
+
 def decode_model(raw: Mapping[str, Any], mesh_filter: str | None = None) -> dict[str, Any]:
     meshes = raw["meshes"]
     if mesh_filter:
@@ -303,6 +383,8 @@ def decode_model(raw: Mapping[str, Any], mesh_filter: str | None = None) -> dict
             for mesh in raw["meshes"]
         ],
         "texturesUsed": textures,
+        "textureDirectories": texture_directories(list(textures.values())),
+        "texturePaths": raw.get("texturePaths", []),
         "meshes": [decode_mesh(mesh) for mesh in meshes],
         "uvChannelNote": UV_CHANNEL_NOTE,
     }

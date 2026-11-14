@@ -15,7 +15,7 @@ from ..worldbuilder_mcp.server import (
     serve,
 )
 from .bridge import BridgeError, W3DViewBridge, work_directory
-from .decode import bmp_to_png, decode_model, view_region
+from .decode import bmp_to_png, decode_model, decode_textures, view_region
 
 
 SERVER_NAME = "generals-w3dview"
@@ -27,7 +27,9 @@ INSTRUCTIONS = (
     "Inspect W3D models through a running W3DView (W3DViewZH.exe). read_model "
     "reports each mesh's W3D export properties, pass count, vertex materials, "
     "shaders, textures and stage mappings straight from the .w3d file. "
-    "open_model displays a file, find_meshes searches the displayed model's meshes, "
+    "read_textures lists the textures each mesh uses with the path of each file. "
+    "open_model displays a file, list_animations lists its animations and frame counts, "
+    "set_animation_frame jumps to a frame, find_meshes searches the displayed model's meshes, "
     "set_mesh_visibility hides or shows them, and capture_views returns screenshots "
     "of the displayed model from view cube sides. Front is +X, left is -Y, top is +Z."
 )
@@ -75,6 +77,28 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "read_textures",
+        "description": (
+            "Read which textures each mesh of a .w3d model uses, on which pass and stage, "
+            "and the full path and folder of each texture file. Also reports W3DView's "
+            "texture search paths and the textures that are missing."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "The model, as for read_model. Omit to read the displayed model.",
+                },
+                "mesh": {
+                    "type": "string",
+                    "description": "Only list meshes whose name contains this text. The texture list stays complete.",
+                },
+                "pid": _PID,
+            },
+        },
+    },
+    {
         "name": "open_model",
         "description": "Load a .w3d file into W3DView and display its top-level object.",
         "inputSchema": {
@@ -84,6 +108,40 @@ TOOL_DEFINITIONS = [
                 "pid": _PID,
             },
             "required": ["path"],
+        },
+    },
+    {
+        "name": "list_animations",
+        "description": (
+            "List the animations loaded for the displayed model's skeleton, with each one's "
+            "frame count, frame rate and length, and the animation and frame now showing. "
+            "An animation kept in its own .w3d file must be loaded first, with open_model."
+        ),
+        "inputSchema": {"type": "object", "properties": {"pid": _PID}},
+    },
+    {
+        "name": "set_animation_frame",
+        "description": (
+            "Jump the displayed model to a frame of an animation through the frame scrubber "
+            "and pause there. Follow with capture_views to screenshot that frame."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "frame": {
+                    "type": "integer",
+                    "description": "Frame to stop on, from 0 to the animation's lastFrame.",
+                },
+                "animation": {
+                    "type": "string",
+                    "description": (
+                        "Animation name or part of it, ignoring case. Omit to stay on the "
+                        "animation already showing."
+                    ),
+                },
+                "pid": _PID,
+            },
+            "required": ["frame"],
         },
     },
     {
@@ -192,11 +250,74 @@ class McpServer:
         )
         return [_text(decode_model(raw, arguments.get("mesh")))]
 
+    def _read_textures(self, arguments: Mapping[str, Any]) -> list[dict[str, Any]]:
+        raw = self.bridge.call(
+            "read_model", [str(arguments.get("path") or "")], pid=arguments.get("pid")
+        )
+        return [_text(decode_textures(raw, arguments.get("mesh")))]
+
     def _open_model(self, arguments: Mapping[str, Any]) -> list[dict[str, Any]]:
         path = arguments.get("path")
         if not isinstance(path, str) or not path:
             raise BridgeError("bad_argument", "open_model needs a path.")
         return [_text(self.bridge.call("open_model", [path], pid=arguments.get("pid")))]
+
+    @staticmethod
+    def _animation_report(result: Mapping[str, Any]) -> dict[str, Any]:
+        animations = [
+            {**animation, "lastFrame": animation["frames"] - 1}
+            for animation in result["animations"]
+        ]
+        current = None
+        if result["currentAnimation"]:
+            current = {
+                "name": result["currentAnimation"],
+                "frame": result["currentFrame"],
+                "frames": result["currentFrames"],
+                "state": result["state"],
+            }
+        return {
+            "displayedObject": result["displayedObject"],
+            "hierarchy": result["hierarchy"],
+            "hasAnimations": bool(animations),
+            "animationCount": len(animations),
+            "animations": animations,
+            "current": current,
+        }
+
+    def _list_animations(self, arguments: Mapping[str, Any]) -> list[dict[str, Any]]:
+        result = self.bridge.call("list_animations", pid=arguments.get("pid"))
+        return [_text(self._animation_report(result))]
+
+    def _set_animation_frame(self, arguments: Mapping[str, Any]) -> list[dict[str, Any]]:
+        frame = arguments.get("frame")
+        if not isinstance(frame, int) or isinstance(frame, bool):
+            raise BridgeError("bad_argument", "frame must be an integer.")
+        pid = arguments.get("pid")
+
+        name = ""
+        wanted = str(arguments.get("animation") or "").lower()
+        if wanted:
+            names = [
+                animation["name"]
+                for animation in self.bridge.call("list_animations", pid=pid)["animations"]
+            ]
+            exact = [
+                candidate
+                for candidate in names
+                if wanted in (candidate.lower(), candidate.lower().rpartition(".")[2])
+            ]
+            matches = exact or [candidate for candidate in names if wanted in candidate.lower()]
+            if len(matches) != 1:
+                problem = "No animation matches" if not matches else "Several animations match"
+                raise BridgeError(
+                    "no_match" if not matches else "ambiguous",
+                    f"{problem} '{wanted}'. Animations: {names}",
+                )
+            name = matches[0]
+
+        result = self.bridge.call("set_animation_frame", [name, str(frame)], pid=pid)
+        return [_text(self._animation_report(result))]
 
     def _find_meshes(self, arguments: Mapping[str, Any]) -> list[dict[str, Any]]:
         result = self.bridge.call("list_meshes", pid=arguments.get("pid"))
@@ -296,7 +417,10 @@ class McpServer:
         handlers = {
             "get_viewer_state": self._get_viewer_state,
             "read_model": self._read_model,
+            "read_textures": self._read_textures,
             "open_model": self._open_model,
+            "list_animations": self._list_animations,
+            "set_animation_frame": self._set_animation_frame,
             "find_meshes": self._find_meshes,
             "set_mesh_visibility": self._set_mesh_visibility,
             "capture_views": self._capture_views,

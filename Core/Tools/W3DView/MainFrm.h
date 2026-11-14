@@ -378,6 +378,9 @@ public:
 	void	Update_Particle_Count (int particles);
 	void	UpdateCameraDistance (float cameraDistance);
 	void	UpdateFrameCount (int iCurrentFrame, int iTotalFrames, float frame_rate);
+
+	// Seeks through the frame scrubber, whether or not its window is open
+	bool	Go_To_Animation_Frame (int frame)	{ return m_frameScrubberDlg.Go_To_Frame (frame); }
 	void	RestoreOriginalSize ();
 	void	Select_Device (bool show_dlg = true);
 

@@ -146,10 +146,19 @@ CFrameScrubberDlg::OnGoToFrame ()
 	if (text.IsEmpty ())
 		return;
 
-	int iFrame = ::atoi ((LPCTSTR)text);
+	Go_To_Frame (::atoi ((LPCTSTR)text));
+}
+
+
+bool
+CFrameScrubberDlg::Go_To_Frame (int iFrame)
+{
+	CMainFrame *pMainFrame = (CMainFrame *)::AfxGetMainWnd ();
+	CW3DViewDoc *doc = (CW3DViewDoc *)pMainFrame->GetActiveDocument ();
+	if (doc == nullptr || doc->GetCurrentAnimation () == nullptr)
+		return false;
 
 	// Pause normal playback
-	CMainFrame *pMainFrame = (CMainFrame *)::AfxGetMainWnd ();
 	CGraphicView *pCGraphicView = (CGraphicView *)pMainFrame->GetPane (0, 1);
 	if (pCGraphicView != nullptr && pCGraphicView->GetAnimationState () == CGraphicView::AnimPlaying)
 		pCGraphicView->SetAnimationState (CGraphicView::AnimPaused);
@@ -161,6 +170,7 @@ CFrameScrubberDlg::OnGoToFrame ()
 	}
 
 	SeekToFrame (iFrame);
+	return true;
 }
 
 
