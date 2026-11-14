@@ -39,13 +39,17 @@ _PID = {
 TOOL_DEFINITIONS = [
     {
         "name": "get_viewer_state",
-        "description": "List running W3DView instances and the model the selected one displays.",
+        "description": (
+            "List running W3DView instances and the model the selected one displays, "
+            "with its polygon and vertex totals."
+        ),
         "inputSchema": {"type": "object", "properties": {"pid": _PID}},
     },
     {
         "name": "read_model",
         "description": (
-            "Read a .w3d model's meshes and materials. Per mesh: W3D export properties "
+            "Read a .w3d model's meshes and materials. Polygon and vertex counts for the "
+            "file and each mesh. Per mesh: W3D export properties "
             "(geometry type, hidden, two-sided, shadow, collision, user text), pass count, "
             "and per pass the vertex material (colours, opacity, stage 0 and stage 1 "
             "mapping type, args and UV channel), shader and stage textures with their "
@@ -63,7 +67,7 @@ TOOL_DEFINITIONS = [
                 },
                 "mesh": {
                     "type": "string",
-                    "description": "Only detail meshes whose name contains this text. Mesh and texture name lists stay complete.",
+                    "description": "Only detail meshes whose name contains this text. The totals, mesh counts and texture list stay complete.",
                 },
                 "pid": _PID,
             },

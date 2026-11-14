@@ -23,6 +23,7 @@
 #include "GraphicView.h"
 #include "MaterialViewer/W3dMaterialParser.h"
 #include "Utils.h"
+#include "ViewportOverlay.h"
 #include "W3DViewDoc.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8wrapper.h"
@@ -356,6 +357,13 @@ std::string Handle_Get_State()
 	Add_Int(out, "bridgeVersion", (long long)W3DViewMcpBridge::BRIDGE_VERSION);
 	Add_String(out, "displayedObject", object_name);
 	Add_String(out, "sourceFile", source_file);
+
+	// The same totals the 7 key draws in the viewport
+	CW3DViewDoc *document = ::GetCurrentDocument();
+	RenderObjClass *object = (document != nullptr) ? document->GetDisplayedObject() : nullptr;
+	Add_Int(out, "polygons", (object != nullptr) ? object->Get_Num_Polys() : 0);
+	Add_Int(out, "vertices", ViewportStats::Count_Vertices(object));
+
 	Close(out, '}');
 	out.erase(out.size() - 1);
 	return Make_Result(out);

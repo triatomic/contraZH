@@ -268,7 +268,7 @@ def decode_mesh(mesh: Mapping[str, Any]) -> dict[str, Any]:
     shaders = [decode_shader(shader) for shader in mesh["shaders"]]
     return {
         "name": mesh["name"],
-        "triangles": mesh["triangles"],
+        "polygons": mesh["triangles"],
         "vertices": mesh["vertices"],
         "w3dProperties": decode_mesh_properties(mesh),
         "passCount": mesh["passCount"],
@@ -295,7 +295,13 @@ def decode_model(raw: Mapping[str, Any], mesh_filter: str | None = None) -> dict
         "resolvedPath": raw["resolvedPath"],
         "topLevelName": raw["topLevelName"],
         "meshCount": len(raw["meshes"]),
-        "meshNames": [mesh["name"] for mesh in raw["meshes"]],
+        # Every mesh in the file counts, hidden and collision meshes included.
+        "totalPolygons": sum(mesh["triangles"] for mesh in raw["meshes"]),
+        "totalVertices": sum(mesh["vertices"] for mesh in raw["meshes"]),
+        "meshCounts": [
+            {"name": mesh["name"], "polygons": mesh["triangles"], "vertices": mesh["vertices"]}
+            for mesh in raw["meshes"]
+        ],
         "texturesUsed": textures,
         "meshes": [decode_mesh(mesh) for mesh in meshes],
         "uvChannelNote": UV_CHANNEL_NOTE,
