@@ -15,7 +15,7 @@ Added new types for AutoChooseSources
 * `SYNC_TO_SECONDARY` - This weapon slot cannot fire on its own, but will be fired whenever SECONDARY is fired.
 * `SYNC_TO_TERTIARY` - This weapon slot cannot fire on its own, but will be fired whenever TERTIARY is fired.
 
-Syncs a weapon slot to another. The weapon slot cannot be used except when its parent weapon is fired. In contraZH, synced weapons require a valid target by default. Set `SyncRequiresValidTarget = SECONDARY No` in the WeaponSet to preserve unconditional targeting. Both modes wait for the synced weapon to be ready. See [Conditional weapon sync](contraZH-Objects-and-Modules.md#conditional-weapon-sync).
+Syncs a weapon slot to another. The weapon slot cannot be used except when it's parent weapon is fired. This ignores all conditions and checks of the synced weapon.
 
 Example:
 ```

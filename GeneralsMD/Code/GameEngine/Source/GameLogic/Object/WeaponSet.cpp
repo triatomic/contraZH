@@ -1050,6 +1050,13 @@ Bool WeaponSet::canFireSyncedWeapon(WeaponSlotType wslot, const Object* source, 
 	{
 		return FALSE;
 	}
+
+	// a continue-attack retarget that finds nothing leaves no victim, and firing at nothing crashes
+	if (victim == nullptr && pos == nullptr)
+	{
+		return FALSE;
+	}
+
 	if (!m_curWeaponTemplateSet->syncRequiresValidTarget(wslot))
 	{
 		return TRUE;
