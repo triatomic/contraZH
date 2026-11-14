@@ -62,6 +62,7 @@
 #include "ViewerScene.h"
 #include "W3DDarkMode.h"
 #include "MaterialViewer/MaterialViewerFrame.h"
+#include "W3DViewMcpBridge.h"
 #ifdef W3DVIEW_HAS_QT
 #include "MaterialViewer/MaterialPanel.h"	// W3dMaterialViewer::PickColor (Qt colour dialog)
 #endif
@@ -403,6 +404,10 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_EN_CHANGE(IDC_TREE_FILTER, OnTreeFilterChanged)
 	// TheSuperHackers @feature F5 refreshes the viewport (re-displays the current asset).
 	ON_COMMAND(IDM_REFRESH_VIEWPORT, OnRefreshViewport)
+	ON_WM_COPYDATA()
+	ON_COMMAND(IDM_MCP_SERVER_ENABLED, OnMcpServerEnabled)
+	ON_UPDATE_COMMAND_UI(IDM_MCP_SERVER_ENABLED, OnUpdateMcpServerEnabled)
+	ON_COMMAND(IDM_MCP_SERVER_INFORMATION, OnMcpServerInformation)
 
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
@@ -482,6 +487,10 @@ CMainFrame::OnCreate (LPCREATESTRUCT lpCreateStruct)
 
 	if (CFrameWnd::OnCreate(lpCreateStruct) == -1) {
 		return -1;
+	}
+
+	if (::AfxGetApp()->GetProfileInt("Config", "McpServerEnabled", 1) != 0) {
+		W3DViewMcpBridge::Attach(m_hWnd);
 	}
 
 	if (!m_wndToolBar.Create(this) ||
@@ -3424,6 +3433,8 @@ CMainFrame::OnLightRotateZBack ()
 void
 CMainFrame::OnDestroy ()
 {
+	W3DViewMcpBridge::Detach(m_hWnd);
+
 	CRect rect;
 	WINDOWPLACEMENT wnd_info = { sizeof (WINDOWPLACEMENT), 0 };
 	::GetWindowPlacement (m_hWnd, &wnd_info);
@@ -5549,6 +5560,47 @@ void CMainFrame::OnMaterialViewer()
 	} else {
 		CMaterialViewerFrame::ShowViewer ();
 	}
+}
+
+BOOL CMainFrame::OnCopyData(CWnd *pWnd, COPYDATASTRUCT *pCopyDataStruct)
+{
+	if (W3DViewMcpBridge::IsEnabled(m_hWnd) && W3DViewMcpBridge::IsRequest(pCopyDataStruct)) {
+		return W3DViewMcpBridge::HandleRequest(pCopyDataStruct);
+	}
+	return CFrameWnd::OnCopyData(pWnd, pCopyDataStruct);
+}
+
+void CMainFrame::OnMcpServerEnabled()
+{
+	if (W3DViewMcpBridge::IsEnabled(m_hWnd)) {
+		W3DViewMcpBridge::Detach(m_hWnd);
+	} else {
+		W3DViewMcpBridge::Attach(m_hWnd);
+	}
+	::AfxGetApp()->WriteProfileInt("Config", "McpServerEnabled", W3DViewMcpBridge::IsEnabled(m_hWnd) ? 1 : 0);
+}
+
+void CMainFrame::OnUpdateMcpServerEnabled(CCmdUI *pCmdUI)
+{
+	pCmdUI->SetCheck(W3DViewMcpBridge::IsEnabled(m_hWnd) ? 1 : 0);
+}
+
+void CMainFrame::OnMcpServerInformation()
+{
+	CString information;
+	information.Format(
+		"Status: %s\n"
+		"Native bridge version: %lu\n"
+		"Process ID: %lu\n"
+		"Discovery marker: GeneralsW3DViewMcp\n"
+		"Transport: local WM_COPYDATA\n"
+		"Request directory: %%TEMP%%\\w3dview-mcp\n\n"
+		"The external Python MCP host (python -m tools.w3dview_mcp) runs as a "
+		"separate process and connects to this native W3DView endpoint.",
+		W3DViewMcpBridge::IsEnabled(m_hWnd) ? "Enabled" : "Disabled",
+		static_cast<unsigned long>(W3DViewMcpBridge::BRIDGE_VERSION),
+		static_cast<unsigned long>(::GetCurrentProcessId()));
+	MessageBox(information, "W3DView MCP Server", MB_OK | MB_ICONINFORMATION);
 }
 
 // TheSuperHackers @feature F5: viewport refresh. Re-runs the exact path a

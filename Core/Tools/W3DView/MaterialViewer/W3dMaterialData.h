@@ -89,12 +89,28 @@ struct PassData
 	int			vertexMaterialIndex = -1;
 	int			shaderIndex = -1;
 	int			stageTextureIndex[2] = { -1, -1 };
+
+	// Every distinct index of a per-vertex or per-triangle id array, in file order.
+	std::vector<int>	vertexMaterialIds;
+	std::vector<int>	shaderIds;
+	std::vector<int>	stageTextureIds[2];
+
+	// Index of the stage's distinct texcoord array within the mesh; -1 means none.
+	int			stageUvSet[2] = { -1, -1 };
+
+	bool		hasDCG = false;			// per-vertex diffuse colour and alpha
+	bool		hasDIG = false;			// per-vertex diffuse illumination
+	bool		hasSCG = false;			// per-vertex specular colour
 };
 
 // Material data of one W3D_CHUNK_MESH.
 struct MeshMaterialData
 {
 	std::string	meshName;				// "Container.Mesh"
+	uint32_t	attributes = 0;			// W3D_MESH_FLAG_* bits (geometry type, hidden, collision, ...)
+	uint32_t	numTris = 0;
+	uint32_t	numVertices = 0;
+	std::string	userText;				// W3D_CHUNK_MESH_USER_TEXT, the Max object properties
 	uint32_t	surfaceType = 13;		// SURFACE_TYPE_DEFAULT, from the first triangle
 	int32_t		sortLevel = 0;
 	bool		prelit = false;			// material chunks came from a W3D_CHUNK_PRELIT_* wrapper

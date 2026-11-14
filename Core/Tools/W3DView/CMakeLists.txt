@@ -186,6 +186,8 @@ set(W3DVIEW_SRC
     "W3DView.h"
     "W3DViewDoc.cpp"
     "W3DViewDoc.h"
+    "W3DViewMcpBridge.cpp"
+    "W3DViewMcpBridge.h"
     "W3DViewView.cpp"
     "W3DViewView.h"
     # TheSuperHackers @feature W3DView native dark mode (Windows 10+).

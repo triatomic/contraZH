@@ -426,6 +426,12 @@ BEGIN
         MENUITEM "&Make Movie...",              IDM_MAKE_MOVIE
         MENUITEM "&Capture Screen Shot...\tF7", IDM_SAVE_SCREENSHOT
     END
+    POPUP "M&CP"
+    BEGIN
+        MENUITEM "&Enable MCP Server",          IDM_MCP_SERVER_ENABLED
+        MENUITEM SEPARATOR
+        MENUITEM "Server &Information...",      IDM_MCP_SERVER_INFORMATION
+    END
     POPUP "&Help"
     BEGIN
         MENUITEM "&About W3DView+...",          ID_APP_ABOUT

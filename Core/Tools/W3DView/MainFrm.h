@@ -353,6 +353,10 @@ protected:
 	afx_msg void OnMaterialViewer();
 	// TheSuperHackers @feature F5 refreshes the viewport (re-displays the current asset).
 	afx_msg void OnRefreshViewport();
+	afx_msg BOOL OnCopyData(CWnd *pWnd, COPYDATASTRUCT *pCopyDataStruct);
+	afx_msg void OnMcpServerEnabled();
+	afx_msg void OnUpdateMcpServerEnabled(CCmdUI *pCmdUI);
+	afx_msg void OnMcpServerInformation();
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 

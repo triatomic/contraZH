@@ -56,6 +56,9 @@ public:
 	// Steps a running turn about center and writes the new camera transform. Returns false when idle.
 	bool Update_Snap(const Vector3 &center, const Matrix3D &camera, Matrix3D &transform);
 
+	// Camera transform a click on region ends at. region is the sum of the face normals it touches.
+	static Matrix3D Get_Snap_Transform(const Vector3 &region, const Vector3 &center, float distance);
+
 private:
 	// region gets the sum of the face normals the point touches
 	bool Hit_Test(HWND hwnd, const Matrix3D &camera, POINT point, Vector3 &region) const;

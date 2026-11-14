@@ -180,6 +180,10 @@ protected:
 		  float					Get_Camera_Distance () const				{ return m_CameraDistance; }
 		  void					Set_Camera_Distance (float dist);
 
+		  // Turns the camera to a view cube region at once. fit frames the whole displayed object.
+		  void					Snap_Camera_To_Cube_Region (const Vector3 &region, bool fit);
+		  void					Set_Camera_Transform (const Matrix3D &transform);
+
 		  void					Set_Camera_Bone_Pos_X (bool onoff)			{ m_CameraBonePosX = onoff; }
 		  BOOL					Is_Camera_Bone_Pos_X () const			{ return m_CameraBonePosX; }
 

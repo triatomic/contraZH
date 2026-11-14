@@ -530,6 +530,11 @@ ViewCubeClass::ViewCubeClass() :
 	m_LastPoint.y = 0;
 }
 
+Matrix3D ViewCubeClass::Get_Snap_Transform(const Vector3 &region, const Vector3 &center, float distance)
+{
+	return Build_Snap_Transform(region, center, distance);
+}
+
 bool ViewCubeClass::Hit_Test(HWND hwnd, const Matrix3D &camera, POINT point, Vector3 &region) const
 {
 	CubeView view;

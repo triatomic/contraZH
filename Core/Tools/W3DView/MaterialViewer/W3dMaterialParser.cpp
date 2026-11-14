@@ -24,6 +24,8 @@
 #include "WWLib/RAWFILE.h"
 #include "WW3D2/w3d_file.h"
 
+#include <algorithm>
+
 namespace W3dMaterialViewer
 {
 
@@ -109,7 +111,51 @@ void Parse_Texture(ChunkLoadClass &cload, TextureData &texture)
 	}
 }
 
-void Parse_Material_Pass(ChunkLoadClass &cload, PassData &pass)
+// Reads a single or per-element uint32 id array. Returns the first id, or -1.
+int Read_Id_Array(ChunkLoadClass &cload, std::vector<int> &distinct)
+{
+	uint32 count = cload.Cur_Chunk_Length() / sizeof(uint32);
+	if (count == 0) {
+		return -1;
+	}
+
+	std::vector<uint32> ids(count);
+	if (cload.Read(&ids[0], count * sizeof(uint32)) != count * sizeof(uint32)) {
+		return -1;
+	}
+
+	for (uint32 i = 0; i < count; i++) {
+		int id = (int)ids[i];
+		if (std::find(distinct.begin(), distinct.end(), id) == distinct.end()) {
+			distinct.push_back(id);
+		}
+	}
+	return (int)ids[0];
+}
+
+// Returns the index of the chunk's texcoord array among the mesh's distinct arrays.
+int Read_Uv_Set(ChunkLoadClass &cload, std::vector<std::string> &uv_sets)
+{
+	uint32 length = cload.Cur_Chunk_Length();
+	if (length == 0) {
+		return -1;
+	}
+
+	std::string data(length, '\0');
+	if (cload.Read(&data[0], length) != length) {
+		return -1;
+	}
+
+	for (size_t i = 0; i < uv_sets.size(); i++) {
+		if (uv_sets[i] == data) {
+			return (int)i;
+		}
+	}
+	uv_sets.push_back(data);
+	return (int)uv_sets.size() - 1;
+}
+
+void Parse_Material_Pass(ChunkLoadClass &cload, PassData &pass, std::vector<std::string> &uv_sets)
 {
 	int stage = 0;
 
@@ -117,31 +163,34 @@ void Parse_Material_Pass(ChunkLoadClass &cload, PassData &pass)
 		switch (cload.Cur_Chunk_ID()) {
 
 			case W3D_CHUNK_VERTEX_MATERIAL_IDS:
-			{
 				// Single or per-vertex array; the first entry is the pass material.
-				uint32 id = 0;
-				if (cload.Read(&id, sizeof(id)) == sizeof(id)) {
-					pass.vertexMaterialIndex = (int)id;
-				}
+				pass.vertexMaterialIndex = Read_Id_Array(cload, pass.vertexMaterialIds);
 				break;
-			}
 
 			case W3D_CHUNK_SHADER_IDS:
-			{
-				uint32 id = 0;
-				if (cload.Read(&id, sizeof(id)) == sizeof(id)) {
-					pass.shaderIndex = (int)id;
-				}
+				pass.shaderIndex = Read_Id_Array(cload, pass.shaderIds);
 				break;
-			}
+
+			case W3D_CHUNK_DCG:
+				pass.hasDCG = true;
+				break;
+
+			case W3D_CHUNK_DIG:
+				pass.hasDIG = true;
+				break;
+
+			case W3D_CHUNK_SCG:
+				pass.hasSCG = true;
+				break;
 
 			case W3D_CHUNK_TEXTURE_STAGE:
 			{
 				while (cload.Open_Chunk()) {
-					if (cload.Cur_Chunk_ID() == W3D_CHUNK_TEXTURE_IDS && stage < 2) {
-						uint32 id = 0;
-						if (cload.Read(&id, sizeof(id)) == sizeof(id)) {
-							pass.stageTextureIndex[stage] = (int)id;
+					if (stage < 2) {
+						if (cload.Cur_Chunk_ID() == W3D_CHUNK_TEXTURE_IDS) {
+							pass.stageTextureIndex[stage] = Read_Id_Array(cload, pass.stageTextureIds[stage]);
+						} else if (cload.Cur_Chunk_ID() == W3D_CHUNK_STAGE_TEXCOORDS) {
+							pass.stageUvSet[stage] = Read_Uv_Set(cload, uv_sets);
 						}
 					}
 					cload.Close_Chunk();
@@ -156,7 +205,7 @@ void Parse_Material_Pass(ChunkLoadClass &cload, PassData &pass)
 
 // Handles one material chunk inside a mesh (or inside a prelit wrapper).
 // Returns true if the chunk was a material chunk.
-bool Parse_Material_Chunk(ChunkLoadClass &cload, MeshMaterialData &mesh)
+bool Parse_Material_Chunk(ChunkLoadClass &cload, MeshMaterialData &mesh, std::vector<std::string> &uv_sets)
 {
 	switch (cload.Cur_Chunk_ID()) {
 
@@ -224,7 +273,7 @@ bool Parse_Material_Chunk(ChunkLoadClass &cload, MeshMaterialData &mesh)
 		case W3D_CHUNK_MATERIAL_PASS:
 		{
 			PassData pass;
-			Parse_Material_Pass(cload, pass);
+			Parse_Material_Pass(cload, pass, uv_sets);
 			mesh.passes.push_back(pass);
 			return true;
 		}
@@ -237,6 +286,7 @@ void Parse_Mesh(ChunkLoadClass &cload, MaterialDocument &document)
 {
 	MeshMaterialData mesh;
 	bool has_materials = false;
+	std::vector<std::string> uv_sets;
 
 	while (cload.Open_Chunk()) {
 		switch (cload.Cur_Chunk_ID()) {
@@ -253,9 +303,16 @@ void Parse_Mesh(ChunkLoadClass &cload, MaterialDocument &document)
 					}
 					mesh.meshName += header.MeshName;
 					mesh.sortLevel = header.SortLevel;
+					mesh.attributes = header.Attributes;
+					mesh.numTris = header.NumTris;
+					mesh.numVertices = header.NumVertices;
 				}
 				break;
 			}
+
+			case W3D_CHUNK_MESH_USER_TEXT:
+				mesh.userText = Read_Chunk_String(cload);
+				break;
 
 			case W3D_CHUNK_TRIANGLES:
 			{
@@ -279,7 +336,7 @@ void Parse_Mesh(ChunkLoadClass &cload, MaterialDocument &document)
 					mesh.prelit = true;
 					has_materials = true;
 					while (cload.Open_Chunk()) {
-						Parse_Material_Chunk(cload, mesh);
+						Parse_Material_Chunk(cload, mesh, uv_sets);
 						cload.Close_Chunk();
 					}
 				}
@@ -287,7 +344,7 @@ void Parse_Mesh(ChunkLoadClass &cload, MaterialDocument &document)
 			}
 
 			default:
-				if (Parse_Material_Chunk(cload, mesh)) {
+				if (Parse_Material_Chunk(cload, mesh, uv_sets)) {
 					has_materials = true;
 				}
 				break;

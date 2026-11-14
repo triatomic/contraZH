@@ -1809,6 +1809,49 @@ CGraphicView::Update_View_Cube_Snap (CW3DViewDoc *doc)
 
 ////////////////////////////////////////////////////////////////////////////
 //
+//  Snap_Camera_To_Cube_Region
+//
+////////////////////////////////////////////////////////////////////////////
+void
+CGraphicView::Snap_Camera_To_Cube_Region (const Vector3 &region, bool fit)
+{
+	if (m_pCamera == nullptr)
+	{
+		return;
+	}
+
+	Vector3 center = sphereCenter;
+	float distance = (m_pCamera->Get_Position () - center).Length ();
+	if (fit)
+	{
+		// The bounding sphere just touches the narrower side of the view
+		const float fov = min (m_pCamera->Get_Horizontal_FOV (), m_pCamera->Get_Vertical_FOV ());
+		center = m_ViewedSphere.Center;
+		distance = max (1.0F, m_ViewedSphere.Radius / (float)sin (fov * 0.5F));
+	}
+
+	Set_Camera_Transform (ViewCubeClass::Get_Snap_Transform (region, center, distance));
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
+//  Set_Camera_Transform
+//
+////////////////////////////////////////////////////////////////////////////
+void
+CGraphicView::Set_Camera_Transform (const Matrix3D &transform)
+{
+	CW3DViewDoc *doc = (CW3DViewDoc *)GetDocument ();
+	if (m_pCamera != nullptr && doc != nullptr)
+	{
+		Apply_Camera_Transform (transform, doc);
+	}
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+//
 //  OnMouseMove
 //
 ////////////////////////////////////////////////////////////////////////////
