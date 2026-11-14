@@ -35,6 +35,7 @@
 #include "Common/ThingTemplate.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
+#include "GameLogic/CommandSequence.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -240,8 +241,11 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
-		if( !jetAI )
+		if (!jetAI)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		jetAI->friend_setTakeoffInProgress(!m_landing);
 		jetAI->friend_setLandingInProgress(m_landing);
@@ -253,24 +257,34 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		if (jet->isEffectivelyDead())
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
-		if( !jetAI )
+		if (!jetAI)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
+		{
 #if RETAIL_COMPATIBLE_CRC
 			return STATE_SUCCESS;
 #else
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 #endif
+		}
 
 		// gotta reserve a space in order to reserve a runway
 		if (!pp->reserveSpace(jet->getID(), jetAI->friend_getParkingOffset(), nullptr))
 		{
 			DEBUG_ASSERTCRASH(m_landing, ("hmm, this should never happen for taking-off things"));
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 		}
 
@@ -449,6 +463,10 @@ public:
 	virtual StateReturnType onEnter() override
 	{
 		Object* jet = getMachineOwner();
+
+		// Every landing failure enters this state with its command still verified.
+		TheCommandSequence->terminateVerifiedCommand(jet);
+
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
 		{
@@ -511,8 +529,11 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
-		if( !jetAI )
+		if (!jetAI)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		jetAI->setCanPathThroughUnits(true);
 		jetAI->friend_setTakeoffInProgress(m_taxiMode != TO_PARKING);
@@ -535,15 +556,21 @@ public:
 
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
+		{
 #if RETAIL_COMPATIBLE_CRC
 			return STATE_SUCCESS;
 #else
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 #endif
+		}
 
 		ParkingPlaceBehaviorInterface::PPInfo ppinfo;
 		if (!pp->reserveSpace(jet->getID(), jetAI->friend_getParkingOffset(), &ppinfo))
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;	// full?
+		}
 
 		Coord3D intermedPt;
 		Bool intermed = false;
@@ -633,6 +660,7 @@ public:
 					if( !pCreationLocations )
 					{
 						DEBUG_CRASH( ("No creation locations specified for runway for JetAIBehavior -- taxiing from hanger (Kris).") );
+						TheCommandSequence->terminateVerifiedCommand(jet);
 						return STATE_FAILURE;
 					}
 					std::vector<Coord3D>::const_iterator it;
@@ -670,6 +698,8 @@ public:
 		jetAI->ignoreObstacleID(jet->getProducerID());
 
 		StateReturnType ret = AIMoveOutOfTheWayState::onEnter();
+		if (ret == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
 		return ret;
 	}
 
@@ -677,11 +707,17 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		if (jet->isEffectivelyDead())
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
-		if( !jetAI )
+		if (!jetAI)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		if( m_taxiMode == TO_PARKING || m_taxiMode == FROM_HANGAR )
 		{
@@ -701,12 +737,16 @@ public:
 			}
 		}
 
-		return AIMoveOutOfTheWayState::update();
+		StateReturnType ret = AIMoveOutOfTheWayState::update();
+		if (ret == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
+		return ret;
 	}
 
 	virtual void onExit( StateExitType status ) override
 	{
 		Object* jet = getMachineOwner();
+
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if (jetAI)
 		{
@@ -750,10 +790,16 @@ public:
 		Object* jet = getMachineOwner();
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if (!jetAI)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		if (jet->isEffectivelyDead())
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		jetAI->friend_setTakeoffInProgress(!m_landing);
 		jetAI->friend_setLandingInProgress(m_landing);
@@ -780,16 +826,20 @@ public:
 
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
+		{
 #if RETAIL_COMPATIBLE_CRC
 			return STATE_SUCCESS;
 #else
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 #endif
+		}
 
 		ParkingPlaceBehaviorInterface::PPInfo ppinfo;
 		if (!pp->reserveSpace(jet->getID(), jetAI->friend_getParkingOffset(), &ppinfo))
 		{
 			// it's full.
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 		}
 
@@ -799,6 +849,7 @@ public:
 			if (!pp->reserveRunway(jet->getID(), m_landing))
 			{
 				DEBUG_CRASH(("we should never get to this state unless we have a runway available"));
+				TheCommandSequence->terminateVerifiedCommand(jet);
 				return STATE_FAILURE;
 			}
 		}
@@ -838,7 +889,8 @@ public:
 		jetAI->friend_setGoalPath( &path );
 
 		StateReturnType ret = AIFollowPathState::onEnter();
-
+		if (ret == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
 		return ret;
 	}
 
@@ -846,11 +898,17 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		if (jet->isEffectivelyDead())
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		if (m_landing)
 		{
@@ -916,6 +974,8 @@ public:
 		}
 
 		StateReturnType ret = AIFollowPathState::update();
+		if (ret == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
 		return ret;
 	}
 
@@ -925,9 +985,11 @@ public:
 
 		// just in case.
 		Object* jet = getMachineOwner();
+
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
 			return;
+
 
 		jetAI->friend_setTakeoffInProgress(false);
 		jetAI->friend_setLandingInProgress(false);
@@ -1597,7 +1659,10 @@ public:
 		Object* jet = getMachineOwner();
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		if (jet->isKindOf(KINDOF_PRODUCED_AT_HELIPAD))
 		{
@@ -1615,21 +1680,31 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		if (jet->isEffectivelyDead())
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
 		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 		}
 
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		ParkingPlaceBehaviorInterface::PPInfo ppinfo;
 		if (!pp->reserveSpace(jet->getID(), jetAI->friend_getParkingOffset(), &ppinfo))
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		const Real THRESH = 0.001f;
 		if (WWMath::Fabs(stdAngleDiff(jet->getOrientation(), ppinfo.parkingOrientation)) <= THRESH)
@@ -1654,6 +1729,7 @@ public:
 	virtual void onExit( StateExitType status ) override
 	{
 		Object* jet = getMachineOwner();
+
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
 			return;
@@ -2094,6 +2170,8 @@ public:
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		jetAI->friend_setTakeoffInProgress(false);
 		jetAI->friend_setLandingInProgress(false);
+
+		TheCommandSequence->terminateVerifiedCommand(jet);
 	}
 
 };
@@ -2147,7 +2225,12 @@ public:
 		}
 		setAdjustsDestination(false);		// precision is necessary
 
-		return AIInternalMoveToState::onEnter();
+		StateReturnType ret =  AIInternalMoveToState::onEnter();
+
+		if (ret != STATE_FAILURE)
+			TheCommandSequence->verifyObjectCommand(jet);
+
+		return ret;
 	}
 };
 EMPTY_DTOR(JetOrHeliReturnForLandingState)
@@ -2561,7 +2644,31 @@ UpdateSleepTime JetAIUpdate::update()
 			m_mostRecentCommand.reconstitute(parms);
 			setFlag(HAS_PENDING_COMMAND, false);
 
- 			aiDoCommand(&parms);
+			Object *obj = getObject();
+			CommandVerifyStatus cvs = obj->getCommandVerifyStatus();
+			if (cvs == STATUS_UNIT_PENDING)
+			{
+				TheCommandSequence->prepareCommandForVerification(obj);
+
+				aiDoCommand(&parms);
+
+				cvs = obj->getCommandVerifyStatus();
+
+				if (cvs == STATUS_AWAITING || cvs == STATUS_EXIT_VERIFIED)
+					TheCommandSequence->removeCurrentCommand(obj);
+
+				if (cvs == STATUS_EXIT_VERIFIED)
+					obj->setCommandVerifyStatus(cvs);
+
+				if (obj->getCommandVerifyStatus() != STATUS_UNIT_PENDING)
+				{
+					while (TheCommandSequence->handleMoveStreak(obj))
+					{
+					}
+				}
+			}
+			else
+				aiDoCommand(&parms);
 		}
 		else if (mustReturnForAmmo)
 		{
@@ -2961,7 +3068,7 @@ Bool JetAIUpdate::isParkedInHangar() const
 /**
  * Follow the path defined by the given array of points
  */
-void JetAIUpdate::privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction )
+void JetAIUpdate::privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction, Bool isReverse, UnsignedInt lastCmdNodeID)
 {
 	if (exitProduction)
 	{
@@ -2976,15 +3083,8 @@ void JetAIUpdate::privateFollowPath( std::vector<Coord3D>* path, Object *ignoreO
 	}
 	else
 	{
-		AIUpdateInterface::privateFollowPath(path, ignoreObject, cmdSource, exitProduction);
+		AIUpdateInterface::privateFollowPath(path, ignoreObject, cmdSource, exitProduction, isReverse, lastCmdNodeID);
 	}
-}
-
-//----------------------------------------------------------------------------------------
-void JetAIUpdate::privateFollowPathAppend( const Coord3D *pos, CommandSourceType cmdSource )
-{
-	// nothing yet... might need to override. not sure. (srj)
-	AIUpdateInterface::privateFollowPathAppend(pos, cmdSource);
 }
 
 //----------------------------------------------------------------------------------------
@@ -3106,6 +3206,9 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 	{
 		// have to wait for takeoff or landing to complete, just store the sucker
 		setFlag(HAS_PENDING_COMMAND, true);
+
+		TheCommandSequence->unitPendingCommand(getObject());
+
 		return;
 	}
 	else if (parms->m_cmd == AICMD_IDLE && getStateMachine()->getCurrentStateID() == RELOAD_AMMO)
@@ -3114,6 +3217,9 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 		// since we're already doing "nothing" and responding to this will cease our reload...
 		// don't just return, tho, in case we were (say) reloading during a guard stint.
 		setFlag(HAS_PENDING_COMMAND, true);
+
+		TheCommandSequence->unitPendingCommand(getObject());
+
 		return;
 	}
 	else if( parms->m_cmd == AICMD_IDLE && getObject()->isAirborneTarget() && !getObject()->isKindOf( KINDOF_PRODUCED_AT_HELIPAD ) )
@@ -3133,6 +3239,31 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 				// don't need (or want) to take off for these
 				break;
 
+#if !RETAIL_COMPATIBLE_CRC
+			// TheSuperHackers @tweak Stubbjax 23/01/2026 Parked jets now defer offensive commands when out of ammo.
+			case AICMD_ATTACKMOVE_TO_POSITION:
+			case AICMD_ATTACK_AREA:
+			case AICMD_ATTACK_OBJECT:
+			case AICMD_ATTACK_POSITION:
+			case AICMD_ATTACK_TEAM:
+			case AICMD_FORCE_ATTACK_OBJECT:
+			case AICMD_GUARD_AREA:
+			case AICMD_GUARD_OBJECT:
+			case AICMD_GUARD_POSITION:
+			case AICMD_GUARD_RETALIATE:
+			case AICMD_HUNT:
+				if (isOutOfSpecialReloadAmmo())
+				{
+					setFlag(HAS_PENDING_COMMAND, true);
+
+					TheCommandSequence->unitPendingCommand(getObject());
+
+					return;
+				}
+
+				FALLTHROUGH;
+#endif
+
 			case AICMD_ENTER:
 			case AICMD_GET_REPAIRED:
 
@@ -3149,6 +3280,9 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 				if (commandNeedsAmmo(parms->m_cmd) && isOutOfSpecialReloadAmmo())
 				{
 					setFlag(HAS_PENDING_COMMAND, true);
+
+					TheCommandSequence->unitPendingCommand(getObject());
+
 					return;
 				}
 
@@ -3156,6 +3290,8 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 				m_mostRecentCommand.store(*parms);
 				setFlag(HAS_PENDING_COMMAND, true);
 
+				TheCommandSequence->unitPendingCommand(getObject());
+				
 				getStateMachine()->clear();
 				setLastCommandSource( CMD_FROM_AI );
 				getStateMachine()->setState( TAKING_OFF_AWAIT_CLEARANCE );
@@ -3170,6 +3306,9 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 		// first, then take off for the order. A return (or a circle over a dead airfield) that is
 		// already under way is left alone.
 		setFlag(HAS_PENDING_COMMAND, true);
+
+		TheCommandSequence->unitPendingCommand(getObject());
+
 		const StateID id = getStateMachine()->getCurrentStateID();
 		if (id < JETAISTATETYPE_FIRST || id > JETAISTATETYPE_LAST)
 		{
@@ -3271,12 +3410,6 @@ void JetAIUpdate::friend_enableLandingEffects(Bool v)
 			TheAudio->removeAudioEvent(m_landingSound.getPlayingHandle());
 		}
 	}
-}
-
-//-------------------------------------------------------------------------------------------------
-void JetAIUpdate::friend_addWaypointToGoalPath( const Coord3D &bestPos )
-{
-	privateFollowPathAppend( &bestPos, CMD_FROM_AI );
 }
 
 //-------------------------------------------------------------------------------------------------

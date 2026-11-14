@@ -125,7 +125,6 @@ public:
 	{
 		return (getFlag(TAKEOFF_IN_PROGRESS) || getFlag(LANDING_IN_PROGRESS));
 	}
-	void friend_addWaypointToGoalPath( const Coord3D &pos );
 	AICommandType friend_getPendingCommandType() const;
 	void friend_purgePendingCommand();
 	Bool isParkedInHangar() const;
@@ -134,8 +133,7 @@ protected:
 
 	virtual AIStateMachine* makeStateMachine() override;
 
-	virtual void privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction ) override;///< follow the path defined by the given array of points
-	virtual void privateFollowPathAppend( const Coord3D *pos, CommandSourceType cmdSource ) override;
+	virtual void privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction, Bool isReverse = false, UnsignedInt lastCmdNodeID = 0) override;///< follow the path defined by the given array of points
 	virtual void privateEnter( Object *obj, CommandSourceType cmdSource ) override;							///< enter the given object
 	virtual void privateGetRepaired( Object *repairDepot, CommandSourceType cmdSource ) override;///< get repaired at repair depot
 

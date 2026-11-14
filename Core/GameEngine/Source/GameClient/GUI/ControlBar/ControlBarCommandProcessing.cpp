@@ -658,15 +658,38 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_DOZER_CONSTRUCT:
 		{
 
-			// sanity
-			if( m_currentSelectedDrawable == nullptr )
-				break;
-
 			//Kris: September 27, 2002
 			//Make sure we have enough CASH to build it WHEN we click the button to build it,
 			//before actually previewing the purchase, otherwise, cancel altogether.
 			const ThingTemplate *whatToBuild = commandButton->getThingTemplate();
-			CanMakeType cmt = TheBuildAssistant->canMakeUnit( obj, whatToBuild );
+			CanMakeType cmt = CANMAKE_NO_PREREQ, curCmt;
+			Bool hasCmt = false;
+			Int rating;
+
+			for (DrawableListCIt it = selected->begin(); it != selected->end(); ++it)
+			{
+				curCmt = TheBuildAssistant->canMakeUnit((*it)->getObject(), whatToBuild);
+				rating = rateCanMakeType(curCmt);
+
+				if (rating < 0)
+				{
+					hasCmt = true;
+					cmt = curCmt;
+					break;
+				}
+
+				if (!hasCmt)
+				{
+					hasCmt = true;
+					cmt = curCmt;
+				}
+				else if (rating < rateCanMakeType(cmt))
+					cmt = curCmt;
+			}
+
+			if (!hasCmt)
+				break;
+			
 			if (cmt == CANMAKE_NO_MONEY)
 			{
 				TheEva->setShouldPlay(EVA_InsufficientFunds);
@@ -690,7 +713,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 
 			// tell the UI that we want to build something so we get a building at the cursor
-			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), m_currentSelectedDrawable );
+			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), selected);
 
 			break;
 
@@ -734,10 +757,12 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				break;
 			}
 
+			DrawableList drawList;
+			drawList.push_back(draw);
 			// tell the UI that we want to build something so we get a building at the cursor
-			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), draw );
+			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), &drawList);
 
-			ProductionUpdateInterface* pu = obj->getProductionUpdateInterface();
+			ProductionUpdateInterface *pu = obj->getProductionUpdateInterface();
 			if( pu )
 			{
 				pu->setSpecialPowerConstructionCommandButton( commandButton );
@@ -776,8 +801,11 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				break;
 			}
 
+
+			DrawableList drawList;
+			drawList.push_back(m_currentSelectedDrawable);
 			// tell the UI that we want to build something so we get a building at the cursor
-			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), m_currentSelectedDrawable );
+			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), &drawList);
 
 			ProductionUpdateInterface* pu = obj->getProductionUpdateInterface();
 			if( pu )
@@ -1446,6 +1474,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// send message to exit
 			GameMessage *exitMsg = TheMessageStream->appendMessage( GameMessage::MSG_EXIT );
 			exitMsg->appendObjectIDArgument( objWantingExit->getID() ); // 0 is the thing inside coming out
+			exitMsg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 
 			// contraZH: shift click exits every passenger of the clicked unit's type
 			if (TheKeyboard && TheKeyboard->isShift())
@@ -1482,6 +1511,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 					exitMsg = TheMessageStream->appendMessage( GameMessage::MSG_EXIT );
 					exitMsg->appendObjectIDArgument( other->getID() );
+					exitMsg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 				}
 			}
 
@@ -1497,7 +1527,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			if (BitIsSet(commandButton->getOptions(), NEED_TARGET_POS) == FALSE) {
 				pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_EVACUATE );
-				TheMessageStream->appendMessage( GameMessage::MSG_EVACUATE );
+				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_EVACUATE );
+				msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			}
 
 			break;
@@ -1518,7 +1549,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_AUTO_FILL:
 		{
 			TheInGameUI->setGUICommand( nullptr );
-			TheMessageStream->appendMessage( GameMessage::MSG_DO_AUTO_FILL );
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_DO_AUTO_FILL );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 		}
 
@@ -1533,7 +1565,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_HACK_INTERNET:
 		{
 			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_INTERNET_HACK );
-			TheMessageStream->appendMessage( GameMessage::MSG_INTERNET_HACK );
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_INTERNET_HACK );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 		}
 
@@ -1558,7 +1591,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_TOGGLE_OVERCHARGE:
 		{
 
-			TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_OVERCHARGE );
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_OVERCHARGE );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 
 		}
@@ -1569,7 +1603,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_HOLD_FIRE:
 		{
 
-			TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_HOLD_FIRE );
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_HOLD_FIRE );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 
 		}
@@ -1580,7 +1615,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_TOGGLE_DEPLOY:
 		{
 
-			TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_DEPLOY );
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_DEPLOY );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 
 		}
@@ -1636,6 +1672,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_SWITCH_WEAPONS, &info );
 
 				msg->appendIntegerArgument( commandButton->getWeaponSlot() );
+				msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 				break;
 		}
 
@@ -1646,6 +1683,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_DO_WEAPON );
 			msg->appendIntegerArgument( commandButton->getWeaponSlot() );
 			msg->appendIntegerArgument( commandButton->getMaxShotsToFire() );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 
 			break;
 
@@ -1658,6 +1696,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_FIRE_WEAPON );
 			msg->appendIntegerArgument( commandButton->getWeaponSlot() );
 			msg->appendIntegerArgument( commandButton->getMaxShotsToFire() );
+			msg->appendIntegerArgument(TheInGameUI->isInWaypointMode());
 
 			break;
 
@@ -1678,6 +1717,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			msg->appendIntegerArgument( spTemplate->getID() );
 			msg->appendIntegerArgument( commandButton->getOptions() );
 			msg->appendObjectIDArgument( obj->getID() );
+			msg->appendBooleanArgument(false);
 			break;
 
 		}
@@ -1689,6 +1729,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			msg->appendIntegerArgument( commandButton->getSpecialPowerTemplate()->getID() );
 			msg->appendIntegerArgument( commandButton->getOptions() );
 			msg->appendObjectIDArgument( INVALID_ID );	// no specific source
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 
 		}

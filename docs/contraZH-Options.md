@@ -287,7 +287,8 @@ Ctrl+Shift+click.)
 * Left click: show that type's (or object's) command set. The whole group stays selected; map
 orders go to everyone, bar commands go to the focused object or type. Plain orders (move, attack
 move, guard, stop, scatter, cheer, formation, waypoints, enter, dock, repair, heal) always go to
-everyone. A building placed from a focused dozer is built by it, with the other dozers helping.
+everyone. A placed building goes to one builder, see
+[Dozer Smart Cast](contraZH-CommandButtons.md#dozer-smart-cast).
 * Right click the pushed-in cameo: back to the group's common commands. Right click another cameo:
 drop it from the selection.
 * Double click (or Ctrl+Shift+click with `SmartSelectionUseMouse = No`): keep only that cameo's
@@ -316,8 +317,8 @@ attack and attack move orders only.)
 
 * Green: move, enter, dock, repair. Pink: attack move. Red: attack. Blue: guard.
 * No line draws to a target in fog or shroud.
-* A waypoint path draws one line per leg. With `All` it replaces the white path shown while Alt is
-held.
+* A waypoint path draws one line per leg. With `All` these lines replace the
+[waypoint display](contraZH-CommandButtons.md#waypoint-display) shown while Alt is held.
 * Credit to olcayseygan, author of Generals Reforged.
 
 ## Input

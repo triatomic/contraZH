@@ -56,6 +56,7 @@
 #include "Common/Radar.h"
 
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/CommandSequence.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
@@ -601,14 +602,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		}
 		case GameMessage::MSG_DO_REVERSE_MOVETO:
 		{
-			Coord3D dest = msg->getArgument( 0 )->location;
-
-			if (currentlySelectedGroup)
-			{
-				currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-				currentlySelectedGroup->groupMoveToPosition( &dest, false, CMD_FROM_PLAYER, /*reverse=*/true );
-			}
-
+			onDoReverseMoveto(msg, currentlySelectedGroup);
 			break;
 		}
 
@@ -694,9 +688,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		// arguments -- peers can hold different selections, so each derives the result from its own.
 		case GameMessage::MSG_DO_AUTO_FILL:
 		{
-			if( currentlySelectedGroup )
-				currentlySelectedGroup->groupAutoFill( CMD_FROM_PLAYER );
-
+			onAutoFill(msg, currentlySelectedGroup);
 			break;
 		}
 
@@ -913,35 +905,21 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		// TheSuperHackers @feature Hold Fire stance.
 		case GameMessage::MSG_TOGGLE_HOLD_FIRE:
 		{
-			// use the selected group
-			if( currentlySelectedGroup )
-				currentlySelectedGroup->groupToggleHoldFire( CMD_FROM_PLAYER );
-
+			onToggleHoldFire(msg, currentlySelectedGroup);
 			break;
 		}
 
 		// Fire weapon toggle: start the selected group firing, or stop it if it already is.
 		case GameMessage::MSG_TOGGLE_FIRE_WEAPON:
 		{
-			WeaponSlotType weaponSlot = (WeaponSlotType)msg->getArgument( 0 )->integer;
-			Int maxShotsToFire = msg->getArgument( 1 )->integer;
-
-			// use the selected group
-			if( currentlySelectedGroup )
-			{
-				currentlySelectedGroup->groupToggleFireWeapon( weaponSlot, maxShotsToFire, CMD_FROM_PLAYER );
-			}
-
+			onToggleFireWeapon(msg, currentlySelectedGroup);
 			break;
 		}
 
 		// Deploy button: flip the selected group between deployed and packed.
 		case GameMessage::MSG_TOGGLE_DEPLOY:
 		{
-			// use the selected group
-			if( currentlySelectedGroup )
-				currentlySelectedGroup->groupToggleDeploy( CMD_FROM_PLAYER );
-
+			onToggleDeploy(msg, currentlySelectedGroup);
 			break;
 		}
 #if RTS_ZEROHOUR
@@ -1285,11 +1263,12 @@ bool GameLogic::onDoWeapon(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlyS
 {
 	WeaponSlotType weaponSlot = (WeaponSlotType)msg->getArgument( 0 )->integer;
 	Int maxShotsToFire = msg->getArgument( 1 )->integer;
+	Bool isWaypoint = msg->getArgument(2)->boolean;
 
 	// lock it just till the weapon is empty or the attack is "done"
-	if( currentlySelectedGroup && currentlySelectedGroup->setWeaponLockForGroup( weaponSlot, LOCKED_TEMPORARILY ))
-	{
-		currentlySelectedGroup->groupAttackPosition( nullptr, maxShotsToFire, CMD_FROM_PLAYER );
+	if( currentlySelectedGroup)
+	{ //&& currentlySelectedGroup->setWeaponLockForGroup( weaponSlot, LOCKED_TEMPORARILY )
+		currentlySelectedGroup->groupAttackPosition( weaponSlot, nullptr, maxShotsToFire, isWaypoint, false, CMD_FROM_PLAYER );
 	}
 
 	return true;
@@ -1298,23 +1277,14 @@ bool GameLogic::onDoWeapon(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlyS
 bool GameLogic::onCombatdropAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Object *targetObject = findObjectByID( msg->getArgument( 0 )->objectID );
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	// issue command for either single object or for selected group
 	if( currentlySelectedGroup && targetObject )
 		currentlySelectedGroup->groupCombatDrop( targetObject,
 																							*targetObject->getPosition(),
+																							isWaypoint,
 																							CMD_FROM_PLAYER );
-
-	/*
-	if( sourceObject && targetObject )
-	{
-		AIUpdateInterface* sourceAI = sourceObject->getAIUpdateInterface();
-		if (sourceAI)
-		{
-			sourceAI->aiCombatDrop( targetObject, *targetObject->getPosition(), CMD_FROM_PLAYER );
-		}
-	}
-	*/
 
 	return true;
 }
@@ -1322,9 +1292,10 @@ bool GameLogic::onCombatdropAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &
 bool GameLogic::onCombatdropAtLocation(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Coord3D targetLoc = msg->getArgument( 0 )->location;
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	if( currentlySelectedGroup )
-		currentlySelectedGroup->groupCombatDrop( nullptr, targetLoc, CMD_FROM_PLAYER );
+		currentlySelectedGroup->groupCombatDrop( nullptr, targetLoc, isWaypoint, CMD_FROM_PLAYER );
 
 	/*
 	if( sourceObject )
@@ -1347,6 +1318,7 @@ bool GameLogic::onDoWeaponAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cu
 	WeaponSlotType weaponSlot = (WeaponSlotType)msg->getArgument( 0 )->integer;
 	Object *targetObject = findObjectByID( msg->getArgument( 1 )->objectID );
 	Int maxShotsToFire = msg->getArgument( 2 )->integer;
+	Bool isWaypoint = msg->getArgument(3)->boolean;
 
 	// sanity
 	if( targetObject == nullptr )
@@ -1356,8 +1328,8 @@ bool GameLogic::onDoWeaponAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cu
 	if( currentlySelectedGroup )
 	{
 			// lock it just till the weapon is empty or the attack is "done"
-		if (currentlySelectedGroup->setWeaponLockForGroup( weaponSlot, LOCKED_TEMPORARILY ))
-			currentlySelectedGroup->groupAttackObject( targetObject, maxShotsToFire, CMD_FROM_PLAYER );
+		if (currentlySelectedGroup->groupHasWeaponSlot( weaponSlot ))
+			currentlySelectedGroup->groupAttackObject(weaponSlot, targetObject, maxShotsToFire, isWaypoint, CMD_FROM_PLAYER );
 	}
 
 	return true;
@@ -1367,9 +1339,16 @@ bool GameLogic::onDoSwitchWeapons(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cur
 {
 	// use the selected group
 	WeaponSlotType weaponSlot = (WeaponSlotType)msg->getArgument( 0 )->integer;
+	Bool isWaypoint = msg->getArgument(1)->boolean;
+
 	// lock until un-switched, or switched to something else.
-	if( currentlySelectedGroup )
-		currentlySelectedGroup->setWeaponLockForGroup( weaponSlot, LOCKED_PERMANENTLY );
+	if (currentlySelectedGroup)
+	{
+		if (!isWaypoint)
+			currentlySelectedGroup->setWeaponLockForGroup(weaponSlot, LOCKED_PERMANENTLY);
+		else
+			currentlySelectedGroup->setWeaponLockInWaypointModeForGroup(weaponSlot);
+	}
 
 	return true;
 }
@@ -1418,13 +1397,14 @@ bool GameLogic::onDoWeaponAtLocation(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &
 	WeaponSlotType weaponSlot = (WeaponSlotType)msg->getArgument( 0 )->integer;
 	Coord3D targetLoc = msg->getArgument( 1 )->location;
 	Int maxShotsToFire = msg->getArgument( 2 )->integer;
+	Bool isWaypoint = msg->getArgument(3)->boolean;
 
 	// issue command for either single object or for selected group
 	if( currentlySelectedGroup )
 	{
 			// lock it just till the weapon is empty or the attack is "done"
-		if (currentlySelectedGroup->setWeaponLockForGroup( weaponSlot, LOCKED_TEMPORARILY ))
-			currentlySelectedGroup->groupAttackPosition( &targetLoc, maxShotsToFire, CMD_FROM_PLAYER );
+		if (currentlySelectedGroup->groupHasWeaponSlot( weaponSlot ))
+			currentlySelectedGroup->groupAttackPosition( weaponSlot, &targetLoc, maxShotsToFire, isWaypoint, false, CMD_FROM_PLAYER );
 	}
 
 	return true;
@@ -1441,6 +1421,9 @@ bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 	// check for possible specific source, ignoring selection.
 	ObjectID sourceID = msg->getArgument(2)->objectID;
 	Object* source = findObjectByID(sourceID);
+
+	Bool isWaypoint = msg->getArgument(3)->boolean;
+
 	if (source != nullptr)
 	{
 #if !RETAIL_COMPATIBLE_CRC
@@ -1458,7 +1441,7 @@ bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 
 		AIGroupPtr theGroup = TheAI->createGroup();
 		theGroup->add(source);
-		theGroup->groupDoSpecialPower( specialPowerID, options );
+		theGroup->groupDoSpecialPower( specialPowerID, options, isWaypoint);
 #if RETAIL_COMPATIBLE_AIGROUP
 		TheAI->destroyGroup(theGroup);
 #else
@@ -1470,7 +1453,7 @@ bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 		//Use the selected group!
 		if( currentlySelectedGroup )
 		{
-			currentlySelectedGroup->groupDoSpecialPower( specialPowerID, options );
+			currentlySelectedGroup->groupDoSpecialPower( specialPowerID, options, isWaypoint);
 		}
 	}
 
@@ -1479,7 +1462,7 @@ bool GameLogic::onDoSpecialPower(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 
 bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
-	const Bool hasAngle = msg->getArgumentCount() >= 6;
+	const Bool hasAngle = msg->getArgumentCount() >= 7;
 	Int argumentIndex = 0;
 
 	// first argument is the special power ID
@@ -1501,6 +1484,9 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 	// check for possible specific source, ignoring selection.
 	ObjectID sourceID = msg->getArgument( argumentIndex++ )->objectID;
 	Object* source = findObjectByID( sourceID );
+
+	Bool isWaypoint = msg->getArgument(argumentIndex++)->boolean;
+
 	if (source != nullptr)
 	{
 #if !RETAIL_COMPATIBLE_CRC
@@ -1518,7 +1504,7 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 
 		AIGroupPtr theGroup = TheAI->createGroup();
 		theGroup->add(source);
-		theGroup->groupDoSpecialPowerAtLocation( specialPowerID, &targetCoord, angle, objectInWay, options );
+		theGroup->groupDoSpecialPowerAtLocation( specialPowerID, &targetCoord, angle, objectInWay, options, isWaypoint );
 #if RETAIL_COMPATIBLE_AIGROUP
 		TheAI->destroyGroup(theGroup);
 #else
@@ -1530,7 +1516,7 @@ bool GameLogic::onDoSpecialPowerAtLocation(MAYBE_UNUSED GameMessage *msg, AIGrou
 		//Use the selected group!
 		if( currentlySelectedGroup )
 		{
-			currentlySelectedGroup->groupDoSpecialPowerAtLocation( specialPowerID, &targetCoord, angle, objectInWay, options );
+			currentlySelectedGroup->groupDoSpecialPowerAtLocation( specialPowerID, &targetCoord, angle, objectInWay, options, isWaypoint );
 		}
 	}
 
@@ -1546,6 +1532,7 @@ bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupP
 	// argument 2 is target object
 	ObjectID targetID = msg->getArgument(1)->objectID;
 	Object *target = findObjectByID( targetID );
+
 	if( !target )
 	{
 		return false;
@@ -1557,6 +1544,9 @@ bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupP
 	// check for possible specific source, ignoring selection.
 	ObjectID sourceID = msg->getArgument(3)->objectID;
 	Object* source = findObjectByID(sourceID);
+
+	Bool isWaypoint = msg->getArgument(4)->boolean;
+
 	if (source != nullptr)
 	{
 #if !RETAIL_COMPATIBLE_CRC
@@ -1574,7 +1564,7 @@ bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupP
 
 		AIGroupPtr theGroup = TheAI->createGroup();
 		theGroup->add(source);
-		theGroup->groupDoSpecialPowerAtObject( specialPowerID, target, options );
+		theGroup->groupDoSpecialPowerAtObject( specialPowerID, target, options, isWaypoint );
 #if RETAIL_COMPATIBLE_AIGROUP
 		TheAI->destroyGroup(theGroup);
 #else
@@ -1585,7 +1575,7 @@ bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupP
 	{
 		if( currentlySelectedGroup )
 		{
-			currentlySelectedGroup->groupDoSpecialPowerAtObject( specialPowerID, target, options );
+			currentlySelectedGroup->groupDoSpecialPowerAtObject( specialPowerID, target, options, isWaypoint);
 		}
 	}
 	return true;
@@ -1595,11 +1585,13 @@ bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupP
 bool GameLogic::onDoAttackmoveto(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Coord3D dest = msg->getArgument( 0 )->location;
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	if (currentlySelectedGroup)
 	{
-		currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-		currentlySelectedGroup->groupAttackMoveToPosition( &dest, NO_MAX_SHOTS_LIMIT, CMD_FROM_PLAYER );
+		//ShigureUi 01/10/2026 delay it to see if we're really going to do this command now in case waypoint wanna do it later 
+		//currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+		currentlySelectedGroup->groupAttackMoveToPosition( &dest, NO_MAX_SHOTS_LIMIT, isWaypoint, CMD_FROM_PLAYER );
 	}
 
 	return true;
@@ -1608,11 +1600,13 @@ bool GameLogic::onDoAttackmoveto(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 bool GameLogic::onDoForcemoveto(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Coord3D dest = msg->getArgument( 0 )->location;
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	if (currentlySelectedGroup)
 	{
-		currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-		currentlySelectedGroup->groupMoveToPosition( &dest, false, CMD_FROM_PLAYER );
+		//ShigureUi 01/10/2026 delay it to see if we're really going to do this command now in case waypoint wanna do it later 
+		//currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+		currentlySelectedGroup->groupMoveToPosition( &dest, isWaypoint, CMD_FROM_PLAYER );
 	}
 
 	return true;
@@ -1622,17 +1616,34 @@ bool GameLogic::onDoForcemoveto(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curre
 bool GameLogic::onDoMoveto(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Coord3D dest = msg->getArgument( 0 )->location;
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	if( currentlySelectedGroup )
 	{
-		//DEBUG_LOG(("GameLogicDispatch - got a MSG_DO_MOVETO command"));
-		currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-		currentlySelectedGroup->groupMoveToPosition( &dest, false, CMD_FROM_PLAYER );
+		//ShigureUi 01/10/2026 delay it to see if we're really going to do this command now in case waypoint wanna do it later 
+		//currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+		currentlySelectedGroup->groupMoveToPosition( &dest, isWaypoint, CMD_FROM_PLAYER );
 	}
 
 	return true;
 }
 
+bool GameLogic::onDoReverseMoveto(MAYBE_UNUSED GameMessage* msg, AIGroupPtr& currentlySelectedGroup)
+{
+	Coord3D dest = msg->getArgument(0)->location;
+	Bool isWaypoint = msg->getArgument(1)->boolean;
+
+	if (currentlySelectedGroup)
+	{
+		//ShigureUi 01/10/2026 delay it to see if we're really going to do this command now in case waypoint wanna do it later 
+		//currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+		currentlySelectedGroup->groupMoveToPosition(&dest, isWaypoint, CMD_FROM_PLAYER, /*reverse=*/true);
+	}
+
+	return true;
+}
+
+//ShigureUi 01/10/2026 unused cuz waypoint replace its function, however the aigroup one is also used by ai so that one is still used
 bool GameLogic::onAddWaypoint(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Coord3D dest = msg->getArgument( 0 )->location;
@@ -1651,9 +1662,10 @@ bool GameLogic::onDoGuardPosition(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cur
 {
 	Coord3D loc = msg->getArgument( 0 )->location;
 	GuardMode gm = (GuardMode)msg->getArgument( 1 )->integer;
+	Bool isWaypoint = msg->getArgument(2)->boolean;
 	if (currentlySelectedGroup)
 	{
-		currentlySelectedGroup->groupGuardPosition(&loc, gm, CMD_FROM_PLAYER);
+		currentlySelectedGroup->groupGuardPosition(&loc, gm, isWaypoint, CMD_FROM_PLAYER);
 	}
 
 	return true;
@@ -1666,9 +1678,10 @@ bool GameLogic::onDoGuardObject(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curre
 		return false;
 
 	GuardMode gm = (GuardMode)msg->getArgument( 1 )->integer;
+	Bool isWaypoint = msg->getArgument(2)->boolean;
 	if (currentlySelectedGroup)
 	{
-		currentlySelectedGroup->groupGuardObject(obj, gm, CMD_FROM_PLAYER);
+		currentlySelectedGroup->groupGuardObject(obj, gm, isWaypoint, CMD_FROM_PLAYER);
 	}
 
 	return true;
@@ -1778,6 +1791,7 @@ bool GameLogic::onDebugKillObject(MAYBE_UNUSED GameMessage *msg)
 bool GameLogic::onEnter(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Object *enter = findObjectByID( msg->getArgument( 1 )->objectID );
+	Bool isWaypoint = msg->getArgument(2)->boolean;
 
 	// sanity
 	if( enter == nullptr )
@@ -1785,8 +1799,8 @@ bool GameLogic::onEnter(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySele
 
 	if( currentlySelectedGroup )
 	{
-		currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-		currentlySelectedGroup->groupEnter( enter, CMD_FROM_PLAYER );
+		//currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+		currentlySelectedGroup->groupEnter( enter, isWaypoint, CMD_FROM_PLAYER );
 	}
 
 	return true;
@@ -1803,6 +1817,8 @@ bool GameLogic::onExit(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelec
 	Object *objectContainingExiter = getSingleObjectFromSelection(currentlySelectedGroup.Peek());
 #endif
 
+	Bool isWaypoint = msg->getArgument(1)->boolean;
+
 	// sanity
 	if( objectWantingToExit == nullptr )
 		return false;
@@ -1814,15 +1830,45 @@ bool GameLogic::onExit(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelec
 	if( objectWantingToExit->getControllingPlayer() != msgPlayer )
 		return false;
 
-	objectWantingToExit->releaseWeaponLock(LOCKED_TEMPORARILY);	// release any temporary locks.
+	if (!isWaypoint)
+	{
+		objectWantingToExit->releaseWeaponLock(LOCKED_TEMPORARILY);	// release any temporary locks.
 
-	// exit whatever objectWantingToExit is INSIDE of
-	AIUpdateInterface *ai = objectWantingToExit->getAIUpdateInterface();
-	if( ai )
-		ai->aiExit( objectContainingExiter, CMD_FROM_PLAYER );
-	// Just like Enter, Exit needs to know the thing to exit.  This can no longer be assumed because of the Tunnel system.
-	// If you do not specify the thing to Exit, it will Exit the thing it thinks it is in.  For a tunnel network,
-	// that will be the specific Tunnel it entered.  (Scripts can talk directly to the guy to say Get Out Regardless)
+		// exit whatever objectWantingToExit is INSIDE of
+		AIUpdateInterface* ai = objectWantingToExit->getAIUpdateInterface();
+		if (ai)
+			ai->aiExit(objectContainingExiter, CMD_FROM_PLAYER);
+		// Just like Enter, Exit needs to know the thing to exit.  This can no longer be assumed because of the Tunnel system.
+		// If you do not specify the thing to Exit, it will Exit the thing it thinks it is in.  For a tunnel network,
+		// that will be the specific Tunnel it entered.  (Scripts can talk directly to the guy to say Get Out Regardless)
+	}
+	else
+	{
+		AIUpdateInterface* ai = objectWantingToExit->getAIUpdateInterface();
+		if (ai)
+		{
+			UnsignedInt cmdNode = TheCommandSequence->newSingleTargetCommand(CommandSequence::COMMAND_DO_EXIT, objectWantingToExit);
+
+			if (!TheCommandSequence->hasAnyCommand(objectContainingExiter))
+			{
+				TheCommandSequence->includeUnitInCommand(cmdNode, objectContainingExiter);
+				TheCommandSequence->prepareCommandForVerification(objectContainingExiter);
+
+				ai->aiExit(objectContainingExiter, CMD_FROM_PLAYER);
+
+				if (TheCommandSequence->isStillAwaiting(objectContainingExiter))
+					TheCommandSequence->removeCurrentCommand(objectContainingExiter);
+				else if (objectContainingExiter->getCommandVerifyStatus() == STATUS_EXIT_VERIFIED)
+				{
+					TheCommandSequence->removeCurrentCommand(objectContainingExiter);
+					objectContainingExiter->setCommandVerifyStatus(STATUS_EXIT_VERIFIED);
+				}
+			}
+			else
+				TheCommandSequence->includeUnitInCommand(cmdNode, objectContainingExiter);
+		}
+
+	}
 
 	return true;
 }
@@ -1831,6 +1877,13 @@ bool GameLogic::onEvacuate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlyS
 {
 	// issue command for either single object or for selected group
 	//	AIGroup *group = TheAI->findGroup( *selectedGroupID );
+
+	Bool isWaypoint;
+
+	if (msg->getArgumentCount() > 1)
+		isWaypoint = msg->getArgument(1)->boolean;
+	else
+		isWaypoint = msg->getArgument(0)->boolean;
 
 	if( currentlySelectedGroup )
 	{
@@ -1847,11 +1900,21 @@ bool GameLogic::onEvacuate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlyS
 		//if (hasArgs)
 		//	currentlySelectedGroup->groupMoveToAndEvacuate( &pos, CMD_FROM_PLAYER );
 		//else
-		currentlySelectedGroup->groupEvacuate( CMD_FROM_PLAYER );
+		currentlySelectedGroup->groupEvacuate( isWaypoint, CMD_FROM_PLAYER );
 
 		// no, this is bad, don't do here, do when POSTING message
 		//			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_EVACUATE );
 	}
+
+	return true;
+}
+
+bool GameLogic::onAutoFill(MAYBE_UNUSED GameMessage* msg, AIGroupPtr& currentlySelectedGroup)
+{
+	Bool isWaypoint = msg->getArgument(0)->boolean;
+
+	if (currentlySelectedGroup)
+		currentlySelectedGroup->groupAutoFill(isWaypoint, CMD_FROM_PLAYER);
 
 	return true;
 }
@@ -1867,11 +1930,11 @@ bool GameLogic::onExecuteRailedTransport(MAYBE_UNUSED GameMessage *msg, AIGroupP
 
 bool GameLogic::onInternetHack(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
-//			ObjectID sourceID = msg->getArgument( 0 )->objectID;
+	Bool isWaypoint = msg->getArgument( 0 )->boolean;
 	if( currentlySelectedGroup )
 	{
-		currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-		currentlySelectedGroup->groupHackInternet( CMD_FROM_PLAYER );
+		//currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+		currentlySelectedGroup->groupHackInternet( isWaypoint, CMD_FROM_PLAYER );
 	}
 
 	return true;
@@ -1880,6 +1943,7 @@ bool GameLogic::onInternetHack(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curren
 bool GameLogic::onGetRepaired(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Object *repairDepot = findObjectByID( msg->getArgument( 0 )->objectID );
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	// sanity
 	if( repairDepot == nullptr )
@@ -1887,7 +1951,7 @@ bool GameLogic::onGetRepaired(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &current
 
 	// tell the currently selected group to go get repaired
 	if( currentlySelectedGroup )
-		currentlySelectedGroup->groupGetRepaired( repairDepot, CMD_FROM_PLAYER );
+		currentlySelectedGroup->groupGetRepaired( repairDepot, isWaypoint, CMD_FROM_PLAYER );
 
 	return true;
 }
@@ -1895,6 +1959,7 @@ bool GameLogic::onGetRepaired(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &current
 bool GameLogic::onDock(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Object *dockBuilding = findObjectByID( msg->getArgument( 0 )->objectID );
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	// sanity
 	if( dockBuilding == nullptr )
@@ -1902,7 +1967,7 @@ bool GameLogic::onDock(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelec
 
 	// tell the currently selected group to go get repaired
 	if( currentlySelectedGroup )
-		currentlySelectedGroup->groupDock( dockBuilding, CMD_FROM_PLAYER );
+		currentlySelectedGroup->groupDock( dockBuilding, isWaypoint, CMD_FROM_PLAYER );
 
 	return true;
 }
@@ -1910,6 +1975,7 @@ bool GameLogic::onDock(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelec
 bool GameLogic::onGetHealed(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Object *healDest = findObjectByID( msg->getArgument( 0 )->objectID );
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	// sanity
 	if( healDest == nullptr )
@@ -1917,7 +1983,7 @@ bool GameLogic::onGetHealed(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currently
 
 	// tell the currently selected group to enter the building for healing
 	if( currentlySelectedGroup )
-		currentlySelectedGroup->groupGetHealed( healDest, CMD_FROM_PLAYER );
+		currentlySelectedGroup->groupGetHealed( healDest, isWaypoint, CMD_FROM_PLAYER );
 
 	return true;
 }
@@ -1925,6 +1991,7 @@ bool GameLogic::onGetHealed(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currently
 bool GameLogic::onDoRepair(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Object *repairTarget = findObjectByID( msg->getArgument( 0 )->objectID );
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	// sanity
 	if( repairTarget == nullptr )
@@ -1935,7 +2002,7 @@ bool GameLogic::onDoRepair(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlyS
 	// that only one of them will actually go ahead and do the repair
 	//
 	if( currentlySelectedGroup )
-		currentlySelectedGroup->groupRepair( repairTarget, CMD_FROM_PLAYER );
+		currentlySelectedGroup->groupRepair( repairTarget, isWaypoint, CMD_FROM_PLAYER );
 
 	return true;
 }
@@ -1943,6 +2010,7 @@ bool GameLogic::onDoRepair(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlyS
 bool GameLogic::onResumeConstruction(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Object *constructTarget = findObjectByID( msg->getArgument( 0 )->objectID );
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	// sanity
 	if( constructTarget == nullptr )
@@ -1954,7 +2022,7 @@ bool GameLogic::onResumeConstruction(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &
 	// on the target
 	//
 	if( currentlySelectedGroup )
-		currentlySelectedGroup->groupResumeConstruction( constructTarget, CMD_FROM_PLAYER );
+		currentlySelectedGroup->groupResumeConstruction( constructTarget, isWaypoint, CMD_FROM_PLAYER );
 
 	// no, this is bad, don't do here, do when POSTING message
 	//		pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), msg->getType() );
@@ -2009,14 +2077,15 @@ bool GameLogic::onDoSpecialPowerOverrideDestination(MAYBE_UNUSED GameMessage *ms
 bool GameLogic::onDoAttackObject(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Object *enemy = findObjectByID( msg->getArgument( 0 )->objectID );
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	// Check enemy, as it is possible that he died this frame.
 	if (enemy)
 	{
 		if (currentlySelectedGroup)
 		{
-			currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-			currentlySelectedGroup->groupAttackObject( enemy, NO_MAX_SHOTS_LIMIT, CMD_FROM_PLAYER );
+			//currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+			currentlySelectedGroup->groupAttackObject( WEAPON_NONE, enemy, NO_MAX_SHOTS_LIMIT, isWaypoint, CMD_FROM_PLAYER );
 		}
 	}
 
@@ -2026,14 +2095,15 @@ bool GameLogic::onDoAttackObject(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 bool GameLogic::onDoForceAttackObject(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Object *enemy = findObjectByID( msg->getArgument( 0 )->objectID );
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	// Check enemy, as it is possible that he died this frame.
 	if (enemy)
 	{
 		if (currentlySelectedGroup)
 		{
-			currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-			currentlySelectedGroup->groupForceAttackObject( enemy, NO_MAX_SHOTS_LIMIT, CMD_FROM_PLAYER );
+			//currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+			currentlySelectedGroup->groupForceAttackObject( WEAPON_NONE, enemy, NO_MAX_SHOTS_LIMIT, isWaypoint, CMD_FROM_PLAYER );
 		}
 	}
 
@@ -2043,6 +2113,7 @@ bool GameLogic::onDoForceAttackObject(MAYBE_UNUSED GameMessage *msg, AIGroupPtr 
 bool GameLogic::onDoForceAttackGround(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	const Coord3D *pos = &msg->getArgument( 0 )->location;
+	Bool isWaypoint = msg->getArgument(1)->boolean;
 
 	if (currentlySelectedGroup)
 	{
@@ -2059,15 +2130,15 @@ bool GameLogic::onDoForceAttackGround(MAYBE_UNUSED GameMessage *msg, AIGroupPtr 
 		Bool forceAttackRequiresPrimaryWeapon = !currentlySelectedGroup->isIdle();
 		if ( forceAttackRequiresPrimaryWeapon )
 		{
-			currentlySelectedGroup->setWeaponLockForGroup( PRIMARY_WEAPON, LOCKED_TEMPORARILY );
-			currentlySelectedGroup->groupAttackPosition( pos, NO_MAX_SHOTS_LIMIT, CMD_FROM_PLAYER );
-			currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);
+			//currentlySelectedGroup->setWeaponLockForGroup( PRIMARY_WEAPON, LOCKED_TEMPORARILY );
+			currentlySelectedGroup->groupAttackPosition( PRIMARY_WEAPON, pos, NO_MAX_SHOTS_LIMIT, isWaypoint, true, CMD_FROM_PLAYER);
+			//currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);
 		}
 		else
 		///////////////////////////////////////////////////////////////////
 		{
-			currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);
-			currentlySelectedGroup->groupAttackPosition( pos, NO_MAX_SHOTS_LIMIT, CMD_FROM_PLAYER );
+			//currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);
+			currentlySelectedGroup->groupAttackPosition( WEAPON_NONE, pos, NO_MAX_SHOTS_LIMIT, isWaypoint, false, CMD_FROM_PLAYER );
 		}
 	}
 
@@ -2400,54 +2471,56 @@ bool GameLogic::onMoveUpgradeEarlier(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &
 	return true;
 }
 
-bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
+bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage* msg, AIGroupPtr& currentlySelectedGroup)
 {
-	const ThingTemplate *place;
+	const ThingTemplate* place;
 	Coord3D loc;
 	Real angle;
 
 	// TheSuperHackers @feature The first of the group builds and any dozer behind it is sent to
 	// help, so a smart selection focus can lead the rest of the selected dozers to one site.
 #if RETAIL_COMPATIBLE_AIGROUP
-	const AIGroup *group = currentlySelectedGroup;
+	AIGroup* group = currentlySelectedGroup;
 #else
-	const AIGroup *group = currentlySelectedGroup.Peek();
+	AIGroup* group = currentlySelectedGroup.Peek();
 #endif
-	if( group == nullptr || group->isEmpty() )
+	if (group == nullptr || group->isEmpty())
 		return false;
-	const VecObjectID &groupIDs = group->getAllIDs();
-	Object *constructorObject = findObjectByID( groupIDs.front() );
-	place = TheThingFactory->findByTemplateID( msg->getArgument( 0 )->integer );
-	loc = msg->getArgument( 1 )->location;
-	angle = msg->getArgument( 2 )->real;
+	const VecObjectID& groupIDs = group->getAllIDs();
+	Object* constructorObject = findObjectByID(groupIDs.front());
+	place = TheThingFactory->findByTemplateID(msg->getArgument(0)->integer);
+	loc = msg->getArgument(1)->location;
+	angle = msg->getArgument(2)->real;
 
-	if( place == nullptr || constructorObject == nullptr )
+	Bool isWaypoint = msg->getArgument(3)->boolean;
+
+	if (place == nullptr || constructorObject == nullptr)
 		return false;  //These are not crashes, as the object may have died before this message came in
 
-	if( msg->getType() == GameMessage::MSG_DOZER_CONSTRUCT )
+	if (msg->getType() == GameMessage::MSG_DOZER_CONSTRUCT)
 	{
-		Object *building = TheBuildAssistant->buildObjectNow( constructorObject, place, &loc, angle,
-																				constructorObject->getControllingPlayer() );
-		for( size_t i = 1; building && i < groupIDs.size(); i++ )
-		{
-			Object *helper = findObjectByID( groupIDs[ i ] );
-			if( helper && helper->getAIUpdateInterface() &&
-					TheActionManager->canResumeConstructionOf( helper, building, CMD_FROM_PLAYER ) )
-			{
-				helper->getAIUpdateInterface()->aiResumeConstruction( building, CMD_FROM_PLAYER );
-			}
-		}
+		group->groupConstruct(place, &loc, angle, isWaypoint, CMD_FROM_PLAYER);
 	}
 	else
 	{
+		if (!isWaypoint)
+		{
+			TheCommandSequence->clearObjectCommand(constructorObject);
+		}
+
 		Coord3D locEnd;
 
 		// get the end of the line location in the world
-		locEnd = msg->getArgument( 3 )->location;
+		locEnd = msg->getArgument(4)->location;
 
-		// place the line of structures, the end location being present will make it happen
-		TheBuildAssistant->buildObjectLineNow( constructorObject, place, &loc, &locEnd, angle,
-																						constructorObject->getControllingPlayer() );
+		//if (!TheCommandSequence->hasAnyCommand(constructorObject))
+		//{
+			// place the line of structures, the end location being present will make it happen
+			TheBuildAssistant->buildObjectLineNow(constructorObject, place, &loc, &locEnd, angle,
+				constructorObject->getControllingPlayer());
+		//}
+	
+		//cmdNode = TheCommandSequence->newDozerConstructCommand(CommandSequence::COMMAND_DOZER_CONSTRUCT_LINE, place, &loc, &locEnd, angle);
 	}
 
 	// place the sound for putting a building down
@@ -2512,9 +2585,48 @@ bool GameLogic::onSell(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelec
 
 bool GameLogic::onToggleOvercharge(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
+	Bool isWaypoint = msg->getArgument(0)->boolean;
+
 	// use the selected group
 	if( currentlySelectedGroup )
-		currentlySelectedGroup->groupToggleOvercharge( CMD_FROM_PLAYER );
+		currentlySelectedGroup->groupToggleOvercharge( isWaypoint, CMD_FROM_PLAYER );
+
+	return true;
+}
+
+bool GameLogic::onToggleHoldFire(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
+{
+	Bool isWaypoint = msg->getArgument(0)->boolean;
+
+	// use the selected group
+	if (currentlySelectedGroup)
+		currentlySelectedGroup->groupToggleHoldFire(isWaypoint, CMD_FROM_PLAYER);
+
+	return true;
+}
+
+bool GameLogic::onToggleDeploy(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
+{
+	Bool isWaypoint = msg->getArgument(0)->boolean;
+
+	// use the selected group
+	if (currentlySelectedGroup)
+		currentlySelectedGroup->groupToggleDeploy(isWaypoint, CMD_FROM_PLAYER);
+
+	return true;
+}
+
+bool GameLogic::onToggleFireWeapon(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
+{
+	WeaponSlotType weaponSlot = (WeaponSlotType)msg->getArgument(0)->integer;
+	Int maxShotsToFire = msg->getArgument(1)->integer;
+	Bool isWaypoint = msg->getArgument(2)->boolean;
+
+	// use the selected group
+	if (currentlySelectedGroup)
+	{
+		currentlySelectedGroup->groupToggleFireWeapon(weaponSlot, maxShotsToFire, isWaypoint, CMD_FROM_PLAYER);
+	}
 
 	return true;
 }
