@@ -61,6 +61,55 @@ directory. The repository's `.mcp.json` already holds this entry.
 Some clients have no working directory field. Give those an absolute Python path and put the
 repository root in `PYTHONPATH`.
 
+## Commands
+
+The user types a request to the assistant in plain words, and the assistant picks the tool and
+fills in its input. These requests cover what the server can do.
+
+| The user types | Tool called |
+|---|---|
+| `Is W3DView running? What model is it showing?` | `get_viewer_state` |
+| `How many polys and vertices does the model in W3DView have?` | `get_viewer_state` |
+| `Read the materials of the model open in W3DView.` | `read_model` |
+| `Read C:\Mod\Art\W3D\UVDScorp.w3d and list its meshes and textures.` | `read_model` |
+| `What shader and textures does the TURRET01 mesh of UVDScorp.w3d use?` | `read_model` |
+| `Which meshes of this model are hidden or cast no shadow?` | `read_model` |
+| `Open C:\Mod\Art\W3D\UVDScorp.w3d in W3DView.` | `open_model` |
+| `Screenshot the model from the front, left and top.` | `capture_views` |
+| `Show me the back right corner of the model, zoom unchanged.` | `capture_views` |
+| `Open UVDScorp.w3d and show it from all six sides.` | `open_model`, then `capture_views` |
+
+A request that names a file needs its full path, unless the file sits in a folder W3DView already
+searches. A request that names no file refers to the model in the viewport.
+
+The tool inputs those requests turn into look like this.
+
+```json
+{ "name": "get_viewer_state", "arguments": {} }
+```
+
+```json
+{ "name": "read_model", "arguments": {} }
+```
+
+```json
+{ "name": "read_model", "arguments": { "path": "C:\\Mod\\Art\\W3D\\UVDScorp.w3d", "mesh": "TURRET01" } }
+```
+
+```json
+{ "name": "open_model", "arguments": { "path": "C:\\Mod\\Art\\W3D\\UVDScorp.w3d" } }
+```
+
+```json
+{ "name": "capture_views", "arguments": { "views": ["front", "left", "top"] } }
+```
+
+```json
+{ "name": "capture_views", "arguments": { "views": ["back-right-top"], "fit": false, "max_size": 512 } }
+```
+
+Each input is described under [Tools](#tools).
+
 ## Tools
 
 Every tool takes an optional `pid`, the process id of the W3DView to use. It can be left out while
