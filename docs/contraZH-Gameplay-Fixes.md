@@ -3,6 +3,14 @@
 Always on, no `Options.ini` key. All are retail bugs upstream still carries. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Fast projectiles hit close targets
+
+`DumbProjectileBehavior` projectiles whose flight takes less than one frame now move to their
+target before detonating. Previously, these close shots exploded at the barrel. The fix applies
+to curved and linear flight paths, including projectiles that tumble or keep a fixed orientation.
+
+Changes the simulation and older replay playback for affected shots.
+
 ## Garrisons stay protected when map borders change
 
 Shrinking or expanding the active map border no longer exposes enclosed occupants to ordinary
