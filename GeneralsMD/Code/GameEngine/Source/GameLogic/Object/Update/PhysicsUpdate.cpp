@@ -1608,6 +1608,18 @@ void PhysicsBehavior::onCollide( Object *other, const Coord3D *loc, const Coord3
 						}
 #endif
 					}
+					if (obj->isDestroyed())
+					{
+						return;
+					}
+					if (!obj->isEffectivelyDead() && (obj->isKindOf(KINDOF_INFANTRY) || obj->isKindOf(KINDOF_VEHICLE)))
+					{
+						obj->kill();
+						if (obj->isDestroyed())
+						{
+							return;
+						}
+					}
 					for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
 					{
 						SlowDeathBehaviorInterface* slowDeath = (*module)->getSlowDeathBehaviorInterface();
