@@ -117,6 +117,7 @@ public:
 	virtual void beginSlowDeath( const DamageInfo *damageInfo ) = 0;
 	virtual Int getProbabilityModifier( const DamageInfo *damageInfo ) const = 0;
 	virtual Bool isDieApplicable(const DamageInfo *damageInfo) const = 0;
+	virtual Bool onStructureCollision() { return false; }
 };
 
 //-------------------------------------------------------------------------------------------------

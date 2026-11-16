@@ -93,8 +93,11 @@ public:
 
 	virtual void beginSlowDeath( const DamageInfo *damageInfo ) override;	///< begin the slow death cycle
 	virtual UpdateSleepTime update() override;
+	virtual Bool onStructureCollision() override;
 
 protected:
+
+	void onImpact();
 
 	Int m_orbitDirection;			 ///< -1 or +1 ... use ORBIT_DIRECTION_LEFT/RIGHT
 	Real m_forwardAngle;			 /**< angle of the direction "forward" we want to move in our downspin

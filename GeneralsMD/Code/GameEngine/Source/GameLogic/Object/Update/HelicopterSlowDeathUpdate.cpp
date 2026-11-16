@@ -459,29 +459,7 @@ UpdateSleepTime HelicopterSlowDeathBehavior::update()
 
 		if (pos->z <= ground + 1.0f || hitATree )
 		{
-
-			// mark the frame we hit the ground on
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-			m_hitGroundFrame = TheGameLogic->getFrameLegacy();
-#else
-			m_hitGroundFrame = TheGameLogic->getFrame();
-#endif
-
-			// make hit ground effect
-			FXList::doFXObj( modData->m_fxHitGround, copter );
-			ObjectCreationList::create( modData->m_oclHitGround, copter, nullptr );
-
-			// hold the copter in place now
-			copter->setDisabled( DISABLED_HELD );
-
-			// special damage state ... has the blades no on anymore
-			Drawable *draw = copter->getDrawable();
-			if( draw )
-				draw->setModelConditionState( MODELCONDITION_SPECIAL_DAMAGED );
-
-			// Stop the sound from playing.
-			TheAudio->removeAudioEvent(m_deathSound.getPlayingHandle());
-
+			onImpact();
 		}
 	}
 
@@ -514,6 +492,53 @@ UpdateSleepTime HelicopterSlowDeathBehavior::update()
 	}
 
 	return UPDATE_SLEEP_NONE;
+
+}
+
+// ------------------------------------------------------------------------------------------------
+Bool HelicopterSlowDeathBehavior::onStructureCollision()
+{
+	if (!isSlowDeathActivated())
+	{
+		return false;
+	}
+
+	if (m_hitGroundFrame == 0)
+	{
+		onImpact();
+	}
+	return true;
+}
+
+// ------------------------------------------------------------------------------------------------
+void HelicopterSlowDeathBehavior::onImpact()
+{
+	Object *copter = getObject();
+	const HelicopterSlowDeathBehaviorModuleData *modData = getHelicopterSlowDeathBehaviorModuleData();
+
+	// mark the frame we hit the ground on
+#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+	m_hitGroundFrame = TheGameLogic->getFrameLegacy();
+#else
+	m_hitGroundFrame = TheGameLogic->getFrame();
+#endif
+
+	// make hit ground effect
+	FXList::doFXObj( modData->m_fxHitGround, copter );
+	ObjectCreationList::create( modData->m_oclHitGround, copter, nullptr );
+
+	// hold the copter in place now
+	copter->setDisabled( DISABLED_HELD );
+
+	// special damage state ... has the blades no on anymore
+	Drawable *draw = copter->getDrawable();
+	if( draw )
+	{
+		draw->setModelConditionState( MODELCONDITION_SPECIAL_DAMAGED );
+	}
+
+	// Stop the sound from playing.
+	TheAudio->removeAudioEvent(m_deathSound.getPlayingHandle());
 
 }
 

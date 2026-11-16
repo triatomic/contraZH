@@ -289,25 +289,7 @@ UpdateSleepTime JetSlowDeathBehavior::update()
 		// when we've hit the ground, we're totally done
 		if( height <= 0.0f || hitATree )
 		{
-
-			// stop the death looping sound at the right time
-			TheAudio->removeAudioEvent( m_deathLoopSound.getPlayingHandle() );
-
-			// do some effects
-			FXList::doFXObj( modData->m_fxHitGround, us );
-			ObjectCreationList::create( modData->m_oclHitGround, us, nullptr );
-
-			// we are now on the ground
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-			m_timerOnGroundFrame = TheGameLogic->getFrameLegacy();
-#else
-			m_timerOnGroundFrame = TheGameLogic->getFrame();
-#endif
-
-			// start us rolling on another axis too
-			if( physics )
-				physics->setPitchRate( modData->m_pitchRate );
-
+			onImpact();
 		}
 
 		// timers for the secondary effect
@@ -351,6 +333,50 @@ UpdateSleepTime JetSlowDeathBehavior::update()
 	}
 
 	return UPDATE_SLEEP_NONE;
+
+}
+
+// ------------------------------------------------------------------------------------------------
+Bool JetSlowDeathBehavior::onStructureCollision()
+{
+	if (!isSlowDeathActivated())
+	{
+		return false;
+	}
+
+	if (m_timerOnGroundFrame == 0)
+	{
+		onImpact();
+	}
+	return true;
+}
+
+// ------------------------------------------------------------------------------------------------
+void JetSlowDeathBehavior::onImpact()
+{
+	Object *us = getObject();
+	const JetSlowDeathBehaviorModuleData *modData = getJetSlowDeathBehaviorModuleData();
+	PhysicsBehavior *physics = us->getPhysics();
+
+	// stop the death looping sound at the right time
+	TheAudio->removeAudioEvent( m_deathLoopSound.getPlayingHandle() );
+
+	// do some effects
+	FXList::doFXObj( modData->m_fxHitGround, us );
+	ObjectCreationList::create( modData->m_oclHitGround, us, nullptr );
+
+	// we are now on the ground
+#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+	m_timerOnGroundFrame = TheGameLogic->getFrameLegacy();
+#else
+	m_timerOnGroundFrame = TheGameLogic->getFrame();
+#endif
+
+	// start us rolling on another axis too
+	if( physics )
+	{
+		physics->setPitchRate( modData->m_pitchRate );
+	}
 
 }
 

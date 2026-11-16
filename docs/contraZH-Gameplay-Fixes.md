@@ -3,6 +3,18 @@
 Always on, no `Options.ini` key. All are retail bugs upstream still carries. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Aircraft keep their death effects when crashing into buildings
+
+Jets and helicopters with an active slow-death behavior run their configured
+`FXHitGround` and `OCLHitGround` on building impact, then finish their delayed
+`FXFinalBlowUp` and `OCLFinalBlowUp` stages. Helicopters also create their final rubble.
+The aircraft stays at the impact point until the death sequence finishes.
+
+`VehicleCrashesIntoBuildingWeaponTemplate` still deals crash damage.
+`VehicleCrashesIntoNonBuildingWeaponTemplate` keeps its existing behavior.
+
+This changes the simulation and can change older replay playback.
+
 ## Patriots return to normal range after assisting
 
 Patriots and other units using `AssistedTargetingUpdate` release their temporary weapon lock

@@ -43,6 +43,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/CrushDie.h"		// for CrushEnum
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/SlowDeathBehavior.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/TerrainLogic.h"
@@ -1583,7 +1584,7 @@ void PhysicsBehavior::onCollide( Object *other, const Coord3D *loc, const Coord3
 			{
 				if (other->isKindOf(KINDOF_STRUCTURE))
 				{
-					// fall into a building. if a vehicle, blow up. then destroy ourself (not die), regardless.
+					// Fire crash damage before finishing the aircraft death sequence.
 					if (obj->isKindOf(KINDOF_VEHICLE))
 					{
 #if RETAIL_COMPATIBLE_CRC
@@ -1606,6 +1607,16 @@ void PhysicsBehavior::onCollide( Object *other, const Coord3D *loc, const Coord3
 							FXList::doFXObj(weaponTemplate->getFireFX(obj->getVeterancyLevel()), obj);
 						}
 #endif
+					}
+					for (BehaviorModule** module = obj->getBehaviorModules(); *module; ++module)
+					{
+						SlowDeathBehaviorInterface* slowDeath = (*module)->getSlowDeathBehaviorInterface();
+						if (slowDeath != nullptr && slowDeath->onStructureCollision())
+						{
+							obj->setStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_NO_COLLISIONS));
+							obj->setDisabled(DISABLED_HELD);
+							return;
+						}
 					}
 					TheGameLogic->destroyObject(obj);
 					return;

@@ -91,8 +91,11 @@ public:
 	virtual void onDie( const DamageInfo *damageInfo ) override;
 	virtual void beginSlowDeath( const DamageInfo *damageInfo ) override;
 	virtual UpdateSleepTime update() override;
+	virtual Bool onStructureCollision() override;
 
 protected:
+
+	void onImpact();
 
 	UnsignedInt m_timerDeathFrame;					///< fame we died on
 	UnsignedInt m_timerOnGroundFrame;				///< frame we landed on the ground on
