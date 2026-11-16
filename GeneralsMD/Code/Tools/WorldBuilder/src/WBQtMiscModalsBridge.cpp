@@ -162,11 +162,9 @@ extern "C" int WBQtMacrotexture_GetCount(void)
 	s_macroTextures.clear();
 	char dirBuf[_MAX_PATH];
 	strcpy(dirBuf, "..\\TestArt");
-	int len = strlen(dirBuf);
-	if (len > 0 && dirBuf[len - 1] != '\\')
+	if (!ensureTrailingSeparatorInPath(dirBuf, ARRAY_SIZE(dirBuf)).ok)
 	{
-		dirBuf[len++] = '\\';
-		dirBuf[len] = 0;
+		return 0;
 	}
 	FilenameList filenameList;
 	TheFileSystem->getFileListInDirectory(AsciiString(dirBuf), AsciiString("*.tga"), filenameList, FALSE);
