@@ -5,9 +5,11 @@ it changes the simulation (older replays no longer play back identically) or onl
 
 ## Aircraft keep their death effects when crashing into buildings
 
-Living infantry and vehicles that crash into buildings die through their normal
+Living objects with health that crash into buildings die through their normal
 death modules, so `InstantDeathBehavior` and other eligible death behaviors run
-their configured FX and OCLs. Units that are already dead do not die a second time.
+their configured FX and OCLs. This includes spawned projectile objects such as
+`FlyingPilotGLA`. Units that are already dead do not die a second time.
+Plain `SlowDeathBehavior` modules finish their remaining stages at the impact point.
 
 Jets and helicopters with an active slow-death behavior run their configured
 `FXHitGround` and `OCLHitGround` on building impact, then finish their delayed

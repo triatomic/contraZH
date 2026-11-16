@@ -1612,7 +1612,7 @@ void PhysicsBehavior::onCollide( Object *other, const Coord3D *loc, const Coord3
 					{
 						return;
 					}
-					if (!obj->isEffectivelyDead() && (obj->isKindOf(KINDOF_INFANTRY) || obj->isKindOf(KINDOF_VEHICLE)))
+					if (!obj->isEffectivelyDead() && obj->getBodyModule()->getHealth() > 0.0f)
 					{
 						obj->kill();
 						if (obj->isDestroyed())

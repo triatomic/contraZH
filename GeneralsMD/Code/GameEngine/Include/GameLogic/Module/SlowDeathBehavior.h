@@ -151,6 +151,7 @@ public:
 
 	// SlowDeathBehaviorInterface
 	virtual void beginSlowDeath( const DamageInfo *damageInfo ) override;
+	virtual Bool onStructureCollision() override;
 	virtual Int getProbabilityModifier( const DamageInfo *damageInfo ) const override;
 	virtual Bool isDieApplicable(const DamageInfo *damageInfo) const override { return getSlowDeathBehaviorModuleData()->m_dieMuxData.isDieApplicable(getObject(), damageInfo); }
 

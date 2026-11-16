@@ -335,6 +335,18 @@ void SlowDeathBehavior::beginSlowDeath(const DamageInfo *damageInfo)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+Bool SlowDeathBehavior::onStructureCollision()
+{
+	if (!isSlowDeathActivated())
+	{
+		return false;
+	}
+
+	m_flags |= (1<<BOUNCED);
+	return true;
+}
+
+//-------------------------------------------------------------------------------------------------
 void SlowDeathBehavior::doPhaseStuff(SlowDeathPhaseType sdphase)
 {
 	const SlowDeathBehaviorModuleData* d = getSlowDeathBehaviorModuleData();
