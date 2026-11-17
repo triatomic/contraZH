@@ -616,6 +616,11 @@ Bool TurretAI::friend_turnTowardsAngle(Real desiredAngle, Real rateModifier, Rea
 	// Bool aligned = fabs(m_angle - desiredAngle) <= relThresh;
 	Bool aligned = WWMath::Fabs(stdAngleDiffMod(m_angle, desiredAngle)) <= relThresh;
 
+	if (aligned && relThresh == 0.0f)
+	{
+		getOwner()->clearModelConditionState(MODELCONDITION_TURRET_ROTATE);
+	}
+
 	// DEBUG_LOG((">>> TurretAI::friend_turnTowardsAngle: aligned = %d, actualAngle = %f, m_angle = %f, desiredAngle = %f, relThresh = %f\n", aligned, actualAngle * PI / 180.0, m_angle * PI / 180.0, desiredAngle * PI / 180.0, relThresh * PI / 180.0));
 
 	return aligned;
@@ -1654,11 +1659,7 @@ StateReturnType TurretAIIdleScanState::update()
   if( getMachineOwner()->testStatus( OBJECT_STATUS_UNDER_CONSTRUCTION))
     return STATE_CONTINUE;//ML so that under-construction base-defenses do not idle-scan while under construction
 
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	Bool angleAligned = getTurretAI()->friend_turnTowardsAngle(getTurretAI()->getNaturalTurretAngle() + m_desiredAngle, 0.5f, 0.5f);
-#else
 	Bool angleAligned = getTurretAI()->friend_turnTowardsAngle(getTurretAI()->getNaturalTurretAngle() + m_desiredAngle, 0.5f, 0.0f);
-#endif
 	Bool pitchAligned = getTurretAI()->friend_turnTowardsPitch(getTurretAI()->getNaturalTurretPitch(), 0.5f);
 
 	if( angleAligned && pitchAligned )
