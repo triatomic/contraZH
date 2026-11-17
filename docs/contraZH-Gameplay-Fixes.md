@@ -448,15 +448,35 @@ Presentation only; replays unaffected.
 
 ## AI special powers no longer see through fog
 
-AI in every mode, including campaign and challenge missions, picks special-power targets
-that a human in the AI's seat could pick. This covers the following script actions.
+Skirmish and multiplayer AI picks special-power targets that a human in the AI's seat could
+pick. Campaign, challenge and other single-player missions use the original targeting behavior
+by default. This covers the following script actions.
 
 * `SKIRMISH_FIRE_SPECIAL_POWER_AT_MOST_COST` and its CLP `..._TYPE` variant
 * `SKIRMISH_PERFORM_COMMANDBUTTON_ON_MOST_VALUABLE_OBJECT`
 * `TEAM_ALL_USE_COMMANDBUTTON_ON_NEAREST_*`
 
-A valid target is in view, or a structure the AI has scouted (its fogged ghost). Undetected
-stealth units and buildings never count. With nothing valid, the superweapon holds its fire.
+With the restrictions enabled, a valid target is in view or a structure the AI has scouted
+(its fogged ghost). Undetected enemy stealth units and buildings are excluded. With nothing
+valid, the superweapon holds its fire.
+
+A map's `map.ini` can override either restriction separately in a `MapData` block.
+
+```ini
+MapData
+  AISpecialPowersRespectFog = No
+  AISpecialPowersRespectStealth = No
+End
+```
+
+* `AISpecialPowersRespectFog = Yes` excludes shrouded targets and fogged mobile units.
+* `AISpecialPowersRespectStealth = Yes` excludes undetected stealth targets belonging to
+non-allied players.
+* Both default to `No` for missions and `Yes` for skirmish and multiplayer. `No` disables
+the corresponding restriction. Each setting applies to special powers, superweapons and
+the targeted team command-button actions listed above.
+* Map loading resets both settings, including saved missions and mission replays.
+* Jamming and Hijacker restrictions apply in every mode independently of these settings.
 
 Changes the simulation.
 ([#115](https://github.com/triatomic/contraZH/issues/115))

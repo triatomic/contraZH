@@ -2623,6 +2623,9 @@ static void findAndSelectCommandCenter(Object *obj, void* alreadyFound)
 void GameLogic::loadMapINI( AsciiString mapName )
 {
 	TheWriteableMapData->reset();
+	Bool respectAITargetVisibility = !isInSinglePlayerGame();
+	TheWriteableMapData->m_aiSpecialPowersRespectFog = respectAITargetVisibility;
+	TheWriteableMapData->m_aiSpecialPowersRespectStealth = respectAITargetVisibility;
 
 	if (!TheMapCache) {
 		// Need the map cache to get the map and user map directories.
@@ -5027,7 +5030,8 @@ void GameLogic::getAIMetricsStatistics( UnsignedInt *numAI, UnsignedInt *numMovi
 // ------------------------------------------------------------------------------------------------
 void GameLogic::crc( Xfer *xfer )
 {
-
+	xfer->xferBool( &TheWriteableMapData->m_aiSpecialPowersRespectFog );
+	xfer->xferBool( &TheWriteableMapData->m_aiSpecialPowersRespectStealth );
 }
 
 // ------------------------------------------------------------------------------------------------
