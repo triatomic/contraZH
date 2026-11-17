@@ -2519,6 +2519,47 @@ void W3DModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 
 //-------------------------------------------------------------------------------------------------
 #if RTS_ZEROHOUR
+Bool W3DModelDraw::hasModelAlignment() const
+{
+	const W3DModelDrawModuleData* d = getW3DModelDrawModuleData();
+	const Coord3D& offset = d->m_modelOffset;
+	return offset.x != 0.0f || offset.y != 0.0f || offset.z != 0.0f ||
+		d->m_modelYaw != 0.0f || d->m_modelPitch != 0.0f || d->m_modelRoll != 0.0f;
+}
+
+void W3DModelDraw::applyModelAlignment(Matrix3D& mtx, Real offsetScale) const
+{
+	const W3DModelDrawModuleData* d = getW3DModelDrawModuleData();
+	const Coord3D& offset = d->m_modelOffset;
+	if (offset.x != 0.0f || offset.y != 0.0f || offset.z != 0.0f)
+	{
+		const Vector3 delta = mtx.Rotate_Vector(Vector3(offset.x * offsetScale, offset.y * offsetScale, offset.z * offsetScale));
+		mtx.Adjust_X_Translation(delta.X);
+		mtx.Adjust_Y_Translation(delta.Y);
+		mtx.Adjust_Z_Translation(delta.Z);
+	}
+	if (d->m_modelYaw != 0.0f)
+	{
+		mtx.Rotate_Z(d->m_modelYaw);
+	}
+	if (d->m_modelPitch != 0.0f)
+	{
+		mtx.Rotate_Y(d->m_modelPitch);
+	}
+	if (d->m_modelRoll != 0.0f)
+	{
+		mtx.Rotate_X(d->m_modelRoll);
+	}
+}
+
+void W3DModelDraw::getBoneAlignment(Matrix3D& mtx) const
+{
+	// Cached bones already include the asset scale.
+	const Drawable* draw = getDrawable();
+	mtx.Make_Identity();
+	applyModelAlignment(mtx, draw->getTemplate()->getAssetScale() * draw->getObjectScale());
+}
+
 void W3DModelDraw::updateRenderObjectTransform(const Matrix3D& transform, Bool adjustForState)
 {
 	const W3DModelDrawModuleData* d = getW3DModelDrawModuleData();
@@ -2541,26 +2582,7 @@ void W3DModelDraw::updateRenderObjectTransform(const Matrix3D& transform, Bool a
 		adjustTransformMtx(mtx);
 	}
 
-	const Coord3D& offset = d->m_modelOffset;
-	if (offset.x != 0.0f || offset.y != 0.0f || offset.z != 0.0f)
-	{
-		const Vector3 delta = mtx.Rotate_Vector(Vector3(offset.x, offset.y, offset.z));
-		mtx.Adjust_X_Translation(delta.X);
-		mtx.Adjust_Y_Translation(delta.Y);
-		mtx.Adjust_Z_Translation(delta.Z);
-	}
-	if (d->m_modelYaw != 0.0f)
-	{
-		mtx.Rotate_Z(d->m_modelYaw);
-	}
-	if (d->m_modelPitch != 0.0f)
-	{
-		mtx.Rotate_Y(d->m_modelPitch);
-	}
-	if (d->m_modelRoll != 0.0f)
-	{
-		mtx.Rotate_X(d->m_modelRoll);
-	}
+	applyModelAlignment(mtx);
 
 	m_renderObject->Set_ObjectScale(scale);
 	m_renderObject->Set_Transform(mtx);
@@ -4529,6 +4551,9 @@ Bool W3DModelDraw::getProjectileLaunchOffset(
 	WhichTurretType tur,
 	Coord3D* turretRotPos,
 	Coord3D* turretPitchPos
+#if RTS_ZEROHOUR
+	, Matrix3D* turretAxes
+#endif
 ) const
 {
 	/*
@@ -4590,6 +4615,9 @@ Bool W3DModelDraw::getProjectileLaunchOffset(
 	}
 #endif
 
+#if RTS_ZEROHOUR
+	const Bool queryTurretAxes = turretAxes && !launchPos && tur != TURRET_INVALID;
+#endif
 	CRCDEBUG_LOG(("wslot = %d", wslot));
 	const ModelConditionInfo::WeaponBarrelInfoVec& wbvec = stateToUse->m_weaponBarrelInfoVec[wslot];
 	if( wbvec.empty() )
@@ -4667,6 +4695,59 @@ Bool W3DModelDraw::getProjectileLaunchOffset(
 #endif
 		}
 	}
+#if RTS_ZEROHOUR
+	if (turretAxes)
+	{
+		turretAxes->Make_Identity();
+	}
+	if (hasModelAlignment())
+	{
+		Matrix3D alignment;
+		getBoneAlignment(alignment);
+		if (turretAxes)
+		{
+			*turretAxes = alignment;
+			turretAxes->Set_Translation(Vector3(0.0f, 0.0f, 0.0f));
+		}
+#ifdef CACHE_ATTACH_BONE
+		const Vector3* attachment = d->getAttachToDrawableBoneOffset(getDrawable());
+		if (attachment)
+		{
+			if (launchPos)
+			{
+				launchPos->Adjust_Translation(*attachment);
+			}
+			alignment.Adjust_Translation(*attachment - alignment.Rotate_Vector(*attachment));
+		}
+#endif
+		if (launchPos)
+		{
+			launchPos->preMul(alignment);
+		}
+		if (tur != TURRET_INVALID)
+		{
+			const ModelConditionInfo::TurretInfo& turInfo = stateToUse->m_turrets[tur];
+			if (turretRotPos && turInfo.m_turretAngleNameKey != NAMEKEY_INVALID)
+			{
+				Vector3 pos;
+				Matrix3D::Transform_Vector(alignment, Vector3(turretRotPos->x, turretRotPos->y, turretRotPos->z), &pos);
+				turretRotPos->set(pos.X, pos.Y, pos.Z);
+			}
+			if (turretPitchPos && turInfo.m_turretPitchNameKey != NAMEKEY_INVALID)
+			{
+				Vector3 pos;
+				Matrix3D::Transform_Vector(alignment, Vector3(turretPitchPos->x, turretPitchPos->y, turretPitchPos->z), &pos);
+				turretPitchPos->set(pos.X, pos.Y, pos.Z);
+			}
+		}
+	}
+#endif
+#if RTS_ZEROHOUR
+	if (queryTurretAxes && hasModelAlignment() && stateToUse->m_turrets[tur].m_turretAngleNameKey != NAMEKEY_INVALID)
+	{
+		return true;
+	}
+#endif
 	return launchPos != nullptr;// return if LaunchPos is valid or not
 }
 
@@ -4707,6 +4788,15 @@ Int W3DModelDraw::getPristineBonePositionsForConditionState(
 		getDrawable()->getScale(),
 		getW3DModelDrawModuleData()->m_extraPublicBones);
 
+#if RTS_ZEROHOUR
+	const Bool applyAlignment = hasModelAlignment();
+	Matrix3D alignment;
+	if (applyAlignment)
+	{
+		getBoneAlignment(alignment);
+	}
+#endif
+
 	const int MAX_BONE_GET = 64;
 	Matrix3D tmpMtx[MAX_BONE_GET];
 
@@ -4737,6 +4827,12 @@ Int W3DModelDraw::getPristineBonePositionsForConditionState(
 		if (mtx)
 		{
 			transforms[posCount] = *mtx;
+#if RTS_ZEROHOUR
+			if (applyAlignment)
+			{
+				transforms[posCount].preMul(alignment);
+			}
+#endif
 //			if (isValidTimeToCalcLogicStuff())
 //			{
 //				DUMPMATRIX3D(mtx);
@@ -4919,8 +5015,17 @@ Int W3DModelDraw::getCurrentBonePositions(
 #define DO_INV
 #ifdef DO_INV
 	Matrix3D inverse;
-	originalTransform.Get_Orthogonal_Inverse(inverse);
-	inverse.Scale(getDrawable()->getScale());
+#if RTS_ZEROHOUR
+	if (hasModelAlignment())
+	{
+		getDrawable()->getTransformMatrix()->Get_Inverse(inverse);
+	}
+	else
+#endif
+	{
+		originalTransform.Get_Orthogonal_Inverse(inverse);
+		inverse.Scale(getDrawable()->getScale());
+	}
 #else
 	Matrix3D tmp(true);
 	tmp.Scale(getDrawable()->getScale());
