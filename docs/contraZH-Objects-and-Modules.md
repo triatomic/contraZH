@@ -1,5 +1,30 @@
 # Objects & Modules
 
+## Model alignment
+
+Set these optional fields in a `W3DModelDraw` block or in a draw module derived
+from it. They apply to every model and animation state in that block.
+
+```ini
+Draw = W3DModelDraw ModuleTag_Model
+  ModelOffset = X:0 Y:-2 Z:1
+  ModelYaw = 90
+  ModelPitch = 0
+  ModelRoll = 0
+  DefaultConditionState
+    Model = ExampleModel
+  End
+End
+```
+
+`ModelOffset` moves the model along the draw module's local axes before the angle
+corrections. The draw transform's scale also scales the offset. The angles are in
+degrees. The engine composes yaw around Z, pitch around Y, and roll around X in
+that order. Each field defaults to zero.
+
+The corrections move the rendered model and its client-side bones. The object
+keeps its gameplay position, footprint, and cached projectile launch offsets.
+
 ## Weapon fire particles
 
 `WeaponFireParticleSys = <weapon slot> <particle system>` creates a bone-attached emitter

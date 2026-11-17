@@ -341,6 +341,12 @@ public:
 
   Bool                              m_ignoreAnimScaling; ///< ignore external scaling of animation speed, e.g. for PreAttack.
 
+#if RTS_ZEROHOUR
+	Coord3D m_modelOffset;
+	Real m_modelYaw;
+	Real m_modelPitch;
+	Real m_modelRoll;
+#endif
 	Bool															m_ignoreRotation;  ///< ignore all rotations for this draw module 
 
 	Bool															m_showForOwnerOnly;  ///< show this model only to the owning player 
@@ -519,6 +525,10 @@ protected:
 	const ParticleSystemTemplate* findMoveEffectTemplate(const AsciiString& name) const;	///< snow drawables take "<name>Snow" when it exists
 	void doHideShowSubObjs(const std::vector<ModelConditionInfo::HideShowSubObjInfo>* vec);
 	virtual void adjustTransformMtx(Matrix3D& mtx) const;
+#if RTS_ZEROHOUR
+	void updateRenderObjectTransform(const Matrix3D& transform, Bool adjustForState);
+	void updateRenderObjectTransform(Bool adjustForState);
+#endif
 
 	Real getCurAnimDistanceCovered() const;
 	Bool setCurAnimDurationInMsec(Real duration);

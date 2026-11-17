@@ -1085,6 +1085,12 @@ W3DModelDrawModuleData::W3DModelDrawModuleData() :
   m_receivesDynamicLights = TRUE;
 
 	m_ignoreAnimScaling = FALSE;
+#if RTS_ZEROHOUR
+	m_modelOffset.zero();
+	m_modelYaw = 0.0f;
+	m_modelPitch = 0.0f;
+	m_modelRoll = 0.0f;
+#endif
 	m_ignoreRotation = FALSE;
 	m_showForOwnerOnly = FALSE;
 	m_keepRecoilAcrossStates = FALSE;
@@ -1332,6 +1338,12 @@ void W3DModelDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "IgnoreConditionStates", ModelConditionFlags::parseFromINI, nullptr, offsetof(W3DModelDrawModuleData, m_ignoreConditionStates) },
 		{ "ReceivesDynamicLights", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_receivesDynamicLights) },
 		{ "IgnoreAnimationSpeedScaling", INI::parseBool, NULL, offsetof(W3DModelDrawModuleData, m_ignoreAnimScaling) },
+#if RTS_ZEROHOUR
+		{ "ModelOffset", INI::parseCoord3D, nullptr, offsetof(W3DModelDrawModuleData, m_modelOffset) },
+		{ "ModelYaw", INI::parseAngleReal, nullptr, offsetof(W3DModelDrawModuleData, m_modelYaw) },
+		{ "ModelPitch", INI::parseAngleReal, nullptr, offsetof(W3DModelDrawModuleData, m_modelPitch) },
+		{ "ModelRoll", INI::parseAngleReal, nullptr, offsetof(W3DModelDrawModuleData, m_modelRoll) },
+#endif
 		{ "IgnoreRotation", INI::parseBool, NULL, offsetof(W3DModelDrawModuleData, m_ignoreRotation) },
 		{ "OnlyVisibleToOwningPlayer", INI::parseBool, NULL, offsetof(W3DModelDrawModuleData, m_showForOwnerOnly) },
 		{ "KeepRecoilAcrossStates", INI::parseBool, NULL, offsetof(W3DModelDrawModuleData, m_keepRecoilAcrossStates) },
@@ -2506,6 +2518,71 @@ void W3DModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 }
 
 //-------------------------------------------------------------------------------------------------
+#if RTS_ZEROHOUR
+void W3DModelDraw::updateRenderObjectTransform(const Matrix3D& transform, Bool adjustForState)
+{
+	const W3DModelDrawModuleData* d = getW3DModelDrawModuleData();
+	Matrix3D mtx = transform;
+	if (d->m_ignoreRotation)
+	{
+		Vector3 translation;
+		mtx.Get_Translation(&translation);
+		mtx.Set(translation);
+	}
+
+	const Real scale = getDrawable()->getInstanceScale();
+	if (scale != 1.0f)
+	{
+		mtx.Scale(scale);
+	}
+
+	if (adjustForState)
+	{
+		adjustTransformMtx(mtx);
+	}
+
+	const Coord3D& offset = d->m_modelOffset;
+	if (offset.x != 0.0f || offset.y != 0.0f || offset.z != 0.0f)
+	{
+		const Vector3 delta = mtx.Rotate_Vector(Vector3(offset.x, offset.y, offset.z));
+		mtx.Adjust_X_Translation(delta.X);
+		mtx.Adjust_Y_Translation(delta.Y);
+		mtx.Adjust_Z_Translation(delta.Z);
+	}
+	if (d->m_modelYaw != 0.0f)
+	{
+		mtx.Rotate_Z(d->m_modelYaw);
+	}
+	if (d->m_modelPitch != 0.0f)
+	{
+		mtx.Rotate_Y(d->m_modelPitch);
+	}
+	if (d->m_modelRoll != 0.0f)
+	{
+		mtx.Rotate_X(d->m_modelRoll);
+	}
+
+	m_renderObject->Set_ObjectScale(scale);
+	m_renderObject->Set_Transform(mtx);
+}
+
+void W3DModelDraw::updateRenderObjectTransform(Bool adjustForState)
+{
+	const Drawable* draw = getDrawable();
+	Matrix3D mtx = *draw->getTransformMatrix();
+	if (!draw->isInstanceIdentity())
+	{
+		mtx.postMul(*draw->getInstanceMatrix());
+	}
+	if (draw->getObjectScale() != 1.0f)
+	{
+		mtx.Scale(draw->getObjectScale());
+	}
+	updateRenderObjectTransform(mtx, adjustForState);
+}
+#endif
+
+//-------------------------------------------------------------------------------------------------
 void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 {
 	if (getW3DModelDrawModuleData()->m_showForOwnerOnly &&
@@ -2515,6 +2592,7 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 		return;
 	}
 
+#if !RTS_ZEROHOUR
 	Matrix3D transformMtxLocal; // = Matrix3D::Identity;
 	if (getW3DModelDrawModuleData()->m_ignoreRotation) {
 		//transformMtxLocal = *transformMtx;
@@ -2523,6 +2601,8 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 		transformMtxLocal.Set(trans);
 		transformMtx = &transformMtxLocal;
 	}
+
+#endif
 
 	// update whether or not we should be animating.
 	setPauseAnimation( !getDrawable()->getShouldAnimate(getW3DModelDrawModuleData()->m_animationsRequirePower) );
@@ -2537,6 +2617,7 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	if (m_objectDecal)
 		updateObjectDecalVisibility();
 
+#if !RTS_ZEROHOUR
 	Matrix3D scaledTransform;
 	if (getDrawable()->getInstanceScale() != 1.0f)
 	{
@@ -2547,6 +2628,8 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 		if (m_renderObject)
 			m_renderObject->Set_ObjectScale(getDrawable()->getInstanceScale());
 	}
+
+#endif
 
 	if (isAnimationComplete(m_renderObject))
 	{
@@ -2595,9 +2678,13 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	// set our position in the render object to our position of the drawable
 	if (m_renderObject)
 	{
+#if RTS_ZEROHOUR
+		updateRenderObjectTransform(*transformMtx, TRUE);
+#else
 		Matrix3D mtx = *transformMtx;
 		adjustTransformMtx(mtx);
 		m_renderObject->Set_Transform(mtx);
+#endif
 	}
 
 	handleClientTurretPositioning();
@@ -4131,6 +4218,9 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 			//|| (newState->m_validStuff & ModelConditionInfo::HAS_PROJECTILE_BONES)
 		)
 	{
+#if RTS_ZEROHOUR
+		const Bool hadRenderObject = m_renderObject != nullptr;
+#endif
 		Matrix3D transform;
 		nukeCurrentRender(&transform);
 		Drawable* draw = getDrawable();
@@ -4299,7 +4389,20 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 			// model transition is smooth and will immediately appear at the same orientation and location
 			// as the previous one
 			//
+#if RTS_ZEROHOUR
+			if (hadRenderObject)
+			{
+				m_renderObject->Set_ObjectScale(draw->getInstanceScale());
+				m_renderObject->Set_Transform(transform);
+			}
+			else
+			{
+				// The draw module list can still be under construction.
+				updateRenderObjectTransform(FALSE);
+			}
+#else
 			m_renderObject->Set_Transform(transform);
+#endif
 			onRenderObjRecreated();
 		}
 	}
@@ -4888,14 +4991,11 @@ void W3DModelDraw::reactToTransformChange( const Matrix3D* oldMtx,
 	// set the position of our render object
 	if( m_renderObject )
 	{
-		Matrix3D mtx = *getDrawable()->getTransformMatrix();
-
-		// Scale like doDrawModule, or a fogged object that was never drawn is ghosted at its unscaled size.
 #if RTS_ZEROHOUR
-		Real scale = getDrawable()->getObjectScale() * getDrawable()->getInstanceScale();
+		updateRenderObjectTransform(TRUE);
 #else
+		Matrix3D mtx = *getDrawable()->getTransformMatrix();
 		Real scale = getDrawable()->getInstanceScale();
-#endif
 		if (scale != 1.0f)
 		{
 			mtx.Scale(scale);
@@ -4903,6 +5003,7 @@ void W3DModelDraw::reactToTransformChange( const Matrix3D* oldMtx,
 
 		adjustTransformMtx(mtx);
 		m_renderObject->Set_Transform(mtx);
+#endif
 	}
 
 	if (m_trackRenderObject && getDrawable()->getObject())
