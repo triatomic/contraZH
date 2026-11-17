@@ -2149,6 +2149,13 @@ W3DModelDraw::W3DModelDraw(Thing *thing, const ModuleData* moduleData) : DrawMod
 		m_weaponRecoilInfoVec[i].clear();
 	}
 	m_needRecalcBoneParticleSystems = false;
+#if RTS_ZEROHOUR
+	m_useModelTransformForParticles = false;
+	m_hasAlignedAttachment = false;
+#endif
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+	m_hasDebugModelAlignment = false;
+#endif
 	m_fullyObscuredByShroud = false;
 
 	m_prevAnimHelper.frameNum = 0;
@@ -2477,6 +2484,26 @@ void W3DModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 	const W3DModelDrawModuleData* d = getW3DModelDrawModuleData();
 
 #ifdef CACHE_ATTACH_BONE
+#if RTS_ZEROHOUR
+	Matrix3D attachment;
+	Bool aligned = false;
+	const Bool attached = getDrawableBoneAttachment(getDrawable()->getModelConditionFlags(), attachment, aligned, -1);
+	m_hasAlignedAttachment = attached && aligned;
+	if (attached)
+	{
+		if (aligned)
+		{
+			const Drawable* draw = getDrawable();
+			const Real scale = draw->getInstanceScale() * (d->m_ignoreRotation ? 1.0f : draw->getObjectScale());
+			if (scale != 0.0f && scale != 1.0f)
+			{
+				// The aligned attachment translation is already scaled.
+				attachment.Set_Translation(attachment.Get_Translation() * (1.0f / scale));
+			}
+		}
+		mtx.postMul(attachment);
+	}
+#else
 	const Vector3* offset = d->getAttachToDrawableBoneOffset(getDrawable());
 	if (offset)
 	{
@@ -2485,6 +2512,7 @@ void W3DModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 		mtx.Adjust_Y_Translation(tmp.Y);
 		mtx.Adjust_Z_Translation(tmp.Z);
 	}
+#endif
 #else
 	if (d->m_attachToDrawableBone.isNotEmpty())
 	{
@@ -2519,18 +2547,55 @@ void W3DModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 
 //-------------------------------------------------------------------------------------------------
 #if RTS_ZEROHOUR
+ModelAlignment W3DModelDraw::getModelAlignment() const
+{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	if (m_hasDebugModelAlignment)
+	{
+		return m_debugModelAlignment;
+	}
+#endif
+	const W3DModelDrawModuleData* d = getW3DModelDrawModuleData();
+	const ModelAlignment alignment = { d->m_modelOffset, d->m_modelYaw, d->m_modelPitch, d->m_modelRoll };
+	return alignment;
+}
+
 Bool W3DModelDraw::hasModelAlignment() const
 {
-	const W3DModelDrawModuleData* d = getW3DModelDrawModuleData();
-	const Coord3D& offset = d->m_modelOffset;
-	return offset.x != 0.0f || offset.y != 0.0f || offset.z != 0.0f ||
-		d->m_modelYaw != 0.0f || d->m_modelPitch != 0.0f || d->m_modelRoll != 0.0f;
+	const ModelAlignment alignment = getModelAlignment();
+	return alignment.offset.x != 0.0f || alignment.offset.y != 0.0f || alignment.offset.z != 0.0f ||
+		alignment.yaw != 0.0f || alignment.pitch != 0.0f || alignment.roll != 0.0f;
 }
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+Bool W3DModelDraw::getDebugModelAlignment(ModelAlignment& alignment) const
+{
+	alignment = getModelAlignment();
+	return true;
+}
+
+void W3DModelDraw::setDebugModelAlignment(const ModelAlignment* alignment)
+{
+	m_hasDebugModelAlignment = alignment != nullptr;
+	if (alignment)
+	{
+		m_debugModelAlignment = *alignment;
+	}
+	if (m_trackRenderObject)
+	{
+		m_trackRenderObject->breakTrack();
+	}
+	if (m_renderObject)
+	{
+		updateRenderObjectTransform(TRUE);
+	}
+}
+#endif
 
 void W3DModelDraw::applyModelAlignment(Matrix3D& mtx, Real offsetScale) const
 {
-	const W3DModelDrawModuleData* d = getW3DModelDrawModuleData();
-	const Coord3D& offset = d->m_modelOffset;
+	const ModelAlignment alignment = getModelAlignment();
+	const Coord3D& offset = alignment.offset;
 	if (offset.x != 0.0f || offset.y != 0.0f || offset.z != 0.0f)
 	{
 		const Vector3 delta = mtx.Rotate_Vector(Vector3(offset.x * offsetScale, offset.y * offsetScale, offset.z * offsetScale));
@@ -2538,26 +2603,95 @@ void W3DModelDraw::applyModelAlignment(Matrix3D& mtx, Real offsetScale) const
 		mtx.Adjust_Y_Translation(delta.Y);
 		mtx.Adjust_Z_Translation(delta.Z);
 	}
-	if (d->m_modelYaw != 0.0f)
+	if (alignment.yaw != 0.0f)
 	{
-		mtx.Rotate_Z(d->m_modelYaw);
+		mtx.Rotate_Z(alignment.yaw);
 	}
-	if (d->m_modelPitch != 0.0f)
+	if (alignment.pitch != 0.0f)
 	{
-		mtx.Rotate_Y(d->m_modelPitch);
+		mtx.Rotate_Y(alignment.pitch);
 	}
-	if (d->m_modelRoll != 0.0f)
+	if (alignment.roll != 0.0f)
 	{
-		mtx.Rotate_X(d->m_modelRoll);
+		mtx.Rotate_X(alignment.roll);
 	}
 }
 
-void W3DModelDraw::getBoneAlignment(Matrix3D& mtx) const
+Bool W3DModelDraw::getDrawableBoneAttachment(const ModelConditionFlags& condition, Matrix3D& attachment, Bool& aligned, Int remainingAttachments) const
 {
-	// Cached bones already include the asset scale.
-	const Drawable* draw = getDrawable();
-	mtx.Make_Identity();
-	applyModelAlignment(mtx, draw->getTemplate()->getAssetScale() * draw->getObjectScale());
+	const AsciiString& name = getW3DModelDrawModuleData()->m_attachToDrawableBone;
+	if (name.isEmpty() || remainingAttachments == 0)
+	{
+		return false;
+	}
+	if (remainingAttachments < 0)
+	{
+		// The number of draw modules bounds the search even if attachment names form a cycle.
+		remainingAttachments = 0;
+		for (const DrawModule** dm = getDrawable()->getDrawModules(); *dm; ++dm)
+		{
+			++remainingAttachments;
+		}
+	}
+	for (const DrawModule** dm = getDrawable()->getDrawModules(); *dm; ++dm)
+	{
+		if (*dm == this)
+		{
+			continue;
+		}
+		const ObjectDrawInterface* source = (*dm)->getObjectDrawInterface();
+		if (source && source->getPristineBoneAttachment(condition, name.str(), attachment, aligned, remainingAttachments - 1))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+Bool W3DModelDraw::getPristineBoneAttachment(const ModelConditionFlags& condition, const char* boneName,
+	Matrix3D& attachment, Bool& aligned, Int remainingAttachments) const
+{
+	const ModelConditionInfo* state = findBestInfo(condition);
+	if (!state)
+	{
+		return false;
+	}
+	state->validateStuff(state == m_curState ? m_renderObject : nullptr, getDrawable()->getScale(),
+		getW3DModelDrawModuleData()->m_extraPublicBones);
+	AsciiString name(boneName);
+	name.toLower();
+	const Matrix3D* bone = state->findPristineBone(NAMEKEY(name.str()), nullptr);
+	if (!bone)
+	{
+		return false;
+	}
+
+	const Vector3 position = bone->Get_Translation();
+	aligned = getBoneAlignment(condition, attachment, remainingAttachments);
+	attachment.Translate(position);
+	return true;
+}
+
+Bool W3DModelDraw::getBoneAlignment(const ModelConditionFlags& condition, Matrix3D& mtx, Int remainingAttachments, Vector3* unalignedAttachment) const
+{
+	Bool inherited = false;
+	const Bool attached = getDrawableBoneAttachment(condition, mtx, inherited, remainingAttachments);
+	const Bool own = hasModelAlignment();
+	if (unalignedAttachment)
+	{
+		*unalignedAttachment = attached ? mtx.Get_Translation() : Vector3(0.0f, 0.0f, 0.0f);
+	}
+	if (!attached || (!own && !inherited))
+	{
+		mtx.Make_Identity();
+	}
+	if (own)
+	{
+		// Cached bones already include the asset scale.
+		const Drawable* draw = getDrawable();
+		applyModelAlignment(mtx, draw->getTemplate()->getAssetScale() * draw->getObjectScale());
+	}
+	return own || inherited;
 }
 
 void W3DModelDraw::updateRenderObjectTransform(const Matrix3D& transform, Bool adjustForState)
@@ -2577,6 +2711,7 @@ void W3DModelDraw::updateRenderObjectTransform(const Matrix3D& transform, Bool a
 		mtx.Scale(scale);
 	}
 
+	m_hasAlignedAttachment = false;
 	if (adjustForState)
 	{
 		adjustTransformMtx(mtx);
@@ -2710,6 +2845,15 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	}
 
 	handleClientTurretPositioning();
+#if RTS_ZEROHOUR
+	const Bool useModelTransform = hasModelAlignment() || m_hasAlignedAttachment;
+	if (m_useModelTransformForParticles != useModelTransform)
+	{
+		stopClientParticleSystems();
+		m_needRecalcBoneParticleSystems = true;
+		m_useModelTransformForParticles = useModelTransform;
+	}
+#endif
 	recalcBonesForClientParticleSystems();
 
   const W3DModelDrawModuleData *modData = getW3DModelDrawModuleData();
@@ -2718,7 +2862,7 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
                                           // IT REPOSITIONS PARTICLESYSTEMS TO TSTAY IN SYNC WITH ANIMATED BONES
 
 #if RTS_ZEROHOUR
-  if (hasModelAlignment())
+  if (m_useModelTransformForParticles)
   {
     updateFrozenBoneParticleSystems();
   }
@@ -3498,7 +3642,7 @@ void W3DModelDraw::recalcBonesForClientParticleSystems()
 #if RTS_ZEROHOUR
 						tracker.frozenBoneTransform.Make_Identity();
 						tracker.followsAnimatedBone = false;
-						const Bool useAlignedBone = m_renderObject && hasModelAlignment();
+						const Bool useAlignedBone = m_renderObject && m_useModelTransformForParticles;
 #endif
 						if (tracker.boneIndex != 0)
 						{
@@ -4677,6 +4821,9 @@ Bool W3DModelDraw::getProjectileLaunchOffset(
 
 #if RTS_ZEROHOUR
 	const Bool queryTurretAxes = turretAxes && !launchPos && tur != TURRET_INVALID;
+	Matrix3D alignment;
+	Vector3 unalignedAttachment;
+	const Bool applyAlignment = getBoneAlignment(condition, alignment, -1, &unalignedAttachment);
 #endif
 	CRCDEBUG_LOG(("wslot = %d", wslot));
 	const ModelConditionInfo::WeaponBarrelInfoVec& wbvec = stateToUse->m_weaponBarrelInfoVec[wslot];
@@ -4719,7 +4866,11 @@ Bool W3DModelDraw::getProjectileLaunchOffset(
 	if (tur != TURRET_INVALID)
 	{
 #ifdef CACHE_ATTACH_BONE
+#if RTS_ZEROHOUR
+		const Vector3* offset = applyAlignment ? nullptr : &unalignedAttachment;
+#else
 		const Vector3* offset = d->getAttachToDrawableBoneOffset(getDrawable());
+#endif
 #endif
 		const ModelConditionInfo::TurretInfo& turInfo = stateToUse->m_turrets[tur];
 		if (turretRotPos)
@@ -4760,40 +4911,26 @@ Bool W3DModelDraw::getProjectileLaunchOffset(
 	{
 		turretAxes->Make_Identity();
 	}
-	if (hasModelAlignment())
+	if (applyAlignment)
 	{
-		Matrix3D alignment;
-		getBoneAlignment(alignment);
 		if (turretAxes)
 		{
 			*turretAxes = alignment;
 			turretAxes->Set_Translation(Vector3(0.0f, 0.0f, 0.0f));
 		}
-#ifdef CACHE_ATTACH_BONE
-		const Vector3* attachment = d->getAttachToDrawableBoneOffset(getDrawable());
-		if (attachment)
-		{
-			if (launchPos)
-			{
-				launchPos->Adjust_Translation(*attachment);
-			}
-			alignment.Adjust_Translation(*attachment - alignment.Rotate_Vector(*attachment));
-		}
-#endif
 		if (launchPos)
 		{
 			launchPos->preMul(alignment);
 		}
 		if (tur != TURRET_INVALID)
 		{
-			const ModelConditionInfo::TurretInfo& turInfo = stateToUse->m_turrets[tur];
-			if (turretRotPos && turInfo.m_turretAngleNameKey != NAMEKEY_INVALID)
+			if (turretRotPos)
 			{
 				Vector3 pos;
 				Matrix3D::Transform_Vector(alignment, Vector3(turretRotPos->x, turretRotPos->y, turretRotPos->z), &pos);
 				turretRotPos->set(pos.X, pos.Y, pos.Z);
 			}
-			if (turretPitchPos && turInfo.m_turretPitchNameKey != NAMEKEY_INVALID)
+			if (turretPitchPos)
 			{
 				Vector3 pos;
 				Matrix3D::Transform_Vector(alignment, Vector3(turretPitchPos->x, turretPitchPos->y, turretPitchPos->z), &pos);
@@ -4803,7 +4940,7 @@ Bool W3DModelDraw::getProjectileLaunchOffset(
 	}
 #endif
 #if RTS_ZEROHOUR
-	if (queryTurretAxes && hasModelAlignment() && stateToUse->m_turrets[tur].m_turretAngleNameKey != NAMEKEY_INVALID)
+	if (queryTurretAxes && applyAlignment && stateToUse->m_turrets[tur].m_turretAngleNameKey != NAMEKEY_INVALID)
 	{
 		return true;
 	}
@@ -4849,12 +4986,8 @@ Int W3DModelDraw::getPristineBonePositionsForConditionState(
 		getW3DModelDrawModuleData()->m_extraPublicBones);
 
 #if RTS_ZEROHOUR
-	const Bool applyAlignment = hasModelAlignment();
 	Matrix3D alignment;
-	if (applyAlignment)
-	{
-		getBoneAlignment(alignment);
-	}
+	const Bool applyAlignment = (positions || transforms) && getBoneAlignment(condition, alignment);
 #endif
 
 	const int MAX_BONE_GET = 64;
@@ -5076,7 +5209,7 @@ Int W3DModelDraw::getCurrentBonePositions(
 #ifdef DO_INV
 	Matrix3D inverse;
 #if RTS_ZEROHOUR
-	if (hasModelAlignment())
+	if (hasModelAlignment() || m_hasAlignedAttachment)
 	{
 		getDrawable()->getTransformMatrix()->Get_Inverse(inverse);
 	}
@@ -5175,6 +5308,21 @@ void W3DModelDraw::reactToTransformChange( const Matrix3D* oldMtx,
 	{
 		Object *obj = getDrawable()->getObject();
 		const Coord3D* pos = getDrawable()->getPosition();
+#if RTS_ZEROHOUR
+		Coord3D trackCenter;
+		if (m_renderObject && (hasModelAlignment() || m_hasAlignedAttachment))
+		{
+			const Int left = m_renderObject->Get_Bone_Index("TREADFX01");
+			const Int right = m_renderObject->Get_Bone_Index("TREADFX02");
+			if (left != 0 && right != 0)
+			{
+				const Vector3 center = (m_renderObject->Get_Bone_Transform(left).Get_Translation() +
+					m_renderObject->Get_Bone_Transform(right).Get_Translation()) * 0.5f;
+				trackCenter.set(center.X, center.Y, center.Z);
+				pos = &trackCenter;
+			}
+		}
+#endif
 
 		// Tread edges are oriented from the direction of travel, so a forward<->reverse switch would flip
 		// the handedness of the next edge and twist the quad bridging it to the previous one. Track the

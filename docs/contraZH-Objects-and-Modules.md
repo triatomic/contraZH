@@ -23,8 +23,10 @@ degrees. The engine composes yaw around Z, pitch around Y, and roll around X in
 that order. Each field defaults to zero.
 
 The corrections move the rendered model, bone attachments, `ParticleSysBone`
-emitters, and projectile launch points. The object keeps its gameplay position
-and footprint.
+emitters, and projectile launch points. Models that attach to another draw
+module's bone inherit that module's correction. Tread marks use the corrected
+center of the two tread bones. The object keeps its gameplay position and
+footprint.
 
 ## Weapon fire particles
 
