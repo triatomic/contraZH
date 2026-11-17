@@ -2717,6 +2717,13 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
     updateBonesForClientParticleSystems();// LORENZEN ADDED THIS
                                           // IT REPOSITIONS PARTICLESYSTEMS TO TSTAY IN SYNC WITH ANIMATED BONES
 
+#if RTS_ZEROHOUR
+  if (hasModelAlignment())
+  {
+    updateFrozenBoneParticleSystems();
+  }
+#endif
+
   handleClientRecoil();
 #if RTS_ZEROHOUR
 	updateWeaponFireParticleSystems();
@@ -3485,16 +3492,30 @@ void W3DModelDraw::recalcBonesForClientParticleSystems()
 						pos.zero();
 						Real rotation = 0.0f;
 
-						Int boneIndex = m_renderObject ? m_renderObject->Get_Bone_Index(it->boneName.str()) : 0;
-						if (boneIndex != 0)
+						ParticleSysTrackerType tracker;
+						tracker.id = sys->getSystemID();
+						tracker.boneIndex = m_renderObject ? m_renderObject->Get_Bone_Index(it->boneName.str()) : 0;
+#if RTS_ZEROHOUR
+						tracker.frozenBoneTransform.Make_Identity();
+						tracker.followsAnimatedBone = false;
+						const Bool useAlignedBone = m_renderObject && hasModelAlignment();
+#endif
+						if (tracker.boneIndex != 0)
 						{
 							// ugh... kill the mtx so we get it in modelspace, not world space
 							Matrix3D originalTransform = m_renderObject->Get_Transform();	// save the transform
 							Matrix3D tmp(true);
+#if RTS_ZEROHOUR
+							if (!useAlignedBone)
+							{
+								tmp.Scale(getDrawable()->getScale());
+							}
+#else
 							tmp.Scale(getDrawable()->getScale());
+#endif
 							m_renderObject->Set_Transform(tmp);					// set to identity transform
 
-							const Matrix3D boneTransform = m_renderObject->Get_Bone_Transform(boneIndex);
+							const Matrix3D boneTransform = m_renderObject->Get_Bone_Transform(tracker.boneIndex);
 							Vector3 vpos = boneTransform.Get_Translation();
 							rotation = boneTransform.Get_Z_Rotation();
 
@@ -3503,13 +3524,28 @@ void W3DModelDraw::recalcBonesForClientParticleSystems()
 							pos.x = vpos.X;
 							pos.y = vpos.Y;
 							pos.z = vpos.Z;
+#if RTS_ZEROHOUR
+							if (useAlignedBone)
+							{
+								tracker.frozenBoneTransform = boneTransform;
+							}
+#endif
 						}
 
-						// got the bone position...
-						sys->setPosition(&pos);
-
-						// and the direction, so that the system is oriented like the bone is
-						sys->rotateLocalTransformZ(rotation);
+#if RTS_ZEROHOUR
+						if (useAlignedBone)
+						{
+							Matrix3D worldTransform;
+							worldTransform.mul(m_renderObject->Get_Transform(), tracker.frozenBoneTransform);
+							sys->setLocalTransform(&worldTransform);
+							sys->setSkipParentXfrm(true);
+						}
+						else
+#endif
+						{
+							sys->setPosition(&pos);
+							sys->rotateLocalTransformZ(rotation);
+						}
 
 						// Attach it to the object...
 						sys->attachToDrawable(drawable);
@@ -3525,10 +3561,6 @@ void W3DModelDraw::recalcBonesForClientParticleSystems()
 
 						// store the particle system id so we can kill it later.
 
-						ParticleSysTrackerType tracker;
-						tracker.id = sys->getSystemID();
-						tracker.boneIndex = boneIndex;
-
 						m_particleSystemIDs.push_back( tracker );
 					}
 				}
@@ -3539,6 +3571,31 @@ void W3DModelDraw::recalcBonesForClientParticleSystems()
 }
 
 
+
+#if RTS_ZEROHOUR
+void W3DModelDraw::updateFrozenBoneParticleSystems()
+{
+	if (!m_renderObject)
+	{
+		return;
+	}
+
+	const Matrix3D& modelTransform = m_renderObject->Get_Transform();
+	for (std::vector<ParticleSysTrackerType>::const_iterator it = m_particleSystemIDs.begin(); it != m_particleSystemIDs.end(); ++it)
+	{
+		if (!it->followsAnimatedBone)
+		{
+			ParticleSystem* sys = TheParticleSystemManager->findParticleSystem(it->id);
+			if (sys)
+			{
+				Matrix3D worldTransform;
+				worldTransform.mul(modelTransform, it->frozenBoneTransform);
+				sys->setLocalTransform(&worldTransform);
+			}
+		}
+	}
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /*
@@ -3560,12 +3617,15 @@ Bool W3DModelDraw::updateBonesForClientParticleSystems()
 	const Drawable* drawable = getDrawable();
 	if (drawable != nullptr && m_curState != nullptr && m_renderObject != nullptr )
 	{
-		for (std::vector<ParticleSysTrackerType>::const_iterator it = m_particleSystemIDs.begin(); it != m_particleSystemIDs.end(); ++it)
+		for (std::vector<ParticleSysTrackerType>::iterator it = m_particleSystemIDs.begin(); it != m_particleSystemIDs.end(); ++it)
 		{
 			ParticleSystem *sys = TheParticleSystemManager->findParticleSystem((*it).id);
 			Int boneIndex = (*it).boneIndex;
 			if ( (sys != nullptr) && (boneIndex != 0)  )
 			{
+#if RTS_ZEROHOUR
+				it->followsAnimatedBone = true;
+#endif
     		const Matrix3D boneTransform = m_renderObject->Get_Bone_Transform(boneIndex);// just a little worried about state changes
 
         Vector3 vpos = boneTransform.Get_Translation();

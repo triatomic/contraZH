@@ -22,8 +22,9 @@ corrections. The draw transform's scale also scales the offset. The angles are i
 degrees. The engine composes yaw around Z, pitch around Y, and roll around X in
 that order. Each field defaults to zero.
 
-The corrections move the rendered model, bone attachments, and projectile
-launch points. The object keeps its gameplay position and footprint.
+The corrections move the rendered model, bone attachments, `ParticleSysBone`
+emitters, and projectile launch points. The object keeps its gameplay position
+and footprint.
 
 ## Weapon fire particles
 

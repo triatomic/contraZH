@@ -521,6 +521,9 @@ protected:
 	void computeDrawnTurretAngles(Real* angles, Real* pitches);
 	void handleClientRecoil();
 	void recalcBonesForClientParticleSystems();
+#if RTS_ZEROHOUR
+	void updateFrozenBoneParticleSystems();
+#endif
 	void stopClientParticleSystems();
 #if RTS_ZEROHOUR
 	void updateWeaponFireParticleSystems();
@@ -574,6 +577,10 @@ private:
 	{
 		ParticleSystemID id;
 		Int				boneIndex;
+#if RTS_ZEROHOUR
+		Matrix3D frozenBoneTransform;
+		Bool followsAnimatedBone;
+#endif
 	};
 
 	struct AnimInfoHelper
