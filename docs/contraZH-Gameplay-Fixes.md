@@ -13,6 +13,23 @@ AI dozers and workers stay at their current positions instead of teleporting to 
 build sites. Exact-position build orders wait until their specified site becomes legal.
 These rules apply in skirmish, multiplayer, campaign and challenge missions.
 
+`AIData.ini` accepts these settings in its `AIData` block. Omitting them uses these defaults.
+
+```ini
+AIData
+  BuildingSearchDistance = 40
+  SkirmishBuildingSearchDistance = 590
+End
+```
+
+`BuildingSearchDistance` controls non-skirmish AI, normally campaign and challenge missions.
+`SkirmishBuildingSearchDistance` controls skirmish AI, including multiplayer computer players.
+Each value is the maximum displacement along either axis from the planned building position,
+in world units. One WorldBuilder terrain cell spans 10 world units. The search advances in
+10-unit steps, so distances round down to a multiple of 10. Zero or negative values restrict
+construction to the planned position. Exact-position orders always use only that position.
+Map `AIData` overrides can change the distances. Larger searches check more candidate sites.
+
 This changes the simulation and can change older replay playback. Multiplayer clients need
 matching engine versions.
 

@@ -134,6 +134,8 @@ void AISideBuildList::addInfo(BuildListInfo *info)
 static const FieldParse TheAIFieldParseTable[] =
 {
 
+	{ "BuildingSearchDistance", INI::parseReal, nullptr, offsetof( TAiData, m_buildingSearchDistance ) },
+	{ "SkirmishBuildingSearchDistance", INI::parseReal, nullptr, offsetof( TAiData, m_skirmishBuildingSearchDistance ) },
 	{ "StructureSeconds",				INI::parseReal,nullptr,		offsetof( TAiData, m_structureSeconds ) },
 	{ "TeamSeconds",						INI::parseReal,nullptr,		offsetof( TAiData, m_teamSeconds ) },
 	{ "Wealthy",								INI::parseInt,nullptr,			offsetof( TAiData, m_resourcesWealthy ) },
@@ -920,6 +922,8 @@ m_next(nullptr),
 m_sideInfo(nullptr),
 m_attackIgnoreInsignificantBuildings(false),
 m_skirmishGroupFudgeValue(0.0f),
+m_buildingSearchDistance(40.0f),
+m_skirmishBuildingSearchDistance(590.0f),
 m_structureSeconds(0),
 m_teamSeconds(0),
 m_resourcesWealthy(0),
@@ -968,6 +972,8 @@ m_retaliateFriendsRadius(120.0f)
 //-------------------------------------------------------------------------------------------------
 void TAiData::crc( Xfer *xfer )
 {
+	xfer->xferReal( &m_buildingSearchDistance );
+	xfer->xferReal( &m_skirmishBuildingSearchDistance );
 	xfer->xferReal( &m_structureSeconds );
 	xfer->xferReal( &m_teamSeconds );
 	xfer->xferInt( &m_resourcesWealthy );

@@ -557,15 +557,15 @@ Object *AIPlayer::buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildLi
 			Real posOffset;
 			Bool valid = false;
 			// Wiggle it a little :)
-			Real limit = 10*PATHFIND_CELL_SIZE_F;
+			Real limit = 2*TheAI->getAiData()->m_buildingSearchDistance;
 			if (isSkirmishAI()) {
-				limit = 120*PATHFIND_CELL_SIZE_F;
+				limit = 2*TheAI->getAiData()->m_skirmishBuildingSearchDistance;
 			}
 			if (info->isExactPositionOnly()) {
 				limit = 0;
 			}
 			Coord3D newPos = pos;
-			for (posOffset = 2*PATHFIND_CELL_SIZE_F; posOffset<limit; posOffset += 2*PATHFIND_CELL_SIZE_F) {
+			for (posOffset = 2*PATHFIND_CELL_SIZE_F; posOffset<=limit; posOffset += 2*PATHFIND_CELL_SIZE_F) {
 				Real offset = posOffset/2;
 				Real xPos, yPos;
 				yPos = pos.y-offset;
