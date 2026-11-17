@@ -217,7 +217,7 @@ Bool clpIsSeenByPlayer(const Object *obj, const Player *player)
 //-------------------------------------------------------------------------------------------------
 Bool clpAIPlaysFair(const Player *player)
 {
-	return player && player->getPlayerType() == PLAYER_COMPUTER && !TheGameLogic->isInSinglePlayerGame();
+	return player && player->getPlayerType() == PLAYER_COMPUTER;
 }
 
 //-------------------------------------------------------------------------------------------------

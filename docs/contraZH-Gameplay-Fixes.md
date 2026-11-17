@@ -3,6 +3,19 @@
 Always on, no `Options.ini` key. All are retail bugs upstream still carries. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## AI construction uses legal, reachable sites
+
+AI builders search nearby sites when a planned building overlaps an obstacle, sits on
+restricted terrain, or cannot be reached. The search checks every pathfinding cell along
+each ring and keeps the first valid site. If no site passes, the AI retries later.
+
+AI dozers and workers stay at their current positions instead of teleporting to unreachable
+build sites. Exact-position build orders wait until their specified site becomes legal.
+These rules apply in skirmish, multiplayer, campaign and challenge missions.
+
+This changes the simulation and can change older replay playback. Multiplayer clients need
+matching engine versions.
+
 ## Patriots return to normal range after assisting
 
 Patriots and other units using `AssistedTargetingUpdate` release their temporary weapon lock
@@ -418,16 +431,15 @@ Presentation only; replays unaffected.
 
 ## AI special powers no longer see through fog
 
-Skirmish and multiplayer AI fired special powers at targets it had never seen. These script
-actions now pick only targets a human in the AI's seat could pick:
+AI in every mode, including campaign and challenge missions, picks special-power targets
+that a human in the AI's seat could pick. This covers the following script actions.
 
 * `SKIRMISH_FIRE_SPECIAL_POWER_AT_MOST_COST` and its CLP `..._TYPE` variant
 * `SKIRMISH_PERFORM_COMMANDBUTTON_ON_MOST_VALUABLE_OBJECT`
 * `TEAM_ALL_USE_COMMANDBUTTON_ON_NEAREST_*`
 
 A valid target is in view, or a structure the AI has scouted (its fogged ghost). Undetected
-stealth units and buildings never count. With nothing valid, the superweapon holds its fire. The
-campaign and challenge missions keep the old behavior.
+stealth units and buildings never count. With nothing valid, the superweapon holds its fire.
 
 Changes the simulation.
 ([#115](https://github.com/triatomic/contraZH/issues/115))
@@ -443,10 +455,10 @@ Changes the simulation.
 
 ## Jammed AI units wait out the jam
 
-A human cannot order a jammed unit, because jamming makes it unselectable. Skirmish and
-multiplayer AI now plays by the same rule. A jammed unit ignores script orders, command-button
-abilities included, and keeps doing what it was doing. The newest order it missed runs when the
-jam ends. The campaign and challenge missions keep the old behavior.
+A human cannot order a jammed unit, because jamming makes it unselectable. AI in every mode,
+including campaign and challenge missions, now follows the same rule. A jammed unit ignores
+script orders, command-button abilities included, and keeps doing what it was doing. The newest order it missed runs when the
+jam ends.
 
 Changes the simulation.
 ([#115](https://github.com/triatomic/contraZH/issues/115))

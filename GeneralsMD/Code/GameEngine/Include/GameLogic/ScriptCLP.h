@@ -49,7 +49,7 @@ Bool clpObjectMatchesType(const Object *obj, const AsciiString &objectType);
 /** True if the player can see obj right now, meaning it is not shrouded or fogged for that player. */
 Bool clpIsSeenByPlayer(const Object *obj, const Player *player);
 
-/** True if player is a computer player outside the campaign, held to what a human could see and order. */
+/** True if player is a computer player, held to what a human could see and order. */
 Bool clpAIPlaysFair(const Player *player);
 
 /** True if player could target obj as a human would: not shrouded, fogged only if a structure, and not hidden by stealth. Always TRUE when clpAIPlaysFair is FALSE. */
