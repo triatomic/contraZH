@@ -132,6 +132,7 @@ public:
 	void friend_purgePendingCommand();
 	Bool isParkedInHangar() const;
 	void onTransportUnloaded();
+	Bool returnsToBaseAfterUnload() const { return getJetAIUpdateModuleData()->m_returnToBaseAfterUnload; }
 
 protected:
 
