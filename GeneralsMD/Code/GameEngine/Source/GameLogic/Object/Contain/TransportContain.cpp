@@ -661,11 +661,17 @@ Bool TransportContain::isPassengerAllowedToFire( ObjectID id ) const
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-void TransportContain::exitObjectViaDoor(Object *obj, ExitDoorType exitDoor)
+const AsciiString& TransportContain::getExitInAirTemplateFor(const Object *passenger) const
 {
 	const TransportContainModuleData *data = getTransportContainModuleData();
-	const AsciiString& containerName = obj->isKindOf(KINDOF_VEHICLE) && !data->m_exitInAirVehicleTemplate.isEmpty()
+	return passenger->isKindOf(KINDOF_VEHICLE) && !data->m_exitInAirVehicleTemplate.isEmpty()
 		? data->m_exitInAirVehicleTemplate : data->m_exitInAirTemplate;
+}
+
+// ------------------------------------------------------------------------------------------------
+void TransportContain::exitObjectViaDoor(Object *obj, ExitDoorType exitDoor)
+{
+	const AsciiString& containerName = getExitInAirTemplateFor(obj);
 	if (!getObject()->isSignificantlyAboveTerrain() || containerName.isEmpty())
 	{
 		OpenContain::exitObjectViaDoor(obj, exitDoor);

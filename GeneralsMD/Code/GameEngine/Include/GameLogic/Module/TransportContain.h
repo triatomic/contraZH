@@ -97,6 +97,7 @@ public:
 	virtual ExitDoorType reserveDoorForExit( const ThingTemplate* objType, Object *specificObject ) override;
 	virtual void unreserveDoorForExit( ExitDoorType exitDoor ) override;
 	virtual void exitObjectViaDoor(Object *obj, ExitDoorType exitDoor) override;
+	virtual const AsciiString& getExitInAirTemplateFor(const Object *passenger) const override;
 	virtual Bool isDisplayedOnControlBar() const override {return TRUE;}///< Does this container display its contents on the ControlBar?
 
 protected:

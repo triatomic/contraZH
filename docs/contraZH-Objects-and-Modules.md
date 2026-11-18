@@ -18,6 +18,7 @@ The C27 configures this in its `JetAIUpdate` module. Changes simulation when ena
 * `ExitInAirTemplate` names a container for passengers unloaded above the ground. It defaults to empty.
 * `ExitInAirVehicleTemplate` overrides that container for vehicle passengers. It defaults to empty.
 * Inventory exits and `EVACUATE` use these templates while the transport is significantly above terrain.
+* An OCL with `UseTransportOccupants = Yes` uses the same templates for weapon drops.
 * Ground exits use the transport's usual exit path.
 * Missing templates and incompatible containers leave the passenger aboard.
 * The templates must have a contain module, such as `ParachuteContain`.

@@ -3,12 +3,13 @@
 ## CreateObject UseTransportOccupants
 
 `UseTransportOccupants = Yes` transfers every passenger from the source object's contain module
-into a separate `PutInContainer` object. The default is `No`.
+into its transport's configured airborne exit container. The default is `No`.
 
-* `PutVehiclesInContainer` overrides `PutInContainer` for vehicle passengers. It defaults to empty.
+* `TransportContain` supplies `ExitInAirTemplate` and `ExitInAirVehicleTemplate` for each passenger.
 * Each passenger keeps its object identity, owner, health, veterancy, upgrades, and experience.
 * `ObjectNames`, `Count`, and `ObjectCount` do not select or limit passengers in this mode.
-* `PutInContainer` is required. A missing template or an incompatible container leaves passengers aboard.
+* Missing airborne exit templates and incompatible containers leave passengers aboard.
+* `PutInContainer` applies to newly created objects. It is ignored in this passenger transfer mode.
 * The container receives the usual OCL position, offset, disposition, force, and lifetime settings.
 * `IgnorePrimaryObstacle` and `InvulnerableTime` also apply to each passenger.
 * `RequiresLivePlayer` checks the source player's state before releasing passengers.
@@ -18,8 +19,6 @@ into a separate `PutInContainer` object. The default is `No`.
 ObjectCreationList OCL_DropTransportOccupants
   CreateObject
     UseTransportOccupants = Yes
-    PutInContainer = AmericaParachuteSelectable
-    PutVehiclesInContainer = LargeParachute
     IgnorePrimaryObstacle = Yes
     Disposition = RANDOM_FORCE
     MinForceMagnitude = 10
