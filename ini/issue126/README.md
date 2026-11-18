@@ -13,3 +13,5 @@ engine built from this PR.
 The original predefined infantry OCL remains available for other weapons.
 
 Inventory exits and Evacuate also create parachutes when the plane is in the air. Ground exits unload normally.
+
+The last passenger leaving an airborne C27 triggers an immediate return to its airfield. Evacuate unloads immediately and works while parked.

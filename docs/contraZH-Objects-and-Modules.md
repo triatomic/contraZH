@@ -1,5 +1,18 @@
 # Objects & Modules
 
+## JetAIUpdate return after unloading
+
+`ReturnToBaseAfterUnload = Yes` makes a jet return to its airfield on the next AI update after
+its last passenger leaves. The default is `No`.
+
+* A completed weapon drop, the last inventory exit, and Evacuate trigger the return while airborne.
+* The completed drop clears the attack order and any pending command.
+* Evacuate unloads immediately, including while parked, without issuing a takeoff command.
+* A parked aircraft stays parked after unloading.
+* A return requested during takeoff or landing waits for that maneuver to finish.
+
+The C27 configures this in its `JetAIUpdate` module. Changes simulation when enabled.
+
 ## TransportContain airborne exits
 
 * `ExitInAirTemplate` names a container for passengers unloaded above the ground. It defaults to empty.

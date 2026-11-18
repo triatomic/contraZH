@@ -41,6 +41,7 @@
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/JetAIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/TransportContain.h"
@@ -397,6 +398,11 @@ void TransportContain::onRemoving( Object *rider )
 		if( draw )
 			draw->clearModelConditionState( MODELCONDITION_LOADED );
 
+		JetAIUpdate *jetAI = getObject()->getAI() ? getObject()->getAI()->getJetAIUpdate() : nullptr;
+		if (jetAI)
+		{
+			jetAI->onTransportUnloaded();
+		}
 	}
 
 	if (getObject()->isAboveTerrain())

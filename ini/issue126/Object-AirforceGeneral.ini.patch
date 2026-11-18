@@ -22,3 +22,11 @@
    Behavior = PhysicsBehavior ModuleTag_04
      Mass = 500.0
    End
+@@ -18134,6 +18149,7 @@
+     TakeoffPause              = 500
+     MinHeight                 = 5
+     ReturnToBaseIdleTime      = 10000
++    ReturnToBaseAfterUnload   = Yes
+     ParkingOffset             = 0
+   End
+ 
