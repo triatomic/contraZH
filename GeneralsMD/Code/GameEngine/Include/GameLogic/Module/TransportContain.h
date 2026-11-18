@@ -97,6 +97,8 @@ public:
 	virtual ExitDoorType reserveDoorForExit( const ThingTemplate* objType, Object *specificObject ) override;
 	virtual void unreserveDoorForExit( ExitDoorType exitDoor ) override;
 	virtual void exitObjectViaDoor(Object *obj, ExitDoorType exitDoor) override;
+	virtual Object* launchPassengers(const ObjectCreationNugget *nugget) override;
+	virtual Bool isPassengerLaunchPending() const override { return !m_launchPassengers.empty(); }
 	virtual const AsciiString& getExitInAirTemplateFor(const Object *passenger) const override;
 	virtual Bool isDisplayedOnControlBar() const override {return TRUE;}///< Does this container display its contents on the ControlBar?
 
@@ -114,5 +116,8 @@ protected:
 	Int m_extraSlotsInUse;
 
 	UnsignedInt m_frameExitNotBusy;
+	Int m_launchNuggetIndex;
+	std::list<ObjectID> m_launchPassengers;
+	Object* processPassengerLaunch();
 
 };

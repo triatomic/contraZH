@@ -38,6 +38,7 @@
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/BodyModule.h"
+#include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/CountermeasuresBehavior.h"
 #include "GameLogic/Module/JetAIUpdate.h"
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
@@ -2505,6 +2506,16 @@ UpdateSleepTime JetAIUpdate::update()
 	const JetAIUpdateModuleData* d = getJetAIUpdateModuleData();
 
 	getProducerLocation();
+
+	if (getObject()->getContain() && getObject()->getContain()->isPassengerLaunchPending())
+	{
+		m_returnToBaseFrame = 0;
+		if (isAttacking())
+		{
+			friend_purgePendingCommand();
+			AIUpdateInterface::privateIdle(CMD_FROM_AI);
+		}
+	}
 
 	// Defer the return until the current weapon or passenger exit callback finishes.
 	if (getFlag(RETURN_AFTER_UNLOAD) && !getFlag(TAKEOFF_IN_PROGRESS) && !getFlag(LANDING_IN_PROGRESS))

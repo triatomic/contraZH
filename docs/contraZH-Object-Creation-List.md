@@ -36,6 +36,8 @@ into its transport's configured airborne exit container. The default is `No`.
 
 * `TransportContain` supplies `ExitInAirTemplate` and `ExitInAirVehicleTemplate` for each passenger.
 * Each passenger keeps its object identity, owner, health, veterancy, upgrades, and experience.
+* `ExitDelay` spaces releases from the moving transport. Zero releases the whole payload together.
+* The drop queues the passengers aboard when it starts. Further weapon shots keep that queue.
 * `ObjectNames`, `Count`, and `ObjectCount` do not select or limit passengers in this mode.
 * Missing airborne exit templates and incompatible containers leave passengers aboard.
 * `PutInContainer` applies to newly created objects. It is ignored in this passenger transfer mode.

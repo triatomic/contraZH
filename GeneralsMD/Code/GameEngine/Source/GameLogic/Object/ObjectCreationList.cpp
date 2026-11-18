@@ -80,6 +80,23 @@
 
 ObjectCreationListStore *TheObjectCreationListStore = nullptr;					///< the ObjectCreationList store definition
 
+Int ObjectCreationListStore::findNuggetIndex(const ObjectCreationNugget *nugget) const
+{
+	for (Int i = 0; i < (Int)m_nuggets.size(); ++i)
+	{
+		if (m_nuggets[i] == nugget)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
+const ObjectCreationNugget* ObjectCreationListStore::getNuggetByIndex(Int index) const
+{
+	return index >= 0 && index < (Int)m_nuggets.size() ? m_nuggets[index] : nullptr;
+}
+
 //-------------------------------------------------------------------------------------------------
 static void adjustVector(Coord3D *vec, const Matrix3D* mtx)
 {
@@ -1420,63 +1437,53 @@ protected:
 
 	}
 
-	Object* launchTransportOccupants(const Coord3D *pos, const Matrix3D *mtx, Real orientation, const Object *sourceObj, UnsignedInt lifetimeFrames) const
+	virtual Object* createForTransportPassenger(const Object *sourceObj, Object *passenger) const override
 	{
 		ContainModuleInterface *transport = sourceObj ? sourceObj->getContain() : nullptr;
-		if (!transport ||
-			(m_requiresLivePlayer && (!sourceObj->getControllingPlayer() || !sourceObj->getControllingPlayer()->isPlayerActive())))
+		if (!transport || (m_requiresLivePlayer &&
+			(!sourceObj->getControllingPlayer() || !sourceObj->getControllingPlayer()->isPlayerActive())))
 		{
 			return nullptr;
 		}
-		Object *firstObject = nullptr;
-		const ContainedItemsList passengers = *transport->getContainedItemsList();
-		for (ContainedItemsList::const_iterator it = passengers.begin(); it != passengers.end(); ++it)
+		const AsciiString& containerName = transport->getExitInAirTemplateFor(passenger);
+		if (containerName.isEmpty())
 		{
-			Object *passenger = *it;
-			const AsciiString& containerName = transport->getExitInAirTemplateFor(passenger);
-			if (containerName.isEmpty())
-			{
-				continue;
-			}
-			const ThingTemplate *containerTmpl = TheThingFactory->findTemplate(containerName);
-			if (!containerTmpl)
-			{
-				continue;
-			}
-			Object *container = TheThingFactory->newObject(containerTmpl, passenger->getTeam());
-			if (!container)
-			{
-				break;
-			}
-			ContainModuleInterface *contain = container->getContain();
-			if (!contain || !contain->isValidContainerFor(passenger, TRUE))
-			{
-				TheGameLogic->destroyObject(container);
-				continue;
-			}
-
-			doStuffToObj(container, AsciiString::TheEmptyString, pos, mtx, orientation, sourceObj, lifetimeFrames);
-			transport->removeFromContain(passenger);
-			if (passenger->getAI())
-			{
-				passenger->getAI()->aiIdle(CMD_FROM_AI);
-			}
-			passenger->setLayer(LAYER_GROUND);
-			if (m_ignorePrimaryObstacle && passenger->getPhysics())
-			{
-				passenger->getPhysics()->setIgnoreCollisionsWith(sourceObj);
-			}
-			if (m_invulnerableTime > 0)
-			{
-				passenger->goInvulnerable(m_invulnerableTime);
-			}
-			contain->addToContain(passenger);
-			if (!firstObject)
-			{
-				firstObject = container;
-			}
+			return nullptr;
 		}
-		return firstObject;
+		const ThingTemplate *containerTmpl = TheThingFactory->findTemplate(containerName);
+		if (!containerTmpl)
+		{
+			return nullptr;
+		}
+		Object *container = TheThingFactory->newObject(containerTmpl, passenger->getTeam());
+		if (!container)
+		{
+			return nullptr;
+		}
+		ContainModuleInterface *contain = container->getContain();
+		if (!contain || !contain->isValidContainerFor(passenger, TRUE))
+		{
+			TheGameLogic->destroyObject(container);
+			return nullptr;
+		}
+
+		doStuffToObj(container, AsciiString::TheEmptyString, sourceObj->getPosition(), sourceObj->getTransformMatrix(), sourceObj->getOrientation(), sourceObj, 0);
+		transport->removeFromContain(passenger);
+		if (passenger->getAI())
+		{
+			passenger->getAI()->aiIdle(CMD_FROM_AI);
+		}
+		passenger->setLayer(LAYER_GROUND);
+		if (m_ignorePrimaryObstacle && passenger->getPhysics())
+		{
+			passenger->getPhysics()->setIgnoreCollisionsWith(sourceObj);
+		}
+		if (m_invulnerableTime > 0)
+		{
+			passenger->goInvulnerable(m_invulnerableTime);
+		}
+		contain->addToContain(passenger);
+		return container;
 	}
 
 	Object* reallyCreate(const Coord3D *pos, const Matrix3D *mtx, Real orientation, const Object *sourceObj, UnsignedInt lifetimeFrames ) const
@@ -1489,7 +1496,8 @@ protected:
 
 		if (m_useTransportOccupants)
 		{
-			return launchTransportOccupants(pos, mtx, orientation, sourceObj, lifetimeFrames);
+			ContainModuleInterface *contain = sourceObj ? sourceObj->getContain() : nullptr;
+			return contain ? contain->launchPassengers(this) : nullptr;
 		}
 
 		if (m_names.size() <= 0)

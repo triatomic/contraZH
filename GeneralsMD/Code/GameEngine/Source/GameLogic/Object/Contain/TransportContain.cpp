@@ -46,6 +46,7 @@
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/TransportContain.h"
 #include "GameLogic/Object.h"
+#include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/WeaponSetType.h"
 
@@ -144,6 +145,7 @@ TransportContain::TransportContain( Thing *thing, const ModuleData *moduleData )
 {
 	m_extraSlotsInUse = 0;
 	m_frameExitNotBusy = 0;
+	m_launchNuggetIndex = -1;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -544,6 +546,7 @@ UpdateSleepTime TransportContain::update()
 			}
 		}
 	}
+	processPassengerLaunch();
 	return OpenContain::update(); //extend
 }
 
@@ -660,6 +663,56 @@ Bool TransportContain::isPassengerAllowedToFire( ObjectID id ) const
 }
 
 // ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+Object* TransportContain::launchPassengers(const ObjectCreationNugget *nugget)
+{
+	if (!isPassengerLaunchPending())
+	{
+		m_launchNuggetIndex = TheObjectCreationListStore->findNuggetIndex(nugget);
+		if (m_launchNuggetIndex < 0)
+		{
+			return nullptr;
+		}
+		for (ContainedItemsList::const_iterator it = getContainList().begin(); it != getContainList().end(); ++it)
+		{
+			m_launchPassengers.push_back((*it)->getID());
+		}
+	}
+	return processPassengerLaunch();
+}
+
+// ------------------------------------------------------------------------------------------------
+Object* TransportContain::processPassengerLaunch()
+{
+	const ObjectCreationNugget *nugget = TheObjectCreationListStore->getNuggetByIndex(m_launchNuggetIndex);
+	if (!nugget || getObject()->isEffectivelyDead())
+	{
+		m_launchPassengers.clear();
+		m_launchNuggetIndex = -1;
+		return nullptr;
+	}
+	Object *firstObject = nullptr;
+	while (!m_launchPassengers.empty() && !isExitBusy())
+	{
+		Object *passenger = TheGameLogic->findObjectByID(m_launchPassengers.front());
+		m_launchPassengers.pop_front();
+		if (!passenger || !isContained(passenger))
+		{
+			continue;
+		}
+		Object *container = nugget->createForTransportPassenger(getObject(), passenger);
+		if (!firstObject)
+		{
+			firstObject = container;
+		}
+	}
+	if (m_launchPassengers.empty())
+	{
+		m_launchNuggetIndex = -1;
+	}
+	return firstObject;
+}
+
 // ------------------------------------------------------------------------------------------------
 const AsciiString& TransportContain::getExitInAirTemplateFor(const Object *passenger) const
 {
@@ -778,7 +831,7 @@ void TransportContain::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -793,6 +846,11 @@ void TransportContain::xfer( Xfer *xfer )
 
 	// frame exit not busy
 	xfer->xferUnsignedInt( &m_frameExitNotBusy );
+	if (version >= 2)
+	{
+		xfer->xferInt(&m_launchNuggetIndex);
+		xfer->xferSTLObjectIDList(&m_launchPassengers);
+	}
 
 }
 
