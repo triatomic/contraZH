@@ -83,6 +83,7 @@ public:
 
 	virtual void onCapture( Player *oldOwner, Player *newOwner ) override; // have to kick everyone out on capture.
 	virtual void onContaining( Object *obj, Bool wasSelected ) override;		///< object now contains 'obj'
+	virtual void orderAllPassengersToExit(CommandSourceType commandSource, Bool instantly) override;
 	virtual void onRemoving( Object *obj ) override;			///< object no longer contains 'obj'
 	virtual UpdateSleepTime update() override;							///< called once per frame
 
