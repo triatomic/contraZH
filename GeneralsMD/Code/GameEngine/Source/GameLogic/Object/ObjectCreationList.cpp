@@ -811,6 +811,7 @@ public:
 		m_fadeSoundName(AsciiString::TheEmptyString),
 		m_particleSysName(AsciiString::TheEmptyString),
 		m_putInContainer(AsciiString::TheEmptyString),
+		m_putVehiclesInContainer(AsciiString::TheEmptyString),
 		m_minMag(0.0f),
 		m_maxMag(0.0f),
 		m_minPitch(0.0f),
@@ -905,6 +906,7 @@ public:
 		{
 			{ "ContainInsideSourceObject", INI::parseBool, nullptr, offsetof( GenericObjectCreationNugget, m_containInsideSourceObject) },
 			{ "UseTransportOccupants", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_useTransportOccupants) },
+			{ "PutVehiclesInContainer", INI::parseAsciiString, nullptr, offsetof(GenericObjectCreationNugget, m_putVehiclesInContainer) },
 			{ "ObjectNames",				parseDebrisObjectNames,		nullptr, 0 },
 			{ "ObjectCount",				INI::parseInt,  nullptr, offsetof(GenericObjectCreationNugget, m_objectCount) },
 			{ "InheritsVeterancy",	INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_inheritsVeterancy) },
@@ -1426,17 +1428,18 @@ protected:
 		{
 			return nullptr;
 		}
-		const ThingTemplate *containerTmpl = TheThingFactory->findTemplate(m_putInContainer);
-		if (!containerTmpl)
-		{
-			return nullptr;
-		}
-
 		Object *firstObject = nullptr;
 		const ContainedItemsList passengers = *transport->getContainedItemsList();
 		for (ContainedItemsList::const_iterator it = passengers.begin(); it != passengers.end(); ++it)
 		{
 			Object *passenger = *it;
+			const AsciiString& containerName = passenger->isKindOf(KINDOF_VEHICLE) && !m_putVehiclesInContainer.isEmpty()
+				? m_putVehiclesInContainer : m_putInContainer;
+			const ThingTemplate *containerTmpl = TheThingFactory->findTemplate(containerName);
+			if (!containerTmpl)
+			{
+				continue;
+			}
 			Object *container = TheThingFactory->newObject(containerTmpl, passenger->getTeam());
 			if (!container)
 			{
@@ -1677,6 +1680,7 @@ private:
 	const FXList*							m_waterImpactFX;
 	Bool											m_requiresLivePlayer;
 	Bool m_useTransportOccupants;
+	AsciiString m_putVehiclesInContainer;
 	Bool											m_experienceSink;
 	Bool											m_inheritsWeaponBonus;
 	Bool											m_containInsideSourceObject; ///< The created stuff will be added to the Conatin module of the SourceObject

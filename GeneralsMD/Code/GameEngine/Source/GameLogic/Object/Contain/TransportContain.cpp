@@ -36,6 +36,7 @@
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/AI.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -111,6 +112,8 @@ void TransportContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "HealthRegen%PerSec", INI::parseReal, nullptr, offsetof( TransportContainModuleData, m_healthRegen ) },
 		{ "ExitDelay",	INI::parseDurationUnsignedInt,		nullptr, offsetof( TransportContainModuleData, m_exitDelay ) },
 		{ "ArmedRidersUpgradeMyWeaponSet",	INI::parseBool,		nullptr, offsetof( TransportContainModuleData, m_armedRidersUpgradeWeaponSet ) },
+		{ "ExitInAirTemplate", INI::parseAsciiString, nullptr, offsetof(TransportContainModuleData, m_exitInAirTemplate) },
+		{ "ExitInAirVehicleTemplate", INI::parseAsciiString, nullptr, offsetof(TransportContainModuleData, m_exitInAirVehicleTemplate) },
 		{ "DelayExitInAir",	INI::parseBool,		nullptr, offsetof( TransportContainModuleData, m_isDelayExitInAir ) },
 
     { nullptr, nullptr, nullptr, 0 }
@@ -651,6 +654,56 @@ Bool TransportContain::isPassengerAllowedToFire( ObjectID id ) const
 }
 
 // ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void TransportContain::exitObjectViaDoor(Object *obj, ExitDoorType exitDoor)
+{
+	const TransportContainModuleData *data = getTransportContainModuleData();
+	const AsciiString& containerName = obj->isKindOf(KINDOF_VEHICLE) && !data->m_exitInAirVehicleTemplate.isEmpty()
+		? data->m_exitInAirVehicleTemplate : data->m_exitInAirTemplate;
+	if (!getObject()->isSignificantlyAboveTerrain() || containerName.isEmpty())
+	{
+		OpenContain::exitObjectViaDoor(obj, exitDoor);
+		return;
+	}
+
+	const ThingTemplate *tmpl = TheThingFactory->findTemplate(containerName);
+	if (!tmpl)
+	{
+		return;
+	}
+	Object *container = TheThingFactory->newObject(tmpl, obj->getTeam());
+	if (!container)
+	{
+		return;
+	}
+	ContainModuleInterface *contain = container->getContain();
+	if (!contain || !contain->isValidContainerFor(obj, TRUE))
+	{
+		TheGameLogic->destroyObject(container);
+		return;
+	}
+
+	container->setProducer(getObject());
+	container->setOrientation(getObject()->getOrientation());
+	container->setPosition(getObject()->getPosition());
+	if (container->getPhysics())
+	{
+		container->getPhysics()->setAllowToFall(TRUE);
+		container->getPhysics()->setIgnoreCollisionsWith(getObject());
+	}
+	removeFromContain(obj);
+	if (obj->getAI())
+	{
+		obj->getAI()->aiIdle(CMD_FROM_AI);
+	}
+	obj->setLayer(LAYER_GROUND);
+	if (obj->getPhysics())
+	{
+		obj->getPhysics()->setIgnoreCollisionsWith(getObject());
+	}
+	contain->addToContain(obj);
+}
+
 // ------------------------------------------------------------------------------------------------
 ExitDoorType TransportContain::reserveDoorForExit( const ThingTemplate* objType, Object *specificObject )
 {

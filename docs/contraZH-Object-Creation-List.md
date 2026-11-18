@@ -5,6 +5,7 @@
 `UseTransportOccupants = Yes` transfers every passenger from the source object's contain module
 into a separate `PutInContainer` object. The default is `No`.
 
+* `PutVehiclesInContainer` overrides `PutInContainer` for vehicle passengers. It defaults to empty.
 * Each passenger keeps its object identity, owner, health, veterancy, upgrades, and experience.
 * `ObjectNames`, `Count`, and `ObjectCount` do not select or limit passengers in this mode.
 * `PutInContainer` is required. A missing template or an incompatible container leaves passengers aboard.
@@ -18,6 +19,7 @@ ObjectCreationList OCL_DropTransportOccupants
   CreateObject
     UseTransportOccupants = Yes
     PutInContainer = AmericaParachuteSelectable
+    PutVehiclesInContainer = LargeParachute
     IgnorePrimaryObstacle = Yes
     Disposition = RANDOM_FORCE
     MinForceMagnitude = 10

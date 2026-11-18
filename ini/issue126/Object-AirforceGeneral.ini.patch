@@ -1,13 +1,15 @@
 --- a/Object/AirforceGeneral.ini
 +++ b/Object/AirforceGeneral.ini
-@@ -18121,6 +18121,19 @@
+@@ -18121,6 +18121,21 @@
      SubdualDamageHealAmount = 32
    End
  
 +  Behavior = TransportContain ModuleTag_Transport
 +    Slots = 6
-+    AllowInsideKindOf = INFANTRY
-+    ForbidInsideKindOf = NO_GARRISON
++    ExitInAirTemplate = AmericaParachuteSelectable
++    ExitInAirVehicleTemplate = LargeParachute
++    AllowInsideKindOf = INFANTRY VEHICLE VEHICLE
++    ForbidInsideKindOf = NO_GARRISON AIRCRAFT
 +    AllowAlliesInside = Yes
 +    AllowNeutralInside = No
 +    AllowEnemiesInside = No

@@ -1,5 +1,26 @@
 # Objects & Modules
 
+## TransportContain airborne exits
+
+* `ExitInAirTemplate` names a container for passengers unloaded above the ground. It defaults to empty.
+* `ExitInAirVehicleTemplate` overrides that container for vehicle passengers. It defaults to empty.
+* Inventory exits and `EVACUATE` use these templates while the transport is significantly above terrain.
+* Ground exits use the transport's usual exit path.
+* Missing templates and incompatible containers leave the passenger aboard.
+* The templates must have a contain module, such as `ParachuteContain`.
+
+```
+Behavior = TransportContain ModuleTag_Transport
+  Slots = 6
+  AllowInsideKindOf = INFANTRY VEHICLE
+  ForbidInsideKindOf = NO_GARRISON AIRCRAFT
+  ExitInAirTemplate = AmericaParachuteSelectable
+  ExitInAirVehicleTemplate = LargeParachute
+End
+```
+
+Changes simulation when configured. [Issue #126](https://github.com/triatomic/contraZH/issues/126).
+
 ## Weapon fire particles
 
 `WeaponFireParticleSys = <weapon slot> <particle system>` creates a bone-attached emitter

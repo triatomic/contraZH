@@ -1,6 +1,6 @@
 --- a/ObjectCreationList.ini
 +++ b/ObjectCreationList.ini
-@@ -2901,6 +2901,21 @@
+@@ -2901,6 +2901,22 @@
  End
  
  ; ----------------------------------------------
@@ -8,6 +8,7 @@
 +  CreateObject
 +    UseTransportOccupants = Yes
 +    PutInContainer = AmericaParachuteSelectable
++    PutVehiclesInContainer = LargeParachute
 +    IgnorePrimaryObstacle = Yes
 +    Disposition = RANDOM_FORCE
 +    MinForceMagnitude = 10

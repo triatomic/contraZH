@@ -1403,7 +1403,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 #if defined(RTS_ZEROHOUR)
 			if (w && !w->hasRequiredTransportOccupants(obj))
 			{
-				return COMMAND_NOT_READY;
+				return COMMAND_RESTRICTED;
 			}
 #endif
 
