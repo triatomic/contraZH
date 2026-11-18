@@ -811,6 +811,7 @@ public:
 		m_fadeSoundName(AsciiString::TheEmptyString),
 		m_particleSysName(AsciiString::TheEmptyString),
 		m_putInContainer(AsciiString::TheEmptyString),
+		m_putVehiclesInContainer(AsciiString::TheEmptyString),
 		m_minMag(0.0f),
 		m_maxMag(0.0f),
 		m_minPitch(0.0f),
@@ -905,6 +906,7 @@ public:
 		{
 			{ "ContainInsideSourceObject", INI::parseBool, nullptr, offsetof( GenericObjectCreationNugget, m_containInsideSourceObject) },
 			{ "UseTransportOccupants", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_useTransportOccupants) },
+			{ "PutVehiclesInContainer", INI::parseAsciiString, nullptr, offsetof(GenericObjectCreationNugget, m_putVehiclesInContainer) },
 			{ "ObjectNames",				parseDebrisObjectNames,		nullptr, 0 },
 			{ "ObjectCount",				INI::parseInt,  nullptr, offsetof(GenericObjectCreationNugget, m_objectCount) },
 			{ "InheritsVeterancy",	INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_inheritsVeterancy) },
@@ -1504,7 +1506,7 @@ protected:
 
 		Object* container = nullptr;
 		Object *firstObject = nullptr;
-		if (!m_putInContainer.isEmpty())
+		if (m_putVehiclesInContainer.isEmpty() && !m_putInContainer.isEmpty())
 		{
 			const ThingTemplate* containerTmpl = TheThingFactory->findTemplate(m_putInContainer);
 			if (containerTmpl)
@@ -1547,6 +1549,27 @@ protected:
 				DEBUG_CRASH( ("OCL::reallyCreate() failed to create debris %s.", tmpl->getName().str() ) );
 				return firstObject;
 			}
+			if (!m_putVehiclesInContainer.isEmpty())
+			{
+				const AsciiString& containerName = debris->isKindOf(KINDOF_VEHICLE) ? m_putVehiclesInContainer : m_putInContainer;
+				const ThingTemplate *containerTmpl = containerName.isEmpty() ? nullptr : TheThingFactory->findTemplate(containerName);
+				container = nullptr;
+				if (containerTmpl)
+				{
+					container = TheThingFactory->newObject(containerTmpl, debrisOwner);
+					if (!container)
+					{
+						TheGameLogic->destroyObject(debris);
+						return firstObject;
+					}
+					if (!firstObject)
+					{
+						firstObject = container;
+					}
+					doStuffToObj(container, AsciiString::TheEmptyString, pos, mtx, orientation, sourceObj, lifetimeFrames);
+				}
+			}
+
 			if( !firstObject )
 			{
 				firstObject = debris;
@@ -1617,8 +1640,10 @@ protected:
 		firstObject->getExperienceTracker()->setExperienceSink(sinkID != INVALID_ID ? sinkID : sourceObj->getID());
 #endif
 
-		if (container)
+		if (container && m_putVehiclesInContainer.isEmpty())
+		{
 			doStuffToObj( container, AsciiString::TheEmptyString, pos, mtx, orientation, sourceObj, lifetimeFrames );
+		}
 
 		return firstObject;
 	}
@@ -1681,6 +1706,7 @@ private:
 	const FXList*							m_waterImpactFX;
 	Bool											m_requiresLivePlayer;
 	Bool m_useTransportOccupants;
+	AsciiString m_putVehiclesInContainer;
 	Bool											m_experienceSink;
 	Bool											m_inheritsWeaponBonus;
 	Bool											m_containInsideSourceObject; ///< The created stuff will be added to the Conatin module of the SourceObject
