@@ -9,7 +9,6 @@ its last passenger leaves. The default is `No`.
 * The completed drop clears the attack order and any pending command.
 * Evacuate starts unloading without issuing a takeoff command, including while parked.
 * `TransportContain`'s `ExitDelay` spaces weapon drops, ordinary Evacuate, and inventory exits.
-* A fresh Evacuate starts without the previous load's cooldown. Repeated presses keep the active sequence's spacing.
 * Explicit instant-evacuation script commands bypass `ExitDelay`.
 * A parked aircraft stays parked after unloading.
 * A return requested during takeoff or landing waits for that maneuver to finish.

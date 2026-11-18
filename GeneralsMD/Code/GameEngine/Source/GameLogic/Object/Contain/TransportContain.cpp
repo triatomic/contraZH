@@ -340,11 +340,6 @@ void TransportContain::onContaining( Object *rider, Bool wasSelected )
 void TransportContain::onRemoving( Object *rider )
 {
 	OpenContain::onRemoving(rider);
-	m_launchPassengers.remove(rider->getID());
-	if (m_launchPassengers.empty())
-	{
-		m_launchNuggetIndex = -1;
-	}
 
 	// object is no longer held inside a transport
 	rider->clearDisabled( DISABLED_HELD );
@@ -668,30 +663,6 @@ Bool TransportContain::isPassengerAllowedToFire( ObjectID id ) const
 }
 
 // ------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------
-void TransportContain::orderAllPassengersToExit(CommandSourceType commandSource, Bool instantly)
-{
-	const TransportContainModuleData *data = getTransportContainModuleData();
-	if (!instantly && (!data->m_exitInAirTemplate.isEmpty() || !data->m_exitInAirVehicleTemplate.isEmpty()))
-	{
-		Bool exiting = isPassengerLaunchPending();
-		for (ContainedItemsList::const_iterator it = getContainList().begin(); it != getContainList().end(); ++it)
-		{
-			const AIUpdateInterface *ai = (*it)->getAI();
-			if (ai && (ai->getAIStateType() == AI_EXIT || ai->getAIStateType() == AI_EXIT_INSTANTLY))
-			{
-				exiting = TRUE;
-				break;
-			}
-		}
-		if (!exiting)
-		{
-			m_frameExitNotBusy = TheGameLogic->getFrame();
-		}
-	}
-	OpenContain::orderAllPassengersToExit(commandSource, instantly);
-}
-
 // ------------------------------------------------------------------------------------------------
 Object* TransportContain::launchPassengers(const ObjectCreationNugget *nugget)
 {
