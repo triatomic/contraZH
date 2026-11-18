@@ -1,0 +1,22 @@
+--- a/Object/AirforceGeneral.ini
++++ b/Object/AirforceGeneral.ini
+@@ -18121,6 +18121,19 @@
+     SubdualDamageHealAmount = 32
+   End
+ 
++  Behavior = TransportContain ModuleTag_Transport
++    Slots = 6
++    AllowInsideKindOf = INFANTRY
++    ForbidInsideKindOf = NO_GARRISON
++    AllowAlliesInside = Yes
++    AllowNeutralInside = No
++    AllowEnemiesInside = No
++    PassengersAllowedToFire = No
++    ScatterNearbyOnExit = No
++    OrientLikeContainerOnExit = Yes
++    ResetMoodCheckTimeOnExit = No
++  End
++
+   Behavior = PhysicsBehavior ModuleTag_04
+     Mass = 500.0
+   End

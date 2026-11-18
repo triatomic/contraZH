@@ -837,6 +837,8 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 	const Object *containedBy = source->getContainedBy();
 	Bool hasAWeaponInRange = FALSE;
 	Bool hasAWeapon				 = FALSE;
+	Bool hasAvailableWeapon = FALSE;
+	Bool hasUnavailableCargoWeapon = FALSE;
 
 	// Only the slots chooseBestWeaponForTarget may pick: every slot when free, else the locked or requested one.
 	Int first, last;
@@ -863,12 +865,19 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 		if ( weaponToTestForRange )
 		{
 			hasAWeapon = TRUE;
+			if (!weaponToTestForRange->hasRequiredTransportOccupants(source))
+			{
+				hasUnavailableCargoWeapon = TRUE;
+				continue;
+			}
 			if ((weaponToTestForRange->getAntiMask() & targetAntiMask) == 0)//this weapon cannot hit the target
 				continue;
 
 			// A lock or a requested slot bypasses the picker, so only a free choice honours AutoChooseSources.
 			if( !isCurWeaponLocked() && specificSlot == (WeaponSlotType)-1 && !isSlotAllowedForCommandSource( (WeaponSlotType)slot, commandSource ) )
 				continue;
+
+			hasAvailableWeapon = TRUE;
 
 			Bool handled = FALSE;
 			ContainModuleInterface *contain = containedBy ? containedBy->getContain() : nullptr;
@@ -908,7 +917,7 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 
 // ----- things we examine about SOURCE to determine legality of attack
 
-	if (hasAnyDamageWeapon())
+	if (hasAnyDamageWeapon() && (!hasUnavailableCargoWeapon || hasAvailableWeapon))
 	{
 		if ((m_totalAntiMask & targetAntiMask) == 0)
 			return ATTACKRESULT_INVALID_SHOT;
@@ -1046,7 +1055,8 @@ Bool WeaponSet::canSlotAttackGround( WeaponSlotType wslot, CommandSourceType cmd
 Bool WeaponSet::canFireSyncedWeapon(WeaponSlotType wslot, const Object* source, const Object* victim, const Coord3D* pos) const
 {
 	Weapon* weapon = m_weapons[wslot];
-	if (weapon == nullptr || m_curWeaponTemplateSet == nullptr || weapon->getStatus() != READY_TO_FIRE)
+	if (weapon == nullptr || m_curWeaponTemplateSet == nullptr || weapon->getStatus() != READY_TO_FIRE ||
+		!weapon->hasRequiredTransportOccupants(source))
 	{
 		return FALSE;
 	}
@@ -1145,8 +1155,10 @@ Bool WeaponSet::chooseBestWeaponForTarget(const Object* obj, const Object* victi
 		}
 
 		Weapon* weapon = m_weapons[i];
-		if (weapon == nullptr)
+		if (weapon == nullptr || !weapon->hasRequiredTransportOccupants(obj))
+		{
 			continue;
+		}
 
 		// No bad wrong!  Being out of range does not mean this weapon can not affect the target!
 		// weapon out of range.

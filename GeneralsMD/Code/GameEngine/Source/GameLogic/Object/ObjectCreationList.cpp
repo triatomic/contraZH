@@ -775,6 +775,7 @@ public:
 
 	GenericObjectCreationNugget() :
 		m_requiresLivePlayer(FALSE),
+		m_useTransportOccupants(FALSE),
 		m_debrisTemplateName(AsciiString::TheEmptyString),
 		m_debrisToGenerate(1),
 		m_mass(0),
@@ -903,6 +904,7 @@ public:
 		static const FieldParse myFieldParse[] =
 		{
 			{ "ContainInsideSourceObject", INI::parseBool, nullptr, offsetof( GenericObjectCreationNugget, m_containInsideSourceObject) },
+			{ "UseTransportOccupants", INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_useTransportOccupants) },
 			{ "ObjectNames",				parseDebrisObjectNames,		nullptr, 0 },
 			{ "ObjectCount",				INI::parseInt,  nullptr, offsetof(GenericObjectCreationNugget, m_objectCount) },
 			{ "InheritsVeterancy",	INI::parseBool, nullptr, offsetof(GenericObjectCreationNugget, m_inheritsVeterancy) },
@@ -1416,6 +1418,61 @@ protected:
 
 	}
 
+	Object* launchTransportOccupants(const Coord3D *pos, const Matrix3D *mtx, Real orientation, const Object *sourceObj, UnsignedInt lifetimeFrames) const
+	{
+		ContainModuleInterface *transport = sourceObj ? sourceObj->getContain() : nullptr;
+		if (!transport || m_putInContainer.isEmpty() ||
+			(m_requiresLivePlayer && (!sourceObj->getControllingPlayer() || !sourceObj->getControllingPlayer()->isPlayerActive())))
+		{
+			return nullptr;
+		}
+		const ThingTemplate *containerTmpl = TheThingFactory->findTemplate(m_putInContainer);
+		if (!containerTmpl)
+		{
+			return nullptr;
+		}
+
+		Object *firstObject = nullptr;
+		const ContainedItemsList passengers = *transport->getContainedItemsList();
+		for (ContainedItemsList::const_iterator it = passengers.begin(); it != passengers.end(); ++it)
+		{
+			Object *passenger = *it;
+			Object *container = TheThingFactory->newObject(containerTmpl, passenger->getTeam());
+			if (!container)
+			{
+				break;
+			}
+			ContainModuleInterface *contain = container->getContain();
+			if (!contain || !contain->isValidContainerFor(passenger, TRUE))
+			{
+				TheGameLogic->destroyObject(container);
+				continue;
+			}
+
+			doStuffToObj(container, AsciiString::TheEmptyString, pos, mtx, orientation, sourceObj, lifetimeFrames);
+			transport->removeFromContain(passenger);
+			if (passenger->getAI())
+			{
+				passenger->getAI()->aiIdle(CMD_FROM_AI);
+			}
+			passenger->setLayer(LAYER_GROUND);
+			if (m_ignorePrimaryObstacle && passenger->getPhysics())
+			{
+				passenger->getPhysics()->setIgnoreCollisionsWith(sourceObj);
+			}
+			if (m_invulnerableTime > 0)
+			{
+				passenger->goInvulnerable(m_invulnerableTime);
+			}
+			contain->addToContain(passenger);
+			if (!firstObject)
+			{
+				firstObject = container;
+			}
+		}
+		return firstObject;
+	}
+
 	Object* reallyCreate(const Coord3D *pos, const Matrix3D *mtx, Real orientation, const Object *sourceObj, UnsignedInt lifetimeFrames ) const
 	{
 		const ThingTemplate* debrisTemplate;
@@ -1423,6 +1480,11 @@ protected:
 			debrisTemplate = TheThingFactory->findTemplate(m_debrisTemplateName);
 		else
 			debrisTemplate = TheThingFactory->findTemplate("GenericDebris");
+
+		if (m_useTransportOccupants)
+		{
+			return launchTransportOccupants(pos, mtx, orientation, sourceObj, lifetimeFrames);
+		}
 
 		if (m_names.size() <= 0)
 			return nullptr;
@@ -1614,6 +1676,7 @@ private:
 	AudioEventRTS							m_waterImpactSound;
 	const FXList*							m_waterImpactFX;
 	Bool											m_requiresLivePlayer;
+	Bool m_useTransportOccupants;
 	Bool											m_experienceSink;
 	Bool											m_inheritsWeaponBonus;
 	Bool											m_containInsideSourceObject; ///< The created stuff will be added to the Conatin module of the SourceObject

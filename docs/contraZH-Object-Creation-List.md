@@ -1,5 +1,40 @@
 # ObjectCreationList.ini
 
+## CreateObject UseTransportOccupants
+
+`UseTransportOccupants = Yes` transfers every passenger from the source object's contain module
+into a separate `PutInContainer` object. The default is `No`.
+
+* Each passenger keeps its object identity, owner, health, veterancy, upgrades, and experience.
+* `ObjectNames`, `Count`, and `ObjectCount` do not select or limit passengers in this mode.
+* `PutInContainer` is required. A missing template or an incompatible container leaves passengers aboard.
+* The container receives the usual OCL position, offset, disposition, force, and lifetime settings.
+* `IgnorePrimaryObstacle` and `InvulnerableTime` also apply to each passenger.
+* `RequiresLivePlayer` checks the source player's state before releasing passengers.
+* Use `RequiresTransportOccupants = Yes` on the firing weapon to disable it while empty.
+
+```
+ObjectCreationList OCL_DropTransportOccupants
+  CreateObject
+    UseTransportOccupants = Yes
+    PutInContainer = AmericaParachuteSelectable
+    IgnorePrimaryObstacle = Yes
+    Disposition = RANDOM_FORCE
+    MinForceMagnitude = 10
+    MaxForceMagnitude = 12
+    MinForcePitch = 50
+    MaxForcePitch = 60
+    InvulnerableTime = 2000
+    RequiresLivePlayer = Yes
+  End
+End
+```
+
+A `FireOCL` releases passengers at the aircraft's position when it fires. The weapon's range
+controls how close the aircraft must get to the ordered location.
+
+Changes simulation when enabled. [Issue #126](https://github.com/triatomic/contraZH/issues/126).
+
 ## Attack nugget: FireRegardlessOfOrders
 
 * `FireRegardlessOfOrders = No` - (Default. `Yes` fires every `NumberOfShots` no matter what the
