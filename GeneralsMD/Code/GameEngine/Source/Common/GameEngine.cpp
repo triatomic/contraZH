@@ -113,7 +113,6 @@
 #include "GameLogic/PathScenario.h"
 #include "Common/GameMcp.h"
 #include "GameNetwork/NetworkInterface.h"
-#include "GameNetwork/WOLBrowser/WebBrowser.h"
 #include "GameNetwork/LANAPI.h"
 #include "GameNetwork/GameSpy/GameResultsThread.h"
 
@@ -250,10 +249,6 @@ static void setStartupStage(const char* stage)
 }
 
 //-------------------------------------------------------------------------------------------------
-extern HINSTANCE ApplicationHInstance;  ///< our application instance
-extern CComModule _Module;
-
-//-------------------------------------------------------------------------------------------------
 static void updateTGAtoDDS();
 
 //-------------------------------------------------------------------------------------------------
@@ -335,8 +330,6 @@ GameEngine::GameEngine()
 	m_discordRichPresence = nullptr;
 #endif
 	m_isActive = FALSE;
-
-	_Module.Init(nullptr, ApplicationHInstance, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -400,8 +393,6 @@ GameEngine::~GameEngine()
 #endif
 
 	Drawable::killStaticImages();
-
-	_Module.Term();
 
 #ifdef PERF_TIMERS
 	PerfGather::termPerfDump();
@@ -779,7 +770,6 @@ void GameEngine::init()
 		setStartupStage("Subsystem initialization");
 
 		initSubsystem(TheActionManager,"TheActionManager", MSGNEW("GameEngineSubsystem") ActionManager(), nullptr);
-		//initSubsystem((CComObject<WebBrowser> *)TheWebBrowser,"(CComObject<WebBrowser> *)TheWebBrowser", (CComObject<WebBrowser> *)createWebBrowser(), nullptr);
 		initSubsystem(TheGameStateMap,"TheGameStateMap", MSGNEW("GameEngineSubsystem") GameStateMap, nullptr );
 		initSubsystem(TheGameState,"TheGameState", MSGNEW("GameEngineSubsystem") GameState, nullptr );
 

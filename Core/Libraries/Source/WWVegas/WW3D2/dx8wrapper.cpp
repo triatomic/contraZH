@@ -53,7 +53,6 @@
 #include "dx8wrapper.h"
 #include "dx8instancing.h"
 #include "dx8skinning.h"
-#include "dx8webbrowser.h"
 #include "dx8fvf.h"
 #include "dx8vertexbuffer.h"
 #include "dx8indexbuffer.h"
@@ -1949,22 +1948,14 @@ void DX8Wrapper::Begin_Scene()
 {
 	DX8_THREAD_ASSERT();
 
-#if ENABLE_EMBEDDED_BROWSER
-	DX8WebBrowser::Update();
-#endif
-
 	Bind_Scene_Target();
 	DX8CALL(BeginScene());
-
-	DX8WebBrowser::Update();
 }
 
 void DX8Wrapper::End_Scene(bool flip_frames)
 {
 	DX8_THREAD_ASSERT();
 	DX8CALL(EndScene());
-
-	DX8WebBrowser::Render(0);
 
 	if (flip_frames) {
 		ShaderDrawCounterClass::End_Frame();

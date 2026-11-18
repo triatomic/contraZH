@@ -227,7 +227,6 @@ public:
 	static void parseAudioEventDefinition( INI *ini );
 	static void parseDialogDefinition( INI *ini );
 	static void parseMusicTrackDefinition( INI *ini );
-	static void parseWebpageURLDefinition( INI *ini );
 	static void parseHeaderTemplateDefinition( INI *ini );
 	static void parseParticleSystemDefinition( INI *ini );
 	static void parseParticleSystemExtendDefinition( INI *ini );

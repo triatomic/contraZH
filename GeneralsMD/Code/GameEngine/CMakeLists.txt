@@ -563,8 +563,6 @@ set(GAMEENGINE_SRC
 #    Include/GameNetwork/Transport.h
 #    Include/GameNetwork/udp.h
 #    Include/GameNetwork/User.h
-#    Include/GameNetwork/WOLBrowser/FEBDispatch.h
-#    Include/GameNetwork/WOLBrowser/WebBrowser.h
 #    Include/Precompiled/PreRTS.h
 #    Source/Common/Audio/AudioEventRTS.cpp
 #    Source/Common/Audio/AudioRequest.cpp
@@ -615,7 +613,6 @@ set(GAMEENGINE_SRC
 #    Source/Common/INI/INIVideo.cpp
 #    Source/Common/INI/INIWater.cpp
 #    Source/Common/INI/INIWeapon.cpp
-#    Source/Common/INI/INIWebpageURL.cpp
 #    Source/Common/Language.cpp
 #    Source/Common/MessageStream.cpp
 #    Source/Common/MiniLog.cpp
@@ -1170,7 +1167,6 @@ set(GAMEENGINE_SRC
 #    Source/GameNetwork/Transport.cpp
 #    Source/GameNetwork/udp.cpp
 #    Source/GameNetwork/User.cpp
-#    Source/GameNetwork/WOLBrowser/WebBrowser.cpp
 #    Source/Precompiled/PreRTS.cpp
 
     # TheSuperHackers @merge Fork feature modules (GeneralsMD-only, not part of base/Core)

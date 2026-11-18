@@ -168,7 +168,6 @@ static const BlockParse theTypeTable[] =
 	{ "Weapon",                         INI::parseWeaponTemplateDefinition },
 	{ "WeaponExtend",                   INI::parseWeaponExtendTemplateDefinition },
 	{ "Weather",                        INI::parseWeatherDefinition },
-	{ "WebpageURL",                     INI::parseWebpageURLDefinition },
 	{ "WindowTransition",               INI::parseWindowTransitions },
 };
 
