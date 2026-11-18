@@ -3132,11 +3132,27 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
 
+	if (parms->m_cmd == AICMD_MOVE_AWAY_FROM_UNIT && !isAllowedToMoveAwayFromUnit())
+	{
+		return;
+	}
+
 	if (getJetAIUpdateModuleData()->m_returnToBaseAfterUnload &&
 		(parms->m_cmd == AICMD_EVACUATE || parms->m_cmd == AICMD_EVACUATE_INSTANTLY))
 	{
 		friend_purgePendingCommand();
-		privateEvacuateInstantly(parms->m_intValue, parms->m_cmdSource);
+		if (isAttacking())
+		{
+			AIUpdateInterface::privateIdle(parms->m_cmdSource);
+		}
+		if (parms->m_cmd == AICMD_EVACUATE_INSTANTLY)
+		{
+			privateEvacuateInstantly(parms->m_intValue, parms->m_cmdSource);
+		}
+		else
+		{
+			privateEvacuate(parms->m_intValue, parms->m_cmdSource);
+		}
 		return;
 	}
 

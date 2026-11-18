@@ -7,7 +7,9 @@ its last passenger leaves. The default is `No`.
 
 * A completed weapon drop, the last inventory exit, and Evacuate trigger the return while airborne.
 * The completed drop clears the attack order and any pending command.
-* Evacuate unloads immediately, including while parked, without issuing a takeoff command.
+* Evacuate starts unloading without issuing a takeoff command, including while parked.
+* `TransportContain`'s `ExitDelay` spaces ordinary Evacuate and inventory exits.
+* Explicit instant-evacuation script commands bypass `ExitDelay`.
 * A parked aircraft stays parked after unloading.
 * A return requested during takeoff or landing waits for that maneuver to finish.
 
