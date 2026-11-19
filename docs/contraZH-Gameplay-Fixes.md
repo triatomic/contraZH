@@ -11,6 +11,23 @@ shot.
 
 This changes the simulation and can change older replay playback. ([#244](https://github.com/triatomic/contraZH/issues/244))
 
+## Force fire can target allied stealthed objects
+
+Force fire can target stealthed units and buildings owned by an allied player.
+The attack check now recognizes allied stealth visibility as well as ownership.
+
+This changes the simulation and can change older replay playback. Multiplayer clients need
+matching engine versions.
+
+## Mines leave docking approach positions clear
+
+Docking units ignore mines when choosing an approach position, matching normal pathfinding.
+Adding mines to a China supply center no longer pushes its trucks toward farther docking
+positions. This applies to mines owned by any player.
+
+This changes the simulation and can change older replay playback. Multiplayer clients need
+matching engine versions.
+
 ## Patriots return to normal range after assisting
 
 Patriots and other units using `AssistedTargetingUpdate` release their temporary weapon lock
