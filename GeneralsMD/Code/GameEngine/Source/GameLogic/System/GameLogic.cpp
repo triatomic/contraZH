@@ -5030,8 +5030,7 @@ void GameLogic::getAIMetricsStatistics( UnsignedInt *numAI, UnsignedInt *numMovi
 // ------------------------------------------------------------------------------------------------
 void GameLogic::crc( Xfer *xfer )
 {
-	xfer->xferBool( &TheWriteableMapData->m_aiSpecialPowersRespectFog );
-	xfer->xferBool( &TheWriteableMapData->m_aiSpecialPowersRespectStealth );
+
 }
 
 // ------------------------------------------------------------------------------------------------

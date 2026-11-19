@@ -29,6 +29,7 @@
 
 #include "Common/CRCDebug.h"
 #include "Common/GameState.h"
+#include "Common/MapData.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -1045,6 +1046,8 @@ void AI::crc( Xfer *xfer )
 			xfer->xferSnapshot( (*groupIt) );
 		}
 	}
+	xfer->xferBool( &TheWriteableMapData->m_aiSpecialPowersRespectFog );
+	xfer->xferBool( &TheWriteableMapData->m_aiSpecialPowersRespectStealth );
 
 }
 
