@@ -82,6 +82,7 @@
 #include "GameClient/GameWindowID.h"
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Keyboard.h"
 #include "GameClient/VideoPlayer.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/GadgetStaticText.h"
@@ -159,6 +160,322 @@ static UnicodeString formatIncomeValue(UnsignedInt cashPerMin)
 		result.format(L"%u", (cashPerMin / 10) * 10);
 	}
 	return result;
+}
+
+// ------------------------------------------------------------------------------------------------
+enum
+{
+	QUEUE_BAR_INFANTRY,
+	QUEUE_BAR_VEHICLE,
+	QUEUE_BAR_AIRCRAFT,
+	QUEUE_BAR_SUPPORT,
+	QUEUE_BAR_BUTTON_COUNT
+};
+
+static const char *const TheQueueBarButtons[ QUEUE_BAR_BUTTON_COUNT ] =
+{
+	"ControlBar.wnd:ButtonQueueBarInfantry",
+	"ControlBar.wnd:ButtonQueueBarVehicle",
+	"ControlBar.wnd:ButtonQueueBarAircraft",
+	"ControlBar.wnd:ButtonQueueBarSupport",
+};
+
+static std::vector<ObjectID> s_queueBarIdle[ QUEUE_BAR_BUTTON_COUNT ];
+// logic frame of the last scan
+static UnsignedInt s_queueBarFrame = ~0u;
+struct QueueBarIdleRecord
+{
+	UnsignedInt start;	///< frame the unit was first seen idle
+	UnsignedInt seen;		///< frame of the last scan that found it idle
+};
+// when each idle unit was first seen idle, and the scan that last saw it
+static std::map<ObjectID, QueueBarIdleRecord> s_queueBarIdleSince;
+// a unit shows once it has been idle this long, so a pause between targets does not count
+static const UnsignedInt QUEUE_BAR_IDLE_GRACE_FRAMES = LOGICFRAMES_PER_SECOND * 6;
+
+// ------------------------------------------------------------------------------------------------
+static NameKeyType queueBarButtonKey( Int index )
+{
+	static NameKeyType keys[ QUEUE_BAR_BUTTON_COUNT ] = { NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID };
+	if( keys[ index ] == NAMEKEY_INVALID )
+	{
+		keys[ index ] = TheNameKeyGenerator->nameToKey( TheQueueBarButtons[ index ] );
+	}
+	return keys[ index ];
+}
+
+// ------------------------------------------------------------------------------------------------
+static void collectIdleUnit( Object *obj, void *userData )
+{
+	// Aircraft first because most aircraft are also vehicles
+	Int category;
+	if( obj->isKindOf( KINDOF_AIRCRAFT ) )
+	{
+		category = QUEUE_BAR_AIRCRAFT;
+	}
+	else if( obj->isKindOf( KINDOF_INFANTRY ) )
+	{
+		category = QUEUE_BAR_INFANTRY;
+	}
+	else if( obj->isKindOf( KINDOF_VEHICLE ) )
+	{
+		category = QUEUE_BAR_VEHICLE;
+	}
+	else
+	{
+		return;
+	}
+
+	// Dozers and harvesters are workers, not army
+	if( obj->isKindOf( KINDOF_DOZER ) || obj->isKindOf( KINDOF_HARVESTER ) )
+	{
+		return;
+	}
+
+	// Contra tags its non-combat units with IGNORES_SELECT_ALL
+	if( obj->isKindOf( KINDOF_IGNORES_SELECT_ALL ) )
+	{
+		category = QUEUE_BAR_SUPPORT;
+	}
+
+	// An angry mob's nexus stands for its members
+	if( obj->isKindOf( KINDOF_IGNORED_IN_GUI ) || obj->isOffMap() )
+	{
+		return;
+	}
+
+	if( !obj->isMassSelectable() || obj->isEffectivelyDead() || obj->getDrawable() == nullptr || obj->getContainedBy() != nullptr )
+	{
+		return;
+	}
+
+	AIUpdateInterface *ai = obj->getAIUpdateInterface();
+	if( ai == nullptr || !ai->isIdle() )
+	{
+		return;
+	}
+
+	UnsignedInt now = TheGameLogic->getFrame();
+	QueueBarIdleRecord record;
+	record.start = now;
+	record.seen = now;
+	std::pair<std::map<ObjectID, QueueBarIdleRecord>::iterator, bool> result = s_queueBarIdleSince.insert( std::make_pair( obj->getID(), record ) );
+	result.first->second.seen = now;
+	UnsignedInt start = result.first->second.start;
+
+	if( now - start >= QUEUE_BAR_IDLE_GRACE_FRAMES )
+	{
+		s_queueBarIdle[ category ].push_back( obj->getID() );
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+static void resetQueueBar()
+{
+	for( Int i = 0; i < QUEUE_BAR_BUTTON_COUNT; ++i )
+	{
+		s_queueBarIdle[ i ].clear();
+	}
+	s_queueBarIdleSince.clear();
+	s_queueBarFrame = ~0u;
+}
+
+// ------------------------------------------------------------------------------------------------
+static void setQueueBarCount( GameWindow *button, size_t idle )
+{
+	if( !BitIsSet( button->winGetStatus(), WIN_STATUS_COUNT_FOOTER ) )
+	{
+		static NameKeyType commandButtonKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:ButtonCommand01" );
+
+		// a button fresh from the layout takes the command group row's count font and colours
+		button->winSetStatus( WIN_STATUS_COUNT_FOOTER );
+		GameWindow *commandButton = TheWindowManager->winGetWindowFromId( nullptr, commandButtonKey );
+		if( commandButton != nullptr )
+		{
+			GameFont *font = commandButton->winGetFont();
+			if( font != nullptr )
+			{
+				button->winSetFont( font );
+			}
+			button->winSetEnabledTextColors( commandButton->winGetEnabledTextColor(), commandButton->winGetEnabledTextBorderColor() );
+			button->winSetHiliteTextColors( commandButton->winGetHiliteTextColor(), commandButton->winGetHiliteTextBorderColor() );
+			button->winSetDisabledTextColors( commandButton->winGetDisabledTextColor(), commandButton->winGetDisabledTextBorderColor() );
+		}
+	}
+
+	UnicodeString count;
+	if( idle > 0 && idle <= MAX_CAMEO_COUNT_BADGE )
+	{
+		count.format( L"%d", (Int)idle );
+	}
+	if( count != button->winGetText() )
+	{
+		GadgetButtonSetText( button, count );
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+static void updateQueueBar()
+{
+	static NameKeyType parentKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:QueueBarParent" );
+	static NameKeyType controlBarKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:ControlBarParent" );
+
+	GameWindow *parent = TheWindowManager->winGetWindowFromId( nullptr, parentKey );
+	if( parent == nullptr )
+	{
+		return;
+	}
+
+	Player *player = nullptr;
+	Bool track = TheGlobalData->m_queueBar && TheGameLogic->isInGame() && !TheGameLogic->isInShellGame();
+	Bool show = FALSE;
+	if( track )
+	{
+		player = ThePlayerList->getLocalPlayer();
+		track = player != nullptr && player->isPlayerActive();
+		GameWindow *controlBar = TheWindowManager->winGetWindowFromId( nullptr, controlBarKey );
+		show = track && controlBar != nullptr && !controlBar->winIsHidden();
+	}
+
+	if( track )
+	{
+		UnsignedInt frame = TheGameLogic->getFrame();
+		if( frame != s_queueBarFrame )
+		{
+			for( Int i = 0; i < QUEUE_BAR_BUTTON_COUNT; ++i )
+			{
+				s_queueBarIdle[ i ].clear();
+			}
+			player->iterateObjects( collectIdleUnit, nullptr );
+			std::map<ObjectID, QueueBarIdleRecord>::iterator it = s_queueBarIdleSince.begin();
+			while( it != s_queueBarIdleSince.end() )
+			{
+				if( it->second.seen != frame )
+				{
+					s_queueBarIdleSince.erase( it++ );
+				}
+				else
+				{
+					++it;
+				}
+			}
+			s_queueBarFrame = frame;
+		}
+	}
+	else
+	{
+		resetQueueBar();
+	}
+
+	Bool anyIdle = FALSE;
+	for( Int i = 0; i < QUEUE_BAR_BUTTON_COUNT; ++i )
+	{
+		Bool hide = s_queueBarIdle[ i ].empty();
+		if( !hide )
+		{
+			anyIdle = TRUE;
+		}
+		GameWindow *button = TheWindowManager->winGetWindowFromId( parent, queueBarButtonKey( i ) );
+		if( button != nullptr && button->winIsHidden() != hide )
+		{
+			button->winHide( hide );
+		}
+		if( button != nullptr )
+		{
+			setQueueBarCount( button, s_queueBarIdle[ i ].size() );
+		}
+	}
+
+	Bool hideParent = !show || !anyIdle;
+	if( parent->winIsHidden() != hideParent )
+	{
+		parent->winHide( hideParent );
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+static void selectNextIdleUnit( Int index )
+{
+	const std::vector<ObjectID> &idle = s_queueBarIdle[ index ];
+	size_t count = idle.size();
+	if( count == 0 )
+	{
+		return;
+	}
+
+	size_t start = 0;
+	if( TheInGameUI->getSelectCount() == 1 )
+	{
+		Drawable *selected = TheInGameUI->getFirstSelectedDrawable();
+		Object *selectedObj = selected ? selected->getObject() : nullptr;
+		if( selectedObj != nullptr )
+		{
+			for( size_t i = 0; i < count; ++i )
+			{
+				if( idle[ i ] == selectedObj->getID() )
+				{
+					start = ( i + 1 ) % count;
+					break;
+				}
+			}
+		}
+	}
+
+	for( size_t n = 0; n < count; ++n )
+	{
+		Object *obj = TheGameLogic->findObjectByID( idle[ ( start + n ) % count ] );
+		if( obj != nullptr && obj->getDrawable() != nullptr )
+		{
+			TheInGameUI->deselectAllDrawables();
+			GameMessage *teamMsg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP );
+			teamMsg->appendBooleanArgument( TRUE );
+			teamMsg->appendObjectIDArgument( obj->getID() );
+			TheInGameUI->selectDrawable( obj->getDrawable() );
+			TheTacticalView->userLookAt( obj->getPosition() );
+			return;
+		}
+	}
+}
+
+// GameMessage counts its arguments in an UnsignedByte
+static const Int QUEUE_BAR_MAX_MSG_ARGS = 255;
+
+// ------------------------------------------------------------------------------------------------
+static void selectAllIdleUnits( Int index )
+{
+	const std::vector<ObjectID> &idle = s_queueBarIdle[ index ];
+	GameMessage *teamMsg = nullptr;
+	for( size_t i = 0; i < idle.size(); ++i )
+	{
+		Object *obj = TheGameLogic->findObjectByID( idle[ i ] );
+		if( obj == nullptr || obj->getDrawable() == nullptr )
+		{
+			continue;
+		}
+
+		if( teamMsg == nullptr )
+		{
+			TheInGameUI->deselectAllDrawables();
+			teamMsg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP );
+			teamMsg->appendBooleanArgument( TRUE );
+		}
+		else if( teamMsg->getArgumentCount() >= QUEUE_BAR_MAX_MSG_ARGS )
+		{
+			teamMsg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP );
+			teamMsg->appendBooleanArgument( FALSE );
+		}
+
+		if( TheInGameUI->getMaxSelectCount() > 0 && TheInGameUI->getSelectCount() >= TheInGameUI->getMaxSelectCount() )
+		{
+			UnicodeString msg;
+			msg.format( TheGameText->fetch( "GUI:MaxSelectionSize" ).str(), TheInGameUI->getMaxSelectCount() );
+			TheInGameUI->message( msg );
+			return;
+		}
+
+		teamMsg->appendObjectIDArgument( obj->getID() );
+		TheInGameUI->selectDrawable( obj->getDrawable() );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3521,6 +3838,7 @@ void InGameUI::update()
 	TheControlBar->update();
 
 	updateIdleWorker();
+	updateQueueBar();
 
 	// update any random window layout that so requests
 	for (std::list<WindowLayout *>::iterator it = m_windowLayouts.begin(); it != m_windowLayouts.end(); ++it)
@@ -3651,6 +3969,7 @@ void InGameUI::reset()
 	clearFloatingText();
 	clearWorldAnimations();
 	resetIdleWorker();
+	resetQueueBar();
 	// clear hint lists
 	for( i = 0; i < MAX_MOVE_HINTS; i++ )
 	{
@@ -6132,6 +6451,15 @@ void InGameUI::postDraw()
 
 		x = m_messagePosition.x;
 		y = m_messagePosition.y;
+
+		// the messages start under the inline HUD line, and under the command group box while it shows
+		y = max( y, getHudAnchorBottom() );
+		const Int commandGroupBottom = TheControlBar ? TheControlBar->getCommandGroupBarBottom() : 0;
+		if( commandGroupBottom > 0 )
+		{
+			y = max( y, commandGroupBottom + COMMAND_GROUP_SCREEN_MARGIN );
+		}
+
 		for( i = MAX_UI_MESSAGES - 1; i >= 0; i-- )
 		{
 
@@ -8920,6 +9248,58 @@ WindowMsgHandledType IdleWorkerSystem( GameWindow *window, UnsignedInt msg,
 
 }
 
+WindowMsgHandledType QueueBarSystem( GameWindow *window, UnsignedInt msg,
+																			WindowMsgData mData1, WindowMsgData mData2 )
+{
+	switch( msg )
+	{
+		//---------------------------------------------------------------------------------------------
+		case GWM_INPUT_FOCUS:
+		{
+			if( mData1 == TRUE )
+			{
+				*(Bool *)mData2 = FALSE;
+			}
+			break;
+
+		}
+		//---------------------------------------------------------------------------------------------
+		case GBM_SELECTED:
+		{
+			GameWindow *control = (GameWindow *)mData1;
+			if( control != nullptr )
+			{
+				Int id = control->winGetWindowId();
+				for( Int i = 0; i < QUEUE_BAR_BUTTON_COUNT; ++i )
+				{
+					if( id == queueBarButtonKey( i ) )
+					{
+						if( TheKeyboard != nullptr && ( TheKeyboard->getModifierFlags() & KEY_STATE_SHIFT ) )
+						{
+							selectAllIdleUnits( i );
+						}
+						else
+						{
+							selectNextIdleUnit( i );
+						}
+						break;
+					}
+				}
+			}
+			break;
+
+		}
+
+		//---------------------------------------------------------------------------------------------
+		default:
+			return MSG_IGNORED;
+
+	}
+
+	return MSG_HANDLED;
+
+}
+
 
 void InGameUI::updateRenderFpsString()
 {
@@ -9028,6 +9408,32 @@ void InGameUI::drawSystemTime(Int &x, Int &y)
 	{
 		m_systemTimeString->draw(m_systemTimePosition.x, m_systemTimePosition.y, m_systemTimeColor, m_systemTimeDropColor);
 	}
+}
+
+// the font height, since a string has no text until its first draw
+static Int getHudStringBottom(DisplayString *string)
+{
+	GameFont *font = string ? string->getFont() : nullptr;
+	return font ? kHudAnchorY + font->height : 0;
+}
+
+Int InGameUI::getHudAnchorBottom() const
+{
+	Int bottom = 0;
+	if (m_networkLatencyPointSize > 0 && TheGameLogic && TheGameLogic->isInMultiplayerGame() && isAtHudAnchorPos(m_networkLatencyPosition))
+	{
+		bottom = max(bottom, getHudStringBottom(m_networkLatencyString));
+	}
+	if (m_renderFpsPointSize > 0 && isAtHudAnchorPos(m_renderFpsPosition))
+	{
+		bottom = max(bottom, getHudStringBottom(m_renderFpsString));
+		bottom = max(bottom, getHudStringBottom(m_renderFpsLimitString));
+	}
+	if (m_systemTimePointSize > 0 && isAtHudAnchorPos(m_systemTimePosition))
+	{
+		bottom = max(bottom, getHudStringBottom(m_systemTimeString));
+	}
+	return bottom;
 }
 
 void InGameUI::drawGameTime()
