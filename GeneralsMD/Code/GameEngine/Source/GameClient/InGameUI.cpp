@@ -82,6 +82,7 @@
 #include "GameClient/GameWindowID.h"
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Keyboard.h"
 #include "GameClient/VideoPlayer.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/GadgetStaticText.h"
@@ -159,6 +160,322 @@ static UnicodeString formatIncomeValue(UnsignedInt cashPerMin)
 		result.format(L"%u", (cashPerMin / 10) * 10);
 	}
 	return result;
+}
+
+// ------------------------------------------------------------------------------------------------
+enum
+{
+	QUEUE_BAR_INFANTRY,
+	QUEUE_BAR_VEHICLE,
+	QUEUE_BAR_AIRCRAFT,
+	QUEUE_BAR_SUPPORT,
+	QUEUE_BAR_BUTTON_COUNT
+};
+
+static const char *const TheQueueBarButtons[ QUEUE_BAR_BUTTON_COUNT ] =
+{
+	"ControlBar.wnd:ButtonQueueBarInfantry",
+	"ControlBar.wnd:ButtonQueueBarVehicle",
+	"ControlBar.wnd:ButtonQueueBarAircraft",
+	"ControlBar.wnd:ButtonQueueBarSupport",
+};
+
+static std::vector<ObjectID> s_queueBarIdle[ QUEUE_BAR_BUTTON_COUNT ];
+// logic frame of the last scan
+static UnsignedInt s_queueBarFrame = ~0u;
+struct QueueBarIdleRecord
+{
+	UnsignedInt start;	///< frame the unit was first seen idle
+	UnsignedInt seen;		///< frame of the last scan that found it idle
+};
+// when each idle unit was first seen idle, and the scan that last saw it
+static std::map<ObjectID, QueueBarIdleRecord> s_queueBarIdleSince;
+// a unit shows once it has been idle this long, so a pause between targets does not count
+static const UnsignedInt QUEUE_BAR_IDLE_GRACE_FRAMES = LOGICFRAMES_PER_SECOND * 6;
+
+// ------------------------------------------------------------------------------------------------
+static NameKeyType queueBarButtonKey( Int index )
+{
+	static NameKeyType keys[ QUEUE_BAR_BUTTON_COUNT ] = { NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID };
+	if( keys[ index ] == NAMEKEY_INVALID )
+	{
+		keys[ index ] = TheNameKeyGenerator->nameToKey( TheQueueBarButtons[ index ] );
+	}
+	return keys[ index ];
+}
+
+// ------------------------------------------------------------------------------------------------
+static void collectIdleUnit( Object *obj, void *userData )
+{
+	// Aircraft first because most aircraft are also vehicles
+	Int category;
+	if( obj->isKindOf( KINDOF_AIRCRAFT ) )
+	{
+		category = QUEUE_BAR_AIRCRAFT;
+	}
+	else if( obj->isKindOf( KINDOF_INFANTRY ) )
+	{
+		category = QUEUE_BAR_INFANTRY;
+	}
+	else if( obj->isKindOf( KINDOF_VEHICLE ) )
+	{
+		category = QUEUE_BAR_VEHICLE;
+	}
+	else
+	{
+		return;
+	}
+
+	// Dozers and harvesters are workers, not army
+	if( obj->isKindOf( KINDOF_DOZER ) || obj->isKindOf( KINDOF_HARVESTER ) )
+	{
+		return;
+	}
+
+	// Contra tags its non-combat units with IGNORES_SELECT_ALL
+	if( obj->isKindOf( KINDOF_IGNORES_SELECT_ALL ) )
+	{
+		category = QUEUE_BAR_SUPPORT;
+	}
+
+	// An angry mob's nexus stands for its members
+	if( obj->isKindOf( KINDOF_IGNORED_IN_GUI ) || obj->isOffMap() )
+	{
+		return;
+	}
+
+	if( !obj->isMassSelectable() || obj->isEffectivelyDead() || obj->getDrawable() == nullptr || obj->getContainedBy() != nullptr )
+	{
+		return;
+	}
+
+	AIUpdateInterface *ai = obj->getAIUpdateInterface();
+	if( ai == nullptr || !ai->isIdle() )
+	{
+		return;
+	}
+
+	UnsignedInt now = TheGameLogic->getFrame();
+	QueueBarIdleRecord record;
+	record.start = now;
+	record.seen = now;
+	std::pair<std::map<ObjectID, QueueBarIdleRecord>::iterator, bool> result = s_queueBarIdleSince.insert( std::make_pair( obj->getID(), record ) );
+	result.first->second.seen = now;
+	UnsignedInt start = result.first->second.start;
+
+	if( now - start >= QUEUE_BAR_IDLE_GRACE_FRAMES )
+	{
+		s_queueBarIdle[ category ].push_back( obj->getID() );
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+static void resetQueueBar()
+{
+	for( Int i = 0; i < QUEUE_BAR_BUTTON_COUNT; ++i )
+	{
+		s_queueBarIdle[ i ].clear();
+	}
+	s_queueBarIdleSince.clear();
+	s_queueBarFrame = ~0u;
+}
+
+// ------------------------------------------------------------------------------------------------
+static void setQueueBarCount( GameWindow *button, size_t idle )
+{
+	if( !BitIsSet( button->winGetStatus(), WIN_STATUS_COUNT_FOOTER ) )
+	{
+		static NameKeyType commandButtonKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:ButtonCommand01" );
+
+		// a button fresh from the layout takes the command group row's count font and colours
+		button->winSetStatus( WIN_STATUS_COUNT_FOOTER );
+		GameWindow *commandButton = TheWindowManager->winGetWindowFromId( nullptr, commandButtonKey );
+		if( commandButton != nullptr )
+		{
+			GameFont *font = commandButton->winGetFont();
+			if( font != nullptr )
+			{
+				button->winSetFont( font );
+			}
+			button->winSetEnabledTextColors( commandButton->winGetEnabledTextColor(), commandButton->winGetEnabledTextBorderColor() );
+			button->winSetHiliteTextColors( commandButton->winGetHiliteTextColor(), commandButton->winGetHiliteTextBorderColor() );
+			button->winSetDisabledTextColors( commandButton->winGetDisabledTextColor(), commandButton->winGetDisabledTextBorderColor() );
+		}
+	}
+
+	UnicodeString count;
+	if( idle > 0 && idle <= MAX_CAMEO_COUNT_BADGE )
+	{
+		count.format( L"%d", (Int)idle );
+	}
+	if( count != button->winGetText() )
+	{
+		GadgetButtonSetText( button, count );
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+static void updateQueueBar()
+{
+	static NameKeyType parentKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:QueueBarParent" );
+	static NameKeyType controlBarKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:ControlBarParent" );
+
+	GameWindow *parent = TheWindowManager->winGetWindowFromId( nullptr, parentKey );
+	if( parent == nullptr )
+	{
+		return;
+	}
+
+	Player *player = nullptr;
+	Bool track = TheGlobalData->m_queueBar && TheGameLogic->isInGame() && !TheGameLogic->isInShellGame();
+	Bool show = FALSE;
+	if( track )
+	{
+		player = ThePlayerList->getLocalPlayer();
+		track = player != nullptr && player->isPlayerActive();
+		GameWindow *controlBar = TheWindowManager->winGetWindowFromId( nullptr, controlBarKey );
+		show = track && controlBar != nullptr && !controlBar->winIsHidden();
+	}
+
+	if( track )
+	{
+		UnsignedInt frame = TheGameLogic->getFrame();
+		if( frame != s_queueBarFrame )
+		{
+			for( Int i = 0; i < QUEUE_BAR_BUTTON_COUNT; ++i )
+			{
+				s_queueBarIdle[ i ].clear();
+			}
+			player->iterateObjects( collectIdleUnit, nullptr );
+			std::map<ObjectID, QueueBarIdleRecord>::iterator it = s_queueBarIdleSince.begin();
+			while( it != s_queueBarIdleSince.end() )
+			{
+				if( it->second.seen != frame )
+				{
+					s_queueBarIdleSince.erase( it++ );
+				}
+				else
+				{
+					++it;
+				}
+			}
+			s_queueBarFrame = frame;
+		}
+	}
+	else
+	{
+		resetQueueBar();
+	}
+
+	Bool anyIdle = FALSE;
+	for( Int i = 0; i < QUEUE_BAR_BUTTON_COUNT; ++i )
+	{
+		Bool hide = s_queueBarIdle[ i ].empty();
+		if( !hide )
+		{
+			anyIdle = TRUE;
+		}
+		GameWindow *button = TheWindowManager->winGetWindowFromId( parent, queueBarButtonKey( i ) );
+		if( button != nullptr && button->winIsHidden() != hide )
+		{
+			button->winHide( hide );
+		}
+		if( button != nullptr )
+		{
+			setQueueBarCount( button, s_queueBarIdle[ i ].size() );
+		}
+	}
+
+	Bool hideParent = !show || !anyIdle;
+	if( parent->winIsHidden() != hideParent )
+	{
+		parent->winHide( hideParent );
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+static void selectNextIdleUnit( Int index )
+{
+	const std::vector<ObjectID> &idle = s_queueBarIdle[ index ];
+	size_t count = idle.size();
+	if( count == 0 )
+	{
+		return;
+	}
+
+	size_t start = 0;
+	if( TheInGameUI->getSelectCount() == 1 )
+	{
+		Drawable *selected = TheInGameUI->getFirstSelectedDrawable();
+		Object *selectedObj = selected ? selected->getObject() : nullptr;
+		if( selectedObj != nullptr )
+		{
+			for( size_t i = 0; i < count; ++i )
+			{
+				if( idle[ i ] == selectedObj->getID() )
+				{
+					start = ( i + 1 ) % count;
+					break;
+				}
+			}
+		}
+	}
+
+	for( size_t n = 0; n < count; ++n )
+	{
+		Object *obj = TheGameLogic->findObjectByID( idle[ ( start + n ) % count ] );
+		if( obj != nullptr && obj->getDrawable() != nullptr )
+		{
+			TheInGameUI->deselectAllDrawables();
+			GameMessage *teamMsg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP );
+			teamMsg->appendBooleanArgument( TRUE );
+			teamMsg->appendObjectIDArgument( obj->getID() );
+			TheInGameUI->selectDrawable( obj->getDrawable() );
+			TheTacticalView->userLookAt( obj->getPosition() );
+			return;
+		}
+	}
+}
+
+// GameMessage counts its arguments in an UnsignedByte
+static const Int QUEUE_BAR_MAX_MSG_ARGS = 255;
+
+// ------------------------------------------------------------------------------------------------
+static void selectAllIdleUnits( Int index )
+{
+	const std::vector<ObjectID> &idle = s_queueBarIdle[ index ];
+	GameMessage *teamMsg = nullptr;
+	for( size_t i = 0; i < idle.size(); ++i )
+	{
+		Object *obj = TheGameLogic->findObjectByID( idle[ i ] );
+		if( obj == nullptr || obj->getDrawable() == nullptr )
+		{
+			continue;
+		}
+
+		if( teamMsg == nullptr )
+		{
+			TheInGameUI->deselectAllDrawables();
+			teamMsg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP );
+			teamMsg->appendBooleanArgument( TRUE );
+		}
+		else if( teamMsg->getArgumentCount() >= QUEUE_BAR_MAX_MSG_ARGS )
+		{
+			teamMsg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP );
+			teamMsg->appendBooleanArgument( FALSE );
+		}
+
+		if( TheInGameUI->getMaxSelectCount() > 0 && TheInGameUI->getSelectCount() >= TheInGameUI->getMaxSelectCount() )
+		{
+			UnicodeString msg;
+			msg.format( TheGameText->fetch( "GUI:MaxSelectionSize" ).str(), TheInGameUI->getMaxSelectCount() );
+			TheInGameUI->message( msg );
+			return;
+		}
+
+		teamMsg->appendObjectIDArgument( obj->getID() );
+		TheInGameUI->selectDrawable( obj->getDrawable() );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1202,10 +1519,11 @@ enum DebugPanelTabID
 	DEBUG_TAB_SHADERS,
 	DEBUG_TAB_SPAWNER,
 	DEBUG_TAB_CHEATS,
+	DEBUG_TAB_MODEL_ALIGNMENT,
 	DEBUG_TAB_COUNT
 };
 
-const wchar_t *DebugPanelTabNames[] = { L"Shaders", L"Unit spawner", L"Cheats" };
+const wchar_t *DebugPanelTabNames[] = { L"Shaders", L"Unit spawner", L"Cheats", L"Model alignment" };
 
 // The cheats that take a value come first; each has a child control beside its label.
 enum DebugCheatID
@@ -1265,7 +1583,15 @@ const Int DEBUG_CHEAT_RUN_WIDTH = 56;
 const Int DEBUG_CHEAT_ACTION_TOP = DEBUG_CHEAT_TOP + DEBUG_CHEAT_VALUE_COUNT * DEBUG_CHEAT_ROW_HEIGHT + 8;
 const Int DEBUG_CHEAT_ACTION_ROWS = (DEBUG_CHEAT_COUNT - DEBUG_CHEAT_VALUE_COUNT + 1) / 2;
 const Int DEBUG_CHEATS_HEIGHT = DEBUG_CHEAT_ACTION_TOP + DEBUG_CHEAT_ACTION_ROWS * DEBUG_CHEAT_ROW_HEIGHT + 24;
-const Int DebugPanelHeights[] = { SHADER_PANEL_HEIGHT, UNIT_SPAWNER_HEIGHT, DEBUG_CHEATS_HEIGHT };
+const wchar_t* ModelAlignmentLabels[] = { L"Offset X", L"Offset Y", L"Offset Z", L"Yaw (deg)", L"Pitch (deg)", L"Roll (deg)" };
+const Int MODEL_ALIGNMENT_ROW_HEIGHT = 24;
+const Int MODEL_ALIGNMENT_VALUE_TOP = SHADER_PANEL_HEADER + MODEL_ALIGNMENT_ROW_HEIGHT + 6;
+const Int MODEL_ALIGNMENT_RESET_TOP = MODEL_ALIGNMENT_VALUE_TOP + ARRAY_SIZE(ModelAlignmentLabels) * MODEL_ALIGNMENT_ROW_HEIGHT;
+const Int MODEL_ALIGNMENT_HEIGHT = MODEL_ALIGNMENT_RESET_TOP + 48;
+const Int MODEL_ALIGNMENT_BUTTON_X = SHADER_PANEL_WIDTH - 72;
+const Int DebugPanelHeights[] = { SHADER_PANEL_HEIGHT, UNIT_SPAWNER_HEIGHT, DEBUG_CHEATS_HEIGHT, MODEL_ALIGNMENT_HEIGHT };
+DrawableID DebugModelAlignmentDrawable = INVALID_DRAWABLE_ID;
+Int DebugModelAlignmentModule = 0;
 Int DebugPanelTab = DEBUG_TAB_SHADERS;
 GameWindow *DebugCheatControls[DEBUG_CHEAT_VALUE_COUNT] = { nullptr };
 GameWindow *UnitSpawnerSide = nullptr;
@@ -1865,6 +2191,140 @@ void drawDebugCheats(Int x, Int y, Color white, Color shadow)
 	ShaderPanelString->draw(x + 8, y + DEBUG_CHEATS_HEIGHT - 20, white, shadow);
 }
 
+ObjectDrawInterface* getDebugModelAlignmentModule(ModelAlignment& alignment, AsciiString& tag, Int& count)
+{
+	count = 0;
+	const DrawableList* selected = TheInGameUI->getAllSelectedDrawables();
+	Drawable* draw = selected->size() == 1 ? selected->front() : nullptr;
+	const DrawableID id = draw ? draw->getID() : INVALID_DRAWABLE_ID;
+	if (id != DebugModelAlignmentDrawable)
+	{
+		DebugModelAlignmentDrawable = id;
+		DebugModelAlignmentModule = 0;
+	}
+	if (!draw)
+	{
+		return nullptr;
+	}
+
+	ObjectDrawInterface* result = nullptr;
+	Int resultIndex = 0;
+	for (DrawModule** dm = draw->getDrawModules(); *dm; ++dm)
+	{
+		ObjectDrawInterface* candidate = (*dm)->getObjectDrawInterface();
+		ModelAlignment values;
+		if (candidate && candidate->getDebugModelAlignment(values))
+		{
+			if (count <= DebugModelAlignmentModule)
+			{
+				result = candidate;
+				resultIndex = count;
+				alignment = values;
+				tag = TheNameKeyGenerator->keyToName((*dm)->getModuleTagNameKey());
+			}
+			++count;
+		}
+	}
+	DebugModelAlignmentModule = resultIndex;
+	return result;
+}
+
+void handleModelAlignmentClick(Int x, Int y)
+{
+	if (!canUseDebugCheats())
+	{
+		return;
+	}
+	ModelAlignment alignment;
+	AsciiString tag;
+	Int count;
+	ObjectDrawInterface* module = getDebugModelAlignmentModule(alignment, tag, count);
+	if (!module)
+	{
+		return;
+	}
+
+	if (y >= MODEL_ALIGNMENT_RESET_TOP && y < MODEL_ALIGNMENT_RESET_TOP + MODEL_ALIGNMENT_ROW_HEIGHT && x >= 8 && x < 110)
+	{
+		module->setDebugModelAlignment(nullptr);
+		return;
+	}
+	if (x < MODEL_ALIGNMENT_BUTTON_X || x >= MODEL_ALIGNMENT_BUTTON_X + 56)
+	{
+		return;
+	}
+	const Int direction = x < MODEL_ALIGNMENT_BUTTON_X + 28 ? -1 : 1;
+	if (y >= SHADER_PANEL_HEADER && y < MODEL_ALIGNMENT_VALUE_TOP)
+	{
+		DebugModelAlignmentModule = (DebugModelAlignmentModule + direction + count) % count;
+	}
+	else if (y >= MODEL_ALIGNMENT_VALUE_TOP && y < MODEL_ALIGNMENT_RESET_TOP)
+	{
+		const Int index = (y - MODEL_ALIGNMENT_VALUE_TOP) / MODEL_ALIGNMENT_ROW_HEIGHT;
+		Real* values[] = { &alignment.offset.x, &alignment.offset.y, &alignment.offset.z, &alignment.yaw, &alignment.pitch, &alignment.roll };
+		*values[index] += direction * (index < 3 ? 0.25f : DEG_TO_RADF(1.0f));
+		module->setDebugModelAlignment(&alignment);
+	}
+}
+
+void drawModelAlignmentButtons(Int x, Int y, Color text, Color shadow)
+{
+	for (Int button = 0; button < 2; ++button)
+	{
+		const Int buttonX = x + MODEL_ALIGNMENT_BUTTON_X + button * 28;
+		TheDisplay->drawOpenRect(buttonX, y, 24, MODEL_ALIGNMENT_ROW_HEIGHT - 4, 1.0f, text);
+		ShaderPanelString->setText(UnicodeString(button == 0 ? L"-" : L"+"));
+		ShaderPanelString->draw(buttonX + 8, y + 2, text, shadow);
+	}
+}
+
+void drawModelAlignment(Int x, Int y, Color text, Color shadow)
+{
+	if (!canUseDebugCheats())
+	{
+		ShaderPanelString->setText(UnicodeString(L"Model alignment editing is available in single-player matches"));
+		ShaderPanelString->draw(x + 8, y + SHADER_PANEL_HEADER + 6, text, shadow);
+		return;
+	}
+
+	ModelAlignment alignment;
+	AsciiString tag;
+	Int count;
+	if (!getDebugModelAlignmentModule(alignment, tag, count))
+	{
+		ShaderPanelString->setText(UnicodeString(L"Select one object with a W3D model draw module"));
+		ShaderPanelString->draw(x + 8, y + SHADER_PANEL_HEADER + 6, text, shadow);
+		return;
+	}
+
+	UnicodeString moduleTag;
+	moduleTag.translate(tag);
+	UnicodeString label;
+	label.format(L"%d/%d  %ls", DebugModelAlignmentModule + 1, count, moduleTag.str());
+	ShaderPanelString->setText(label);
+	ShaderPanelString->draw(x + 8, y + SHADER_PANEL_HEADER + 4, text, shadow);
+	if (count > 1)
+	{
+		drawModelAlignmentButtons(x, y + SHADER_PANEL_HEADER, text, shadow);
+	}
+
+	const Real values[] = { alignment.offset.x, alignment.offset.y, alignment.offset.z,
+		alignment.yaw / DEG_TO_RADF(1.0f), alignment.pitch / DEG_TO_RADF(1.0f), alignment.roll / DEG_TO_RADF(1.0f) };
+	for (Int i = 0; i < ARRAY_SIZE(values); ++i)
+	{
+		const Int rowY = y + MODEL_ALIGNMENT_VALUE_TOP + i * MODEL_ALIGNMENT_ROW_HEIGHT;
+		label.format(L"%ls  %.2f", ModelAlignmentLabels[i], values[i]);
+		ShaderPanelString->setText(label);
+		ShaderPanelString->draw(x + 8, rowY + 2, text, shadow);
+		drawModelAlignmentButtons(x, rowY, text, shadow);
+	}
+	TheDisplay->drawOpenRect(x + 8, y + MODEL_ALIGNMENT_RESET_TOP, 102, MODEL_ALIGNMENT_ROW_HEIGHT - 4, 1.0f, text);
+	ShaderPanelString->setText(UnicodeString(L"Reset to INI"));
+	ShaderPanelString->draw(x + 16, y + MODEL_ALIGNMENT_RESET_TOP + 2, text, shadow);
+	ShaderPanelString->setText(UnicodeString(L"Changes apply to this object for this level"));
+	ShaderPanelString->draw(x + 8, y + MODEL_ALIGNMENT_HEIGHT - 20, text, shadow);
+}
+
 void selectDebugPanelTab(Int tab)
 {
 	TheWindowManager->winSetFocus(nullptr);
@@ -1930,6 +2390,8 @@ void destroyShaderDebugPanel()
 	UnitSpawnerSpawnMode = nullptr;
 	std::fill(DebugCheatControls, DebugCheatControls + DEBUG_CHEAT_VALUE_COUNT, (GameWindow *)nullptr);
 	DebugPanelTab = DEBUG_TAB_SHADERS;
+	DebugModelAlignmentDrawable = INVALID_DRAWABLE_ID;
+	DebugModelAlignmentModule = 0;
 	UnitSpawnerTemplates.clear();
 	UnitSpawnerSides.clear();
 	if (ShaderPanelString)
@@ -2024,6 +2486,10 @@ WindowMsgHandledType shaderPanelInput(GameWindow *window, UnsignedInt msg, Windo
 		{
 			runDebugCheat(debugCheatAt(x, y));
 		}
+		else if (DebugPanelTab == DEBUG_TAB_MODEL_ALIGNMENT)
+		{
+			handleModelAlignmentClick(x, y);
+		}
 		else if (x >= 8 && x < SHADER_PANEL_WIDTH - 8 && y >= SHADER_PANEL_HEADER
 			&& y < SHADER_PANEL_HEADER + SHADER_PANEL_ROWS * SHADER_PANEL_ROW_HEIGHT)
 		{
@@ -2084,6 +2550,11 @@ void drawShaderDebugPanel(GameWindow *window, WinInstanceData *)
 	if (DebugPanelTab == DEBUG_TAB_CHEATS)
 	{
 		drawDebugCheats(x, y, white, shadow);
+		return;
+	}
+	if (DebugPanelTab == DEBUG_TAB_MODEL_ALIGNMENT)
+	{
+		drawModelAlignment(x, y, white, shadow);
 		return;
 	}
 	if (DebugPanelTab == DEBUG_TAB_SPAWNER)
@@ -3521,6 +3992,7 @@ void InGameUI::update()
 	TheControlBar->update();
 
 	updateIdleWorker();
+	updateQueueBar();
 
 	// update any random window layout that so requests
 	for (std::list<WindowLayout *>::iterator it = m_windowLayouts.begin(); it != m_windowLayouts.end(); ++it)
@@ -3651,6 +4123,7 @@ void InGameUI::reset()
 	clearFloatingText();
 	clearWorldAnimations();
 	resetIdleWorker();
+	resetQueueBar();
 	// clear hint lists
 	for( i = 0; i < MAX_MOVE_HINTS; i++ )
 	{
@@ -6132,6 +6605,15 @@ void InGameUI::postDraw()
 
 		x = m_messagePosition.x;
 		y = m_messagePosition.y;
+
+		// the messages start under the inline HUD line, and under the command group box while it shows
+		y = max( y, getHudAnchorBottom() );
+		const Int commandGroupBottom = TheControlBar ? TheControlBar->getCommandGroupBarBottom() : 0;
+		if( commandGroupBottom > 0 )
+		{
+			y = max( y, commandGroupBottom + COMMAND_GROUP_SCREEN_MARGIN );
+		}
+
 		for( i = MAX_UI_MESSAGES - 1; i >= 0; i-- )
 		{
 
@@ -8920,6 +9402,58 @@ WindowMsgHandledType IdleWorkerSystem( GameWindow *window, UnsignedInt msg,
 
 }
 
+WindowMsgHandledType QueueBarSystem( GameWindow *window, UnsignedInt msg,
+																			WindowMsgData mData1, WindowMsgData mData2 )
+{
+	switch( msg )
+	{
+		//---------------------------------------------------------------------------------------------
+		case GWM_INPUT_FOCUS:
+		{
+			if( mData1 == TRUE )
+			{
+				*(Bool *)mData2 = FALSE;
+			}
+			break;
+
+		}
+		//---------------------------------------------------------------------------------------------
+		case GBM_SELECTED:
+		{
+			GameWindow *control = (GameWindow *)mData1;
+			if( control != nullptr )
+			{
+				Int id = control->winGetWindowId();
+				for( Int i = 0; i < QUEUE_BAR_BUTTON_COUNT; ++i )
+				{
+					if( id == queueBarButtonKey( i ) )
+					{
+						if( TheKeyboard != nullptr && ( TheKeyboard->getModifierFlags() & KEY_STATE_SHIFT ) )
+						{
+							selectAllIdleUnits( i );
+						}
+						else
+						{
+							selectNextIdleUnit( i );
+						}
+						break;
+					}
+				}
+			}
+			break;
+
+		}
+
+		//---------------------------------------------------------------------------------------------
+		default:
+			return MSG_IGNORED;
+
+	}
+
+	return MSG_HANDLED;
+
+}
+
 
 void InGameUI::updateRenderFpsString()
 {
@@ -9028,6 +9562,32 @@ void InGameUI::drawSystemTime(Int &x, Int &y)
 	{
 		m_systemTimeString->draw(m_systemTimePosition.x, m_systemTimePosition.y, m_systemTimeColor, m_systemTimeDropColor);
 	}
+}
+
+// the font height, since a string has no text until its first draw
+static Int getHudStringBottom(DisplayString *string)
+{
+	GameFont *font = string ? string->getFont() : nullptr;
+	return font ? kHudAnchorY + font->height : 0;
+}
+
+Int InGameUI::getHudAnchorBottom() const
+{
+	Int bottom = 0;
+	if (m_networkLatencyPointSize > 0 && TheGameLogic && TheGameLogic->isInMultiplayerGame() && isAtHudAnchorPos(m_networkLatencyPosition))
+	{
+		bottom = max(bottom, getHudStringBottom(m_networkLatencyString));
+	}
+	if (m_renderFpsPointSize > 0 && isAtHudAnchorPos(m_renderFpsPosition))
+	{
+		bottom = max(bottom, getHudStringBottom(m_renderFpsString));
+		bottom = max(bottom, getHudStringBottom(m_renderFpsLimitString));
+	}
+	if (m_systemTimePointSize > 0 && isAtHudAnchorPos(m_systemTimePosition))
+	{
+		bottom = max(bottom, getHudStringBottom(m_systemTimeString));
+	}
+	return bottom;
 }
 
 void InGameUI::drawGameTime()

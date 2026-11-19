@@ -637,6 +637,9 @@ Bool TurretAI::friend_turnTowardsPitch(Real desiredPitch, Real rateModifier)
 	// rotate turret back to zero angle
 	Real actualPitch = getTurretPitch();
 	Real pitchRate = getPitchRate() * rateModifier;
+#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+	pitchRate *= 2.f;
+#endif
 	Real pitchDiff = normalizeAngle(desiredPitch - actualPitch);
 
 	if (WWMath::Fabs(pitchDiff) < pitchRate)

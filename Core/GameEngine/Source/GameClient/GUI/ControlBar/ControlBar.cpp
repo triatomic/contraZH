@@ -1014,6 +1014,7 @@ ControlBar::ControlBar()
 	m_specialPowerLayout = nullptr;
 	m_smartSelectionParent = nullptr;
 	m_smartSelectionMoneyWindow = nullptr;
+	m_cameoRowBlocker = nullptr;
 	for( i = 0; i < MAX_SMART_SELECTION_BUTTONS; i++ )
 	{
 		m_smartSelectionButtons[i] = nullptr;
@@ -1028,7 +1029,13 @@ ControlBar::ControlBar()
 	for( i = 0; i < MAX_COMMAND_GROUP_BUTTONS; i++ )
 	{
 		m_commandGroupButtons[i] = nullptr;
+		m_commandGroupNumbers[i] = nullptr;
+		m_commandGroupImages[i] = nullptr;
 	}
+	m_commandGroupButtonSize.x = 0;
+	m_commandGroupButtonSize.y = 0;
+	m_commandGroupNumberColor = GAME_COLOR_UNDEFINED;
+	m_commandGroupNumberDropColor = GAME_COLOR_UNDEFINED;
 	m_scienceLayout = nullptr;
 	m_rightHUDWindow = nullptr;
 	m_rightHUDCameoWindow = nullptr;
