@@ -1074,7 +1074,8 @@ void MeshClass::Render_Material_Pass(MaterialPassClass * pass,IndexBufferClass *
  *=============================================================================================*/
 void MeshClass::Special_Render(SpecialRenderInfoClass & rinfo)
 {
-	if ((Is_Not_Hidden_At_All() == false) && (rinfo.RenderType != SpecialRenderInfoClass::RENDER_SHADOW)) {
+	if (Is_Not_Hidden_At_All() == false)
+	{
 		return;
 	}
 
@@ -1106,14 +1107,6 @@ void MeshClass::Special_Render(SpecialRenderInfoClass & rinfo)
 																Get_Bounding_Box() );
 		}
 		rinfo.VisRasterizer->Enable_Two_Sided_Rendering(false);
-	}
-
-	if (rinfo.RenderType == SpecialRenderInfoClass::RENDER_SHADOW) {
-		const HTreeClass * htree = nullptr;
-		if (Container!=nullptr) {
-			htree = Container->Get_HTree();
-		}
-		Model->Shadow_Render(rinfo,Transform,htree);
 	}
 }
 
