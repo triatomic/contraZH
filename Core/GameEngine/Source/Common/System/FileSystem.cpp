@@ -523,9 +523,9 @@ bool FileSystem::removeExtension(UnicodeString& path)
 }
 
 //============================================================================
-// FileSystem::appendPathSeparator
+// FileSystem::ensureTrailingPathSeparatorInPath
 //============================================================================
-void FileSystem::appendPathSeparator(AsciiString& path)
+void FileSystem::ensureTrailingPathSeparatorInPath(AsciiString& path)
 {
 	if (path.isNotEmpty() && !isPathSeparator(path.back()))
 	{

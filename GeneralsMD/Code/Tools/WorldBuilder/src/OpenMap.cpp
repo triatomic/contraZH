@@ -472,13 +472,13 @@ Bool OpenMap::extractPackedMap( const CString &bigPath, const CString &archiveMa
 		const char *sidecars[] = { "map.ini", "map.str" };
 		for (int k = 0; k < 2; ++k) {
 			AsciiString p = mapDir;
-			if (p.getLength() > 0 && !p.endsWith("\\")) p.concat('\\');
+			FileSystem::ensureTrailingPathSeparatorInPath(p);
 			p.concat(sidecars[k]);
 			files.insert(p);
 		}
 		// Preview is <MapName>.tga next to the .map.
 		AsciiString prev = mapDir;
-		if (prev.getLength() > 0 && !prev.endsWith("\\")) prev.concat('\\');
+		FileSystem::ensureTrailingPathSeparatorInPath(prev);
 		prev.concat(leaf); prev.concat(".tga");
 		files.insert(prev);
 	}
