@@ -95,6 +95,7 @@
 #include <vector>
 #include <map>
 #include <float.h>
+#include <Utility/cmath_adapter.h>
 
 
 // Turn this on to turn off pixel shaders. jba[4/3/2003]
@@ -1955,7 +1956,7 @@ static bool Pixel_Light_Screen_Rect(const W3DShaderManager::PixelLight &light, c
 		const double clipZ = x * transform.m[0][2] + y * transform.m[1][2] + z * transform.m[2][2] + transform.m[3][2];
 		const double clipW = x * transform.m[0][3] + y * transform.m[1][3] + z * transform.m[2][3] + transform.m[3][3];
 		// A box crossing the near plane keeps the full viewport because its projection is unbounded.
-		if (!_finite(clipX) || !_finite(clipY) || !_finite(clipZ) || !_finite(clipW) || clipZ <= 0.0 || clipW <= 1e-6)
+		if (!std::isfinite(clipX) || !std::isfinite(clipY) || !std::isfinite(clipZ) || !std::isfinite(clipW) || clipZ <= 0.0 || clipW <= 1e-6)
 		{
 			return true;
 		}

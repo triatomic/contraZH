@@ -53,6 +53,7 @@
 #include "pointgr.h"
 #endif
 #include <WWDebug/wwprofile.h>
+#include <Utility/cmath_adapter.h>
 #include <algorithm>
 #include <vector>
 #include <stdlib.h>
@@ -787,7 +788,7 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 					triangle.idx = node_id;
 					const float z = state->billboards[i / 2].Position.Z;
 					triangle.z = (z + z + z) / 3.0f;
-					DEBUG_ASSERTCRASH((!_isnan(triangle.z) && _finite(triangle.z)), ("Billboard has invalid center"));
+					DEBUG_ASSERTCRASH((!std::isnan(triangle.z) && std::isfinite(triangle.z)), ("Billboard has invalid center"));
 				}
 				state->min_vertex_index = vertex_array_offset;
 				polygon_array_offset += state->polygon_count;
@@ -826,7 +827,7 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 					tis_ptr->tri.k = idx3 + vertex_array_offset;
 					tis_ptr->idx = node_id;
 					tis_ptr->z = (v1->z + v2->z + v3->z)/3.0f;
-					DEBUG_ASSERTCRASH((! _isnan(tis_ptr->z) && _finite(tis_ptr->z)), ("Triangle has invalid center"));
+					DEBUG_ASSERTCRASH((! std::isnan(tis_ptr->z) && std::isfinite(tis_ptr->z)), ("Triangle has invalid center"));
 				}
 			} else {
 				for (int i=0;i<state->polygon_count;++i) {
@@ -849,7 +850,7 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 					tis_ptr->z = (mtx[2][0]*(v1->x + v2->x + v3->x) +
 												mtx[2][1]*(v1->y + v2->y + v3->y) +
 												mtx[2][2]*(v1->z + v2->z + v3->z))/3.0f + mtx[2][3];
-					DEBUG_ASSERTCRASH((! _isnan(tis_ptr->z) && _finite(tis_ptr->z)), ("Triangle has invalid center"));
+					DEBUG_ASSERTCRASH((! std::isnan(tis_ptr->z) && std::isfinite(tis_ptr->z)), ("Triangle has invalid center"));
 				}
 			}
 
