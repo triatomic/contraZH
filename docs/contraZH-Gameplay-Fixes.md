@@ -577,7 +577,8 @@ shoreline clearance, group movement and bridge handling.
 
 GO 60 Hz builds no longer end idle scans up to 29 degrees short. Leonidas now turns through
 its chosen scan angle, and the Technical gunner stops its turning animation when the turn ends.
-Completed scans and recentering also clear the turning animation after a final full rotation step.
+The turning animation also stops when a turret holds or goes idle, so a gunner no longer loops
+it after losing a target mid-turn.
 
 Changes the simulation in GO 60 Hz builds; affects replays.
 ([#153](https://github.com/triatomic/contraZH/issues/153))

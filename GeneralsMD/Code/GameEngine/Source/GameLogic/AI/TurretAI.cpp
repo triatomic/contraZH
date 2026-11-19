@@ -616,11 +616,6 @@ Bool TurretAI::friend_turnTowardsAngle(Real desiredAngle, Real rateModifier, Rea
 	// Bool aligned = fabs(m_angle - desiredAngle) <= relThresh;
 	Bool aligned = WWMath::Fabs(stdAngleDiffMod(m_angle, desiredAngle)) <= relThresh;
 
-	if (aligned && relThresh == 0.0f)
-	{
-		getOwner()->clearModelConditionState(MODELCONDITION_TURRET_ROTATE);
-	}
-
 	// DEBUG_LOG((">>> TurretAI::friend_turnTowardsAngle: aligned = %d, actualAngle = %f, m_angle = %f, desiredAngle = %f, relThresh = %f\n", aligned, actualAngle * PI / 180.0, m_angle * PI / 180.0, desiredAngle * PI / 180.0, relThresh * PI / 180.0));
 
 	return aligned;
@@ -1569,6 +1564,8 @@ void TurretAIIdleState::resetIdleScan()
 //----------------------------------------------------------------------------------------------------------
 StateReturnType TurretAIIdleState::onEnter()
 {
+	getMachineOwner()->clearModelConditionState(MODELCONDITION_TURRET_ROTATE);
+
 	AIUpdateInterface *ai = getMachineOwner()->getAIUpdateInterface();
 	if (ai)
 	{
@@ -1713,6 +1710,8 @@ void TurretAIHoldTurretState::loadPostProcess()
 //----------------------------------------------------------------------------------------------------------
 StateReturnType TurretAIHoldTurretState::onEnter()
 {
+	getMachineOwner()->clearModelConditionState(MODELCONDITION_TURRET_ROTATE);
+
 	m_timestamp = TheGameLogic->getFrame() + getTurretAI()->getRecenterTime();
 
 	TurretAI* turret = getTurretAI();
