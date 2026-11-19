@@ -72,6 +72,18 @@ while placing it. A solid ring marks its widest anti-ground weapon and a paler d
 widest anti-air weapon. Wall pieces get their rings each. The D3D9 build draws the rings with the
 same shader as `SelectionCircle`, on cards with `ps_2_a`. Other builds and cards draw one ring at
 the wider of the two ranges.)
+* `QueueBar = No` - (Yes shows up to four buttons at the top right in game: infantry, vehicles,
+aircraft and support units. A button shows while the player has an idle unit of that kind, with the
+number of them at its bottom centre in the font and colours of the command group row's count. Clicking it
+selects one idle unit and centres the camera on it, and clicking again steps to the next. `Shift` +
+click selects every idle unit of that kind without moving the camera. Support units are those with
+`IGNORES_SELECT_ALL`, such as radar vans, listening outposts and sentry drones; they show under
+Support only. Dozers, workers, supply gatherers, units off the map and units inside a transport or
+building are left out. An angry mob counts once.
+A unit is idle when its AI has no order and no target, so a parked jet with full ammo counts and one
+that is reloading does not. It shows after 6 seconds of unbroken idling, so a pause between targets
+does not count. Hidden for observers and while the control bar is hidden. Also the Idle
+unit tracker checkbox on the Interface tab. Applies on Accept.)
 * `ObjectDecals = Yes` - (No hides ground decals requested with `DisplayDecal`. Independent of shadow
 settings. Applies on Accept, including to objects already on the map.)
 * `SmartPips = No` - (Yes keeps ammo and passenger pips visible on own units whenever there is
@@ -108,6 +120,12 @@ greyscale ring with alpha).
 * `DisplayDecal` needs the `.tga` named by `DecalTexture`; there is no default.
 * The `DefensesRangeCircle` checkbox needs `CheckDefensesRangeCircle` in `OptionsMenu.wnd`.
 * The `VeterancyLevel` checkbox needs `CheckVeterancyLevel` in `OptionsMenu.wnd`.
+* `QueueBar` needs mod-side windows in `ControlBar.wnd`: a second top-level window `QueueBarParent`
+(hidden, `SYSTEMCALLBACK = "QueueBarSystem"`) holding the push buttons `ButtonQueueBarInfantry`,
+`ButtonQueueBarVehicle`, `ButtonQueueBarAircraft` and `ButtonQueueBarSupport`. The layout sets their
+place, images and tooltips. The count is drawn bottom centre inside each button, so the button
+image should leave about a fifth of its height free under the icon.
+Its checkbox needs `CheckQueueBar` in `OptionsMenu.wnd`.
 
 ### Recommended detail level
 
@@ -327,13 +345,18 @@ step the focus through the row.
 
 ### Command group row
 
-A row on the command bar frame with one cameo per non-empty command group (1-9, then 0). Each shows
-the group's most common unit, its number and live member count. Shown whenever any group has
-members.
+A box at the top left of the screen with one cameo per non-empty command group (1-9, then 0). Each
+shows the group's most common unit with its live member count, and the group's number under the
+cameo. Shown whenever any group has members. The box sits under the FPS, clock and latency readouts
+when they are at the top left, and in-game messages start under the box.
 
 * `SmartCommandGroup = Yes` - (No hides the row. `SmartSelection = No` hides it too.)
 
 * Left click selects the group; double click also centres the camera on it.
+* Numpad `*` (`AUTO_CREATE_TEAMS` in CommandMap.ini) gives each of the first ten selected objects a
+group of its own, in selection order: 1 to 9, then 0. A group that takes a new object loses its old
+members, and objects past the tenth are left alone. In cheat builds the fast forward toggle moves from
+numpad `*` to Ctrl + numpad `*`.
 
 ## Action lines
 

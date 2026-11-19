@@ -195,6 +195,7 @@ public:
 	Bool m_useAlternateMouse;
 	Bool m_useRightMouseScrollWithAlternateMouse; // TheSuperHackers @feature User option for RMB scroll in Alternate Mouse mode.
 	Bool m_clientRetaliationModeEnabled;
+	Bool m_guardRequiresVisibility;
 	// TheSuperHackers @feature Client side health bar display preference, from Options.ini.
 	// Holds a HealthBarDisplayMode; stored as Int so this widely included header does not
 	// have to pull in OptionPreferences.h.
@@ -211,6 +212,8 @@ public:
 	Bool m_selectionCircleEnabled;
 	// TheSuperHackers @feature Ring the attack range of an armed structure while it is being placed.
 	Bool m_defensesRangeCircle;
+	// Show a button each for idle infantry, vehicles, aircraft and support units.
+	Bool m_queueBar;
 	// TheSuperHackers @feature Draw the decals objects ask for with DisplayDecal.
 	Bool m_objectDecalsEnabled;
 	// TheSuperHackers @feature Keep ammo and passenger pips on screen when there is something

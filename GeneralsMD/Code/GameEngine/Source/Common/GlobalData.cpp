@@ -268,6 +268,7 @@ static const char *DistanceFogPresetNames[] = { "SUN", "DESERT", "FUTURISTIC", "
 	{ "DrawEntireTerrain",					INI::parseBool,				nullptr,			offsetof( GlobalData, m_drawEntireTerrain ) },
 	{ "TerrainLOD",									INI::parseIndexList,	TerrainLODNames,	offsetof( GlobalData, m_terrainLOD ) },
 	{ "TerrainLODTargetTimeMS",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_terrainLODTargetTimeMS ) },
+	{ "GuardRequiresVisibility",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_guardRequiresVisibility ) },
 	{ "RightMouseAlwaysScrolls",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_rightMouseAlwaysScrolls ) },
 	{ "UseWaterPlane",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_useWaterPlane ) },
 	{ "UseCloudPlane",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_useCloudPlane ) },
@@ -1640,6 +1641,7 @@ GlobalData::GlobalData()
 	m_useRightMouseScrollWithAlternateMouse = TRUE;
 #endif
 	m_clientRetaliationModeEnabled = TRUE; //On by default.
+	m_guardRequiresVisibility = FALSE;
 	// TheSuperHackers @feature Health bars behave exactly as they always have unless Options.ini says otherwise.
 	m_healthBarDisplayMode = HealthBarDisplayMode_Default;
 	m_alliedDecalMode = AlliedDecalMode_Default;
@@ -1648,6 +1650,7 @@ GlobalData::GlobalData()
 	m_castMode = CastMode_Default;
 	m_selectionCircleEnabled = FALSE;
 	m_defensesRangeCircle = FALSE;
+	m_queueBar = FALSE;
 	m_objectDecalsEnabled = TRUE;
 	m_smartPips = FALSE;
 	m_numericalHealth = FALSE;
@@ -2060,6 +2063,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_castMode = optionPref.getCastMode();
 	TheWritableGlobalData->m_selectionCircleEnabled = optionPref.getSelectionCircleEnabled();
 	TheWritableGlobalData->m_defensesRangeCircle = optionPref.getDefensesRangeCircleEnabled();
+	TheWritableGlobalData->m_queueBar = optionPref.getQueueBarEnabled();
 	TheWritableGlobalData->m_objectDecalsEnabled = optionPref.getObjectDecalsEnabled();
 	TheWritableGlobalData->m_smartPips = optionPref.getSmartPipsEnabled();
 	TheWritableGlobalData->m_numericalHealth = optionPref.getNumericalHealthEnabled();
