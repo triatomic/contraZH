@@ -11,7 +11,8 @@ Fogged and unexplored targets are excluded, including shared team targets.
   GuardRequiresVisibility = Yes
 ```
 
-The setting applies to guard-position, guard-object and guard-area target searches.
+The setting applies to guard-position, guard-object, guard-area and tunnel network guard
+target searches.
 Existing attacks and retaliation keep their normal behavior. Enabling this setting changes
 the simulation, so multiplayer clients and replay playback need matching values.
 
