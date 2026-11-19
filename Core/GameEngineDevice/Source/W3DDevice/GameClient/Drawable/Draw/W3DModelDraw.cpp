@@ -5291,6 +5291,10 @@ void W3DModelDraw::reactToTransformChange( const Matrix3D* oldMtx,
 	{
 #if RTS_ZEROHOUR
 		updateRenderObjectTransform(TRUE);
+		if (m_useModelTransformForParticles)
+		{
+			updateFrozenBoneParticleSystems();
+		}
 #else
 		Matrix3D mtx = *getDrawable()->getTransformMatrix();
 		Real scale = getDrawable()->getInstanceScale();
