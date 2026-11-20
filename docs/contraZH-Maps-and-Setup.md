@@ -1,5 +1,9 @@
 # Maps & Game Setup
 
+## Chat input
+
+* In-game chat uses Unicode keyboard input, so fonts such as Windows Arial can display Cyrillic.
+
 ## Maps
 
 ### String file encoding
