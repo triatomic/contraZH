@@ -57,6 +57,10 @@
 #include "Common/FileSystem.h"
 #include "Common/version.h"
 
+#if defined(RTS_ZEROHOUR)
+#include <windows.h>
+#endif
+
 
 
 
@@ -190,14 +194,14 @@ class GameTextManager : public GameTextInterface
 		void						removeLeadingAndTrailing ( Char *m_buffer );
 		void						readToEndOfQuote( File *file, Char *in, Char *out, Char *wavefile, Int maxBufLen );
 		void						reverseWord ( Char *file, Char *lp );
-		void						translateCopy( WideChar *outbuf, Char *inbuf );
+		void						translateCopy( WideChar *outbuf, Char *inbuf, Int codePage );
 		Bool						getStringCount( const Char *filename, Int& textCount );
 		Bool						getCSFInfo ( const Char *filename );
 		Bool						parseCSF(  const Char *filename );
 		Bool						parseStringFile( const char *filename );
 		Bool						parseMapStringFile( const char *filename );
-		Bool						readLine( char *buffer, Int max, File *file );
-		Char						readChar( File *file );
+		Bool						readLine( char *buffer, Int max, File *file, Int *codePage = nullptr );
+		Int							readChar( File *file );
 };
 
 static int __cdecl			compareLUT ( const void *,  const void*);
@@ -502,7 +506,7 @@ void GameTextManager::readToEndOfQuote( File *file, Char *in, Char *out, Char *w
 	Int slash = FALSE;
 	Int state = 0;
 	Int line_start = FALSE;
-	Char ch;
+	Int ch;
 	Int ccount = 0;
 	Int len = 0;
 	Int done = FALSE;
@@ -513,7 +517,7 @@ void GameTextManager::readToEndOfQuote( File *file, Char *in, Char *out, Char *w
 
 		if ( in )
 		{
-			if ( (ch = *in++) == 0 )
+			if ( (ch = (UnsignedByte)*in++) == 0 )
 			{
 				in = nullptr; // have exhausted the input m_buffer
 				ch = readChar ( file );
@@ -526,7 +530,7 @@ void GameTextManager::readToEndOfQuote( File *file, Char *in, Char *out, Char *w
 
 		if ( ch == EOF )
 		{
-			return ;
+			break;
 		}
 
 		if ( ch == '\n' )
@@ -553,12 +557,12 @@ void GameTextManager::readToEndOfQuote( File *file, Char *in, Char *out, Char *w
 			slash = FALSE;
 		}
 
-		if ( iswspace ( ch ))
+		if ( iswspace ( (Char)ch ))
 		{
 			ch = ' ';
 		}
 
-		*out++ = ch;
+		*out++ = (Char)ch;
 		maxBufLen--;
 	}
 
@@ -570,7 +574,7 @@ void GameTextManager::readToEndOfQuote( File *file, Char *in, Char *out, Char *w
 
 		if ( in )
 		{
-			if ( (ch = *in++) == 0 )
+			if ( (ch = (UnsignedByte)*in++) == 0 )
 			{
 				in = nullptr; // have exhausted the input m_buffer
 				ch = readChar ( file );
@@ -590,7 +594,7 @@ void GameTextManager::readToEndOfQuote( File *file, Char *in, Char *out, Char *w
 		{
 
 			case 0:
-				if ( iswspace ( ch ) || ch == '=' )
+				if ( iswspace ( (Char)ch ) || ch == '=' )
 				{
 					break;
 				}
@@ -600,7 +604,7 @@ void GameTextManager::readToEndOfQuote( File *file, Char *in, Char *out, Char *w
 			case 1:
 				if ( ( ch >= 'a' && ch <= 'z') || ( ch >= 'A' && ch <='Z') || (ch >= '0' && ch <= '9') || ch == '_' )
 				{
-					*wavefile++ = ch;
+					*wavefile++ = (Char)ch;
 					len++;
 					break;
 				}
@@ -670,7 +674,7 @@ void GameTextManager::reverseWord ( Char *file, Char *lp )
 // GameTextManager::translateCopy
 //============================================================================
 
-void GameTextManager::translateCopy( WideChar *outbuf, Char *inbuf )
+void GameTextManager::translateCopy( WideChar *outbuf, Char *inbuf, Int codePage )
 {
 	Int slash = FALSE;
 
@@ -739,6 +743,9 @@ void GameTextManager::translateCopy( WideChar *outbuf, Char *inbuf )
 	}
 #endif
 
+	Char *text = inbuf;
+	Char *decoded = text;
+
 	while( *inbuf != '\0' )
 	{
 		if( slash == TRUE )
@@ -753,44 +760,59 @@ void GameTextManager::translateCopy( WideChar *outbuf, Char *inbuf )
 					return;
 
 				case '\\':
-					*outbuf++ = '\\';
+					*decoded++ = '\\';
 					break;
 
 				case '\'':
-					*outbuf++ = '\'';
+					*decoded++ = '\'';
 					break;
 
 				case '\"':
-					*outbuf++ = '\"';
+					*decoded++ = '\"';
 					break;
 
 				case '\?':
-					*outbuf++ = '\?';
+					*decoded++ = '\?';
 					break;
 
 				case 't':
-					*outbuf++ = '\t';
+					*decoded++ = '\t';
 					break;
 
 				case 'n':
-					*outbuf++ = '\n';
+					*decoded++ = '\n';
 					break;
 
 				default:
-					*outbuf++ = *inbuf & 0x00FF;
+					*decoded++ = *inbuf;
 					break;
 			}
 		}
 		else if( *inbuf != '\\' )
 		{
-			*outbuf++ = *inbuf & 0x00FF;
+			*decoded++ = *inbuf;
 		}
 		else
+		{
 			slash = TRUE;
+		}
 
 		inbuf++;
 	}
-	*outbuf= 0;
+	*decoded = 0;
+
+#if defined(RTS_ZEROHOUR)
+	if ( codePage && MultiByteToWideChar( codePage, 0, text, -1, outbuf, MAX_UITEXT_LENGTH*2 ) )
+	{
+		return;
+	}
+#endif
+
+	while ( *text )
+	{
+		*outbuf++ = *text++ & 0x00FF;
+	}
+	*outbuf = 0;
 }
 
 //============================================================================
@@ -800,6 +822,7 @@ void GameTextManager::translateCopy( WideChar *outbuf, Char *inbuf )
 Bool GameTextManager::getStringCount( const char *filename, Int& textCount )
 {
 	Int ok = TRUE;
+	Int codePage = -1;
 
 	textCount = 0;
 
@@ -814,7 +837,7 @@ Bool GameTextManager::getStringCount( const char *filename, Int& textCount )
 
 	while(ok)
 	{
-		if( !readLine( m_buffer, sizeof( m_buffer) -1, file ) )
+		if( !readLine( m_buffer, sizeof( m_buffer) -1, file, &codePage ) )
 			break;
 		removeLeadingAndTrailing ( m_buffer );
 
@@ -1011,6 +1034,7 @@ Bool GameTextManager::parseStringFile( const char *filename )
 {
 	Int listCount = 0;
 	Int ok = TRUE;
+	Int codePage = -1;
 
 	File *file = TheFileSystem->openFile(filename, File::READ | File::TEXT);
 
@@ -1022,7 +1046,7 @@ Bool GameTextManager::parseStringFile( const char *filename )
 	while( ok )
 	{
 		Int len;
-		if( !readLine( m_buffer, MAX_UITEXT_LENGTH, file ))
+		if( !readLine( m_buffer, MAX_UITEXT_LENGTH, file, &codePage ))
 		{
 			break;
 		}
@@ -1079,7 +1103,7 @@ Bool GameTextManager::parseStringFile( const char *filename )
 				else
 				{
 					// Copy string into new home
-					translateCopy( m_tbuffer, m_buffer2 );
+					translateCopy( m_tbuffer, m_buffer2, codePage );
 					stripSpaces ( m_tbuffer );
 
 					m_stringInfo[listCount].text = m_tbuffer ;
@@ -1141,6 +1165,7 @@ Bool GameTextManager::parseMapStringFile( const char *filename )
 {
 	Int listCount = 0;
 	Int ok = TRUE;
+	Int codePage = -1;
 
 	File *file;
 
@@ -1153,7 +1178,7 @@ Bool GameTextManager::parseMapStringFile( const char *filename )
 	while( ok )
 	{
 		Int len;
-		if( !readLine( m_buffer, MAX_UITEXT_LENGTH, file ))
+		if( !readLine( m_buffer, MAX_UITEXT_LENGTH, file, &codePage ))
 		{
 			break;
 		}
@@ -1210,7 +1235,7 @@ Bool GameTextManager::parseMapStringFile( const char *filename )
 				else
 				{
 					// Copy string into new home
-					translateCopy( m_tbuffer, m_buffer2 );
+					translateCopy( m_tbuffer, m_buffer2, codePage );
 					stripSpaces ( m_tbuffer );
 
 					UnicodeString text = UnicodeString(m_tbuffer);
@@ -1410,8 +1435,11 @@ AsciiStringVec& GameTextManager::getStringsWithLabelPrefix(AsciiString label)
 // GameTextManager::readLine
 //============================================================================
 
-Bool	GameTextManager::readLine( char *buffer, Int max, File *file )
+Bool	GameTextManager::readLine( char *buffer, Int max, File *file, Int *codePage )
 {
+#if defined(RTS_ZEROHOUR)
+	Char *line = buffer;
+#endif
 	Int ok = FALSE;
 
 	while ( max && file->read( buffer, 1 ) == 1 )
@@ -1429,6 +1457,25 @@ Bool	GameTextManager::readLine( char *buffer, Int max, File *file )
 
 	*buffer = 0;
 
+#if defined(RTS_ZEROHOUR)
+	if ( codePage && *codePage == -1 && ok )
+	{
+		*codePage = 0;
+		if ( strncmp( line, "\xEF\xBB\xBF", 3 ) == 0 )
+		{
+			*codePage = CP_UTF8;
+			memmove( line, line + 3, strlen( line + 3 ) + 1 );
+		}
+		else if ( strcmp( line, "// encoding: utf-8" ) == 0 || strcmp( line, "// encoding: utf-8\r" ) == 0 )
+		{
+			*codePage = CP_UTF8;
+		}
+		else if ( strcmp( line, "// encoding: windows-1251" ) == 0 || strcmp( line, "// encoding: windows-1251\r" ) == 0 )
+		{
+			*codePage = 1251;
+		}
+	}
+#endif
 	return ok;
 }
 
@@ -1436,16 +1483,16 @@ Bool	GameTextManager::readLine( char *buffer, Int max, File *file )
 // GameTextManager::readChar
 //============================================================================
 
-Char	GameTextManager::readChar( File *file )
+Int	GameTextManager::readChar( File *file )
 {
-	Char ch;
+	UnsignedByte ch;
 
 	if ( file->read( &ch, 1 ) == 1 )
 	{
 		return ch;
 	}
 
-	return 0;
+	return EOF;
 }
 
 //============================================================================

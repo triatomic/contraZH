@@ -2,6 +2,13 @@
 
 ## Maps
 
+### String file encoding
+
+Zero Hour supports UTF-8 and Windows-1251 in `Data/Generals.str` and map `.str` files.
+Save a UTF-8 file with a BOM or add `// encoding: utf-8` as its first line.
+For Windows-1251, add `// encoding: windows-1251` as the first line.
+Unmarked files keep the original byte mapping. The encoding applies to the quoted text.
+
 ### More terrain texture tiles
 
 * Terrain `Texture` entries accept TGA or legacy DXT1/DXT5 DDS files in `Art/Terrain`, in both the
