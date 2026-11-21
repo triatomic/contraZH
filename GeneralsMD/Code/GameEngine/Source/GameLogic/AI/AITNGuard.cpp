@@ -280,16 +280,20 @@ Bool AITNGuardMachine::canFightFrom(const Coord3D& from, Object* target)
 	return usable;
 }
 
-Bool AITNGuardMachine::deploy()
+TunnelContain* AITNGuardMachine::prepareDeployment(UnsignedInt now, Coord3D& start, Coord3D& end)
 {
 	Object* owner = getOwner();
 	Player* player = owner->getControllingPlayer();
 	TunnelTracker* network = player ? player->getTunnelSystem() : nullptr;
-	const UnsignedInt now = TheGameLogic->getFrame();
-	if (!network || now < m_redeployAt || !owner->getContainedBy()->getContain() ||
-		!owner->getContainedBy()->getContain()->isTunnelContain())
+	const Object* container = owner->getContainedBy();
+	if (!network || !container || !container->getContain() || !container->getContain()->isTunnelContain())
 	{
-		return false;
+		return nullptr;
+	}
+	onReturned();
+	if (now < m_redeployAt)
+	{
+		return nullptr;
 	}
 
 	const TAiData& defaults = *TheAI->getAiData();
@@ -301,6 +305,7 @@ Bool AITNGuardMachine::deploy()
 
 	TunnelContain* best = nullptr;
 	ObjectID bestTarget = INVALID_ID;
+	Coord3D bestStart;
 	Coord3D bestExit;
 	Real bestDistance = 0.0f;
 	Real bestLeash = 0.0f;
@@ -316,8 +321,14 @@ Bool AITNGuardMachine::deploy()
 
 		TunnelContain* contain = static_cast<TunnelContain*>(tunnel->getContain()->asOpenContain());
 		Coord3D exitPosition;
-		if (!contain->getGuardExitPosition(exitPosition) || contain->isExitBusy() ||
-			!TheAI->pathfinder()->goalBoxFree(owner, &exitPosition))
+		Coord3D startPosition;
+		Pathfinder* pathfinder = TheAI->pathfinder();
+		if (contain->isExitBusy() || !contain->getGuardExitPosition(exitPosition, &startPosition))
+		{
+			continue;
+		}
+		if (!pathfinder->goalBoxFree(owner, &exitPosition) &&
+			(!contain->getGuardExitPosition(exitPosition, &startPosition, true) || !pathfinder->goalBoxFree(owner, &exitPosition)))
 		{
 			continue;
 		}
@@ -348,6 +359,7 @@ Bool AITNGuardMachine::deploy()
 			{
 				best = contain;
 				bestTarget = target->getID();
+				bestStart = startPosition;
 				bestExit = exitPosition;
 				bestDistance = distance;
 				bestLeash = m_leashRadius;
@@ -359,7 +371,7 @@ Bool AITNGuardMachine::deploy()
 
 	if (!best)
 	{
-		return false;
+		return nullptr;
 	}
 
 	m_nemesisToAttack = bestTarget;
@@ -370,8 +382,57 @@ Bool AITNGuardMachine::deploy()
 	m_outsideUntil = 0;
 	m_outsideDuration = (UnsignedInt)guardSetting(settings.m_tunnelGuardMaxOutsideTime, defaults.m_tunnelGuardMaxOutsideTime);
 	m_redeployAt = (UnsignedInt)guardSetting(settings.m_tunnelGuardRedeployDelay, defaults.m_tunnelGuardRedeployDelay);
-	best->exitObjectInAHurry(owner);
-	return true;
+	start = bestStart;
+	end = bestExit;
+	return best;
+}
+
+Bool AITNGuardMachine::deployGuards()
+{
+	Object* owner = getOwner();
+	Player* player = owner->getControllingPlayer();
+	TunnelTracker* network = player ? player->getTunnelSystem() : nullptr;
+	if (!network)
+	{
+		return false;
+	}
+
+	struct Deployment
+	{
+		Object* unit;
+		TunnelContain* exit;
+		Coord3D start;
+		Coord3D end;
+	};
+
+	std::vector<Deployment> deployments;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const ContainedItemsList& passengers = *network->getContainedItemsList();
+	for (ContainedItemsList::const_iterator it = passengers.begin(); it != passengers.end(); ++it)
+	{
+		Object* unit = *it;
+		AIUpdateInterface* ai = unit->getAI();
+		AITNGuardMachine* guard = ai ? ai->getStateMachine()->getTunnelGuardMachine() : nullptr;
+		if (!guard || guard->getCurrentStateID() != AI_TN_GUARD_IDLE || unit->isEffectivelyDead())
+		{
+			continue;
+		}
+
+		Deployment deployment = { unit, nullptr, {}, {} };
+		deployment.exit = guard->prepareDeployment(now, deployment.start, deployment.end);
+		if (deployment.exit)
+		{
+			deployments.push_back(deployment);
+		}
+	}
+
+	Bool ownerDeployed = false;
+	for (std::vector<Deployment>::const_iterator it = deployments.begin(); it != deployments.end(); ++it)
+	{
+		it->exit->exitGuard(it->unit, it->start, it->end);
+		ownerDeployed = ownerDeployed || it->unit == owner;
+	}
+	return ownerDeployed;
 }
 
 void AITNGuardMachine::onReturned()
@@ -730,7 +791,7 @@ StateReturnType AITNGuardIdleState::update()
 	if (owner->getContainedBy())
 	{
 		getGuardMachine()->onReturned();
-		if (getGuardMachine()->deploy())
+		if (getGuardMachine()->deployGuards())
 		{
 			return STATE_SLEEP(0);
 		}

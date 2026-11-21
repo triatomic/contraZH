@@ -1358,7 +1358,7 @@ void OpenContain::exitObjectViaDoor( Object *exitObj, ExitDoorType exitDoor )
 		TheAI->pathfinder()->addObjectToPathfindMap( exitObj );
 	}
 }
-Bool OpenContain::getGuardExitPosition(Coord3D& position, Coord3D* startPosition) const
+Bool OpenContain::getGuardExitPosition(Coord3D& position, Coord3D* startPosition, Bool forceFallback) const
 {
 	const Int numberExits = getOpenContainModuleData()->m_numberOfExitPaths;
 	if (numberExits < 1)
@@ -1376,14 +1376,19 @@ Bool OpenContain::getGuardExitPosition(Coord3D& position, Coord3D* startPosition
 	const Object* tunnel = getObject();
 	Coord3D start;
 	const Bool hasStart = tunnel->getSingleLogicalBonePosition(startBone.str(), &start, nullptr);
-	if (!tunnel->getSingleLogicalBonePosition(endBone.str(), &position, nullptr))
+	const Bool hasEnd = tunnel->getSingleLogicalBonePosition(endBone.str(), &position, nullptr);
+	const Real radius = tunnel->getGeometryInfo().getBoundingCircleRadius();
+	const Real dx = position.x - tunnel->getPosition()->x;
+	const Real dy = position.y - tunnel->getPosition()->y;
+	const Bool useFallback = forceFallback || !hasEnd || (isTunnelContain() && dx * dx + dy * dy < radius * radius);
+	if (useFallback)
 	{
 		if (!isTunnelContain())
 		{
 			return false;
 		}
 
-		const Real distance = tunnel->getGeometryInfo().getBoundingCircleRadius() + 2 * PATHFIND_CELL_SIZE_F;
+		const Real distance = radius + 2 * PATHFIND_CELL_SIZE_F;
 		const Real angle = tunnel->getOrientation();
 		position = *tunnel->getPosition();
 		position.x += Cos(angle) * distance;
@@ -1393,7 +1398,7 @@ Bool OpenContain::getGuardExitPosition(Coord3D& position, Coord3D* startPosition
 
 	if (startPosition)
 	{
-		*startPosition = hasStart ? start : *tunnel->getPosition();
+		*startPosition = hasStart && !useFallback ? start : *tunnel->getPosition();
 	}
 	return true;
 }
@@ -1408,8 +1413,16 @@ void OpenContain::exitObjectInAHurry( Object *exitObj )
 {
 	Coord3D startPosition;
 	Coord3D endPosition;
-	const Bool hasExit = getGuardExitPosition(endPosition, &startPosition);
-	removeFromContain( exitObj );
+	if (!getGuardExitPosition(endPosition, &startPosition))
+	{
+		return;
+	}
+	exitGuard(exitObj, startPosition, endPosition);
+}
+
+void OpenContain::exitGuard(Object* exitObj, const Coord3D& startPosition, const Coord3D& endPosition)
+{
+	removeFromContain(exitObj);
 
 	Object *me = getObject();
 
@@ -1424,7 +1437,6 @@ void OpenContain::exitObjectInAHurry( Object *exitObj )
 	}
 
 	const Int numberExits = getOpenContainModuleData()->m_numberOfExitPaths;
-	if (hasExit)
 	{
 		if (numberExits > 1)
 		{
@@ -1463,12 +1475,6 @@ void OpenContain::exitObjectInAHurry( Object *exitObj )
 
 			TheAI->pathfinder()->updateGoal(exitObj, &endPosition, TheTerrainLogic->getLayerForDestination(&endPosition));
 		}
-	}
-	else
-	{
-		///< @todo This really should be automatically wrapped up in an activation sequence	for objects in general
-		// tell the AI about it
-		TheAI->pathfinder()->addObjectToPathfindMap( exitObj );
 	}
 }
 

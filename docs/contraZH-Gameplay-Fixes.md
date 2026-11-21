@@ -9,7 +9,8 @@ The existing World Builder team tunnel guard action assigns defenders to the net
 Each guard waits for a visible enemy it can attack. It uses the closest eligible
 exit to the threat if it can shoot from the exit or reach a firing position within
 its leash. The tunnel gun, incoming damage, and shared targets do not trigger
-deployment. Manual evacuation and scheduled auto-pop still work.
+deployment. Eligible guards deploy together after the network checks each
+unit. Manual evacuation and scheduled auto-pop still work.
 
 Guards can pick up new targets near the same exit while enemies remain in range. The return timer starts
 when the area is clear and resets if another enemy approaches. Once it expires,

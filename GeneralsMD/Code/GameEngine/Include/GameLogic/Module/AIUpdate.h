@@ -732,6 +732,7 @@ protected:
 	virtual Bool getTreatAsAircraftForLocoDistToGoal() const;
 
 	// yes, protected, NOT public... try to avoid exposing the state machine directly, please
+	friend class AITNGuardMachine;
 	AIStateMachine* getStateMachine() { return m_stateMachine; }
 	const AIStateMachine* getStateMachine() const { return m_stateMachine; }
 

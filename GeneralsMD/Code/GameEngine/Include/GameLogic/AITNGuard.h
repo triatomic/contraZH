@@ -77,6 +77,8 @@ public:
 // FORWARD DECLARATIONS ///////////////////////////////////////////////////////
 
 //--------------------------------------------------------------------------------------
+class TunnelContain;
+
 class AITNGuardMachine : public StateMachine
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( AITNGuardMachine, "AITNGuardMachinePool" );
@@ -84,6 +86,7 @@ class AITNGuardMachine : public StateMachine
 private:
 	Coord3D									m_positionToGuard;
 	ObjectID								m_nemesisToAttack;
+	TunnelContain* prepareDeployment(UnsignedInt now, Coord3D& start, Coord3D& end);
 	GuardMode								m_guardMode;
 	Real m_leashRadius;
 	Real m_detectionRadius;
@@ -113,7 +116,7 @@ public:
 	GuardMode getGuardMode() const { return m_guardMode; }
 	void setGuardMode(GuardMode guardMode) { m_guardMode = guardMode; }
 
-	Bool deploy();
+	Bool deployGuards();
 	Real getLeashRadius() const { return m_leashRadius; }
 	Real getDetectionRadius() const { return m_detectionRadius; }
 	Bool canFightFrom(const Coord3D& from, Object* target);
