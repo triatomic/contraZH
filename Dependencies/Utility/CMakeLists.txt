@@ -20,7 +20,6 @@ set(UTILITY_SRC
     Utility/premultiply_alpha.inl
     Utility/premultiply_alpha_sse2.inl
     Utility/premultiply_alpha_x86asm.inl
-    Utility/pseh_compat.h
     Utility/sstream_adapter.h
     Utility/stdio_adapter.h
     Utility/STLUtils.h
