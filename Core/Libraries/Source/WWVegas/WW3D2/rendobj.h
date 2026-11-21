@@ -34,8 +34,6 @@
  *                                                                                             *
  * 06/27/02 KM Shader system classid addition                                       *
  * 07/01/02 KM Coltype enum change to avoid MAX conflicts									   *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -594,18 +592,7 @@ WWINLINE const AABoxClass & RenderObjClass::Get_Bounding_Box() const
 	return CachedBoundingBox;
 }
 
-/**************************************************************************
- * Bound_Degrees -- Bounds a degree value between 0 and 360.              *
- *                                                                        *
- * INPUT:                                                                 *
- *                                                                        *
- * OUTPUT:                                                                *
- *                                                                        *
- * WARNINGS:                                                              *
- *                                                                        *
- * HISTORY:                                                               *
- *   09/22/1997 PWG : Created.                                            *
- *========================================================================*/
+// Bounds a degree value between 0 and 360.
 WWINLINE float Bound_Degrees(float angle)
 {
 	while (angle > 359) angle -= 360;
@@ -613,21 +600,8 @@ WWINLINE float Bound_Degrees(float angle)
 	return angle;
 }
 
-/***********************************************************************************************
- * RenderObjClass::Get_Transform -- returns the transform for the object                       *
- *                                                                                             *
- * If the transform is invalid (a container has been moved or animated) then the transform     *
- * will be recalculated.                                                                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   2/25/99    GTH : Created.                                                                 *
- *=============================================================================================*/
+// If the transform is invalid (a container has been moved or animated) then the transform will be
+// recalculated.
 WWINLINE const Matrix3D & RenderObjClass::Get_Transform() const
 {
 	Validate_Transform();
