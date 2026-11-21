@@ -1164,6 +1164,17 @@ AIGuardMachine* AIStateMachine::getGuardMachine(void)
 }
 
 //----------------------------------------------------------------------------------------------------------
+AITNGuardMachine* AIStateMachine::getTunnelGuardMachine()
+{
+	if (getCurrentStateID() != AI_GUARD_TUNNEL_NETWORK)
+	{
+		return nullptr;
+	}
+	AITunnelNetworkGuardState* guardState = static_cast<AITunnelNetworkGuardState*>(internalGetState(AI_GUARD_TUNNEL_NETWORK));
+	return guardState->getTunnelGuardMachine();
+}
+
+//----------------------------------------------------------------------------------------------------------
 AIGuardRetaliateMachine* AIStateMachine::getGuardRetaliateMachine(void)
 {
 	if (getCurrentStateID() == AI_GUARD_RETALIATE) {
@@ -7858,7 +7869,7 @@ StateReturnType AITunnelNetworkGuardState::onEnter()
 	// now that essential parameters are set, set the machine's initial state
 	if (m_guardMachine->initDefaultState() == STATE_FAILURE)
 		return STATE_FAILURE;
-	return m_guardMachine->setState(AI_GUARD_RETURN);
+	return STATE_CONTINUE;
 }
 
 //----------------------------------------------------------------------------------------------------------

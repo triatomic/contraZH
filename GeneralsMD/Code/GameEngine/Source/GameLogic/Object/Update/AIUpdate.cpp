@@ -54,6 +54,7 @@
 
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
+#include "GameLogic/AITNGuard.h"
 #include "GameLogic/CommandSequence.h"
 #include "GameLogic/PathTuning.h"
 #include "GameLogic/Locomotor.h"
@@ -616,6 +617,10 @@ void AIUpdateInterface::doPathfind( PathfindServicesInterface *pathfinder )
 		}
 		//CRCDEBUG_LOG(("AIUpdateInterface::doPathfind() - m_isAttackPath = FALSE after computeAttackPath()"));
 		m_isAttackPath = FALSE;
+		if (getStateMachine()->getTunnelGuardMachine())
+		{
+			return;
+		}
 		if (victim) {
 			m_requestedDestination = *victim->getPosition();
 			/* find a pathable destination near the victim.*/
@@ -2695,6 +2700,13 @@ Bool AIUpdateInterface::computeAttackPath( PathfindServicesInterface *pathServic
 				if (m_path==nullptr) {
 					return false;
 				}
+			}
+			const AITNGuardMachine* guard = getStateMachine()->getTunnelGuardMachine();
+			if (guard && !guard->isPathWithinLeash(m_path))
+			{
+				destroyPath();
+				TheAI->pathfinder()->setIgnoreObstacleID(INVALID_ID);
+				return false;
 			}
 			goal = *m_path->getLastNode()->getPosition();
 			TheAI->pathfinder()->updateGoal(getObject(), &goal, TheTerrainLogic->getLayerForDestination(&goal));

@@ -3,9 +3,37 @@
 Always on, no `Options.ini` key. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
-## Taking damage does not call tunnel guards out
+## AI tunnel guards deploy through clear, reachable exits
 
-Tunnel guards no longer deploy in response to damage alone. A tunnel can still call its guards out by acquiring an enemy target.
+The existing World Builder team tunnel guard action assigns defenders to the network.
+Each guard waits for a visible enemy it can attack. It uses the closest eligible
+exit to the threat if it can shoot from the exit or reach a firing position within
+its leash. The tunnel gun, incoming damage, and shared targets do not trigger
+deployment. Manual evacuation and scheduled auto-pop still work.
+
+Guards can pick up new targets near the same exit until their outside timer
+expires. They then return to the network and wait out their redeploy delay.
+This changes simulation behavior.
+
+Set these fields in `AIData` or override them in an object's `TunnelContain`
+module. Distances are world units. Times are milliseconds.
+
+| Field | Default | Effect |
+| --- | ---: | --- |
+| `TunnelGuardRadius` | 180 | Detection radius without a matching zone. An object-level value overrides zone radii for that object type. |
+| `TunnelGuardInnerPerimeterRadius` | 220 | Detection radius inside the owner's inner perimeter. |
+| `TunnelGuardOuterPerimeterRadius` | 160 | Detection radius inside the owner's outer perimeter. |
+| `TunnelGuardCombatZoneRadius` | 120 | Detection radius inside `CombatZone`. |
+| `TunnelGuardLeashRadius` | -1 | Bounds distance from the exit and total firing route length. A negative AIData value uses the detection radius. |
+| `TunnelGuardExitClearRadius` | 24 | Visible enemies this close block deployment. Zero disables the enemy clearance check. |
+| `TunnelGuardMaxOutsideTime` | 8000 | Time outside before guards return. Zero disables deployment. |
+| `TunnelGuardRedeployDelay` | 5000 | Time underground before the guard can deploy again. |
+| `TunnelGuardAutoAssignCount` | 0 | Target guard count for the skirmish AI's network. Positive values let tunnels recruit nearby idle armed units from the default team. Zero disables recruitment. |
+
+The inner perimeter takes precedence over the outer perimeter, then the combat zone.
+An omitted object field inherits its AIData value. A zero detection radius disables
+deployment from that tunnel. Units already inside remain passengers unless assigned
+to tunnel guard.
 
 ## AI construction uses legal, reachable sites
 

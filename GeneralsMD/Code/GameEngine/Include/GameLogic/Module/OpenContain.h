@@ -215,6 +215,7 @@ public:
 	virtual Bool isExitBusy() const override {return FALSE;}	///< Contain style exiters are getting the ability to space out exits, so ask this before reserveDoor as a kind of no-commitment check.
 	virtual ExitDoorType reserveDoorForExit( const ThingTemplate* objType, Object *specificObject ) override { return DOOR_1; }
 	virtual void exitObjectViaDoor( Object *newObj, ExitDoorType exitDoor ) override;
+	Bool getGuardExitPosition(Coord3D& position) const;
 	virtual void exitObjectInAHurry( Object *newObj ) override;
 
 

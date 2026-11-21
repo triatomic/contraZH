@@ -85,6 +85,10 @@ private:
 	Coord3D									m_positionToGuard;
 	ObjectID								m_nemesisToAttack;
 	GuardMode								m_guardMode;
+	Real m_leashRadius;
+	Real m_detectionRadius;
+	UnsignedInt m_outsideUntil;
+	UnsignedInt m_redeployAt;
 
 protected:
 	// snapshot interface
@@ -108,7 +112,13 @@ public:
 	GuardMode getGuardMode() const { return m_guardMode; }
 	void setGuardMode(GuardMode guardMode) { m_guardMode = guardMode; }
 
-	Bool lookForInnerTarget();
+	Bool deploy();
+	Real getLeashRadius() const { return m_leashRadius; }
+	Real getDetectionRadius() const { return m_detectionRadius; }
+	Bool canFightFrom(const Coord3D& from, Object* target);
+	Bool isPathWithinLeash(Path* path) const;
+	UnsignedInt getOutsideUntil() const { return m_outsideUntil; }
+	void onReturned();
 
 	static Real getStdGuardRange(const Object* obj);
 };

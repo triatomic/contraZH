@@ -37,6 +37,8 @@
 #include "Common/TunnelTracker.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Module/TunnelContain.h"
@@ -541,6 +543,51 @@ void TunnelContain::orderAllPassengersToIdle( CommandSourceType commandSource )
 // ------------------------------------------------------------------------------------------------
 /** Per frame update */
 // ------------------------------------------------------------------------------------------------
+namespace
+{
+struct TunnelGuardRecruitment
+{
+	TunnelContain* tunnel;
+	Player* player;
+	Coord3D exitPosition;
+	Object* candidate;
+	Int assigned;
+	Real distanceSquared;
+};
+
+void findTunnelGuard(Object* unit, void* data)
+{
+	TunnelGuardRecruitment& recruitment = *static_cast<TunnelGuardRecruitment*>(data);
+	AIUpdateInterface* ai = unit->getAI();
+	if (!ai || unit->isEffectivelyDead())
+	{
+		return;
+	}
+	if (ai->getCurrentStateID() == AI_GUARD_TUNNEL_NETWORK)
+	{
+		++recruitment.assigned;
+		return;
+	}
+	if (unit->getTeam() != recruitment.player->getDefaultTeam() || unit->getContainedBy() ||
+		unit->isDisabled() || !unit->isAbleToAttack() || !ai->isIdle())
+	{
+		return;
+	}
+
+	const Coord3D* position = &recruitment.exitPosition;
+	const Real dx = position->x - unit->getPosition()->x;
+	const Real dy = position->y - unit->getPosition()->y;
+	const Real distanceSquared = dx * dx + dy * dy;
+	if (distanceSquared < recruitment.distanceSquared && recruitment.tunnel->isValidContainerFor(unit, true) &&
+		TheAI->pathfinder()->clientSafeQuickDoesPathExist(ai->getLocomotorSet(), unit->getRequiredBridgeHeight(),
+			unit->getPosition(), position))
+	{
+		recruitment.candidate = unit;
+		recruitment.distanceSquared = distanceSquared;
+	}
+}
+}
+
 UpdateSleepTime TunnelContain::update()
 {
 	// extending functionality to heal the units within the tunnel system
@@ -568,6 +615,25 @@ UpdateSleepTime TunnelContain::update()
 			if (tunnelSystem->isNextTunnelToPop(obj, TheGameLogic->getFrame()) && tunnelSystem->getContainCount() > 0)
 			{
 				orderAllPassengersToExit(CMD_FROM_AI, false);
+			}
+		}
+
+		const TAiData& aiData = *TheAI->getAiData();
+		const Int overrideCount = getTunnelContainModuleData()->m_tunnelGuardAutoAssignCount;
+		const Int desiredGuards = overrideCount >= 0 ? overrideCount : aiData.m_tunnelGuardAutoAssignCount;
+		if (desiredGuards > 0 && tunnelSystem && !obj->isEffectivelyDead() && !obj->isDisabled() &&
+			!obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) && controllingPlayer->isSkirmishAIPlayer() &&
+			(TheGameLogic->getFrame() + obj->getID()) % LOGICFRAMES_PER_SECOND == 0)
+		{
+			const Real radius = aiData.m_tunnelGuardRadius;
+			TunnelGuardRecruitment recruitment = { this, controllingPlayer, {}, nullptr, 0, radius * radius };
+			if (getGuardExitPosition(recruitment.exitPosition))
+			{
+				controllingPlayer->iterateObjects(findTunnelGuard, &recruitment);
+				if (recruitment.candidate && recruitment.assigned < desiredGuards)
+				{
+					recruitment.candidate->getAI()->aiGuardTunnelNetwork(GUARDMODE_NORMAL, CMD_FROM_AI);
+				}
 			}
 		}
 

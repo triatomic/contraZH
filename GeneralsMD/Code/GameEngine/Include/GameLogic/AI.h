@@ -169,6 +169,15 @@ public:
 	Real m_guardInnerModifierHuman;	// Multiply the human unit's vision by this much == guard inner circle
 	Real m_guardOuterModifierHuman;	// Multiply the human unit's vision by this much == guard outer circle
 	UnsignedInt m_guardChaseUnitFrames;		// Number of frames for which a unit should
+	Int m_tunnelGuardAutoAssignCount;
+	Real m_tunnelGuardRadius;
+	Real m_tunnelGuardInnerPerimeterRadius;
+	Real m_tunnelGuardOuterPerimeterRadius;
+	Real m_tunnelGuardCombatZoneRadius;
+	Real m_tunnelGuardLeashRadius;
+	Real m_tunnelGuardExitClearRadius;
+	Real m_tunnelGuardMaxOutsideTime;
+	Real m_tunnelGuardRedeployDelay;
 	UnsignedInt m_guardEnemyScanRate;		// rate to scan for enemies while guarding
 	UnsignedInt m_guardEnemyReturnScanRate;		// rate to scan for enemies while guarding but returning
 

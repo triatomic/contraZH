@@ -49,6 +49,8 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CollideModule.h"
+#include "GameLogic/Module/TunnelContain.h"
+#include "GameLogic/Weapon.h"
 #include "Common/TunnelTracker.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -57,81 +59,59 @@
 const Real CLOSE_ENOUGH = (25.0f);
 
 
-static Bool hasAttackedMeAndICanReturnFire( State *thisState, void* /*userData*/ )
+static Real distanceSquared(const Coord3D& a, const Coord3D& b)
 {
-	Object *obj = thisState->getMachineOwner();
-	BodyModuleInterface *bmi = obj ? obj->getBodyModule() : nullptr;
-
-	if (!(obj && bmi)) {
-		return FALSE;
-	}
-
-	if (bmi->getClearableLastAttacker() == INVALID_ID) {
-		return FALSE;
-	}
-
-	// TheSuperHackers @feature Units holding fire only return fire if their template allows it
-	// (AIUpdate: HoldFireAllowsRetaliation). Checked before clearing the attacker below, so that
-	// disallowing retaliation does not disturb the existing attacker bookkeeping.
-	AIUpdateInterface *ai = obj->getAI();
-	if (ai && !ai->isRetaliationAllowed()) {
-		return FALSE;
-	}
-
-	// K. It appears we have a valid aggressor. Find it, and determine if we can attack it, etc.
-	Object *target = TheGameLogic->findObjectByID(bmi->getClearableLastAttacker());
-	bmi->clearLastAttacker();
-
-	// We use the clearable last attacker because we should continue attacking the guy. But if he
-	// stops attacking us, then we want our timer to kick us off of him and make us go attack
-	// other units instead.
-
-
-	if (!target) {
-		return FALSE;
-	}
-
-	if (obj->getRelationship(target) != ENEMIES) {
-		return FALSE;
-	}
-
-	// This is a quick test on the target. It will be duplicated in getAbleToAttackSpecificObject,
-	// but the payoff is worth the duplication.
-	if (target->isEffectivelyDead()) {
-		return FALSE;
-	}
-
-	CanAttackResult result = obj->getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, target, CMD_FROM_AI);
-	if( result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING )
-	{
-		return TRUE;
-	}
-	return FALSE;
+	const Real dx = a.x - b.x;
+	const Real dy = a.y - b.y;
+	return dx * dx + dy * dy;
 }
 
-static Object *findBestTunnel(Player *ownerPlayer, const Coord3D *pos)
+static Bool isOperationalTunnel(const Object* tunnel)
 {
-	if (!ownerPlayer) return nullptr; // should never happen, but hey.  jba.
-	TunnelTracker *tunnels = ownerPlayer->getTunnelSystem();
-	Object *bestTunnel = nullptr;
-	Real bestDistSqr = 0;
-	const std::list<ObjectID> *allTunnels = tunnels->getContainerList();
-	for( std::list<ObjectID>::const_iterator iter = allTunnels->begin(); iter != allTunnels->end(); iter++ ) {
-		// For each ID, look it up and change its team.  We all get captured together.
-		Object *currentTunnel = TheGameLogic->findObjectByID( *iter );
-		if( currentTunnel ) {
-			Real dx = currentTunnel->getPosition()->x-pos->x;
-			Real dy = currentTunnel->getPosition()->y-pos->y;
-			Real distSqr = dx*dx+dy*dy;
-			if (bestTunnel==nullptr || distSqr<bestDistSqr) {
-				bestDistSqr = distSqr;
-				bestTunnel = currentTunnel;
-			}
+	return tunnel && !tunnel->isEffectivelyDead() && !tunnel->isDisabled() &&
+		!tunnel->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) &&
+		!tunnel->getStatusBits().test(OBJECT_STATUS_SOLD) &&
+		tunnel->getContain() && tunnel->getContain()->isTunnelContain();
+}
+
+static Object* findReturnTunnel(Object* unit)
+{
+	Player* player = unit->getControllingPlayer();
+	TunnelTracker* network = player ? player->getTunnelSystem() : nullptr;
+	if (!network)
+	{
+		return nullptr;
+	}
+
+	Object* best = nullptr;
+	Real bestDistance = 0.0f;
+	const std::list<ObjectID>& tunnels = *network->getContainerList();
+	for (std::list<ObjectID>::const_iterator it = tunnels.begin(); it != tunnels.end(); ++it)
+	{
+		Object* tunnel = TheGameLogic->findObjectByID(*it);
+		if (!isOperationalTunnel(tunnel) || !tunnel->getContain()->isValidContainerFor(unit, true))
+		{
+			continue;
+		}
+
+		Coord3D exit;
+		OpenContain* contain = tunnel->getContain()->asOpenContain();
+		if (!contain || !contain->getGuardExitPosition(exit))
+		{
+			continue;
+		}
+
+		const Real distance = distanceSquared(exit, *unit->getPosition());
+		if ((!best || distance < bestDistance) &&
+			TheAI->pathfinder()->clientSafeQuickDoesPathExist(unit->getAI()->getLocomotorSet(),
+				unit->getRequiredBridgeHeight(), unit->getPosition(), &exit))
+		{
+			best = tunnel;
+			bestDistance = distance;
 		}
 	}
-	return bestTunnel;
+	return best;
 }
-
 
 //-- ExitConditions -------------------------------------------------------------------------------
 /**
@@ -154,23 +134,21 @@ Bool TunnelNetworkExitConditions::shouldExit(const StateMachine* machine) const
 AITNGuardMachine::AITNGuardMachine( Object *owner ) :
 	StateMachine(owner, "AITNGuardMachine"),
 	m_nemesisToAttack(INVALID_ID),
-	m_guardMode(GUARDMODE_NORMAL)
+	m_guardMode(GUARDMODE_NORMAL),
+	m_leashRadius(0.0f),
+	m_detectionRadius(0.0f),
+	m_outsideUntil(0),
+	m_redeployAt(0)
 {
 	m_positionToGuard.zero();
-
-	static const StateConditionInfo attackAggressors[] =
-	{
-		StateConditionInfo(hasAttackedMeAndICanReturnFire, AI_TN_GUARD_ATTACK_AGGRESSOR, nullptr),
-		StateConditionInfo(nullptr, INVALID_STATE_ID, nullptr)
-	};
 
 	// order matters: first state is the default state.
 // srj sez: I made "return" the start state, so that if ordered to guard a position
 // that isn't the unit's current position, it moves to that position first.
-	defineState( AI_TN_GUARD_RETURN,						newInstance(AITNGuardReturnState)( this ), AI_TN_GUARD_IDLE, AI_TN_GUARD_INNER, attackAggressors );
+	defineState( AI_TN_GUARD_RETURN,						newInstance(AITNGuardReturnState)( this ), AI_TN_GUARD_IDLE, AI_TN_GUARD_IDLE );
 	defineState( AI_TN_GUARD_IDLE,							newInstance(AITNGuardIdleState)( this ), AI_TN_GUARD_INNER, AI_TN_GUARD_RETURN );
-	defineState( AI_TN_GUARD_INNER,						newInstance(AITNGuardInnerState)( this ), AI_TN_GUARD_OUTER, AI_TN_GUARD_OUTER , attackAggressors);
-	defineState( AI_TN_GUARD_OUTER,						newInstance(AITNGuardOuterState)( this ), AI_TN_GUARD_GET_CRATE, AI_TN_GUARD_GET_CRATE );
+	defineState( AI_TN_GUARD_INNER,						newInstance(AITNGuardInnerState)( this ), AI_TN_GUARD_RETURN, AI_TN_GUARD_RETURN);
+	defineState( AI_TN_GUARD_OUTER,						newInstance(AITNGuardOuterState)( this ), AI_TN_GUARD_INNER, AI_TN_GUARD_RETURN );
 	defineState( AI_TN_GUARD_GET_CRATE,				newInstance(AITNGuardPickUpCrateState)( this ), AI_TN_GUARD_RETURN, AI_TN_GUARD_RETURN );
 	defineState( AI_TN_GUARD_ATTACK_AGGRESSOR, newInstance(AITNGuardAttackAggressorState)( this ), AI_TN_GUARD_RETURN, AI_TN_GUARD_RETURN  );
 #ifdef STATE_MACHINE_DEBUG
@@ -193,49 +171,207 @@ AITNGuardMachine::~AITNGuardMachine()
 }
 
 //--------------------------------------------------------------------------------------
-Bool AITNGuardMachine::lookForInnerTarget()
+static Real guardSetting(Real overrideValue, Real fallback)
 {
-	Object* owner = getOwner();
+	return overrideValue >= 0.0f ? overrideValue : fallback;
+}
 
-	// Check if team auto targets same victim.
-	Object *teamVictim = nullptr;
-	if (owner->getTeam()->getPrototype()->getTemplateInfo()->m_attackCommonTarget)
+static Bool isInGuardZone(const AsciiString& name, const Coord3D& position)
+{
+	const PolygonTrigger* zone = TheTerrainLogic->getTriggerAreaByName(name);
+	ICoord3D point;
+	point.x = (Int)position.x;
+	point.y = (Int)position.y;
+	point.z = (Int)position.z;
+	return zone && zone->pointInTrigger(point);
+}
+
+static Real getTunnelGuardRadius(Player* player, const Object* tunnel, const TunnelContainModuleData& settings, const TAiData& defaults)
+{
+	Real zoneRadius = -1.0f;
+	const Int start = player->getMpStartIndex();
+	AsciiString zoneName;
+	zoneName.format("InnerPerimeter%d", start + 1);
+	if (start >= 0 && isInGuardZone(zoneName, *tunnel->getPosition()))
 	{
-		teamVictim = owner->getTeam()->getTeamTargetObject();
-		if (teamVictim && (!TheGlobalData->m_guardRequiresVisibility ||
-			teamVictim->getShroudedStatus(owner->getControllingPlayer()->getPlayerIndex()) == OBJECTSHROUD_CLEAR))
+		zoneRadius = guardSetting(settings.m_tunnelGuardInnerPerimeterRadius, defaults.m_tunnelGuardInnerPerimeterRadius);
+	}
+	else
+	{
+		zoneName.format("OuterPerimeter%d", start + 1);
+		if (start >= 0 && isInGuardZone(zoneName, *tunnel->getPosition()))
 		{
-			setNemesisID(teamVictim->getID());
-			return true;	// Transitions to AITNGuardInnerState.
+			zoneRadius = guardSetting(settings.m_tunnelGuardOuterPerimeterRadius, defaults.m_tunnelGuardOuterPerimeterRadius);
+		}
+		else if (isInGuardZone(AsciiString("CombatZone"), *tunnel->getPosition()))
+		{
+			zoneRadius = guardSetting(settings.m_tunnelGuardCombatZoneRadius, defaults.m_tunnelGuardCombatZoneRadius);
 		}
 	}
+	return guardSetting(settings.m_tunnelGuardRadius, guardSetting(zoneRadius, defaults.m_tunnelGuardRadius));
+}
 
-	// Find tunnel network to defend.
-	// Scan my tunnels.
-	Player *ownerPlayer = getOwner()->getControllingPlayer();
-	if (!ownerPlayer) return false; // should never happen, but hey.  jba.
-	TunnelTracker *tunnels = ownerPlayer->getTunnelSystem();
-	if (tunnels==nullptr) return false;
-	if (tunnels->getCurNemesis()) {
-		setNemesisID(tunnels->getCurNemesis()->getID());
-		return true;	// Transitions to AITNGuardInnerState.
+Bool AITNGuardMachine::isPathWithinLeash(Path* path) const
+{
+	if (!path || !path->getLastNode())
+	{
+		return false;
 	}
-	const std::list<ObjectID> *allTunnels = tunnels->getContainerList();
-	for( std::list<ObjectID>::const_iterator iter = allTunnels->begin(); iter != allTunnels->end(); iter++ ) {
-		Object *currentTunnel = TheGameLogic->findObjectByID( *iter );
-		if( currentTunnel ) {
-			// Check for attacking.
-			if (currentTunnel->getAI()) {
-				Object *victim = currentTunnel->getAI()->getGoalObject();
-				if (owner->getRelationship(victim) == ENEMIES) {
-					setNemesisID(victim->getID());
-					return true;
-				}
+
+	Real totalDistance = 0.0f;
+	const Coord3D* previous = nullptr;
+	for (const PathNode* node = path->getFirstNode(); node; node = node->getNext())
+	{
+		if (distanceSquared(*node->getPosition(), m_positionToGuard) > m_leashRadius * m_leashRadius)
+		{
+			return false;
+		}
+		if (previous)
+		{
+			totalDistance += sqrtf(distanceSquared(*previous, *node->getPosition()));
+		}
+		previous = node->getPosition();
+	}
+	return totalDistance <= m_leashRadius;
+}
+
+Bool AITNGuardMachine::canFightFrom(const Coord3D& from, Object* target)
+{
+	Object* owner = getOwner();
+	if (!target || target->isEffectivelyDead() || owner->getRelationship(target) != ENEMIES ||
+		owner->isDisabled() || owner->getStatusBits().test(OBJECT_STATUS_NO_ATTACK) ||
+		target->getShroudedStatus(owner->getControllingPlayer()->getPlayerIndex()) != OBJECTSHROUD_CLEAR ||
+		!owner->chooseBestWeaponForTarget(target, PREFER_MOST_DAMAGE, CMD_FROM_AI))
+	{
+		return false;
+	}
+
+	WeaponSlotType slot = PRIMARY_WEAPON;
+	const Weapon* weapon = owner->getCurrentWeapon(&slot);
+	const AbleToAttackType attackType = owner->getContainedBy() ? ATTACK_TUNNEL_NETWORK_GUARD : ATTACK_NEW_TARGET;
+	const CanAttackResult attack = owner->getAbleToAttackSpecificObject(attackType, target, CMD_FROM_AI, slot);
+	if (!weapon || (attack != ATTACKRESULT_POSSIBLE && attack != ATTACKRESULT_POSSIBLE_AFTER_MOVING) ||
+		distanceSquared(from, m_positionToGuard) > m_leashRadius * m_leashRadius)
+	{
+		return false;
+	}
+
+	Pathfinder* pathfinder = TheAI->pathfinder();
+	const LocomotorSet& locomotor = owner->getAI()->getLocomotorSet();
+	const Coord3D* targetPos = target->getPosition();
+	if (pathfinder->isValidAttackGoal(owner, locomotor, from, target, targetPos, weapon))
+	{
+		return true;
+	}
+
+	Path* path = pathfinder->findAttackPath(owner, locomotor, &from, target, targetPos, weapon);
+	const Bool usable = isPathWithinLeash(path) &&
+		pathfinder->isValidAttackGoal(owner, locomotor, *path->getLastNode()->getPosition(), target, targetPos, weapon);
+	if (path)
+	{
+		deleteInstance(path);
+	}
+	return usable;
+}
+
+Bool AITNGuardMachine::deploy()
+{
+	Object* owner = getOwner();
+	Player* player = owner->getControllingPlayer();
+	TunnelTracker* network = player ? player->getTunnelSystem() : nullptr;
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (!network || now < m_redeployAt || !owner->getContainedBy()->getContain() ||
+		!owner->getContainedBy()->getContain()->isTunnelContain())
+	{
+		return false;
+	}
+
+	const TAiData& defaults = *TheAI->getAiData();
+	PartitionFilterRelationship enemy(owner, PartitionFilterRelationship::ALLOW_ENEMIES);
+	PartitionFilterFreeOfFog clearFog(player->getPlayerIndex());
+	PartitionFilterSameMapStatus mapStatus(owner);
+	PartitionFilter* visibleEnemies[] = { &enemy, &clearFog, &mapStatus, nullptr };
+
+	TunnelContain* best = nullptr;
+	ObjectID bestTarget = INVALID_ID;
+	Coord3D bestExit;
+	Real bestDistance = 0.0f;
+	Real bestLeash = 0.0f;
+	Real bestRadius = 0.0f;
+	const std::list<ObjectID>& tunnels = *network->getContainerList();
+	for (std::list<ObjectID>::const_iterator it = tunnels.begin(); it != tunnels.end(); ++it)
+	{
+		Object* tunnel = TheGameLogic->findObjectByID(*it);
+		if (!isOperationalTunnel(tunnel) || network->isAutoExitTunnel(tunnel) || tunnel->getLayer() != owner->getLayer())
+		{
+			continue;
+		}
+
+		TunnelContain* contain = static_cast<TunnelContain*>(tunnel->getContain()->asOpenContain());
+		Coord3D exitPosition;
+		if (!contain->getGuardExitPosition(exitPosition) || contain->isExitBusy() ||
+			!TheAI->pathfinder()->goalBoxFree(owner, &exitPosition))
+		{
+			continue;
+		}
+
+		const TunnelContainModuleData& settings = *contain->getGuardSettings();
+		const Real radius = getTunnelGuardRadius(player, tunnel, settings, defaults);
+		const Real clearRadius = guardSetting(settings.m_tunnelGuardExitClearRadius, defaults.m_tunnelGuardExitClearRadius);
+		if (radius <= 0.0f || guardSetting(settings.m_tunnelGuardMaxOutsideTime, defaults.m_tunnelGuardMaxOutsideTime) < 1.0f ||
+			(clearRadius > 0.0f && ThePartitionManager->getClosestObject(&exitPosition, clearRadius, FROM_CENTER_2D, visibleEnemies)))
+		{
+			continue;
+		}
+
+		m_positionToGuard = exitPosition;
+		m_leashRadius = guardSetting(settings.m_tunnelGuardLeashRadius, guardSetting(defaults.m_tunnelGuardLeashRadius, radius));
+		ObjectIterator* targets = ThePartitionManager->iterateObjectsInRange(&exitPosition, radius,
+			FROM_CENTER_2D, visibleEnemies, ITER_SORTED_NEAR_TO_FAR);
+		MemoryPoolObjectHolder targetHolder(targets);
+		for (Object* target = targets->first(); target; target = targets->next())
+		{
+			const Real distance = distanceSquared(*target->getPosition(), exitPosition);
+			if (best && distance >= bestDistance)
+			{
+				break;
+			}
+			if (canFightFrom(exitPosition, target))
+			{
+				best = contain;
+				bestTarget = target->getID();
+				bestExit = exitPosition;
+				bestDistance = distance;
+				bestLeash = m_leashRadius;
+				bestRadius = radius;
+				break;
 			}
 		}
 	}
 
-	return false;
+	if (!best)
+	{
+		return false;
+	}
+
+	m_nemesisToAttack = bestTarget;
+	m_positionToGuard = bestExit;
+	m_leashRadius = bestLeash;
+	m_detectionRadius = bestRadius;
+	const TunnelContainModuleData& settings = *best->getGuardSettings();
+	m_outsideUntil = now + (UnsignedInt)guardSetting(settings.m_tunnelGuardMaxOutsideTime, defaults.m_tunnelGuardMaxOutsideTime);
+	m_redeployAt = (UnsignedInt)guardSetting(settings.m_tunnelGuardRedeployDelay, defaults.m_tunnelGuardRedeployDelay);
+	best->exitObjectInAHurry(owner);
+	return true;
+}
+
+void AITNGuardMachine::onReturned()
+{
+	if (m_outsideUntil)
+	{
+		m_outsideUntil = 0;
+		m_redeployAt += TheGameLogic->getFrame();
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -251,7 +387,7 @@ void AITNGuardMachine::crc( Xfer *xfer )
 void AITNGuardMachine::xfer( Xfer *xfer )
 {
   // version
-  XferVersion currentVersion = 2;
+  XferVersion currentVersion = 3;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -261,6 +397,13 @@ void AITNGuardMachine::xfer( Xfer *xfer )
 
 	xfer->xferObjectID(&m_nemesisToAttack);
 	xfer->xferCoord3D(&m_positionToGuard);
+	if (version >= 3)
+	{
+		xfer->xferReal(&m_leashRadius);
+		xfer->xferReal(&m_detectionRadius);
+		xfer->xferUnsignedInt(&m_outsideUntil);
+		xfer->xferUnsignedInt(&m_redeployAt);
+	}
 
 }
 
@@ -309,12 +452,11 @@ AITNGuardInnerState::~AITNGuardInnerState()
 StateReturnType AITNGuardInnerState::onEnter()
 {
 	Object* nemesis = TheGameLogic->findObjectByID(getGuardMachine()->getNemesisID()) ;
-	if (nemesis == nullptr)
+	if (!getGuardMachine()->canFightFrom(*getMachineOwner()->getPosition(), nemesis))
 	{
-		DEBUG_LOG(("Unexpected null nemesis in AITNGuardInnerState."));
 		return STATE_SUCCESS;
 	}
-	m_exitConditions.m_attackGiveUpFrame = TheGameLogic->getFrame() + TheAI->getAiData()->m_guardChaseUnitFrames;
+	m_exitConditions.m_attackGiveUpFrame = getGuardMachine()->getOutsideUntil();
 
 	m_attackState = newInstance(AIAttackState)(getMachine(), false, true, false, &m_exitConditions);
 
@@ -329,82 +471,23 @@ StateReturnType AITNGuardInnerState::onEnter()
 	return STATE_SUCCESS;
 }
 
-static Object *TunnelNetworkScan(Object *owner)
-{
-		PartitionFilterRelationship					f1(owner, PartitionFilterRelationship::ALLOW_ENEMIES);
-		PartitionFilterPossibleToAttack			f2(ATTACK_NEW_TARGET, owner, CMD_FROM_AI);
-		PartitionFilterSameMapStatus				filterMapStatus(owner);
-		PartitionFilterFreeOfFog filterFogged(owner->getControllingPlayer()->getPlayerIndex());
-
-		PartitionFilter *filters[16];
-		Int count = 0;
-
-		filters[count++] = &f1;
-		filters[count++] = &f2;
-		filters[count++] = &filterMapStatus;
-		if (TheGlobalData->m_guardRequiresVisibility)
-		{
-			filters[count++] = &filterFogged;
-		}
-
-		Real visionRange = AITNGuardMachine::getStdGuardRange(owner);
-
-		filters[count++] = nullptr;
-
-		Object* target = ThePartitionManager->getClosestObject(owner->getPosition(), visionRange, FROM_CENTER_2D, filters);
-		return target;
-}
-
-//--------------------------------------------------------------------------------------
 StateReturnType AITNGuardInnerState::update()
 {
-	Object* nemesis = TheGameLogic->findObjectByID(getGuardMachine()->getNemesisID()) ;
-	Player *ownerPlayer = getMachineOwner()->getControllingPlayer();
-	TunnelTracker *tunnels = nullptr;
-	if (ownerPlayer) {
-		tunnels = ownerPlayer->getTunnelSystem();
-	}
-
+	AITNGuardMachine* guard = getGuardMachine();
 	Object* owner = getMachineOwner();
-	// killed him.
-	Object *teamVictim = owner->getTeam()->getTeamTargetObject();
-	if (nemesis == nullptr)
+	Object* target = TheGameLogic->findObjectByID(guard->getNemesisID());
+	Path* path = owner->getAI()->getPath();
+	if (!m_attackState || !target || target->isEffectivelyDead() ||
+		owner->getRelationship(target) != ENEMIES ||
+		distanceSquared(*target->getPosition(), *guard->getPositionToGuard()) >
+			guard->getDetectionRadius() * guard->getDetectionRadius() ||
+		target->getShroudedStatus(owner->getControllingPlayer()->getPlayerIndex()) != OBJECTSHROUD_CLEAR ||
+		TheGameLogic->getFrame() >= guard->getOutsideUntil() ||
+		distanceSquared(*owner->getPosition(), *guard->getPositionToGuard()) >
+			guard->getLeashRadius() * guard->getLeashRadius() ||
+		(path && !guard->isPathWithinLeash(path)))
 	{
-		if (teamVictim)
-		{
-			getGuardMachine()->setNemesisID(teamVictim->getID());
-			m_exitConditions.m_attackGiveUpFrame = TheGameLogic->getFrame() + TheAI->getAiData()->m_guardChaseUnitFrames;
-			return STATE_CONTINUE;
-		}
-
-		// Check tunnel.
-		if (tunnels) {
-			nemesis = tunnels->getCurNemesis();
-			if (nemesis) {
-				getGuardMachine()->setNemesisID(nemesis->getID());
-				m_exitConditions.m_attackGiveUpFrame = TheGameLogic->getFrame() + TheAI->getAiData()->m_guardChaseUnitFrames;
-				return STATE_CONTINUE;
-			}
-		}
-
-		if (m_scanForEnemy) {
-			m_scanForEnemy = false; // we just do 1 scan.
-			nemesis = TunnelNetworkScan(owner);
-			if (nemesis) {
-				m_attackState->onExit(EXIT_RESET);
-				m_attackState->getMachine()->setGoalObject(nemesis);
-				if (tunnels) {
-					tunnels->updateNemesis(nemesis);
-				}
-				StateReturnType returnVal = m_attackState->onEnter();
-				return returnVal;
-			}
-		}
-	} else {
-		if (nemesis != teamVictim && teamVictim != nullptr) {
-			tunnels->updateNemesis(nemesis);
-			getGuardMachine()->setNemesisID(teamVictim->getID());
-		}
+		return STATE_SUCCESS;
 	}
 	return m_attackState->update();
 }
@@ -457,74 +540,44 @@ AITNGuardOuterState::~AITNGuardOuterState()
 //--------------------------------------------------------------------------------------
 StateReturnType AITNGuardOuterState::onEnter()
 {
-	if (getGuardMachine()->getGuardMode() == GUARDMODE_GUARD_WITHOUT_PURSUIT)
-	{
-		// "patrol" mode does not follow targets outside the guard area.
-		return STATE_SUCCESS;
-	}
-
-	Object* nemesis = TheGameLogic->findObjectByID(getGuardMachine()->getNemesisID()) ;
-	if (nemesis == nullptr)
-	{
-		DEBUG_LOG(("Unexpected null nemesis in AITNGuardOuterState."));
-		return STATE_SUCCESS;
-	}
-
-	m_exitConditions.m_attackGiveUpFrame = TheGameLogic->getFrame() + TheAI->getAiData()->m_guardChaseUnitFrames;
-	m_attackState = newInstance(AIAttackState)(getMachine(), false, true, false, &m_exitConditions);
-	m_attackState->getMachine()->setGoalObject(nemesis);
-
-	StateReturnType returnVal = m_attackState->onEnter();
-	if (returnVal == STATE_CONTINUE) {
-		return STATE_CONTINUE;
-	}
-
-	// if we had no one to attack, we were successful, so go to the next state.
-	return STATE_SUCCESS;
+	return STATE_CONTINUE;
 }
 
-//--------------------------------------------------------------------------------------
 StateReturnType AITNGuardOuterState::update()
 {
-	if (m_attackState == nullptr) {
-		return STATE_SUCCESS;
-	}
-
-	Object *owner = getMachineOwner();
-	Object* goalObj = m_attackState->getMachineGoalObject();
-	if (goalObj)
+	AITNGuardMachine* guard = getGuardMachine();
+	Object* owner = getMachineOwner();
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (now >= guard->getOutsideUntil() || owner->getContainedBy() ||
+		distanceSquared(*owner->getPosition(), *guard->getPositionToGuard()) >
+			guard->getLeashRadius() * guard->getLeashRadius())
 	{
-	}	else {
-		Object* nemesis = TheGameLogic->findObjectByID(getGuardMachine()->getNemesisID()) ;
-		if (nemesis) {
-			goalObj = nemesis;
-		}
-		// Check if team auto targets same victim.
-		Object *teamVictim = nullptr;
-		if (goalObj == nullptr && owner->getTeam()->getPrototype()->getTemplateInfo()->m_attackCommonTarget)
+		return STATE_FAILURE;
+	}
+
+	PartitionFilterRelationship enemies(owner, PartitionFilterRelationship::ALLOW_ENEMIES);
+	PartitionFilterFreeOfFog visibility(owner->getControllingPlayer()->getPlayerIndex());
+	PartitionFilterSameMapStatus mapStatus(owner);
+	PartitionFilter* filters[] = { &enemies, &visibility, &mapStatus, nullptr };
+	ObjectIterator* targets = ThePartitionManager->iterateObjectsInRange(guard->getPositionToGuard(),
+		guard->getDetectionRadius(), FROM_CENTER_2D, filters, ITER_SORTED_NEAR_TO_FAR);
+	MemoryPoolObjectHolder holder(targets);
+	for (Object* target = targets->first(); target; target = targets->next())
+	{
+		if (guard->canFightFrom(*owner->getPosition(), target))
 		{
-			teamVictim = owner->getTeam()->getTeamTargetObject();
-			if (teamVictim)
-			{
-				goalObj = teamVictim;
-			}
-			m_attackState->getMachine()->setGoalObject(goalObj);
-			return m_attackState->onEnter();
+			guard->setNemesisID(target->getID());
+			return STATE_SUCCESS;
 		}
 	}
 
-	return m_attackState->update();
+	const UnsignedInt scanRate = TheAI->getAiData()->m_guardEnemyScanRate;
+	const UnsignedInt remaining = guard->getOutsideUntil() - now;
+	return STATE_SLEEP(scanRate < remaining ? scanRate : remaining);
 }
 
-//--------------------------------------------------------------------------------------
 void AITNGuardOuterState::onExit( StateExitType status )
 {
-	if (m_attackState)
-	{
-		m_attackState->onExit(status);
-		deleteInstance(m_attackState);
-		m_attackState = nullptr;
-	}
 }
 
 //-- AITNGuardReturnState ----------------------------------------------------------------------------
@@ -569,21 +622,7 @@ StateReturnType AITNGuardReturnState::onEnter()
 		// we are already inside our tunnel.  Return success. jba [8/24/2003]
 		return STATE_SUCCESS;
 	}
-	if (getMachineOwner()->getTeam()) {
-		Object *teamVictim = getMachineOwner()->getTeam()->getTeamTargetObject();
-		if (teamVictim)	{
-			// We have a team target.  Go attack it rather than returning to the tunel. jba [8/24/2003]
-			getGuardMachine()->setNemesisID(teamVictim->getID());
-			return STATE_FAILURE; // Fail to return goes to inner attack state.
-		}
-	}
-// no, no, no, don't do this in onEnter, unless you like really slow maps. (srj)
-//	if (getGuardMachine()->lookForInnerTarget())
-//		return STATE_FAILURE; // early termination because we found a target.
-
-	// Find tunnel network to enter.
-	// Scan my tunnels.
-	Object *bestTunnel = findBestTunnel(getMachineOwner()->getControllingPlayer(), getMachineOwner()->getPosition());
+	Object *bestTunnel = findReturnTunnel(getMachineOwner());
 	if (bestTunnel==nullptr) return STATE_FAILURE;
 
 	getMachine()->setGoalObject(bestTunnel);
@@ -595,33 +634,6 @@ StateReturnType AITNGuardReturnState::onEnter()
 //--------------------------------------------------------------------------------------
 StateReturnType AITNGuardReturnState::update()
 {
-	Player *ownerPlayer = getMachineOwner()->getControllingPlayer();
-	if (getMachineOwner()->getTeam()) {
-		Object *teamVictim = getMachineOwner()->getTeam()->getTeamTargetObject();
-		if (teamVictim)	{
-			getGuardMachine()->setNemesisID(teamVictim->getID());
-			return STATE_FAILURE; // Fail to return goes to inner attack state.
-		}
-	}
-	// Check tunnel for target.
-	TunnelTracker *tunnels = nullptr;
-	if (ownerPlayer) {
-		tunnels = ownerPlayer->getTunnelSystem();
-	}
-
-	if (tunnels) {
-		Object *nemesis = tunnels->getCurNemesis();
-		if (nemesis) {
-			// Check distance.
-			//Coord3D dist;
-			//Coord3D curPos;
-			//dist.set()
-			getGuardMachine()->setNemesisID(nemesis->getID());
-			return STATE_FAILURE; // Fail to return goes to inner attack state.
-		}
-	}
-
-	// Just let the return movement finish.
 	StateReturnType ret = AIEnterState::update();
 	if (ret==STATE_CONTINUE) return STATE_CONTINUE;
 	return STATE_SUCCESS;
@@ -691,38 +703,20 @@ StateReturnType AITNGuardIdleState::update()
 	//getMachine()->setDebugOutput(true);
 #endif
 	Object *owner = getMachineOwner();
-	AIUpdateInterface *ai = owner->getAIUpdateInterface();
-	// Check to see if we have created a crate we need to pick up.
-	if (ai->getCrateID() != INVALID_ID)
+	if (owner->getContainedBy())
 	{
-		getMachine()->setState(AI_TN_GUARD_GET_CRATE);
-		return STATE_SLEEP(m_nextEnemyScanTime - now);
-	}
-
-	// if anyone is in the inner area, return success.
-	if (getGuardMachine()->lookForInnerTarget())
-	{
-		Object *nemesis = TheGameLogic->findObjectByID(getGuardMachine()->getNemesisID());
-		if (nemesis == nullptr)
+		getGuardMachine()->onReturned();
+		if (getGuardMachine()->deploy())
 		{
-			DEBUG_LOG(("Unexpected null nemesis in AITNGuardAttackAggressorState."));
 			return STATE_SLEEP(0);
 		}
-		if (getMachineOwner()->getContainedBy()) {
-			Object *bestTunnel = findBestTunnel(owner->getControllingPlayer(), nemesis->getPosition());
-			ExitInterface* goalExitInterface = bestTunnel->getContain() ? bestTunnel->getContain()->getContainExitInterface() : nullptr;
-			if( goalExitInterface == nullptr )
-				return STATE_FAILURE;
-
-			if( goalExitInterface->isExitBusy() )
-				return STATE_SLEEP(0);// Just wait a sec.
-			goalExitInterface->exitObjectInAHurry(getMachineOwner());
-			return STATE_SLEEP(0);
-		}
-		return STATE_SUCCESS;	// Transitions to AITNGuardInnerState.
+	}
+	else if (getGuardMachine()->getOutsideUntil() > now)
+	{
+		return STATE_SUCCESS;
 	}
 
-	if (!owner->getContainedBy() && findBestTunnel(owner->getControllingPlayer(), owner->getPosition())) {
+	if (!owner->getContainedBy() && findReturnTunnel(owner)) {
 		return STATE_FAILURE;	 // go to AITNGuardReturnState, & enter a tunnel.
 	}
 

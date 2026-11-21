@@ -752,9 +752,11 @@ private:
 	virtual Path *findClosestPath( Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 		Coord3D *to, Bool blocked, Real pathCostMultiplier, Bool moveAllies ) override;
 
+public:
 	/** Find a short, valid path to a location that obj can attack victim from.  */
 	virtual Path *findAttackPath( const Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 		const Object *victim, const Coord3D* victimPos, const Weapon *weapon ) override;
+private:
 
 	/** Find a short, valid path to a location that is away from the repulsors.  */
 	virtual Path *findSafePath( const Object *obj, const LocomotorSet& locomotorSet,

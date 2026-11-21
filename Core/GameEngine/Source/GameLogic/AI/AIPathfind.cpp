@@ -12452,7 +12452,7 @@ Path *Pathfinder::findAttackPathImpl( const Object *obj, const LocomotorSet& loc
 
 	// Quick check:  See if moving couple of cells towards the victim will work.
 	{
-		Coord3D curPos = *obj->getPosition();
+		Coord3D curPos = *from;
 		Coord3D goalPos = victim?*victim->getPosition():*victimPos;
 		Coord3D delta;
 		delta.set(goalPos.x-curPos.x, goalPos.y-curPos.y, 0);
@@ -12517,7 +12517,7 @@ Path *Pathfinder::findAttackPathImpl( const Object *obj, const LocomotorSet& loc
 
 		// determine start cell
 	ICoord2D startCellNdx;
-	Coord3D objPos = *obj->getPosition();
+	Coord3D objPos = *from;
 	// since worldtocell truncates, add.
 	if (centerInCell) {
 		objPos.x += PATHFIND_CELL_SIZE_F/2.0f;

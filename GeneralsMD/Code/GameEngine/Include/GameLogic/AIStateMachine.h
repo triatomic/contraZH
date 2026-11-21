@@ -172,6 +172,7 @@ public:
 	StateID getTemporaryState() const {return m_temporaryState?m_temporaryState->getID():INVALID_STATE_ID;}
 
 	AIGuardMachine* getGuardMachine( void );
+	AITNGuardMachine* getTunnelGuardMachine();
 	AIGuardRetaliateMachine* getGuardRetaliateMachine( void );
 
 public:	// overrides.
@@ -1282,6 +1283,9 @@ protected:
 	virtual void crc( Xfer *xfer ) override;
 	virtual void xfer( Xfer *xfer ) override;
 	virtual void loadPostProcess() override;
+
+public:
+	AITNGuardMachine* getTunnelGuardMachine() const { return m_guardMachine; }
 
 private:
 	AITNGuardMachine *m_guardMachine;					///< state sub-machine for guard behavior

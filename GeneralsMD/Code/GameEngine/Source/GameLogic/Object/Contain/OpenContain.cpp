@@ -1358,6 +1358,26 @@ void OpenContain::exitObjectViaDoor( Object *exitObj, ExitDoorType exitDoor )
 		TheAI->pathfinder()->addObjectToPathfindMap( exitObj );
 	}
 }
+Bool OpenContain::getGuardExitPosition(Coord3D& position) const
+{
+	const Int numberExits = getOpenContainModuleData()->m_numberOfExitPaths;
+	if (numberExits < 1)
+	{
+		return false;
+	}
+
+	AsciiString startBone("ExitStart");
+	AsciiString endBone("ExitEnd");
+	if (numberExits > 1)
+	{
+		startBone.format("ExitStart%02d", m_whichExitPath);
+		endBone.format("ExitEnd%02d", m_whichExitPath);
+	}
+	Coord3D start;
+	return getObject()->getSingleLogicalBonePosition(startBone.str(), &start, nullptr) &&
+		getObject()->getSingleLogicalBonePosition(endBone.str(), &position, nullptr);
+}
+
 // ------------------------------------------------------------------------------------------------
 /**
 	This call is used to evacuate units from a tunnel network via a persistent state (guard tunnel networ).
@@ -1428,15 +1448,10 @@ void OpenContain::exitObjectInAHurry( Object *exitObj )
 				TheAI->pathfinder()->updateGoal(me, me->getPosition(), TheTerrainLogic->getLayerForDestination(me->getPosition()));
 			}
 			ai->ignoreObstacle(nullptr);
-			TheAI->pathfinder()->adjustToPossibleDestination(exitObj, ai->getLocomotorSet(), &endPosition);
 			// The units often come out at the same position, and need to ignore collisions briefly
 			// as they move out.  jba.
 			ai->setIgnoreCollisionTime(computeExitIgnoreCollisionFrames(exitObj, ai, startPosition, endPosition));
 			ai->startExitPass(&startPosition, &endPosition);	// TheSuperHackers @feature simonx645 16/11/2026 "exitpass"
-		}
-		exitPath.push_back(endPosition);
-		if (m_rallyPointExists) {
-			exitPath.push_back(m_rallyPoint);
 		}
 
 		if( ai )

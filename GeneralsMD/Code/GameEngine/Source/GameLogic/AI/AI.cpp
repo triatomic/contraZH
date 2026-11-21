@@ -152,6 +152,15 @@ static const FieldParse TheAIFieldParseTable[] =
 	{ "GuardInnerModifierHuman",INI::parseReal,nullptr,		offsetof( TAiData, m_guardInnerModifierHuman ) },
 	{ "GuardOuterModifierHuman",INI::parseReal,nullptr,		offsetof( TAiData, m_guardOuterModifierHuman ) },
 	{ "GuardChaseUnitsDuration",				INI::parseDurationUnsignedInt,nullptr,		offsetof( TAiData, m_guardChaseUnitFrames ) },
+	{ "TunnelGuardAutoAssignCount", INI::parseInt, nullptr, offsetof( TAiData, m_tunnelGuardAutoAssignCount ) },
+	{ "TunnelGuardRadius", INI::parseReal, nullptr, offsetof( TAiData, m_tunnelGuardRadius ) },
+	{ "TunnelGuardInnerPerimeterRadius", INI::parseReal, nullptr, offsetof( TAiData, m_tunnelGuardInnerPerimeterRadius ) },
+	{ "TunnelGuardOuterPerimeterRadius", INI::parseReal, nullptr, offsetof( TAiData, m_tunnelGuardOuterPerimeterRadius ) },
+	{ "TunnelGuardCombatZoneRadius", INI::parseReal, nullptr, offsetof( TAiData, m_tunnelGuardCombatZoneRadius ) },
+	{ "TunnelGuardLeashRadius", INI::parseReal, nullptr, offsetof( TAiData, m_tunnelGuardLeashRadius ) },
+	{ "TunnelGuardExitClearRadius", INI::parseReal, nullptr, offsetof( TAiData, m_tunnelGuardExitClearRadius ) },
+	{ "TunnelGuardMaxOutsideTime", INI::parseDurationReal, nullptr, offsetof( TAiData, m_tunnelGuardMaxOutsideTime ) },
+	{ "TunnelGuardRedeployDelay", INI::parseDurationReal, nullptr, offsetof( TAiData, m_tunnelGuardRedeployDelay ) },
 	{ "GuardEnemyScanRate",				INI::parseDurationUnsignedInt,nullptr,		offsetof( TAiData, m_guardEnemyScanRate ) },
 	{ "GuardEnemyReturnScanRate",				INI::parseDurationUnsignedInt,nullptr,		offsetof( TAiData, m_guardEnemyReturnScanRate ) },
 	{ "SkirmishGroupFudgeDistance",	INI::parseReal,nullptr,		offsetof( TAiData, m_skirmishGroupFudgeValue ) },
@@ -938,6 +947,15 @@ m_guardOuterModifierAI(0),
 m_guardInnerModifierHuman(0),
 m_guardOuterModifierHuman(0),
 m_guardChaseUnitFrames(0),
+m_tunnelGuardAutoAssignCount(0),
+m_tunnelGuardRadius(180.0f),
+m_tunnelGuardInnerPerimeterRadius(220.0f),
+m_tunnelGuardOuterPerimeterRadius(160.0f),
+m_tunnelGuardCombatZoneRadius(120.0f),
+m_tunnelGuardLeashRadius(-1.0f),
+m_tunnelGuardExitClearRadius(24.0f),
+m_tunnelGuardMaxOutsideTime(8 * LOGICFRAMES_PER_SECOND),
+m_tunnelGuardRedeployDelay(5 * LOGICFRAMES_PER_SECOND),
 m_guardEnemyScanRate(LOGICFRAMES_PER_SECOND/2),
 m_guardEnemyReturnScanRate(LOGICFRAMES_PER_SECOND),
 m_wallHeight(0),
@@ -990,6 +1008,15 @@ void TAiData::crc( Xfer *xfer )
 	xfer->xferReal( &m_guardInnerModifierHuman );
 	xfer->xferReal( &m_guardOuterModifierHuman );
 	xfer->xferUnsignedInt( &m_guardChaseUnitFrames );
+	xfer->xferInt(&m_tunnelGuardAutoAssignCount);
+	xfer->xferReal(&m_tunnelGuardRadius);
+	xfer->xferReal(&m_tunnelGuardInnerPerimeterRadius);
+	xfer->xferReal(&m_tunnelGuardOuterPerimeterRadius);
+	xfer->xferReal(&m_tunnelGuardCombatZoneRadius);
+	xfer->xferReal(&m_tunnelGuardLeashRadius);
+	xfer->xferReal(&m_tunnelGuardExitClearRadius);
+	xfer->xferReal(&m_tunnelGuardMaxOutsideTime);
+	xfer->xferReal(&m_tunnelGuardRedeployDelay);
 	xfer->xferUnsignedInt( &m_guardEnemyScanRate );
 	xfer->xferUnsignedInt( &m_guardEnemyReturnScanRate );
 	xfer->xferReal( &m_alertRangeModifier );

@@ -43,6 +43,15 @@ class TunnelContainModuleData : public OpenContainModuleData
 {
 public:
 
+	Int m_tunnelGuardAutoAssignCount;
+	Real m_tunnelGuardRadius;
+	Real m_tunnelGuardInnerPerimeterRadius;
+	Real m_tunnelGuardOuterPerimeterRadius;
+	Real m_tunnelGuardCombatZoneRadius;
+	Real m_tunnelGuardLeashRadius;
+	Real m_tunnelGuardExitClearRadius;
+	Real m_tunnelGuardMaxOutsideTime;
+	Real m_tunnelGuardRedeployDelay;
 	Real m_framesForFullHeal;			///< time (in frames) something becomes fully healed
 
 	TunnelContainModuleData()
@@ -50,6 +59,15 @@ public:
 
 		// by default, takes no time to heal ppl
 		m_framesForFullHeal = 1.0f;
+		m_tunnelGuardAutoAssignCount = -1;
+		m_tunnelGuardRadius = -1.0f;
+		m_tunnelGuardInnerPerimeterRadius = -1.0f;
+		m_tunnelGuardOuterPerimeterRadius = -1.0f;
+		m_tunnelGuardCombatZoneRadius = -1.0f;
+		m_tunnelGuardLeashRadius = -1.0f;
+		m_tunnelGuardExitClearRadius = -1.0f;
+		m_tunnelGuardMaxOutsideTime = -1.0f;
+		m_tunnelGuardRedeployDelay = -1.0f;
 
 		//
 		// by default we say that transports can have infantry inside them, this will be totally
@@ -65,6 +83,15 @@ public:
 
 		static const FieldParse dataFieldParse[] =
 		{
+			{ "TunnelGuardAutoAssignCount", INI::parseInt, nullptr, offsetof( TunnelContainModuleData, m_tunnelGuardAutoAssignCount ) },
+			{ "TunnelGuardRadius", INI::parseReal, nullptr, offsetof( TunnelContainModuleData, m_tunnelGuardRadius ) },
+			{ "TunnelGuardInnerPerimeterRadius", INI::parseReal, nullptr, offsetof( TunnelContainModuleData, m_tunnelGuardInnerPerimeterRadius ) },
+			{ "TunnelGuardOuterPerimeterRadius", INI::parseReal, nullptr, offsetof( TunnelContainModuleData, m_tunnelGuardOuterPerimeterRadius ) },
+			{ "TunnelGuardCombatZoneRadius", INI::parseReal, nullptr, offsetof( TunnelContainModuleData, m_tunnelGuardCombatZoneRadius ) },
+			{ "TunnelGuardLeashRadius", INI::parseReal, nullptr, offsetof( TunnelContainModuleData, m_tunnelGuardLeashRadius ) },
+			{ "TunnelGuardExitClearRadius", INI::parseReal, nullptr, offsetof( TunnelContainModuleData, m_tunnelGuardExitClearRadius ) },
+			{ "TunnelGuardMaxOutsideTime", INI::parseDurationReal, nullptr, offsetof( TunnelContainModuleData, m_tunnelGuardMaxOutsideTime ) },
+			{ "TunnelGuardRedeployDelay", INI::parseDurationReal, nullptr, offsetof( TunnelContainModuleData, m_tunnelGuardRedeployDelay ) },
 			{ "TimeForFullHeal", INI::parseDurationReal, nullptr, offsetof( TunnelContainModuleData, m_framesForFullHeal ) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
@@ -80,6 +107,7 @@ class TunnelContain : public OpenContain, public CreateModuleInterface
 
 public:
 
+	const TunnelContainModuleData* getGuardSettings() const { return getTunnelContainModuleData(); }
 	TunnelContain( Thing *thing, const ModuleData* moduleData );
 	// virtual destructor prototype provided by memory pool declaration
 
