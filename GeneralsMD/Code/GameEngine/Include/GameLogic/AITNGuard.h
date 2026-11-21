@@ -88,6 +88,7 @@ private:
 	Real m_leashRadius;
 	Real m_detectionRadius;
 	UnsignedInt m_outsideUntil;
+	UnsignedInt m_outsideDuration;
 	UnsignedInt m_redeployAt;
 
 protected:
@@ -117,7 +118,20 @@ public:
 	Real getDetectionRadius() const { return m_detectionRadius; }
 	Bool canFightFrom(const Coord3D& from, Object* target);
 	Bool isPathWithinLeash(Path* path) const;
-	UnsignedInt getOutsideUntil() const { return m_outsideUntil; }
+	Bool isDeployed() const { return m_outsideDuration != 0; }
+	Bool shouldReturnAfterClear(UnsignedInt now, Bool hasThreats)
+	{
+		if (hasThreats)
+		{
+			m_outsideUntil = 0;
+			return false;
+		}
+		if (!m_outsideUntil)
+		{
+			m_outsideUntil = now + m_outsideDuration;
+		}
+		return now >= m_outsideUntil;
+	}
 	void onReturned();
 
 	static Real getStdGuardRange(const Object* obj);

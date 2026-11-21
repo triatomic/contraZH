@@ -1358,7 +1358,7 @@ void OpenContain::exitObjectViaDoor( Object *exitObj, ExitDoorType exitDoor )
 		TheAI->pathfinder()->addObjectToPathfindMap( exitObj );
 	}
 }
-Bool OpenContain::getGuardExitPosition(Coord3D& position) const
+Bool OpenContain::getGuardExitPosition(Coord3D& position, Coord3D* startPosition) const
 {
 	const Int numberExits = getOpenContainModuleData()->m_numberOfExitPaths;
 	if (numberExits < 1)
@@ -1373,9 +1373,29 @@ Bool OpenContain::getGuardExitPosition(Coord3D& position) const
 		startBone.format("ExitStart%02d", m_whichExitPath);
 		endBone.format("ExitEnd%02d", m_whichExitPath);
 	}
+	const Object* tunnel = getObject();
 	Coord3D start;
-	return getObject()->getSingleLogicalBonePosition(startBone.str(), &start, nullptr) &&
-		getObject()->getSingleLogicalBonePosition(endBone.str(), &position, nullptr);
+	const Bool hasStart = tunnel->getSingleLogicalBonePosition(startBone.str(), &start, nullptr);
+	if (!tunnel->getSingleLogicalBonePosition(endBone.str(), &position, nullptr))
+	{
+		if (!isTunnelContain())
+		{
+			return false;
+		}
+
+		const Real distance = tunnel->getGeometryInfo().getBoundingCircleRadius() + 2 * PATHFIND_CELL_SIZE_F;
+		const Real angle = tunnel->getOrientation();
+		position = *tunnel->getPosition();
+		position.x += Cos(angle) * distance;
+		position.y += Sin(angle) * distance;
+		position.z = TheTerrainLogic->getGroundHeight(position.x, position.y);
+	}
+
+	if (startPosition)
+	{
+		*startPosition = hasStart ? start : *tunnel->getPosition();
+	}
+	return true;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1386,6 +1406,9 @@ Bool OpenContain::getGuardExitPosition(Coord3D& position) const
 */
 void OpenContain::exitObjectInAHurry( Object *exitObj )
 {
+	Coord3D startPosition;
+	Coord3D endPosition;
+	const Bool hasExit = getGuardExitPosition(endPosition, &startPosition);
 	removeFromContain( exitObj );
 
 	Object *me = getObject();
@@ -1400,34 +1423,14 @@ void OpenContain::exitObjectInAHurry( Object *exitObj )
 		me->clearAndSetModelConditionState( MODELCONDITION_DOOR_1_CLOSING, MODELCONDITION_DOOR_1_OPENING );
 	}
 
-	Int numberExits = getOpenContainModuleData()->m_numberOfExitPaths;
-	if( numberExits > 0 )
+	const Int numberExits = getOpenContainModuleData()->m_numberOfExitPaths;
+	if (hasExit)
 	{
-		// We have ExitStart/End specified in art to use when we kick people out.  If >1, then
-		// we have many and we need to decide which one to use.
-		AsciiString startBone("ExitStart");
-		AsciiString endBone("ExitEnd");
-		Coord3D startPosition;
-		Coord3D endPosition;
-		if( numberExits > 1 )
+		if (numberExits > 1)
 		{
-			char suffix[8];
-			itoa(m_whichExitPath, suffix, 10);
-			if( m_whichExitPath < 10 )
-			{
-				startBone.concat('0');
-				endBone.concat('0');
-			}
-
-			m_whichExitPath = (m_whichExitPath % numberExits) + 1;// To cycle from 1 to n
-
-			startBone.concat(suffix);
-			endBone.concat(suffix);
+			m_whichExitPath = (m_whichExitPath % numberExits) + 1;
 		}
-		me->getSingleLogicalBonePosition( startBone.str(), &startPosition, nullptr );
-		me->getSingleLogicalBonePosition( endBone.str(), &endPosition, nullptr );
 
-		//startPosition.x = startPosition.y = 0;
 		Real exitAngle = me->getOrientation();
 		exitObj->setPosition( &startPosition );
 		exitObj->setOrientation( exitAngle );

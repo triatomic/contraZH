@@ -11,8 +11,9 @@ exit to the threat if it can shoot from the exit or reach a firing position with
 its leash. The tunnel gun, incoming damage, and shared targets do not trigger
 deployment. Manual evacuation and scheduled auto-pop still work.
 
-Guards can pick up new targets near the same exit until their outside timer
-expires. They then return to the network and wait out their redeploy delay.
+Guards can pick up new targets near the same exit while enemies remain in range. The return timer starts
+when the area is clear and resets if another enemy approaches. Once it expires,
+guards return to the network and wait out their redeploy delay.
 This changes simulation behavior.
 
 Set these fields in `AIData` or override them in an object's `TunnelContain`
@@ -25,8 +26,8 @@ module. Distances are world units. Times are milliseconds.
 | `TunnelGuardOuterPerimeterRadius` | 160 | Detection radius inside the owner's outer perimeter. |
 | `TunnelGuardCombatZoneRadius` | 120 | Detection radius inside `CombatZone`. |
 | `TunnelGuardLeashRadius` | -1 | Bounds distance from the exit and total firing route length. A negative AIData value uses the detection radius. |
-| `TunnelGuardExitClearRadius` | 24 | Visible enemies this close block deployment. Zero disables the enemy clearance check. |
-| `TunnelGuardMaxOutsideTime` | 8000 | Time outside before guards return. Zero disables deployment. |
+| `TunnelGuardExitClearRadius` | 24 | Hostile units this close to the tunnel or exit block deployment. Zero disables the enemy clearance check. |
+| `TunnelGuardMaxOutsideTime` | 8000 | Time that the guard area must stay clear before guards return. Zero disables deployment. |
 | `TunnelGuardRedeployDelay` | 5000 | Time underground before the guard can deploy again. |
 | `TunnelGuardAutoAssignCount` | 0 | Target guard count for the skirmish AI's network. Positive values let tunnels recruit nearby idle armed units from the default team. Zero disables recruitment. |
 

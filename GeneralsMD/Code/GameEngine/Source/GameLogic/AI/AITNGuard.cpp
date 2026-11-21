@@ -138,6 +138,7 @@ AITNGuardMachine::AITNGuardMachine( Object *owner ) :
 	m_leashRadius(0.0f),
 	m_detectionRadius(0.0f),
 	m_outsideUntil(0),
+	m_outsideDuration(0),
 	m_redeployAt(0)
 {
 	m_positionToGuard.zero();
@@ -294,8 +295,9 @@ Bool AITNGuardMachine::deploy()
 	const TAiData& defaults = *TheAI->getAiData();
 	PartitionFilterRelationship enemy(owner, PartitionFilterRelationship::ALLOW_ENEMIES);
 	PartitionFilterFreeOfFog clearFog(player->getPlayerIndex());
-	PartitionFilterSameMapStatus mapStatus(owner);
-	PartitionFilter* visibleEnemies[] = { &enemy, &clearFog, &mapStatus, nullptr };
+	PartitionFilterOnMap onMap;
+	PartitionFilter* visibleEnemies[] = { &enemy, &clearFog, &onMap, nullptr };
+	PartitionFilter* nearbyEnemies[] = { &enemy, &onMap, nullptr };
 
 	TunnelContain* best = nullptr;
 	ObjectID bestTarget = INVALID_ID;
@@ -307,7 +309,7 @@ Bool AITNGuardMachine::deploy()
 	for (std::list<ObjectID>::const_iterator it = tunnels.begin(); it != tunnels.end(); ++it)
 	{
 		Object* tunnel = TheGameLogic->findObjectByID(*it);
-		if (!isOperationalTunnel(tunnel) || network->isAutoExitTunnel(tunnel) || tunnel->getLayer() != owner->getLayer())
+		if (!isOperationalTunnel(tunnel) || tunnel->getLayer() != owner->getLayer())
 		{
 			continue;
 		}
@@ -324,7 +326,8 @@ Bool AITNGuardMachine::deploy()
 		const Real radius = getTunnelGuardRadius(player, tunnel, settings, defaults);
 		const Real clearRadius = guardSetting(settings.m_tunnelGuardExitClearRadius, defaults.m_tunnelGuardExitClearRadius);
 		if (radius <= 0.0f || guardSetting(settings.m_tunnelGuardMaxOutsideTime, defaults.m_tunnelGuardMaxOutsideTime) < 1.0f ||
-			(clearRadius > 0.0f && ThePartitionManager->getClosestObject(&exitPosition, clearRadius, FROM_CENTER_2D, visibleEnemies)))
+			(clearRadius > 0.0f && (ThePartitionManager->getClosestObject(&exitPosition, clearRadius, FROM_BOUNDINGSPHERE_2D, nearbyEnemies) ||
+				 ThePartitionManager->getClosestObject(tunnel->getPosition(), clearRadius, FROM_BOUNDINGSPHERE_2D, nearbyEnemies))))
 		{
 			continue;
 		}
@@ -364,7 +367,8 @@ Bool AITNGuardMachine::deploy()
 	m_leashRadius = bestLeash;
 	m_detectionRadius = bestRadius;
 	const TunnelContainModuleData& settings = *best->getGuardSettings();
-	m_outsideUntil = now + (UnsignedInt)guardSetting(settings.m_tunnelGuardMaxOutsideTime, defaults.m_tunnelGuardMaxOutsideTime);
+	m_outsideUntil = 0;
+	m_outsideDuration = (UnsignedInt)guardSetting(settings.m_tunnelGuardMaxOutsideTime, defaults.m_tunnelGuardMaxOutsideTime);
 	m_redeployAt = (UnsignedInt)guardSetting(settings.m_tunnelGuardRedeployDelay, defaults.m_tunnelGuardRedeployDelay);
 	best->exitObjectInAHurry(owner);
 	return true;
@@ -372,8 +376,9 @@ Bool AITNGuardMachine::deploy()
 
 void AITNGuardMachine::onReturned()
 {
-	if (m_outsideUntil)
+	if (m_outsideDuration)
 	{
+		m_outsideDuration = 0;
 		m_outsideUntil = 0;
 		m_redeployAt += TheGameLogic->getFrame();
 	}
@@ -392,7 +397,7 @@ void AITNGuardMachine::crc( Xfer *xfer )
 void AITNGuardMachine::xfer( Xfer *xfer )
 {
   // version
-  XferVersion currentVersion = 3;
+  XferVersion currentVersion = 4;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -408,6 +413,16 @@ void AITNGuardMachine::xfer( Xfer *xfer )
 		xfer->xferReal(&m_detectionRadius);
 		xfer->xferUnsignedInt(&m_outsideUntil);
 		xfer->xferUnsignedInt(&m_redeployAt);
+	}
+	if (version >= 4)
+	{
+		xfer->xferUnsignedInt(&m_outsideDuration);
+	}
+	else if (m_outsideUntil)
+	{
+		const UnsignedInt now = TheGameLogic->getFrame();
+		m_outsideDuration = m_outsideUntil > now ? m_outsideUntil - now : 1;
+		m_outsideUntil = 0;
 	}
 
 }
@@ -461,7 +476,7 @@ StateReturnType AITNGuardInnerState::onEnter()
 	{
 		return STATE_SUCCESS;
 	}
-	m_exitConditions.m_attackGiveUpFrame = getGuardMachine()->getOutsideUntil();
+	m_exitConditions.m_attackGiveUpFrame = ~UnsignedInt(0);
 
 	m_attackState = newInstance(AIAttackState)(getMachine(), false, true, false, &m_exitConditions);
 
@@ -487,7 +502,7 @@ StateReturnType AITNGuardInnerState::update()
 		distanceSquared(*target->getPosition(), *guard->getPositionToGuard()) >
 			guard->getDetectionRadius() * guard->getDetectionRadius() ||
 		target->getShroudedStatus(owner->getControllingPlayer()->getPlayerIndex()) != OBJECTSHROUD_CLEAR ||
-		TheGameLogic->getFrame() >= guard->getOutsideUntil() ||
+		!guard->isDeployed() ||
 		distanceSquared(*owner->getPosition(), *guard->getPositionToGuard()) >
 			guard->getLeashRadius() * guard->getLeashRadius() ||
 		(path && !guard->isPathWithinLeash(path)))
@@ -553,7 +568,7 @@ StateReturnType AITNGuardOuterState::update()
 	AITNGuardMachine* guard = getGuardMachine();
 	Object* owner = getMachineOwner();
 	const UnsignedInt now = TheGameLogic->getFrame();
-	if (now >= guard->getOutsideUntil() || owner->getContainedBy() ||
+	if (!guard->isDeployed() || owner->getContainedBy() ||
 		distanceSquared(*owner->getPosition(), *guard->getPositionToGuard()) >
 			guard->getLeashRadius() * guard->getLeashRadius())
 	{
@@ -567,6 +582,11 @@ StateReturnType AITNGuardOuterState::update()
 	ObjectIterator* targets = ThePartitionManager->iterateObjectsInRange(guard->getPositionToGuard(),
 		guard->getDetectionRadius(), FROM_CENTER_2D, filters, ITER_SORTED_NEAR_TO_FAR);
 	MemoryPoolObjectHolder holder(targets);
+	const Bool hasThreats = targets->first() != nullptr;
+	if (guard->shouldReturnAfterClear(now, hasThreats))
+	{
+		return STATE_FAILURE;
+	}
 	for (Object* target = targets->first(); target; target = targets->next())
 	{
 		if (guard->canFightFrom(*owner->getPosition(), target))
@@ -577,8 +597,7 @@ StateReturnType AITNGuardOuterState::update()
 	}
 
 	const UnsignedInt scanRate = TheAI->getAiData()->m_guardEnemyScanRate;
-	const UnsignedInt remaining = guard->getOutsideUntil() - now;
-	return STATE_SLEEP(scanRate < remaining ? scanRate : remaining);
+	return STATE_SLEEP(scanRate);
 }
 
 void AITNGuardOuterState::onExit( StateExitType status )
@@ -716,7 +735,7 @@ StateReturnType AITNGuardIdleState::update()
 			return STATE_SLEEP(0);
 		}
 	}
-	else if (getGuardMachine()->getOutsideUntil() > now)
+	else if (getGuardMachine()->isDeployed())
 	{
 		return STATE_SUCCESS;
 	}
