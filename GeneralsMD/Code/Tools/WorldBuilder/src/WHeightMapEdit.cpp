@@ -2621,6 +2621,9 @@ void WorldHeightMapEdit::addObject(MapObject *pMapObj)
 void WorldHeightMapEdit::removeFirstObject()
 {
 	MapObject *firstObj = MapObject::TheMapObjectListPtr;
+	if (!firstObj) {
+		return;
+	}
 	MapObject::TheMapObjectListPtr = firstObj->getNext();
 	firstObj->setNextMap(nullptr); // so we don't delete the whole list.
 	deleteInstance(firstObj);
@@ -2672,21 +2675,23 @@ Bool WorldHeightMapEdit::selectDuplicates()
 			}
 
 			if (pObj->getFlag(FLAG_ROAD_FLAGS)) {
-				if (pObj->getNext() == nullptr) continue;
 				if (!pObj->getFlag(FLAG_ROAD_POINT1)) {
 					continue;
 				}
 				if (!prevObj->getFlag(FLAG_ROAD_POINT1)) {
 					continue;
 				}
-				Coord3D nextLoc = *pObj->getNext()->getLocation();
-				Real nextAngle = pObj->getAngle();
-				prevObj = prevObj->getNext();
-				if (!prevObj) continue;
-				if (!prevObj->getFlag(FLAG_ROAD_POINT2)) {
+				MapObject *nextObj = pObj->getNext();
+				if (!nextObj || !nextObj->getFlag(FLAG_ROAD_POINT2)) {
 					continue;
 				}
-				prevLoc = *prevObj->getLocation();
+				MapObject *prevNextObj = prevObj->getNext();
+				if (!prevNextObj || !prevNextObj->getFlag(FLAG_ROAD_POINT2)) {
+					continue;
+				}
+				Coord3D nextLoc = *nextObj->getLocation();
+				Real nextAngle = pObj->getAngle();
+				prevLoc = *prevNextObj->getLocation();
 				if (abs(nextLoc.x-prevLoc.x)>DELTA) {
 					continue; // locations don't match.
 				}
@@ -2695,7 +2700,7 @@ Bool WorldHeightMapEdit::selectDuplicates()
 				}
 
 				if (fabs(nextLoc.z - prevLoc.z) > Z_DELTA)   continue;
-				if (fabs(nextAngle - prevObj->getAngle()) > ANGLE_DELTA) continue;
+				if (fabs(nextAngle - prevNextObj->getAngle()) > ANGLE_DELTA) continue;
 
 				pObj->setSelected(true);
 				pObj = pObj->getNext();
@@ -4120,5 +4125,7 @@ void WorldHeightMapEdit::findBoundaryNear(Coord3D *pt, float okDistance, Int *ou
 	}
 
 	(*outNdx) = -1;
-	(*outHandle) = -1;
+	if (outHandle) {
+		(*outHandle) = -1;
+	}
 }
