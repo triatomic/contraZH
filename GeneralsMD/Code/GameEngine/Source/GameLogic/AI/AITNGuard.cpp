@@ -238,8 +238,13 @@ Bool AITNGuardMachine::isPathWithinLeash(Path* path) const
 Bool AITNGuardMachine::canFightFrom(const Coord3D& from, Object* target)
 {
 	Object* owner = getOwner();
+	DisabledMaskType disabled = owner->getDisabledFlags();
+	if (owner->getContainedBy())
+	{
+		disabled.set(DISABLED_HELD, false);
+	}
 	if (!target || target->isEffectivelyDead() || owner->getRelationship(target) != ENEMIES ||
-		owner->isDisabled() || owner->getStatusBits().test(OBJECT_STATUS_NO_ATTACK) ||
+		disabled.any() || owner->getStatusBits().test(OBJECT_STATUS_NO_ATTACK) ||
 		target->getShroudedStatus(owner->getControllingPlayer()->getPlayerIndex()) != OBJECTSHROUD_CLEAR ||
 		!owner->chooseBestWeaponForTarget(target, PREFER_MOST_DAMAGE, CMD_FROM_AI))
 	{
