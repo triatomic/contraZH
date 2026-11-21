@@ -232,37 +232,6 @@ Bool AITNGuardMachine::lookForInnerTarget()
 					return true;
 				}
 			}
-			// check for attacked.
-			BodyModuleInterface *body = currentTunnel->getBodyModule();
-			if (body) {
-				const DamageInfo *info = body->getLastDamageInfo();
-				if (info) {
-					if (info->out.m_noEffect) {
-						continue;
-					}
-					const UnsignedInt *lastDamageTimestamp = body->getLastDamageTimestamp();
-					if (lastDamageTimestamp && *lastDamageTimestamp + TheAI->getAiData()->m_guardEnemyScanRate > TheGameLogic->getFrame()) {
-						// winner.
-						ObjectID attackerID = info->in.m_sourceID;
-						Object *attacker = TheGameLogic->findObjectByID(attackerID);
-
-						if( attacker )
-						{
-							if (owner->getRelationship(attacker) != ENEMIES) {
-								continue;
-							}
-							CanAttackResult result = getOwner()->getAbleToAttackSpecificObject(ATTACK_TUNNEL_NETWORK_GUARD, attacker, CMD_FROM_AI);
-							if( result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING )
-							{
-								setNemesisID(attackerID);
-								owner->getTeam()->setTeamTargetObject(attacker);
-								tunnels->updateNemesis(attacker);
-								return true;	// Transitions to AITNGuardInnerState.
-							}
-						}
-					}
-				}
-			}
 		}
 	}
 

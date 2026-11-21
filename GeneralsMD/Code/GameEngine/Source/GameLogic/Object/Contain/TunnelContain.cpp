@@ -576,26 +576,6 @@ UpdateSleepTime TunnelContain::update()
 			tunnelSystem->doAutoPopIconInit(getObject());
 			m_isAutoPopModelConditionSet = TRUE;
 		}
-
-		// check for attacked.
-		BodyModuleInterface *body = obj->getBodyModule();
-		if (body) {
-			const DamageInfo *info = body->getLastDamageInfo();
-			if (info) {
-				const UnsignedInt *lastDamageTimestamp = body->getLastDamageTimestamp();
-				if (lastDamageTimestamp && *lastDamageTimestamp + LOGICFRAMES_PER_SECOND > TheGameLogic->getFrame()) {
-					// winner.
-					ObjectID attackerID = info->in.m_sourceID;
-					Object *attacker = TheGameLogic->findObjectByID(attackerID);
-					if( attacker )
-					{
-						if (obj->getRelationship(attacker) == ENEMIES) {
-							tunnelSystem->updateNemesis(attacker);
-						}
-					}
-				}
-			}
-		}
 	}
 	return UPDATE_SLEEP_NONE;
 

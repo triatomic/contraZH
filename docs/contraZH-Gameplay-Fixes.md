@@ -3,6 +3,10 @@
 Always on, no `Options.ini` key. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Taking damage does not call tunnel guards out
+
+Tunnel guards no longer deploy in response to damage alone. A tunnel can still call its guards out by acquiring an enemy target.
+
 ## AI construction uses legal, reachable sites
 
 AI builders search nearby sites when a planned building overlaps an obstacle, sits on
