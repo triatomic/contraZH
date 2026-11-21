@@ -126,9 +126,12 @@ TextureClass *W3DParticleAtlas::find(TextureClass *source, TextureMode mode, Vec
 			TextureLoader::Request_Foreground_Loading(source);
 		}
 
-		// A texture refused for space keeps its refusal until the next eviction.
-		found = locations.insert(std::make_pair(source->Get_Texture_Name(), pack(*source, mode))).first;
-		++m_packsThisFrame;
+		Location location;
+		if (!pack(*source, mode, location))
+		{
+			return nullptr;
+		}
+		found = locations.insert(std::make_pair(source->Get_Texture_Name(), location)).first;
 	}
 
 	if (found->second.page == nullptr)
@@ -148,7 +151,7 @@ void W3DParticleAtlas::evictOldestPage()
 		LocationMap::iterator it = m_locations[i].begin();
 		while (it != m_locations[i].end())
 		{
-			if (it->second.page == evicted || (it->second.page == nullptr && !it->second.neverFits))
+			if (it->second.page == evicted || it->second.page == nullptr)
 			{
 				m_locations[i].erase(it++);
 			}
@@ -166,17 +169,13 @@ void W3DParticleAtlas::evictOldestPage()
 	m_outOfSpace = FALSE;
 }
 
-W3DParticleAtlas::Location W3DParticleAtlas::pack(const TextureClass &source, TextureMode mode)
+// FALSE stores nothing, since an eviction would not cure the refusal and the texture is asked about again when drawn.
+Bool W3DParticleAtlas::pack(const TextureClass &source, TextureMode mode, Location &location)
 {
-	Location refused;
-	refused.page = nullptr;
-	refused.rect.Set(0.0f, 0.0f, 1.0f, 1.0f);
-	refused.neverFits = FALSE;
-
 	// A texture can be initialised without a D3D texture, for example with texturing disabled.
 	if (source.Peek_D3D_Texture() == nullptr)
 	{
-		return refused;
+		return FALSE;
 	}
 
 	const Int width = source.Get_Width();
@@ -186,28 +185,36 @@ W3DParticleAtlas::Location W3DParticleAtlas::pack(const TextureClass &source, Te
 	if (!WWMath::Is_Power_Of_2(width) || !WWMath::Is_Power_Of_2(height) || width < GUTTER || height < GUTTER ||
 		cellWidth > PAGE_SIZE || cellHeight > PAGE_SIZE)
 	{
-		refused.neverFits = TRUE;
-		return refused;
+		return FALSE;
 	}
+
+	++m_packsThisFrame;
+	location.page = nullptr;
+	location.rect.Set(0.0f, 0.0f, 1.0f, 1.0f);
 
 	Int page = 0;
+	Int shelf = 0;
 	Int x = 0;
 	Int y = 0;
-	if (!place(cellWidth, cellHeight, page, x, y) || !copyToCell(source, m_pages[page].texture.Peek(), mode, x + GUTTER, y + GUTTER))
+	if (!place(cellWidth, cellHeight, page, shelf, x, y))
 	{
-		return refused;
+		return TRUE;
 	}
 
-	Location location;
+	if (!copyToCell(source, m_pages[page].texture.Peek(), mode, x + GUTTER, y + GUTTER))
+	{
+		unplace(cellWidth, page, shelf);
+		return FALSE;
+	}
+
 	const Real scale = 1.0f / (Real)PAGE_SIZE;
 	location.page = m_pages[page].texture.Peek();
 	location.rect.Set((x + GUTTER) * scale, (y + GUTTER) * scale, (x + GUTTER + width) * scale, (y + GUTTER + height) * scale);
-	location.neverFits = FALSE;
-	return location;
+	return TRUE;
 }
 
 // Same-height shelves first, then a new shelf on the first page with room, then a new page.
-Bool W3DParticleAtlas::place(Int width, Int height, Int &page, Int &x, Int &y)
+Bool W3DParticleAtlas::place(Int width, Int height, Int &page, Int &shelf, Int &x, Int &y)
 {
 	for (size_t p = 0; p < m_pages.size(); ++p)
 	{
@@ -218,6 +225,7 @@ Bool W3DParticleAtlas::place(Int width, Int height, Int &page, Int &x, Int &y)
 			if (candidate.height == height && candidate.used + width <= PAGE_SIZE)
 			{
 				page = (Int)p;
+				shelf = (Int)s;
 				x = candidate.used;
 				y = candidate.y;
 				candidate.used += width;
@@ -246,9 +254,22 @@ Bool W3DParticleAtlas::place(Int width, Int height, Int &page, Int &x, Int &y)
 	owner.shelves.push_back(added);
 	owner.bottom += height;
 	page = (Int)target;
+	shelf = (Int)owner.shelves.size() - 1;
 	x = 0;
 	y = added.y;
 	return TRUE;
+}
+
+// The cell just placed is always the last on its shelf, and an emptied last shelf frees its rows too.
+void W3DParticleAtlas::unplace(Int width, Int page, Int shelf)
+{
+	Page &owner = m_pages[page];
+	owner.shelves[shelf].used -= width;
+	if (owner.shelves[shelf].used == 0 && shelf == (Int)owner.shelves.size() - 1)
+	{
+		owner.bottom -= owner.shelves[shelf].height;
+		owner.shelves.pop_back();
+	}
 }
 
 Bool W3DParticleAtlas::addPage()

@@ -63,17 +63,17 @@ private:
 
 	struct Location
 	{
-		TextureClass *page;	///< null when the texture was refused
+		TextureClass *page;	///< null when no page had room
 		Vector4 rect;
-		Bool neverFits;		///< refused for its size, so an eviction keeps the refusal
 	};
 
 	typedef std::map<StringClass, Location> LocationMap;
 
 	void evictOldestPage();
 	Bool hasPackBudget();
-	Location pack(const TextureClass &source, TextureMode mode);
-	Bool place(Int width, Int height, Int &page, Int &x, Int &y);
+	Bool pack(const TextureClass &source, TextureMode mode, Location &location);
+	Bool place(Int width, Int height, Int &page, Int &shelf, Int &x, Int &y);
+	void unplace(Int width, Int page, Int shelf);
 	Bool addPage();
 	static Bool copyToCell(const TextureClass &source, const TextureClass *page, TextureMode mode, Int left, Int top);
 
