@@ -88,7 +88,8 @@ Changes the simulation and older replay playback for affected shots.
 ## AI anti-air units keep moving between shots
 
 AI units following attack waypoints or attack-moving keep moving past aircraft outside
-weapon range. They can stop and fire once the aircraft comes into range.
+weapon range. They stop to fire at aircraft in range, and can switch away from a lower
+priority ground target. Saved units regain their scripted attack priorities on load.
 
 ## Tunnel evacuation requires an open endpoint
 

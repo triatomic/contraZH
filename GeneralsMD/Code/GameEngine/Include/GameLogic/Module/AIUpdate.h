@@ -614,6 +614,7 @@ public:
 	///< States that are doing idle checks should call with calledDuringIdle set true so that they check their
 
 	Object *getNextMoodTarget( Bool calledByAI, Bool calledDuringIdle );
+	Object *getHigherPriorityAircraft(const Object *groundTarget);
 	UnsignedInt getNextMoodCheckTime() const { return m_nextMoodCheckTime; }
 
 	// This function will return a combination of MoodMatrixParameter flags.
@@ -829,6 +830,7 @@ private:
 
 	// Attack Info --------------------------------------------------------------------------------------------
 	const AttackPriorityInfo*	m_attackInfo;
+	AsciiString m_attackInfoNameOnLoad;
 
 	// "Planning Mode" -----------------------------------------------------------------------------------------
 	enum { MAX_WAYPOINTS = 16 };
