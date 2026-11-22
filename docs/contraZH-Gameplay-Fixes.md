@@ -85,6 +85,18 @@ to curved and linear flight paths, including projectiles that tumble or keep a f
 
 Changes the simulation and older replay playback for affected shots.
 
+## Tunnel evacuation requires an open endpoint
+
+AI tunnel guards and evacuation orders use completed, registered tunnel entrances.
+An unfinished entrance cannot unload units from the shared network.
+
+## AI supply sites track their warehouse
+
+New AI build orders placed by the supply placement scripts remember the warehouse that
+justified the placement. The AI skips new construction and rebuilding at those sites
+when the warehouse is empty, gone, or enemy-owned. The association survives save and
+load. Orders from older saves have no stored warehouse association.
+
 ## AI supply sources respect allied bases
 
 AI supply construction skips sources already occupied by another player's supply center or

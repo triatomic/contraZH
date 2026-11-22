@@ -704,13 +704,14 @@ void Player::addToBuildList(Object *obj)
 }
 
 //=============================================================================
-void Player::addToPriorityBuildList(AsciiString templateName, Coord3D *pos, Real angle)
+void Player::addToPriorityBuildList(AsciiString templateName, Coord3D *pos, Real angle, ObjectID supplySource)
 {
 	BuildListInfo *newInfo = newInstance( BuildListInfo );
 	newInfo->setTemplateName(templateName);
 	newInfo->setLocation(*pos);
 	newInfo->setAngle(angle);
 	newInfo->markPriorityBuild();
+	newInfo->setSupplySiteSourceID(supplySource);
 	newInfo->setNumRebuilds(1);	 // Build once.
 	newInfo->setNextBuildList(m_pBuildList);
 	m_pBuildList = newInfo;

@@ -237,6 +237,7 @@ protected:
 	virtual Bool selectTeamToReinforce( Int minPriority );			///< determine the next team to reinforce
 	virtual Bool startTraining( WorkOrder *order, Bool busyOK, AsciiString teamName);	///< find a production building that can handle the order, and start building
 	virtual Bool isAGoodIdeaToBuildTeam( TeamPrototype *proto );		///< return true if team should be built
+	Bool canBuildAtSupplySite(ObjectID sourceID) const;
 	virtual void processBaseBuilding();		///< do base-building behaviors
 	virtual void processTeamBuilding();		///< do team-building behaviors
  	static Int getPlayerSuperweaponValue( Coord3D *center, Int playerNdx, Real radius, Bool includeMilitaryUnits = TRUE, const Player *viewer = nullptr );

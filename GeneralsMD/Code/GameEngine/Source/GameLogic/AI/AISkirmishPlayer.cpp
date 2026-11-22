@@ -209,6 +209,10 @@ void AISkirmishPlayer::processBaseBuilding()
 			if (bldg) {
 				continue; // already built.
 			}
+			if (!canBuildAtSupplySite(info->getSupplySiteSourceID()))
+			{
+				continue;
+			}
 			// Make sure it is safe to build here.
 			if (!isLocationSafe(info->getLocation(), curPlan)) {
 				continue;

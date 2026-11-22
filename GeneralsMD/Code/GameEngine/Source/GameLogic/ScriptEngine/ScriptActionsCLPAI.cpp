@@ -250,7 +250,7 @@ static Bool clpPlaceNear(const Coord3D *location, const ThingTemplate *tmpl, Rea
 //-------------------------------------------------------------------------------------------------
 /** True if the player's build list still has an unbuilt supply center near pos. */
 //-------------------------------------------------------------------------------------------------
-static Bool clpHasPendingSupplyCenter(Player *player, const Coord3D *pos, Real radius)
+static Bool clpHasPendingSupplyCenter(Player *player, const Object *source, Real radius)
 {
 	for( BuildListInfo *info = player->getBuildList(); info; info = info->getNext() )
 	{
@@ -267,6 +267,17 @@ static Bool clpHasPendingSupplyCenter(Player *player, const Coord3D *pos, Real r
 		{
 			continue;
 		}
+		ObjectID boundSource = info->getSupplySiteSourceID();
+		if (boundSource != INVALID_ID)
+		{
+			if (boundSource == source->getID())
+			{
+				return TRUE;
+			}
+			continue;
+		}
+
+		const Coord3D *pos = source->getPosition();
 		Real dx = info->getLocation()->x - pos->x;
 		Real dy = info->getLocation()->y - pos->y;
 		if( dx * dx + dy * dy <= radius * radius )
@@ -563,7 +574,7 @@ void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplat
 			bestSupplyWarehouse = curWarehouse;
 		}
 	}
-	if( !bestSupplyWarehouse )
+	if( !bestSupplyWarehouse || !canBuildAtSupplySite(bestSupplyWarehouse->getID()) )
 	{
 		return;
 	}
@@ -620,7 +631,7 @@ void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplat
 	if( valid )
 	{
 		newPos.z = 0;
-		m_player->addToPriorityBuildList( tTemplate->getName(), &newPos, angle );
+		m_player->addToPriorityBuildList( tTemplate->getName(), &newPos, angle, bestSupplyWarehouse->getID() );
 	}
 	else
 	{
@@ -683,7 +694,7 @@ Object *AIPlayer::clpFindSupplyCenter(Int minimumCash)
 			{
 				continue;
 			}
-			if( clpHasPendingSupplyCenter( m_player, &center, radius ) )
+			if( clpHasPendingSupplyCenter( m_player, obj, radius ) )
 			{
 				continue;
 			}

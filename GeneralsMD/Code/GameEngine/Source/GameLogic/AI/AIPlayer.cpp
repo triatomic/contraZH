@@ -706,6 +706,26 @@ Object *AIPlayer::buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildLi
 }
 
 // ------------------------------------------------------------------------------------------------
+Bool AIPlayer::canBuildAtSupplySite(ObjectID sourceID) const
+{
+	if (sourceID == INVALID_ID)
+	{
+		return TRUE;
+	}
+
+	Object *source = TheGameLogic->findObjectByID(sourceID);
+	if (!source || source->isEffectivelyDead() || source->isOffMap() ||
+		m_player->getRelationship(source->getTeam()) == ENEMIES)
+	{
+		return FALSE;
+	}
+
+	static const NameKeyType key = NAMEKEY("SupplyWarehouseDockUpdate");
+	const SupplyWarehouseDockUpdate *warehouse = static_cast<SupplyWarehouseDockUpdate *>(source->findUpdateModule(key));
+	return warehouse && warehouse->getBoxesStored() > 0;
+}
+
+// ------------------------------------------------------------------------------------------------
 /** Build our base. */
 // ------------------------------------------------------------------------------------------------
 void AIPlayer::processBaseBuilding()
@@ -787,7 +807,7 @@ void AIPlayer::processBaseBuilding()
 				}
 			}
 			// check if this building has any "rebuilds" left
-			if (info->isBuildable())
+			if (info->isBuildable() && canBuildAtSupplySite(info->getSupplySiteSourceID()))
 			{
 				Object *bldg = TheGameLogic->findObjectByID( info->getObjectID() );
 
@@ -1926,7 +1946,7 @@ void AIPlayer::buildBySupplies(Int minimumCash, const AsciiString& thingName)
 	}
 
 
-	if (bestSupplyWarehouse) {
+	if (bestSupplyWarehouse && canBuildAtSupplySite(bestSupplyWarehouse->getID())) {
 		Coord3D location;
 		location = *bestSupplyWarehouse->getPosition();
 		// offset back towards the base.
@@ -2048,7 +2068,7 @@ void AIPlayer::buildBySupplies(Int minimumCash, const AsciiString& thingName)
 		}
 		TheTerrainVisual->removeAllBibs();	// isLocationLegalToBuild adds bib feedback, turn it off.  jba.
 		location.z = 0; // All build list locations are ground relative.
-		m_player->addToPriorityBuildList(thingName, &location, angle);
+		m_player->addToPriorityBuildList(thingName, &location, angle, bestSupplyWarehouse->getID());
 		m_curWarehouseID = bestSupplyWarehouse->getID();
 	}
 }

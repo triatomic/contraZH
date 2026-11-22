@@ -519,11 +519,23 @@ void TunnelContain::onCapture( Player *oldOwner, Player *newOwner )
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool TunnelContain::canUseNetworkExit() const
+{
+	const Object *obj = getObject();
+	Player *owner = obj->getControllingPlayer();
+	return m_isCurrentlyRegistered && owner && owner->getTunnelSystem() &&
+		!obj->isEffectivelyDead() && !obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) &&
+		!obj->testStatus(OBJECT_STATUS_SOLD) && !obj->isDisabledByType(DISABLED_SUBDUED) &&
+		!obj->isDisabledByType(DISABLED_FROZEN) && !obj->isDisabledByType(DISABLED_CHRONO);
+}
+
+//-------------------------------------------------------------------------------------------------
 void TunnelContain::orderAllPassengersToExit( CommandSourceType commandSource, Bool instantly )
 {
-	Player *owningPlayer = getObject()->getControllingPlayer();
-	if( !owningPlayer || !owningPlayer->getTunnelSystem() )
+	if (!canUseNetworkExit())
+	{
 		return;
+	}
 
 	OpenContain::orderAllPassengersToExit( commandSource, instantly );
 }
