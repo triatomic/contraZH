@@ -3647,7 +3647,7 @@ StateReturnType AIFollowPathState::update()
 			m_retryCount--;
 		}	else {
 			ppi = ai->friend_getPathPointInfo(m_index);
-			if (ppi->m_cmdNodeID == obj->getCurrentCommand() && ppi->m_cmdNodeID != obj->getLastCommandInMoveStreak())
+			if (ppi && ppi->m_cmdNodeID == obj->getCurrentCommand() && ppi->m_cmdNodeID != obj->getLastCommandInMoveStreak())
 				TheCommandSequence->removeCurrentCommand(obj);
 			++m_index;
 		}
