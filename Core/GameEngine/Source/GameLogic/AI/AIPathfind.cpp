@@ -246,6 +246,7 @@ Bool Pathfinder::shouldRepathAroundTeamThreats(Object *obj)
 	ClosestPointOnPathInfo closest;
 	path->computePointOnPath(obj, ai->getLocomotorSet(), position, closest);
 	Real remaining = closest.distAlongPath;
+	Real exposure = 0.0f;
 	for (const PathNode *node = path->getLastNode(); node; node = node->getPrevious())
 	{
 		const PathNode *next = node->getNextOptimized();
@@ -256,9 +257,11 @@ Bool Pathfinder::shouldRepathAroundTeamThreats(Object *obj)
 		const Real length = distanceXY(*node->getPosition(), *next->getPosition());
 		if (length >= remaining)
 		{
-			return exposedLength(threats, position, *next->getPosition()) > PATHFIND_CELL_SIZE_F;
+			exposure += exposedLength(threats, position, *next->getPosition());
+			return exposure > PATHFIND_CELL_SIZE_F;
 		}
-		if (exposedLength(threats, *node->getPosition(), *next->getPosition()) > PATHFIND_CELL_SIZE_F)
+		exposure += exposedLength(threats, *node->getPosition(), *next->getPosition());
+		if (exposure > PATHFIND_CELL_SIZE_F)
 		{
 			return true;
 		}
