@@ -726,6 +726,51 @@ Bool AIPlayer::canBuildAtSupplySite(ObjectID sourceID) const
 }
 
 // ------------------------------------------------------------------------------------------------
+Bool AIPlayer::hasSupplyCenterAtSite(const Object *source, Real legacyRadius, Bool includePending)
+{
+	for (BuildListInfo *info = m_player->getBuildList(); info; info = info->getNext())
+	{
+		ObjectID boundSource = info->getSupplySiteSourceID();
+		if (boundSource != source->getID())
+		{
+			if (boundSource != INVALID_ID || legacyRadius <= 0.0f)
+			{
+				continue;
+			}
+			const Coord3D *pos = source->getPosition();
+			Real dx = info->getLocation()->x - pos->x;
+			Real dy = info->getLocation()->y - pos->y;
+			if (dx * dx + dy * dy > legacyRadius * legacyRadius)
+			{
+				continue;
+			}
+		}
+
+		const ThingTemplate *plan = TheThingFactory->findTemplate(info->getTemplateName(), FALSE);
+		if (!plan || !plan->isKindOf(KINDOF_CASH_GENERATOR))
+		{
+			continue;
+		}
+
+		const Object *building = TheGameLogic->findObjectByID(info->getObjectID());
+		if (building && building->getControllingPlayer() == m_player && !building->isEffectivelyDead() &&
+			!building->testStatus(OBJECT_STATUS_SOLD) && !building->isKindOf(KINDOF_REBUILD_HOLE))
+		{
+			return TRUE;
+		}
+
+		// Skirmish priority orders can rebuild after the initial build consumes their allowance.
+		if (includePending && ((isSkirmishAI() && info->isPriorityBuild()) ||
+			(info->isBuildable() && (info->isPriorityBuild() || info->isAutomaticBuild()))))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+// ------------------------------------------------------------------------------------------------
 /** Build our base. */
 // ------------------------------------------------------------------------------------------------
 void AIPlayer::processBaseBuilding()
@@ -1935,7 +1980,7 @@ void AIPlayer::buildBySupplies(Int minimumCash, const AsciiString& thingName)
 		return;
 	}
 
-	Object *bestSupplyWarehouse = findSupplyCenter(minimumCash);
+	Object *bestSupplyWarehouse = findSupplyCenter(minimumCash, TRUE);
 
 	if (!tTemplate->isKindOf(KINDOF_CASH_GENERATOR)) {
 		// Build by the current warehouse.
@@ -2283,7 +2328,7 @@ void AIPlayer::buildSpecificBuildingNearestTeam( const AsciiString &thingName, c
 // ------------------------------------------------------------------------------------------------
 /** Find a supply center we haven't built a supply depot near yet. */
 // ------------------------------------------------------------------------------------------------
-Object *AIPlayer::findSupplyCenter(Int minimumCash)
+Object *AIPlayer::findSupplyCenter(Int minimumCash, Bool skipPlanned)
 {
 	Object *bestSupplyWarehouse = nullptr;
 	Real bestDistSqr = 0;
@@ -2311,7 +2356,9 @@ Object *AIPlayer::findSupplyCenter(Int minimumCash)
 					continue;
 				}
 
-				if (!ResourceGatheringManager::isSupplySourceAvailable(obj, m_player))
+				Real radius = SUPPLY_CENTER_CLOSE_DIST + obj->getGeometryInfo().getBoundingCircleRadius();
+				if (!ResourceGatheringManager::isSupplySourceAvailable(obj, m_player) ||
+					(skipPlanned && hasSupplyCenterAtSite(obj, radius, TRUE)))
 				{
 					continue;
 				}

@@ -248,47 +248,6 @@ static Bool clpPlaceNear(const Coord3D *location, const ThingTemplate *tmpl, Rea
 }
 
 //-------------------------------------------------------------------------------------------------
-/** True if the player's build list still has an unbuilt supply center near pos. */
-//-------------------------------------------------------------------------------------------------
-static Bool clpHasPendingSupplyCenter(Player *player, const Object *source, Real radius)
-{
-	for( BuildListInfo *info = player->getBuildList(); info; info = info->getNext() )
-	{
-		if( info->getObjectID() != INVALID_ID || !info->isBuildable() )
-		{
-			continue;
-		}
-		if( !info->isPriorityBuild() && !info->isAutomaticBuild() )
-		{
-			continue;
-		}
-		const ThingTemplate *tmpl = TheThingFactory->findTemplate( info->getTemplateName(), FALSE );
-		if( !tmpl || !tmpl->isKindOf( KINDOF_CASH_GENERATOR ) )
-		{
-			continue;
-		}
-		ObjectID boundSource = info->getSupplySiteSourceID();
-		if (boundSource != INVALID_ID)
-		{
-			if (boundSource == source->getID())
-			{
-				return TRUE;
-			}
-			continue;
-		}
-
-		const Coord3D *pos = source->getPosition();
-		Real dx = info->getLocation()->x - pos->x;
-		Real dy = info->getLocation()->y - pos->y;
-		if( dx * dx + dy * dy <= radius * radius )
-		{
-			return TRUE;
-		}
-	}
-	return FALSE;
-}
-
-//-------------------------------------------------------------------------------------------------
 /** Stock getPlayerSuperweaponValue, with objects of objectType worth five times as much. */
 //-------------------------------------------------------------------------------------------------
 static Int clpSuperweaponValueType(const Coord3D *center, Int playerNdx, Real radius, const AsciiString &objectType, Bool includeMilitaryUnits, const Player *viewer)
@@ -694,7 +653,7 @@ Object *AIPlayer::clpFindSupplyCenter(Int minimumCash)
 			{
 				continue;
 			}
-			if( clpHasPendingSupplyCenter( m_player, obj, radius ) )
+			if( hasSupplyCenterAtSite( obj, radius, TRUE ) )
 			{
 				continue;
 			}

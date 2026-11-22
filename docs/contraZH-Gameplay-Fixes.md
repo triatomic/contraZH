@@ -101,7 +101,8 @@ An unfinished entrance cannot unload units from the shared network.
 New AI build orders placed by the supply placement scripts remember the warehouse that
 justified the placement. The AI skips new construction and rebuilding at those sites
 when the warehouse is empty, gone, or enemy-owned. The association survives save and
-load. Orders from older saves have no stored warehouse association.
+load. A planned rebuild reserves its warehouse so placement scripts look for another
+site. Older saves use the planned center's position when checking reservations.
 
 ## AI supply sources respect allied bases
 

@@ -238,6 +238,7 @@ protected:
 	virtual Bool startTraining( WorkOrder *order, Bool busyOK, AsciiString teamName);	///< find a production building that can handle the order, and start building
 	virtual Bool isAGoodIdeaToBuildTeam( TeamPrototype *proto );		///< return true if team should be built
 	Bool canBuildAtSupplySite(ObjectID sourceID) const;
+	Bool hasSupplyCenterAtSite(const Object *source, Real legacyRadius, Bool includePending);
 	virtual void processBaseBuilding();		///< do base-building behaviors
 	virtual void processTeamBuilding();		///< do team-building behaviors
  	static Int getPlayerSuperweaponValue( Coord3D *center, Int playerNdx, Real radius, Bool includeMilitaryUnits = TRUE, const Player *viewer = nullptr );
@@ -260,7 +261,7 @@ protected:
  	void queueSupplyTruck();
 	void updateBridgeRepair();
 	Bool dozerInQueue();
-	Object *findSupplyCenter(Int minSupplies);
+	Object *findSupplyCenter(Int minSupplies, Bool skipPlanned = FALSE);
 	static void getPlayerStructureBounds(Region2D *bounds, Int playerNdx, Bool conservative = FALSE );
 
 protected:
