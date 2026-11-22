@@ -30,6 +30,20 @@ picker preselects the closest existing name. F3 and Shift+F3 step through other 
 Replace Missing Unit and the Team Builder and Build List repairs use the same name matching.
 Replace All shows a report of every swap, which can be corrected before applying.
 
+## Nearest object for command abilities
+
+The Team menu offers three versions of **Use command ability -- all** for a specified
+object type or named object-type list.
+
+| Action | Eligible owners |
+|---|---|
+| Nearest object type | Any player, including neutral |
+| Nearest enemy object type | Enemies of the acting team's player |
+| Nearest own or allied object type | The acting team's player and its allies |
+
+The actions choose the closest valid target to the centre of the acting team. The
+existing action keeps its saved ID and now also considers targets owned by other allies.
+
 ## Team Builder
 
 The original Team Builder layout has Edit, Undo, Redo and Save Now buttons. Undo and Redo step

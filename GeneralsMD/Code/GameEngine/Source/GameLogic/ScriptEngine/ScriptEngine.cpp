@@ -3686,6 +3686,32 @@ void ScriptEngine::init()
 	curTemplate->m_uiStrings[2] = " on nearest object of type ";
 	curTemplate->m_uiStrings[3] = ".";
 
+	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ALL_USE_COMMANDBUTTON_ON_NEAREST_ENEMY_OBJECTTYPE];
+	curTemplate->m_internalName = "TEAM_ALL_USE_COMMANDBUTTON_ON_NEAREST_ENEMY_OBJECTTYPE";
+	curTemplate->m_uiName = "Team_/ Use command ability -- all -- nearest enemy object type.";
+	curTemplate->m_numParameters = 3;
+	curTemplate->m_parameters[0] = Parameter::TEAM;
+	curTemplate->m_parameters[1] = Parameter::COMMANDBUTTON_ALL_ABILITIES;
+	curTemplate->m_parameters[2] = Parameter::OBJECT_TYPE;
+	curTemplate->m_numUiStrings = 4;
+	curTemplate->m_uiStrings[0] = " ";
+	curTemplate->m_uiStrings[1] = " use ";
+	curTemplate->m_uiStrings[2] = " on nearest enemy object of type ";
+	curTemplate->m_uiStrings[3] = ".";
+
+	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ALL_USE_COMMANDBUTTON_ON_NEAREST_FRIENDLY_OBJECTTYPE];
+	curTemplate->m_internalName = "TEAM_ALL_USE_COMMANDBUTTON_ON_NEAREST_FRIENDLY_OBJECTTYPE";
+	curTemplate->m_uiName = "Team_/ Use command ability -- all -- nearest own or allied object type.";
+	curTemplate->m_numParameters = 3;
+	curTemplate->m_parameters[0] = Parameter::TEAM;
+	curTemplate->m_parameters[1] = Parameter::COMMANDBUTTON_ALL_ABILITIES;
+	curTemplate->m_parameters[2] = Parameter::OBJECT_TYPE;
+	curTemplate->m_numUiStrings = 4;
+	curTemplate->m_uiStrings[0] = " ";
+	curTemplate->m_uiStrings[1] = " use ";
+	curTemplate->m_uiStrings[2] = " on nearest own or allied object of type ";
+	curTemplate->m_uiStrings[3] = ".";
+
  	curTemplate = &m_actionTemplates[ScriptAction::TEAM_PARTIAL_USE_COMMANDBUTTON];
 	curTemplate->m_internalName = "TEAM_PARTIAL_USE_COMMANDBUTTON";
 	curTemplate->m_uiName = "Team_/ Use command ability -- partial -- self.";
