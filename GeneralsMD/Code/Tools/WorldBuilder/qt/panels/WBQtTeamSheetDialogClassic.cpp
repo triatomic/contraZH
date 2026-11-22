@@ -297,6 +297,7 @@ void WBQtTeamSheetDialogClassic::setupBehaviorTab()
 
 	bindCheck(page, IDC_TRANSPORTS_RETURN, m_ui->transportsReturnCheck);
 	bindCheck(page, IDC_AVOID_THREATS, m_ui->avoidThreatsCheck);
+	bindCheck(page, IDC_TEAM_HIT_AND_RUN, m_ui->hitAndRunCheck);
 	bindCombo(page, IDC_ENEMY_INTERACTIONS, readComboItems(page, IDC_ENEMY_INTERACTIONS), m_ui->enemyInteractionsCombo, WB_QT_TEAMNOTIFY_SELCHANGE);
 	bindCheck(page, IDC_ATTACK_COMMON_TARGET, m_ui->attackCommonTargetCheck);
 }

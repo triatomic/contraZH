@@ -340,6 +340,7 @@ DEFINE_KEY(teamTransportsReturn)
 	Usage: True if the team avoids threats.
 */
 DEFINE_KEY(teamAvoidThreats)
+DEFINE_KEY(teamHitAndRun)
 
 /**
 	Which: Team

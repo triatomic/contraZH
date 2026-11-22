@@ -261,6 +261,23 @@ void AttackStateMachine::loadPostProcess()
 //----------------------------------------------------------------------------------------------------------
 static Bool inWeaponRangeObject(State *thisState, void* userData);
 
+static Team *getHitAndRunTeam(Object *obj)
+{
+	Team *team = obj->getTeam();
+	if (!team || !team->doesHitAndRun() || !obj->isMobile() ||
+		obj->isKindOf(KINDOF_AIRCRAFT) || obj->isKindOf(KINDOF_PROJECTILE))
+	{
+		return nullptr;
+	}
+
+	const Player *player = team->getControllingPlayer();
+	if (player && player->getPlayerType() == PLAYER_COMPUTER)
+	{
+		return team;
+	}
+	return nullptr;
+}
+
 //----------------------------------------------------------------------------------------------------------
 /**
  * Create an AI state machine. Define all of the states the machine
@@ -328,6 +345,10 @@ AttackStateMachine::AttackStateMachine( Object *obj, AIAttackState* att, AsciiSt
 								AttackStateMachine::AIM_AT_TARGET,
 								attackingObject ? objectConditions : positionConditions );
 
+	defineState(AttackStateMachine::HIT_AND_RUN_WITHDRAW, newInstance(AIMoveToState)(this),
+		AttackStateMachine::HIT_AND_RUN_WAIT, AttackStateMachine::HIT_AND_RUN_WAIT);
+	defineState(AttackStateMachine::HIT_AND_RUN_WAIT, newInstance(AIIdleState)(this, AIIdleState::DO_NOT_LOOK_FOR_TARGETS),
+		AttackStateMachine::HIT_AND_RUN_WAIT, AttackStateMachine::HIT_AND_RUN_WAIT);
 
 	if (obj->isKindOf(KINDOF_IMMOBILE) == FALSE)
 	{
@@ -5943,6 +5964,11 @@ StateReturnType AIAttackFireWeaponState::update()
 
 	const AIUpdateInterface* ai = obj->getAI();
 	const CommandSourceType cmdSource = ai->getLastCommandSource();
+	Team *team = getHitAndRunTeam(obj);
+	if (team && team->isHitAndRunWithdrawing(TheGameLogic->getFrame()))
+	{
+		return STATE_FAILURE;
+	}
 	const Bool fireAllAtGround = !m_att->isAttackingObject() && ai->forceFiresAllWeapons() && !obj->isCurWeaponLocked();
 	if (fireAllAtGround && !m_att->ownsWeaponSlot(wslot))
 	{
@@ -6088,6 +6114,27 @@ StateReturnType AIAttackFireWeaponState::update()
 		obj->notifyFiringTrackerShotFired(syncedWeapon, INVALID_ID);
 	}
 
+
+	if (team && ai->isAttacking())
+	{
+		const UnsignedInt now = TheGameLogic->getFrame();
+		for (Int slot = PRIMARY_WEAPON; slot < WEAPONSLOT_COUNT; ++slot)
+		{
+			const Weapon *fired = obj->getWeaponInWeaponSlot((WeaponSlotType)slot);
+			if (!fired || fired->getLastShotFrame() != now)
+			{
+				continue;
+			}
+
+			const WeaponStatus status = fired->getStatus();
+			const UnsignedInt ready = fired->getPossibleNextShotFrame();
+			if (ready > now && (status == RELOADING_CLIP ||
+				(status == BETWEEN_FIRING_SHOTS && ready - now >= LOGICFRAMES_PER_SECOND)))
+			{
+				team->recordHitAndRunVolley(now, ready);
+			}
+		}
+	}
 
 	m_att->notifyFired();
 
@@ -6378,6 +6425,48 @@ StateReturnType AIAttackState::update()
 	}
 
 	Object* source = getMachineOwner();
+	Team *team = getHitAndRunTeam(source);
+	const UnsignedInt now = TheGameLogic->getFrame();
+	const StateID attackState = m_attackMachine->getCurrentStateID();
+	const Bool withdrawing = attackState == AttackStateMachine::HIT_AND_RUN_WITHDRAW ||
+		attackState == AttackStateMachine::HIT_AND_RUN_WAIT;
+
+	if (team && team->isHitAndRunWithdrawing(now))
+	{
+		if (!withdrawing)
+		{
+			const Object *victim = getMachineGoalObject();
+			const Coord3D &target = victim ? *victim->getPosition() : m_originalVictimPos;
+			Coord3D destination = *source->getPosition();
+			Coord2D away;
+			away.x = destination.x - target.x;
+			away.y = destination.y - target.y;
+			const Real distance = away.length();
+			if (distance > 0.0f)
+			{
+				const Real scale = 8.0f * PATHFIND_CELL_SIZE_F / distance;
+				destination.x += away.x * scale;
+				destination.y += away.y * scale;
+				Region3D bounds;
+				TheTerrainLogic->getExtent(&bounds);
+				destination.x = std::max(bounds.lo.x, std::min(bounds.hi.x, destination.x));
+				destination.y = std::max(bounds.lo.y, std::min(bounds.hi.y, destination.y));
+				destination.z = TheTerrainLogic->getLayerHeight(destination.x, destination.y, source->getLayer());
+			}
+			m_attackMachine->setGoalObject(nullptr);
+			m_attackMachine->setGoalPosition(&destination);
+			m_attackMachine->setState(AttackStateMachine::HIT_AND_RUN_WITHDRAW);
+		}
+		m_attackMachine->updateStateMachine();
+		return STATE_CONTINUE;
+	}
+
+	if (withdrawing)
+	{
+		m_attackMachine->setGoalObject(getMachineGoalObject());
+		m_attackMachine->setGoalPosition(getMachineGoalPosition());
+		return CONVERT_SLEEP_TO_CONTINUE(m_attackMachine->setState(AttackStateMachine::CHASE_TARGET));
+	}
 
 	// if all of our weapons are out of ammo, can't attack.
 	// (this can happen for units which never auto-reload, like the Raptor)
@@ -6478,7 +6567,12 @@ StateReturnType AIAttackState::update()
 	 * Note the use of CONVERT_SLEEP_TO_CONTINUE; even if the sub-machine
 	 * sleeps, we still need to be called every frame.
 	 */
-	return CONVERT_SLEEP_TO_CONTINUE(m_attackMachine->updateStateMachine());
+	const StateReturnType result = m_attackMachine->updateStateMachine();
+	if (team && team->hasHitAndRunVolley(now))
+	{
+		return STATE_CONTINUE;
+	}
+	return CONVERT_SLEEP_TO_CONTINUE(result);
 }
 
 //----------------------------------------------------------------------------------------------------------

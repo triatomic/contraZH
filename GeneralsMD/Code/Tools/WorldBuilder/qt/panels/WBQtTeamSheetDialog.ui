@@ -556,6 +556,13 @@
              </widget>
             </item>
             <item>
+             <widget class="QCheckBox" name="hitAndRunCheck">
+              <property name="text">
+               <string>Hit and run</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <widget class="QCheckBox" name="attackCommonTargetCheck">
               <property name="text">
                <string>Attack a common target</string>

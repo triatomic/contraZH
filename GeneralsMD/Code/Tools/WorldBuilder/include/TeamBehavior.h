@@ -60,6 +60,7 @@ protected:
 	virtual BOOL OnInitDialog() override;
 	afx_msg void OnTransportsReturn();
 	afx_msg void OnAvoidThreats();
+	afx_msg void OnHitAndRun();
 	afx_msg void OnSelchangeOnEnemySighted();
 	afx_msg void OnSelchangeOnDestroyed();
 	afx_msg void OnSelchangeOnUnitDestroyed();

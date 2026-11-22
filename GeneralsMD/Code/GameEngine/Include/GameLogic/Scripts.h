@@ -704,6 +704,7 @@ public:
 		AI_ADD_TO_BUILDLIST,
 		AREA_TRANSFER_TO_PLAYER,
 		TEAM_MANAGE_SUPPLY_TRUCKS,
+		TEAM_SET_HIT_AND_RUN,
 		// add new items here, please
 		NUM_ITEMS
 	};

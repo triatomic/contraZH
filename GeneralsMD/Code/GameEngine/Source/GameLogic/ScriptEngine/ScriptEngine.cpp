@@ -4112,6 +4112,17 @@ void ScriptEngine::init()
 	curTemplate->m_uiStrings[0] = "Build a shipyard ";
 	curTemplate->m_uiStrings[1] = ", at next free shipyard waypoint.";
 
+	curTemplate = &m_actionTemplates[ScriptAction::TEAM_SET_HIT_AND_RUN];
+	curTemplate->m_internalName = "TEAM_SET_HIT_AND_RUN";
+	curTemplate->m_uiName = "Team_/AI/Enable or disable hit-and-run behavior.";
+	curTemplate->m_numParameters = 2;
+	curTemplate->m_parameters[0] = Parameter::TEAM;
+	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
+	curTemplate->m_numUiStrings = 3;
+	curTemplate->m_uiStrings[0] = "Set hit-and-run behavior for team ";
+	curTemplate->m_uiStrings[1] = " to ";
+	curTemplate->m_uiStrings[2] = ".";
+
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MANAGE_SUPPLY_TRUCKS];
 	curTemplate->m_internalName = "TEAM_MANAGE_SUPPLY_TRUCKS";
 	curTemplate->m_uiName = "Contra/Team_/Supply/Manage supply trucks and their workers.";

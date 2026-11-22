@@ -1619,6 +1619,7 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,22,215,173,8
     GROUPBOX        "Attack:",IDC_STATIC,15,204,181,34
     LTEXT           "in Hard and Brutal (never in Normal)?",IDC_STATIC,35,225,117,8
+    CONTROL         "Hit and run",IDC_TEAM_HIT_AND_RUN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,238,179,8
 END
 
 IDD_EXPORT_SCRIPTS_OPTIONS DIALOG 0, 0, 302, 170

@@ -477,6 +477,13 @@
            </widget>
           </item>
           <item>
+           <widget class="QCheckBox" name="hitAndRunCheck">
+            <property name="text">
+             <string>Hit and run</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QGroupBox" name="initialBox">
             <property name="title">
              <string>Initial Team Behavior</string>

@@ -1125,6 +1125,7 @@ namespace
 			switch (ctrlId)
 			{
 				case IDC_TRANSPORTS_RETURN:    return TheKey_teamTransportsReturn;
+				case IDC_TEAM_HIT_AND_RUN:    return TheKey_teamHitAndRun;
 				case IDC_AVOID_THREATS:        return TheKey_teamAvoidThreats;
 				case IDC_PERIMETER_DEFENSE:    return TheKey_teamIsPerimeterDefense;
 				case IDC_BASE_DEFENSE:         return TheKey_teamIsBaseDefense;

@@ -3353,6 +3353,12 @@ void AIUpdateInterface::joinTeam()
 	}
 	if (other) {
 		AIUpdateInterface* ai = other->getAI();
+		Object *victim = ai->getCurrentVictim();
+		if (team->doesHitAndRun() && ai->isAttacking() && victim && !victim->isEffectivelyDead())
+		{
+			aiAttackObject(victim, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
+			return;
+		}
 		if (ai->isIdle()) {
 			aiMoveToPosition(other->getPosition(), CMD_FROM_AI);
 			return;

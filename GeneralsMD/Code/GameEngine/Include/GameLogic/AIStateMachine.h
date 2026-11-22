@@ -213,6 +213,8 @@ enum StateType CPP_11(: Int)
 		APPROACH_TARGET,											///< Approach a non-moving target.
 		AIM_AT_TARGET,												///< rotate to face GoalObject or GoalPosition
 		FIRE_WEAPON,													///< fire the machine owner's current weapon
+		HIT_AND_RUN_WITHDRAW,
+		HIT_AND_RUN_WAIT,
 	};
 	AttackStateMachine( Object *owner, AIAttackState* att, AsciiString name, Bool follow, Bool attackingObject, Bool forceAttacking );
 

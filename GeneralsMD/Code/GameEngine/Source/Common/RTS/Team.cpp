@@ -719,6 +719,7 @@ TeamTemplateInfo::TeamTemplateInfo(Dict *d) :
 	}
 
 	m_transportsReturn	= d->getBool(TheKey_teamTransportsReturn, &exists);
+	m_hitAndRun = d->getBool(TheKey_teamHitAndRun, &exists);
 	m_avoidThreats = d->getBool(TheKey_teamAvoidThreats, &exists);
 
 	m_attackCommonTarget = d->getBool(TheKey_teamAttackCommonTarget, &exists);
@@ -1307,6 +1308,9 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
   m_id( id ),
 	m_proto(proto),
 	m_enteredOrExited(false),
+	m_hitAndRun(proto->getTemplateInfo()->m_hitAndRun),
+	m_hitAndRunVolleyFrame(0),
+	m_hitAndRunReloadUntil(0),
 	m_active(false),
 	m_seeEnemy(false),
 	m_prevSeeEnemy(false),
@@ -1806,6 +1810,22 @@ Bool Team::hasAnyObjects() const
 		return true;
 	}
 	return false;
+}
+
+void Team::setHitAndRun(Bool enabled)
+{
+	if (m_hitAndRun != enabled)
+	{
+		m_hitAndRun = enabled;
+		m_hitAndRunReloadUntil = 0;
+	}
+}
+
+void Team::recordHitAndRunVolley(UnsignedInt frame, UnsignedInt reloadUntil)
+{
+	// Let teammates finish firing on the frame that starts the withdrawal.
+	m_hitAndRunVolleyFrame = frame;
+	m_hitAndRunReloadUntil = std::max(m_hitAndRunReloadUntil, reloadUntil);
 }
 
 // ------------------------------------------------------------------------
@@ -2580,7 +2600,7 @@ void Team::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2702,6 +2722,13 @@ void Team::xfer( Xfer *xfer )
 
 	// player relations
 	xfer->xferSnapshot( m_playerRelations );
+
+	if (version >= 2)
+	{
+		xfer->xferBool(&m_hitAndRun);
+		xfer->xferUnsignedInt(&m_hitAndRunVolleyFrame);
+		xfer->xferUnsignedInt(&m_hitAndRunReloadUntil);
+	}
 
 }
 

@@ -1,7 +1,12 @@
 # Gameplay Fixes
 
-Always on, no `Options.ini` key. Each entry says whether
+Fixes are on by default unless an entry says otherwise. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
+
+## AI team hit and run
+
+- Enable **Hit and run** in the WorldBuilder Team Behavior tab to let mobile ground attackers withdraw during clip reloads and shot cooldowns of at least one second. The team keeps its scripted approach and resumes its attack when the reload window ends. This changes the simulation when enabled.
+- Use **Enable or disable hit-and-run behavior** under **Team > AI** to change the setting on a team during play.
 
 ## AI construction uses legal, reachable sites
 

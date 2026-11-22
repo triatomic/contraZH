@@ -52,6 +52,7 @@ BEGIN_MESSAGE_MAP(TeamBehavior, CPropertyPage)
 	ON_CBN_SELCHANGE(IDC_ON_CREATE_SCRIPT, OnSelchangeOnCreateScript)
 	ON_BN_CLICKED(IDC_TRANSPORTS_RETURN, OnTransportsReturn)
 	ON_BN_CLICKED(IDC_AVOID_THREATS, OnAvoidThreats)
+	ON_BN_CLICKED(IDC_TEAM_HIT_AND_RUN, OnHitAndRun)
 	ON_CBN_SELCHANGE(IDC_ON_ENEMY_SIGHTED, OnSelchangeOnEnemySighted)
 	ON_CBN_SELCHANGE(IDC_ON_DESTROYED, OnSelchangeOnDestroyed)
 	ON_CBN_SELCHANGE(IDC_ON_UNIT_DESTROYED_SCRIPT, OnSelchangeOnUnitDestroyed)
@@ -139,6 +140,9 @@ BOOL TeamBehavior::OnInitDialog()
 	Bool avoid = m_teamDict->getBool(TheKey_teamAvoidThreats, &exists);
 	pCheck->SetCheck(avoid?1:0);
 
+	pCheck = (CButton *) GetDlgItem(IDC_TEAM_HIT_AND_RUN);
+	pCheck->SetCheck(m_teamDict->getBool(TheKey_teamHitAndRun, &exists) ? 1 : 0);
+
 	pCheck = (CButton *) GetDlgItem(IDC_ATTACK_COMMON_TARGET);
 	Bool attack = m_teamDict->getBool(TheKey_teamAttackCommonTarget, &exists);
 	pCheck->SetCheck(attack?1:0);
@@ -172,6 +176,12 @@ void TeamBehavior::OnAvoidThreats()
 	CButton *pCheck = (CButton *) GetDlgItem(IDC_AVOID_THREATS);
 	Bool checked = 	pCheck->GetCheck()==1;
 	m_teamDict->setBool(TheKey_teamAvoidThreats, checked);
+}
+
+void TeamBehavior::OnHitAndRun()
+{
+	CButton *pCheck = (CButton *) GetDlgItem(IDC_TEAM_HIT_AND_RUN);
+	m_teamDict->setBool(TheKey_teamHitAndRun, pCheck->GetCheck() == 1);
 }
 
 void TeamBehavior::OnSelchangeOnEnemySighted()

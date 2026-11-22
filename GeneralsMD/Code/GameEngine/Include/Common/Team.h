@@ -146,6 +146,7 @@ public:
 	Bool							m_isPerimeterDefense;					///< True if is a perimeter base defense team.
 	Bool							m_automaticallyReinforce;			///< True is team automatically tries to reinforce.
 	Bool							m_transportsReturn;						///< True if transports return to base after unloading.
+	Bool							m_hitAndRun;
 	Bool							m_avoidThreats;								///< True if the team avoids threats.
 	Bool							m_attackCommonTarget;					///< True if the team attacks the same target unit.
 	Int								m_maxInstances;								///< Maximum number of instances of a team that is not singleton.
@@ -197,6 +198,9 @@ private:
 	AsciiString		m_state;						///< Name of the current AI state.
 
 	Bool					m_enteredOrExited;  ///< True if a team member entered or exited a trigger area this frame.
+	Bool					m_hitAndRun;
+	UnsignedInt			m_hitAndRunVolleyFrame;
+	UnsignedInt			m_hitAndRunReloadUntil;
 	Bool					m_active;						///< True if a team is complete.  False while members are being added.
 	Bool					m_created;					///< True when first activated.
 
@@ -291,6 +295,12 @@ public:
 	/**
 		Set the team's AI recruitablity.
 	*/
+	Bool doesHitAndRun() const { return m_hitAndRun; }
+	void setHitAndRun(Bool enabled);
+	void recordHitAndRunVolley(UnsignedInt frame, UnsignedInt reloadUntil);
+	Bool isHitAndRunWithdrawing(UnsignedInt frame) const { return m_hitAndRun && frame > m_hitAndRunVolleyFrame && frame < m_hitAndRunReloadUntil; }
+	Bool hasHitAndRunVolley(UnsignedInt frame) const { return m_hitAndRun && frame == m_hitAndRunVolleyFrame && frame < m_hitAndRunReloadUntil; }
+
 	void setRecruitable(Bool recruitable) {m_isRecruitablitySet = true; m_isRecruitable = recruitable;}
 
 	/**
