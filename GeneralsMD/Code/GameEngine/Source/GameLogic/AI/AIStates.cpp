@@ -6431,26 +6431,45 @@ StateReturnType AIAttackState::update()
 	const Bool withdrawing = attackState == AttackStateMachine::HIT_AND_RUN_WITHDRAW ||
 		attackState == AttackStateMachine::HIT_AND_RUN_WAIT;
 
-	if (team && team->isHitAndRunWithdrawing(now))
+	const Object *victim = getMachineGoalObject();
+	Bool stillExposed = false;
+	if (team && attackState == AttackStateMachine::HIT_AND_RUN_WITHDRAW &&
+		victim && !victim->isEffectivelyDead() && source->getRelationship(victim) == ENEMIES)
+	{
+		const Player *enemy = victim->getControllingPlayer();
+		if (enemy)
+		{
+			const ObjectShroudStatus shroud = source->getShroudedStatus(enemy->getPlayerIndex());
+			stillExposed = shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR;
+		}
+		const Real range = victim->getLargestWeaponRange();
+		stillExposed = stillExposed || (range > 0.0f &&
+			ThePartitionManager->getDistanceSquared(source, victim, FROM_BOUNDINGSPHERE_2D) <= range * range);
+	}
+
+	if (team && (team->isHitAndRunWithdrawing(now) || stillExposed))
 	{
 		if (!withdrawing)
 		{
-			const Object *victim = getMachineGoalObject();
 			const Coord3D &target = victim ? *victim->getPosition() : m_originalVictimPos;
 			Coord3D destination = *source->getPosition();
 			Coord2D away;
 			away.x = destination.x - target.x;
 			away.y = destination.y - target.y;
-			const Real distance = away.length();
-			if (distance > 0.0f)
+			if (away.x != 0.0f || away.y != 0.0f)
 			{
-				const Real scale = 8.0f * PATHFIND_CELL_SIZE_F / distance;
-				destination.x += away.x * scale;
-				destination.y += away.y * scale;
 				Region3D bounds;
 				TheTerrainLogic->getExtent(&bounds);
-				destination.x = std::max(bounds.lo.x, std::min(bounds.hi.x, destination.x));
-				destination.y = std::max(bounds.lo.y, std::min(bounds.hi.y, destination.y));
+				const Real edgeX = away.x < 0.0f ? bounds.lo.x : bounds.hi.x;
+				const Real edgeY = away.y < 0.0f ? bounds.lo.y : bounds.hi.y;
+				Real scale = away.x != 0.0f ? (edgeX - destination.x) / away.x : (edgeY - destination.y) / away.y;
+				if (away.y != 0.0f)
+				{
+					scale = std::min(scale, (edgeY - destination.y) / away.y);
+				}
+				scale = std::max(0.0f, scale);
+				destination.x += away.x * scale;
+				destination.y += away.y * scale;
 				destination.z = TheTerrainLogic->getLayerHeight(destination.x, destination.y, source->getLayer());
 			}
 			m_attackMachine->setGoalObject(nullptr);
