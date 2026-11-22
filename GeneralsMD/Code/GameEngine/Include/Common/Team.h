@@ -199,8 +199,11 @@ private:
 
 	Bool					m_enteredOrExited;  ///< True if a team member entered or exited a trigger area this frame.
 	Bool					m_hitAndRun;
-	UnsignedInt			m_hitAndRunVolleyFrame;
-	UnsignedInt			m_hitAndRunReloadUntil;
+	Bool					m_hitAndRunRetreating;
+	UnsignedInt			m_hitAndRunRetreatMinEnd;
+	Coord3D				m_hitAndRunRetreatPoint;
+	std::map<ObjectID, UnsignedInt> m_hitAndRunShots;
+	void updateHitAndRun();
 	Bool					m_active;						///< True if a team is complete.  False while members are being added.
 	Bool					m_created;					///< True when first activated.
 
@@ -297,9 +300,9 @@ public:
 	*/
 	Bool doesHitAndRun() const { return m_hitAndRun; }
 	void setHitAndRun(Bool enabled);
-	void recordHitAndRunVolley(UnsignedInt frame, UnsignedInt reloadUntil);
-	Bool isHitAndRunWithdrawing(UnsignedInt frame) const { return m_hitAndRun && frame > m_hitAndRunVolleyFrame && frame < m_hitAndRunReloadUntil; }
-	Bool hasHitAndRunVolley(UnsignedInt frame) const { return m_hitAndRun && frame == m_hitAndRunVolleyFrame && frame < m_hitAndRunReloadUntil; }
+	static Bool canHitAndRun(const Object *obj);
+	void recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil);
+	const Coord3D *getHitAndRunRetreatPoint() const { return m_hitAndRunRetreating ? &m_hitAndRunRetreatPoint : nullptr; }
 
 	void setRecruitable(Bool recruitable) {m_isRecruitablitySet = true; m_isRecruitable = recruitable;}
 

@@ -1309,8 +1309,8 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
 	m_proto(proto),
 	m_enteredOrExited(false),
 	m_hitAndRun(proto->getTemplateInfo()->m_hitAndRun),
-	m_hitAndRunVolleyFrame(0),
-	m_hitAndRunReloadUntil(0),
+	m_hitAndRunRetreating(false),
+	m_hitAndRunRetreatMinEnd(0),
 	m_active(false),
 	m_seeEnemy(false),
 	m_prevSeeEnemy(false),
@@ -1322,6 +1322,7 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
 	m_wasIdle(false)
 {
 	m_created = FALSE;
+	m_hitAndRunRetreatPoint.zero();
 	m_commonAttackTarget = INVALID_ID;
 
 	// allocate new relation map pools
@@ -1763,6 +1764,11 @@ Bool Team::hasAnyUnits() const
 // ------------------------------------------------------------------------
 Bool Team::isIdle() const
 {
+	if (m_hitAndRunRetreating)
+	{
+		return false;
+	}
+
 	Bool idle = true; // assume idle.
 	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
@@ -1812,20 +1818,144 @@ Bool Team::hasAnyObjects() const
 	return false;
 }
 
+Bool Team::canHitAndRun(const Object *obj)
+{
+	return obj && obj->getAI() && obj->isMobile() && !obj->isEffectivelyDead() &&
+		!obj->isKindOf(KINDOF_AIRCRAFT) && !obj->isKindOf(KINDOF_PROJECTILE);
+}
+
 void Team::setHitAndRun(Bool enabled)
 {
 	if (m_hitAndRun != enabled)
 	{
 		m_hitAndRun = enabled;
-		m_hitAndRunReloadUntil = 0;
+		m_hitAndRunRetreating = false;
+		m_hitAndRunShots.clear();
 	}
 }
 
-void Team::recordHitAndRunVolley(UnsignedInt frame, UnsignedInt reloadUntil)
+void Team::recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil)
 {
-	// Let teammates finish firing on the frame that starts the withdrawal.
-	m_hitAndRunVolleyFrame = frame;
-	m_hitAndRunReloadUntil = std::max(m_hitAndRunReloadUntil, reloadUntil);
+	if (m_hitAndRun && !m_hitAndRunRetreating)
+	{
+		UnsignedInt &lastReload = m_hitAndRunShots[member];
+		lastReload = std::max(lastReload, reloadUntil);
+	}
+}
+
+void Team::updateHitAndRun()
+{
+	if (!m_hitAndRun || m_hitAndRunShots.empty())
+	{
+		return;
+	}
+
+	Player *player = getControllingPlayer();
+	if (!player || player->getPlayerType() != PLAYER_COMPUTER)
+	{
+		return;
+	}
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	Int attackers = 0;
+	Int fired = 0;
+	Int reloaded = 0;
+	Bool engaged = false;
+	const Waypoint *previousWaypoint = nullptr;
+	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
+	{
+		Object *obj = iter.cur();
+		if (!canHitAndRun(obj) || obj->getLargestWeaponRange() < 0.0f)
+		{
+			continue;
+		}
+
+		++attackers;
+		AIUpdateInterface *ai = obj->getAI();
+		engaged = engaged || ai->isAttacking();
+		if (!previousWaypoint && !m_hitAndRunRetreating)
+		{
+			previousWaypoint = TheTerrainLogic->getWaypointByID(ai->getPriorWaypointID());
+			if (!previousWaypoint)
+			{
+				previousWaypoint = ai->getCompletedWaypoint();
+			}
+		}
+		std::map<ObjectID, UnsignedInt>::const_iterator shot = m_hitAndRunShots.find(obj->getID());
+		if (shot != m_hitAndRunShots.end())
+		{
+			++fired;
+			if (now >= shot->second)
+			{
+				++reloaded;
+			}
+		}
+	}
+
+	const Int required = (attackers + 1) / 2;
+	if (m_hitAndRunRetreating)
+	{
+		if (fired == 0 || (now >= m_hitAndRunRetreatMinEnd && reloaded >= std::min(fired, required)))
+		{
+			m_hitAndRunRetreating = false;
+			m_hitAndRunShots.clear();
+		}
+		return;
+	}
+
+	if (fired == 0 || (!engaged && fired < required))
+	{
+		m_hitAndRunShots.clear();
+		return;
+	}
+	if (fired < required)
+	{
+		return;
+	}
+
+	if (previousWaypoint)
+	{
+		m_hitAndRunRetreatPoint = *previousWaypoint->getLocation();
+	}
+	else
+	{
+		AsciiString name;
+		name.format("%s%d", OUTER_PERIMETER, player->getMpStartIndex() + 1);
+		const PolygonTrigger *perimeter = TheTerrainLogic->getTriggerAreaByName(name);
+		if (perimeter)
+		{
+			perimeter->getCenterPoint(&m_hitAndRunRetreatPoint);
+		}
+		else if (!player->getAiBaseCenter(&m_hitAndRunRetreatPoint))
+		{
+			const TeamTemplateInfo *info = m_proto->getTemplateInfo();
+			name.format("Player_%d_Start", player->getMpStartIndex() + 1);
+			const Waypoint *start = TheTerrainLogic->getWaypointByName(name);
+			if (info->m_hasHomeLocation)
+			{
+				m_hitAndRunRetreatPoint = info->m_homeLocation;
+			}
+			else if (start)
+			{
+				m_hitAndRunRetreatPoint = *start->getLocation();
+			}
+			else
+			{
+				m_hitAndRunShots.clear();
+				return;
+			}
+		}
+	}
+
+	m_hitAndRunRetreating = true;
+	m_hitAndRunRetreatMinEnd = now + LOGICFRAMES_PER_SECOND;
+	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
+	{
+		if (canHitAndRun(iter.cur()))
+		{
+			iter.cur()->getAI()->notifyTeamRetreat();
+		}
+	}
 }
 
 // ------------------------------------------------------------------------
@@ -1836,6 +1966,7 @@ void Team::updateState()
 	if (!m_active) {
 		return;
 	}
+	updateHitAndRun();
 	const TeamTemplateInfo *pInfo = m_proto->getTemplateInfo();
 	if (m_created)
 	{
@@ -2600,7 +2731,7 @@ void Team::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 2;
+	XferVersion currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2726,8 +2857,39 @@ void Team::xfer( Xfer *xfer )
 	if (version >= 2)
 	{
 		xfer->xferBool(&m_hitAndRun);
-		xfer->xferUnsignedInt(&m_hitAndRunVolleyFrame);
-		xfer->xferUnsignedInt(&m_hitAndRunReloadUntil);
+	}
+	if (version == 2)
+	{
+		UnsignedInt oldFrame = 0;
+		xfer->xferUnsignedInt(&oldFrame);
+		xfer->xferUnsignedInt(&oldFrame);
+	}
+	if (version >= 3)
+	{
+		xfer->xferBool(&m_hitAndRunRetreating);
+		xfer->xferUnsignedInt(&m_hitAndRunRetreatMinEnd);
+		xfer->xferCoord3D(&m_hitAndRunRetreatPoint);
+		UnsignedInt shotCount = m_hitAndRunShots.size();
+		xfer->xferUnsignedInt(&shotCount);
+		if (xfer->getXferMode() == XFER_LOAD)
+		{
+			m_hitAndRunShots.clear();
+			for (UnsignedInt i = 0; i < shotCount; ++i)
+			{
+				ObjectID id = INVALID_ID;
+				xfer->xferObjectID(&id);
+				xfer->xferUnsignedInt(&m_hitAndRunShots[id]);
+			}
+		}
+		else
+		{
+			for (std::map<ObjectID, UnsignedInt>::iterator it = m_hitAndRunShots.begin(); it != m_hitAndRunShots.end(); ++it)
+			{
+				ObjectID id = it->first;
+				xfer->xferObjectID(&id);
+				xfer->xferUnsignedInt(&it->second);
+			}
+		}
 	}
 
 }

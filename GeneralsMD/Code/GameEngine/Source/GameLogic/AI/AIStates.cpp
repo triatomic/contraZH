@@ -264,19 +264,81 @@ static Bool inWeaponRangeObject(State *thisState, void* userData);
 static Team *getHitAndRunTeam(Object *obj)
 {
 	Team *team = obj->getTeam();
-	if (!team || !team->doesHitAndRun() || !obj->isMobile() ||
-		obj->isKindOf(KINDOF_AIRCRAFT) || obj->isKindOf(KINDOF_PROJECTILE))
+	if (!team || !team->doesHitAndRun() || !Team::canHitAndRun(obj))
 	{
 		return nullptr;
 	}
 
 	const Player *player = team->getControllingPlayer();
-	if (player && player->getPlayerType() == PLAYER_COMPUTER)
-	{
-		return team;
-	}
-	return nullptr;
+	return player && player->getPlayerType() == PLAYER_COMPUTER ? team : nullptr;
 }
+
+class AIHitAndRunRetreatState : public AIInternalMoveToState
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(AIHitAndRunRetreatState, "AIHitAndRunRetreatState")
+public:
+	AIHitAndRunRetreatState(StateMachine *machine) :
+		AIInternalMoveToState(machine, "AIHitAndRunRetreatState"), m_moving(false)
+	{
+	}
+
+	virtual StateReturnType onEnter() override
+	{
+		const Coord3D *point = getMachineOwner()->getTeam()->getHitAndRunRetreatPoint();
+		if (!point)
+		{
+			return STATE_FAILURE;
+		}
+
+		setGoalPos(point);
+		setAdjustsDestination(true);
+		m_moving = true;
+		if (AIInternalMoveToState::onEnter() != STATE_CONTINUE)
+		{
+			stopMoving(EXIT_NORMAL);
+		}
+		return STATE_CONTINUE;
+	}
+
+	virtual StateReturnType update() override
+	{
+		Team *team = getHitAndRunTeam(getMachineOwner());
+		if (!team || !team->getHitAndRunRetreatPoint())
+		{
+			return STATE_SUCCESS;
+		}
+		if (m_moving && AIInternalMoveToState::update() != STATE_CONTINUE)
+		{
+			stopMoving(EXIT_NORMAL);
+		}
+		return STATE_CONTINUE;
+	}
+
+	virtual void onExit(StateExitType status) override
+	{
+		if (m_moving)
+		{
+			stopMoving(status);
+		}
+	}
+
+protected:
+	virtual void xfer(Xfer *xfer) override
+	{
+		AIInternalMoveToState::xfer(xfer);
+		xfer->xferBool(&m_moving);
+	}
+
+private:
+	void stopMoving(StateExitType status)
+	{
+		AIInternalMoveToState::onExit(status);
+		m_moving = false;
+	}
+
+	Bool m_moving;
+};
+EMPTY_DTOR(AIHitAndRunRetreatState)
 
 //----------------------------------------------------------------------------------------------------------
 /**
@@ -711,6 +773,7 @@ AIStateMachine::AIStateMachine( Object *obj, AsciiString name ) : StateMachine( 
 	defineState( AI_IDLE,																	newInstance(AIIdleState)( this, AIIdleState::LOOK_FOR_TARGETS), AI_IDLE, AI_IDLE );
 	defineState( AI_MOVE_TO,															newInstance(AIMoveToState)( this ), AI_IDLE, AI_IDLE );
 	defineState( AI_MOVE_OUT_OF_THE_WAY,									newInstance(AIMoveOutOfTheWayState)( this ), AI_IDLE, AI_IDLE );
+	defineState(AI_HIT_AND_RUN_RETREAT, newInstance(AIHitAndRunRetreatState)(this), AI_IDLE, AI_IDLE);
 	defineState( AI_MOVE_AND_TIGHTEN,											newInstance(AIMoveAndTightenState)( this ), AI_IDLE, AI_IDLE );
 	defineState( AI_MOVE_AWAY_FROM_REPULSORS,							newInstance(AIMoveAwayFromRepulsorsState)( this ), AI_WANDER_IN_PLACE, AI_WANDER_IN_PLACE );
 	defineState( AI_WANDER_IN_PLACE,											newInstance(AIWanderInPlaceState)( this ), AI_MOVE_AWAY_FROM_REPULSORS, AI_MOVE_AWAY_FROM_REPULSORS );
@@ -907,8 +970,16 @@ StateReturnType AIStateMachine::updateStateMachine()
 	#endif
 	//end -extraLogging
 
+	const Team *team = getHitAndRunTeam(getOwner());
+	if (team && team->getHitAndRunRetreatPoint() && getOwner()->getAI()->isSameMachine(this) &&
+		getTemporaryState() != AI_HIT_AND_RUN_RETREAT && !isLocked())
+	{
+		setTemporaryState(AI_HIT_AND_RUN_RETREAT, 60 * LOGICFRAMES_PER_SECOND);
+	}
+
 	if (m_temporaryState)
 	{
+		const Bool wasRetreating = getTemporaryState() == AI_HIT_AND_RUN_RETREAT;
 		// execute this state
 		StateReturnType status = m_temporaryState->update();
 		if (m_temporaryStateFramEnd < TheGameLogic->getFrame()) {
@@ -935,6 +1006,10 @@ StateReturnType AIStateMachine::updateStateMachine()
 		{
 			m_temporaryState->onExit(EXIT_NORMAL);
 			m_temporaryState = nullptr;
+			if (wasRetreating && getCurrentStateID() != INVALID_STATE_ID)
+			{
+				setState(getCurrentStateID());
+			}
 		}
 	}
 	StateReturnType retType = StateMachine::updateStateMachine();
@@ -5965,7 +6040,7 @@ StateReturnType AIAttackFireWeaponState::update()
 	const AIUpdateInterface* ai = obj->getAI();
 	const CommandSourceType cmdSource = ai->getLastCommandSource();
 	Team *team = getHitAndRunTeam(obj);
-	if (team && team->isHitAndRunWithdrawing(TheGameLogic->getFrame()))
+	if (team && team->getHitAndRunRetreatPoint())
 	{
 		return STATE_FAILURE;
 	}
@@ -6121,17 +6196,9 @@ StateReturnType AIAttackFireWeaponState::update()
 		for (Int slot = PRIMARY_WEAPON; slot < WEAPONSLOT_COUNT; ++slot)
 		{
 			const Weapon *fired = obj->getWeaponInWeaponSlot((WeaponSlotType)slot);
-			if (!fired || fired->getLastShotFrame() != now)
+			if (fired && fired->getLastShotFrame() == now && fired->getStatus() != OUT_OF_AMMO)
 			{
-				continue;
-			}
-
-			const WeaponStatus status = fired->getStatus();
-			const UnsignedInt ready = fired->getPossibleNextShotFrame();
-			if (ready > now && (status == RELOADING_CLIP ||
-				(status == BETWEEN_FIRING_SHOTS && ready - now >= LOGICFRAMES_PER_SECOND)))
-			{
-				team->recordHitAndRunVolley(now, ready);
+				team->recordHitAndRunShot(obj->getID(), fired->getPossibleNextShotFrame());
 			}
 		}
 	}
@@ -6425,62 +6492,8 @@ StateReturnType AIAttackState::update()
 	}
 
 	Object* source = getMachineOwner();
-	Team *team = getHitAndRunTeam(source);
-	const UnsignedInt now = TheGameLogic->getFrame();
 	const StateID attackState = m_attackMachine->getCurrentStateID();
-	const Bool withdrawing = attackState == AttackStateMachine::HIT_AND_RUN_WITHDRAW ||
-		attackState == AttackStateMachine::HIT_AND_RUN_WAIT;
-
-	const Object *victim = getMachineGoalObject();
-	Bool stillExposed = false;
-	if (team && attackState == AttackStateMachine::HIT_AND_RUN_WITHDRAW &&
-		victim && !victim->isEffectivelyDead() && source->getRelationship(victim) == ENEMIES)
-	{
-		const Player *enemy = victim->getControllingPlayer();
-		if (enemy)
-		{
-			const ObjectShroudStatus shroud = source->getShroudedStatus(enemy->getPlayerIndex());
-			stillExposed = shroud == OBJECTSHROUD_CLEAR || shroud == OBJECTSHROUD_PARTIAL_CLEAR;
-		}
-		const Real range = victim->getLargestWeaponRange();
-		stillExposed = stillExposed || (range > 0.0f &&
-			ThePartitionManager->getDistanceSquared(source, victim, FROM_BOUNDINGSPHERE_2D) <= range * range);
-	}
-
-	if (team && (team->isHitAndRunWithdrawing(now) || stillExposed))
-	{
-		if (!withdrawing)
-		{
-			const Coord3D &target = victim ? *victim->getPosition() : m_originalVictimPos;
-			Coord3D destination = *source->getPosition();
-			Coord2D away;
-			away.x = destination.x - target.x;
-			away.y = destination.y - target.y;
-			if (away.x != 0.0f || away.y != 0.0f)
-			{
-				Region3D bounds;
-				TheTerrainLogic->getExtent(&bounds);
-				const Real edgeX = away.x < 0.0f ? bounds.lo.x : bounds.hi.x;
-				const Real edgeY = away.y < 0.0f ? bounds.lo.y : bounds.hi.y;
-				Real scale = away.x != 0.0f ? (edgeX - destination.x) / away.x : (edgeY - destination.y) / away.y;
-				if (away.y != 0.0f)
-				{
-					scale = std::min(scale, (edgeY - destination.y) / away.y);
-				}
-				scale = std::max(0.0f, scale);
-				destination.x += away.x * scale;
-				destination.y += away.y * scale;
-				destination.z = TheTerrainLogic->getLayerHeight(destination.x, destination.y, source->getLayer());
-			}
-			m_attackMachine->setGoalObject(nullptr);
-			m_attackMachine->setGoalPosition(&destination);
-			m_attackMachine->setState(AttackStateMachine::HIT_AND_RUN_WITHDRAW);
-		}
-		m_attackMachine->updateStateMachine();
-		return STATE_CONTINUE;
-	}
-
-	if (withdrawing)
+	if (attackState == AttackStateMachine::HIT_AND_RUN_WITHDRAW || attackState == AttackStateMachine::HIT_AND_RUN_WAIT)
 	{
 		m_attackMachine->setGoalObject(getMachineGoalObject());
 		m_attackMachine->setGoalPosition(getMachineGoalPosition());
@@ -6586,12 +6599,7 @@ StateReturnType AIAttackState::update()
 	 * Note the use of CONVERT_SLEEP_TO_CONTINUE; even if the sub-machine
 	 * sleeps, we still need to be called every frame.
 	 */
-	const StateReturnType result = m_attackMachine->updateStateMachine();
-	if (team && team->hasHitAndRunVolley(now))
-	{
-		return STATE_CONTINUE;
-	}
-	return CONVERT_SLEEP_TO_CONTINUE(result);
+	return CONVERT_SLEEP_TO_CONTINUE(m_attackMachine->updateStateMachine());
 }
 
 //----------------------------------------------------------------------------------------------------------
