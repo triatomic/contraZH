@@ -86,14 +86,6 @@
 
 namespace
 {
-	struct TeamRouteThreat
-	{
-		Coord3D position;
-		Real radius;
-		Real firingRadius;
-	};
-
-	typedef std::vector<TeamRouteThreat> TeamRouteThreats;
 	// The fine search and path smoothing share the same threat costs.
 	const TeamRouteThreats *s_routeThreats = nullptr;
 	enum ThreatClearance { THREAT_BUFFER, THREAT_FIRING_RANGE, THREAT_SOFT_COST };
@@ -225,7 +217,7 @@ namespace
 
 			const Real clearance = std::max(4.0f * PATHFIND_CELL_SIZE_F, 0.2f * range);
 			const Real footprint = enemy->getGeometryInfo().getBoundingCircleRadius() + largestMemberRadius;
-			const TeamRouteThreat threat = {*enemy->getPosition(), range + footprint + clearance, range + footprint};
+			const TeamRouteThreat threat = {enemy->getID(), *enemy->getPosition(), range + footprint + clearance, range + footprint};
 			const Real reach = threat.radius + margin;
 			if (threat.position.x >= std::min(start.x, destination.x) - reach &&
 				threat.position.x <= std::max(start.x, destination.x) + reach &&
@@ -279,6 +271,33 @@ Bool Pathfinder::shouldRepathAroundTeamThreats(Object *obj)
 		return false;
 	}
 
+	const TeamRouteThreats &known = path->getTeamRouteThreats();
+	TeamRouteThreats newThreats;
+	for (TeamRouteThreats::const_iterator it = threats.begin(); it != threats.end(); ++it)
+	{
+		Bool alreadyConsidered = false;
+		for (TeamRouteThreats::const_iterator old = known.begin(); old != known.end(); ++old)
+		{
+			const Real tolerance = 4.0f * PATHFIND_CELL_SIZE_F;
+			if (old->id == it->id && distanceXY(old->position, it->position) < tolerance &&
+				it->firingRadius < old->firingRadius + tolerance)
+			{
+				alreadyConsidered = true;
+				break;
+			}
+		}
+		if (!alreadyConsidered)
+		{
+			TeamRouteThreat threat = *it;
+			threat.radius = threat.firingRadius;
+			newThreats.push_back(threat);
+		}
+	}
+	if (newThreats.empty())
+	{
+		return false;
+	}
+
 	const Coord3D &position = *obj->getPosition();
 	ClosestPointOnPathInfo closest;
 	path->computePointOnPath(obj, ai->getLocomotorSet(), position, closest);
@@ -294,10 +313,10 @@ Bool Pathfinder::shouldRepathAroundTeamThreats(Object *obj)
 		const Real length = distanceXY(*node->getPosition(), *next->getPosition());
 		if (length >= remaining)
 		{
-			exposure += exposedLength(threats, position, *next->getPosition());
+			exposure += exposedLength(newThreats, position, *next->getPosition());
 			return exposure > PATHFIND_CELL_SIZE_F;
 		}
-		exposure += exposedLength(threats, *node->getPosition(), *next->getPosition());
+		exposure += exposedLength(newThreats, *node->getPosition(), *next->getPosition());
 		if (exposure > PATHFIND_CELL_SIZE_F)
 		{
 			return true;
@@ -555,7 +574,11 @@ void Path::crc( Xfer *xfer )
 void Path::xfer( Xfer *xfer )
 {
   // version
+#if RTS_ZEROHOUR
+  XferVersion currentVersion = 2;
+#else
   XferVersion currentVersion = 1;
+#endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -632,6 +655,21 @@ void Path::xfer( Xfer *xfer )
 	xfer->xferBool(&m_blockedByAlly);
 
 	xfer->xferUnsignedShort(&m_moveUnderBridges);
+#if RTS_ZEROHOUR
+	if (version >= 2)
+	{
+		UnsignedInt threatCount = static_cast<UnsignedInt>(m_teamRouteThreats.size());
+		xfer->xferUnsignedInt(&threatCount);
+		m_teamRouteThreats.resize(threatCount);
+		for (TeamRouteThreats::iterator it = m_teamRouteThreats.begin(); it != m_teamRouteThreats.end(); ++it)
+		{
+			xfer->xferObjectID(&it->id);
+			xfer->xferCoord3D(&it->position);
+			xfer->xferReal(&it->radius);
+			xfer->xferReal(&it->firingRadius);
+		}
+	}
+#endif
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI == AI_DEBUG_PATHS)
@@ -1238,12 +1276,6 @@ void Path::computePointOnPath(
 				tryAhead = true;
 				veryClose = true;
 			}
-#if RTS_ZEROHOUR
-			if (Pathfinder::usesTeamThreatRouting(obj) && (!veryClose || offsetDist > 1.0f))
-			{
-				tryAhead = false;
-			}
-#endif
 			if (tryAhead)
 			{
 				// try next segment middle.
@@ -1255,11 +1287,21 @@ void Path::computePointOnPath(
 					tryPos.y = (nextNodePos->y + next->getPosition()->y) * 0.5;
 					tryPos.z = nextNodePos->z;
 					CRCDEBUG_LOG(("Path::computePointOnPath() calling isLinePassable() 2"));
-					if (veryClose || TheAI->pathfinder()->isLinePassable( obj, locomotorSet.getValidSurfaces(), closeNext->getLayer(), pos, tryPos, false, true, locomotorSet.getRequiredWaterLevel()))
+					Bool canCutCorner = true;
+#if RTS_ZEROHOUR
+					canCutCorner = canCrossThreats(m_teamRouteThreats, pos, tryPos, THREAT_BUFFER);
+#endif
+					if (canCutCorner && (veryClose || TheAI->pathfinder()->isLinePassable( obj, locomotorSet.getValidSurfaces(), closeNext->getLayer(), pos, tryPos, false, true, locomotorSet.getRequiredWaterLevel())))
 					{
 						gotPos = true;
 						out.posOnPath = tryPos;
 					}
+#if RTS_ZEROHOUR
+					else if (!canCutCorner && veryClose && offsetDist < 1.0f)
+					{
+						out.posOnPath = *next->getPosition();
+					}
+#endif
 				}
 			}
 		}
@@ -7127,6 +7169,7 @@ Path *Pathfinder::getAircraftPathImpl( const Object *obj, const Coord3D *to )
 	{
 		TeamRouteThreats threats;
 		collectTeamRouteThreats(obj, adjDest, threats);
+		thePath->setTeamRouteThreats(threats);
 		const Real directLength = distanceXY(pos, adjDest);
 		const Real directExposure = exposedLength(threats, pos, adjDest);
 		Real bestCost = directLength + 2.0f * directExposure;
@@ -7914,6 +7957,7 @@ Path *Pathfinder::findPathImpl( Object *obj, const LocomotorSet& locomotorSet, c
 			s_threatClearance = THREAT_SOFT_COST;
 			if (saferPath && !didLastSearchHitCap())
 			{
+				saferPath->setTeamRouteThreats(threats);
 				return saferPath;
 			}
 			if (saferPath)
@@ -7937,6 +7981,9 @@ Path *Pathfinder::findPathImpl( Object *obj, const LocomotorSet& locomotorSet, c
 
 	Path *pat = internalFindPath(obj, locomotorSet, from, rawTo);
 	if (pat!=nullptr) {
+#if RTS_ZEROHOUR
+		pat->setTeamRouteThreats(threats);
+#endif
 		return pat;
 	}
 

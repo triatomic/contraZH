@@ -2366,6 +2366,10 @@ Bool AIUpdateInterface::computePath( PathfindServicesInterface *pathServices, Co
 		if (m_isBlockedAndStuck) {
 			theNewPath = pathServices->patchPath( getObject(), m_locomotorSet,
 				getPath(), m_isBlockedAndStuck);
+			if (theNewPath && m_path)
+			{
+				theNewPath->setTeamRouteThreats(m_path->getTeamRouteThreats());
+			}
 			m_pathWasCapped = (theNewPath != nullptr) && patchingCappedPath;
 		}	else {
 			theNewPath = pathServices->findPath( getObject(), m_locomotorSet, getObject()->getPosition(),

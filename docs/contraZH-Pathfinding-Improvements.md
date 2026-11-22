@@ -12,8 +12,9 @@ older replays may play differently.
   that radius, then try staying outside firing range alone. If neither search succeeds, the
   fallback routes through exposure at a higher cost.
 * The team still follows the script's waypoint order. Units periodically check the remaining route
-  and can replan the current leg if it crosses enemy fire. They keep moving if there is no safer
-  route.
+  and can replan the current leg if a new threat or a threat that has moved across their route
+  puts them in firing range. They keep their current route as they pass threats they already
+  planned for, including when no safer route was available.
 * Exact waypoint paths and explicit attack orders follow their usual rules.
 
 ## Search limits and retries

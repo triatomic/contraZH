@@ -138,6 +138,17 @@ private:
 // performance-wise, so I didn't enable it. (srj)
 #define NO_CPOP_STARTS_FROM_PREV_SEG
 
+#if RTS_ZEROHOUR
+struct TeamRouteThreat
+{
+	ObjectID id;
+	Coord3D position;
+	Real radius;
+	Real firingRadius;
+};
+typedef std::vector<TeamRouteThreat> TeamRouteThreats;
+#endif
+
 struct ClosestPointOnPathInfo
 {
 	Real								distAlongPath;
@@ -155,6 +166,10 @@ public:
 
 	PathNode *getFirstNode() { return m_path; }
 	PathNode *getLastNode() { return m_pathTail; }
+#if RTS_ZEROHOUR
+	const TeamRouteThreats &getTeamRouteThreats() const { return m_teamRouteThreats; }
+	void setTeamRouteThreats(const TeamRouteThreats &threats) { m_teamRouteThreats = threats; }
+#endif
 
 	void updateLastNode( const Coord3D *pos );
 
@@ -209,6 +224,9 @@ protected:
 	const PathNode*					m_cpopRecentStart;
 
 	// Stores opened/destroyed bridges that this path moves below.
+#if RTS_ZEROHOUR
+	TeamRouteThreats m_teamRouteThreats;
+#endif
 	UnsignedShort m_moveUnderBridges; // 16bit -> use as bitset for PATHFIND LAYER ENUMS (2-14 for bridges)
 };
 
