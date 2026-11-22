@@ -5664,6 +5664,26 @@ void AIUpdateInterface::setLoadFactors(Real speed, Real turnRate, Real accel, Re
 
 
 //----------------------------------------------------------------------------------------------
+class PartitionFilterAttackMoveAircraft : public PartitionFilter
+{
+public:
+	PartitionFilterAttackMoveAircraft(const Object *source) : m_source(source) {}
+
+	virtual Bool allow(Object *target) override
+	{
+		return !target->isKindOf(KINDOF_AIRCRAFT) || !target->isAirborneTarget() ||
+			m_source->getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, target, CMD_FROM_AI) == ATTACKRESULT_POSSIBLE;
+	}
+
+#if defined(RTS_DEBUG)
+	virtual const char *debugGetName() override { return "PartitionFilterAttackMoveAircraft"; }
+#endif
+
+private:
+	const Object *m_source;
+};
+
+//----------------------------------------------------------------------------------------------
 /**
  * Return the next object that our mood suggests we should attack.
  */
@@ -5735,6 +5755,13 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 
 	UnsignedInt now = TheGameLogic->getFrame();
 
+	// The attack approach state refuses to chase aircraft on these orders.
+	const AIStateType state = getAIStateType();
+	const Bool requireAircraftInRange = obj->getControllingPlayer()->getPlayerType() == PLAYER_COMPUTER &&
+		(state == AI_ATTACK_MOVE_TO || state == AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS ||
+			state == AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM);
+	PartitionFilterAttackMoveAircraft attackMoveAircraft(obj);
+
 	// Check if team auto targets same victim.
 	Object *teamVictim = nullptr;
 	if (calledByAI && obj->getTeam()->getPrototype()->getTemplateInfo()->m_attackCommonTarget)
@@ -5749,8 +5776,11 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 			}
 		}
 
-		if (teamVictim && getAttitude()>=ATTITUDE_NORMAL)
+		if (teamVictim && getAttitude() >= ATTITUDE_NORMAL &&
+			(!requireAircraftInRange || attackMoveAircraft.allow(teamVictim)))
+		{
 			return teamVictim;
+		}
 	}
 
 	DEBUG_ASSERTCRASH(m_nextMoodCheckTime != 0, ("m_nextMoodCheckTime should never be zero here."));
@@ -5797,7 +5827,8 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 		//Do not allow units that healed me to get acquired! They are our friends!!!
 		if( bmi->getLastDamageInfo()->in.m_damageType != DAMAGE_HEALING )
 		{
-			return TheGameLogic->findObjectByID(bmi->getLastDamageInfo()->in.m_sourceID);
+			Object *attacker = TheGameLogic->findObjectByID(bmi->getLastDamageInfo()->in.m_sourceID);
+			return attacker && (!requireAircraftInRange || attackMoveAircraft.allow(attacker)) ? attacker : nullptr;
 		}
 	}
 	UnsignedInt flags = AI::CAN_ATTACK;
@@ -5834,7 +5865,8 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 		flags |= AI::UNFOGGED;
 	}
 
-	Object *newVictim = TheAI->findClosestEnemy(obj, rangeToFindWithin, flags, getAttackInfo());
+	Object *newVictim = TheAI->findClosestEnemy(obj, rangeToFindWithin, flags, getAttackInfo(),
+		requireAircraftInRange ? &attackMoveAircraft : nullptr);
 
 /*
 DEBUG_LOG(("GNMT frame %d: %s %08lx (con %s %08lx) uses range %f, flags %08lx, %s finds %s %08lx",

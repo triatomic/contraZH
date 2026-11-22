@@ -85,6 +85,11 @@ to curved and linear flight paths, including projectiles that tumble or keep a f
 
 Changes the simulation and older replay playback for affected shots.
 
+## AI anti-air units keep moving between shots
+
+AI units following attack waypoints or attack-moving keep moving past aircraft outside
+weapon range. They can stop and fire once the aircraft comes into range.
+
 ## Tunnel evacuation requires an open endpoint
 
 AI tunnel guards and evacuation orders use completed, registered tunnel entrances.
