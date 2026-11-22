@@ -593,6 +593,32 @@ Object *SpawnBehavior::reclaimOrphanSpawn()
 }
 
 //-------------------------------------------------------------------------------------------------
+Int SpawnBehavior::countPendingOneShotSpawns(KindOfType kind) const
+{
+	if (!m_active || m_oneShotCountdown <= 0)
+	{
+		return 0;
+	}
+
+	const std::vector<AsciiString> &names = getSpawnBehaviorModuleData()->m_spawnTemplateNameData;
+	std::vector<AsciiString>::const_iterator name = m_templateNameIterator;
+	Int count = 0;
+	for (Int i = 0; i < m_oneShotCountdown; ++i)
+	{
+		const ThingTemplate *unit = TheThingFactory->findTemplate(*name);
+		if (unit && unit->isKindOf(kind))
+		{
+			++count;
+		}
+		if (++name == names.end())
+		{
+			name = names.begin();
+		}
+	}
+	return count;
+}
+
+//-------------------------------------------------------------------------------------------------
 Bool SpawnBehavior::createSpawn()
 {
 	Object *parent = getObject();

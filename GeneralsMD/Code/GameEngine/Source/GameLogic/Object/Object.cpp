@@ -6165,11 +6165,85 @@ void Object::doSpecialPowerUsingWaypoints( const SpecialPowerTemplate *specialPo
 }
 
 //-------------------------------------------------------------------------------------------------
+static Bool canUseScriptedBuildingCommand( Object *object, const CommandButton *button, CommandSourceType source )
+{
+	if (source != CMD_FROM_SCRIPT || !object->isStructure())
+	{
+		return TRUE;
+	}
+
+	if (!button || object->isEffectivelyDead() || object->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) ||
+		object->testStatus(OBJECT_STATUS_SOLD) || object->testScriptStatusBit(OBJECT_STATUS_SCRIPT_DISABLED) ||
+		object->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED))
+	{
+		return FALSE;
+	}
+
+	Player *player = object->getControllingPlayer();
+	const UpgradeTemplate *upgrade = button->getUpgradeTemplate();
+	if (upgrade && BitIsSet(button->getOptions(), NEED_UPGRADE))
+	{
+		if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER ? !player->hasUpgradeComplete(upgrade) : !object->hasUpgrade(upgrade))
+		{
+			return FALSE;
+		}
+	}
+
+	ProductionUpdateInterface *production = object->getProductionUpdateInterface();
+	if (production && production->firstProduction() && BitIsSet(button->getOptions(), NOT_QUEUEABLE))
+	{
+		return FALSE;
+	}
+
+	switch (button->getCommandType())
+	{
+		case GUI_COMMAND_OBJECT_UPGRADE:
+		case GUI_COMMAND_PLAYER_UPGRADE:
+			if (!production || !upgrade || production->canQueueUpgrade(upgrade) != CANMAKE_OK ||
+				!TheUpgradeCenter->canAffordUpgrade(player, upgrade, FALSE))
+			{
+				return FALSE;
+			}
+			for (size_t i = 0; i < button->getScienceVec().size(); ++i)
+			{
+				if (!player->hasScience(button->getScienceVec()[i]))
+				{
+					return FALSE;
+				}
+			}
+			break;
+
+		case GUI_COMMAND_SPECIAL_POWER:
+		{
+			const SpecialPowerTemplate *power = button->getSpecialPowerTemplate();
+			if (!TheSpecialPowerStore->canUseSpecialPower(object, power))
+			{
+				return FALSE;
+			}
+			SpecialPowerModuleInterface *module = object->getSpecialPowerModule(power);
+			if (!module->isReadyForCommand(button->getOptions()) ||
+				(power->getCost() > 0 && player->getMoney()->countMoney() < static_cast<UnsignedInt>(power->getCost())))
+			{
+				return FALSE;
+			}
+			const SpecialAbilityUpdate *ability = object->findSpecialAbilityUpdate(power->getSpecialPowerType());
+			return !ability || !ability->isPowerCurrentlyInUse(button);
+		}
+
+		default:
+			break;
+	}
+
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Execute command button ability */
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButton( const CommandButton *commandButton, CommandSourceType cmdSource )
 {
-	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0) ||
+		!canUseScriptedBuildingCommand(this, commandButton, cmdSource))
 	{
 		return;
 	}
@@ -6345,7 +6419,8 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object *obj, CommandSourceType cmdSource )
 {
-	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0) ||
+		!canUseScriptedBuildingCommand(this, commandButton, cmdSource))
 	{
 		return;
 	}
@@ -6489,7 +6564,8 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonAtPosition( const CommandButton *commandButton, const Coord3D *pos, CommandSourceType cmdSource )
 {
-	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0) ||
+		!canUseScriptedBuildingCommand(this, commandButton, cmdSource))
 	{
 		return;
 	}
@@ -6610,7 +6686,8 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonUsingWaypoints( const CommandButton *commandButton, const Waypoint *way, CommandSourceType cmdSource )
 {
-	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0) ||
+		!canUseScriptedBuildingCommand(this, commandButton, cmdSource))
 	{
 		return;
 	}

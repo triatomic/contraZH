@@ -203,6 +203,7 @@ public:
 	virtual void setForceWantingState(Bool v) override { m_forcePending = v; }
 	virtual Bool isForcedIntoWantingState() const override { return m_forcePending; }
 	virtual ObjectID getPreferredDockID() const override { return m_preferredDock; }
+	virtual void setPreferredDockID(ObjectID dock) override { m_preferredDock = dock; }
 	virtual UnsignedInt getActionDelayForDock( Object *dock ) override;
 
 // worker specific
