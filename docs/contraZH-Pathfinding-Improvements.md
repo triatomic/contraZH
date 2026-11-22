@@ -3,6 +3,15 @@
 These changes are always on. They change the simulation, so all players need the same build and
 older replays may play differently.
 
+## Scripted team movement
+
+* **Team avoids threats** makes ordinary scripted move orders and waypoint paths favor routes with
+  less exposure to visible enemy weapons that can target members of the team.
+* The team still follows the script's waypoint order. Units periodically check the remaining route
+  and can replan the current leg if it crosses enemy fire. They keep moving if there is no safer
+  route.
+* Exact waypoint paths and explicit attack orders follow their usual rules.
+
 ## Search limits and retries
 
 * A full pathfind queue retries refused requests after a few frames. The queue holds 2047 pending

@@ -2399,6 +2399,11 @@ StateReturnType AIMoveToState::update()
 
 	}
 
+	if (TheAI->pathfinder()->shouldRepathAroundTeamThreats(obj))
+	{
+		computePath();
+	}
+
 	return AIInternalMoveToState::update();
 }
 
@@ -4579,6 +4584,11 @@ StateReturnType AIFollowWaypointPathState::update()
 		if (getAdjustsDestination()) {
 			TheAI->pathfinder()->updateGoal(obj, &m_goalPosition, m_goalLayer);
 		}
+	}
+
+	if (!m_appendGoalPosition && TheAI->pathfinder()->shouldRepathAroundTeamThreats(obj))
+	{
+		computePath();
 	}
 
 	// do movement

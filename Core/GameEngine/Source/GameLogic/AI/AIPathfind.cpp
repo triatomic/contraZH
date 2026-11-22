@@ -81,6 +81,193 @@
 #include <queue>
 #include <vector>
 
+#if RTS_ZEROHOUR
+#include "Common/Team.h"
+
+namespace
+{
+	struct TeamRouteThreat
+	{
+		Coord3D position;
+		Real radius;
+	};
+
+	typedef std::vector<TeamRouteThreat> TeamRouteThreats;
+	// The fine search and path smoothing share the same threat costs.
+	const TeamRouteThreats *s_routeThreats = nullptr;
+
+	Real distanceXY(const Coord3D &from, const Coord3D &to)
+	{
+		const Real dx = to.x - from.x;
+		const Real dy = to.y - from.y;
+		return WWMath::Sqrt(dx * dx + dy * dy);
+	}
+
+	Real exposedLength(const TeamRouteThreats &threats, const Coord3D &from, const Coord3D &to)
+	{
+		const Real length = distanceXY(from, to);
+		if (length == 0.0f)
+		{
+			return 0.0f;
+		}
+
+		const Real dx = (to.x - from.x) / length;
+		const Real dy = (to.y - from.y) / length;
+		Real exposed = 0.0f;
+		for (TeamRouteThreats::const_iterator it = threats.begin(); it != threats.end(); ++it)
+		{
+			const Real x = it->position.x - from.x;
+			const Real y = it->position.y - from.y;
+			const Real cross = x * dy - y * dx;
+			const Real halfChordSquared = it->radius * it->radius - cross * cross;
+			if (halfChordSquared > 0.0f)
+			{
+				const Real along = x * dx + y * dy;
+				const Real halfChord = WWMath::Sqrt(halfChordSquared);
+				exposed += std::max(0.0f, std::min(length, along + halfChord) - std::max(0.0f, along - halfChord));
+			}
+		}
+		return exposed;
+	}
+
+	void collectTeamRouteThreats(const Object *obj, const Coord3D &destination, TeamRouteThreats &threats)
+	{
+		const Team *team = obj->getTeam();
+		Int targetMask = 0;
+		for (DLINK_ITERATOR<Object> it = team->iterate_TeamMemberList(); !it.done(); it.advance())
+		{
+			const Object *member = it.cur();
+			if (member->isEffectivelyDead() || member->getContainedBy())
+			{
+				continue;
+			}
+			if (!member->isUsingAirborneLocomotor())
+			{
+				targetMask |= WEAPON_ANTI_GROUND;
+			}
+			else if (member->isKindOf(KINDOF_INFANTRY))
+			{
+				targetMask |= WEAPON_ANTI_AIRBORNE_INFANTRY;
+			}
+			else
+			{
+				targetMask |= WEAPON_ANTI_AIRBORNE_VEHICLE;
+			}
+		}
+
+		const Coord3D &start = *obj->getPosition();
+		if (targetMask == 0)
+		{
+			return;
+		}
+
+		const Real margin = 0.5f * distanceXY(start, destination);
+		const Int playerIndex = obj->getControllingPlayer()->getPlayerIndex();
+		for (const Object *enemy = TheGameLogic->getFirstObject(); enemy; enemy = enemy->getNextObject())
+		{
+			if (enemy->isEffectivelyDead() || enemy->isDisabled() || enemy->getContainedBy() ||
+				enemy->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) ||
+				obj->getRelationship(enemy) != ENEMIES || !enemy->isAbleToAttack() ||
+				enemy->getShroudedStatus(playerIndex) != OBJECTSHROUD_CLEAR ||
+				(enemy->testStatus(OBJECT_STATUS_STEALTHED) && !enemy->testStatus(OBJECT_STATUS_DETECTED)))
+			{
+				continue;
+			}
+
+			Real range = 0.0f;
+			for (Int slot = 0; slot < WEAPONSLOT_COUNT; ++slot)
+			{
+				const Weapon *weapon = enemy->getWeaponInWeaponSlot(static_cast<WeaponSlotType>(slot));
+				if (weapon && weapon->isDamageWeapon() && (weapon->getAntiMask() & targetMask))
+				{
+					range = std::max(range, weapon->getAttackRange(enemy));
+				}
+			}
+			if (range <= 0.0f)
+			{
+				continue;
+			}
+
+			const TeamRouteThreat threat = {*enemy->getPosition(), range + PATHFIND_CELL_SIZE_F};
+			const Real reach = threat.radius + margin;
+			if (threat.position.x >= std::min(start.x, destination.x) - reach &&
+				threat.position.x <= std::max(start.x, destination.x) + reach &&
+				threat.position.y >= std::min(start.y, destination.y) - reach &&
+				threat.position.y <= std::max(start.y, destination.y) + reach)
+			{
+				threats.push_back(threat);
+			}
+		}
+	}
+}
+
+Bool Pathfinder::teamAvoidsThreats(const Object *obj)
+{
+	return obj && obj->getTeam() && !obj->isKindOf(KINDOF_PROJECTILE) &&
+		obj->getTeam()->getPrototype()->getTemplateInfo()->m_avoidThreats;
+}
+
+Bool Pathfinder::usesTeamThreatRouting(const Object *obj)
+{
+	if (!teamAvoidsThreats(obj) || !obj->getAI() || obj->getAI()->getLastCommandSource() != CMD_FROM_SCRIPT)
+	{
+		return false;
+	}
+
+	const StateID state = obj->getAI()->getCurrentStateID();
+	return state == AI_FOLLOW_WAYPOINT_PATH_AS_TEAM || state == AI_FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS ||
+		state == AI_MOVE_TO;
+}
+
+Bool Pathfinder::shouldRepathAroundTeamThreats(Object *obj)
+{
+	if (!usesTeamThreatRouting(obj))
+	{
+		return false;
+	}
+
+	AIUpdateInterface *ai = obj->getAI();
+	Path *path = ai->getPath();
+	const UnsignedInt interval = 2 * LOGICFRAMES_PER_SECOND;
+	if (!path || ai->isWaitingForPath() || ai->getPathAge() < interval ||
+		TheGameLogic->getFrame() % interval != static_cast<UnsignedInt>(obj->getID()) % interval)
+	{
+		return false;
+	}
+
+	TeamRouteThreats threats;
+	collectTeamRouteThreats(obj, *path->getLastNode()->getPosition(), threats);
+	if (threats.empty())
+	{
+		return false;
+	}
+
+	const Coord3D &position = *obj->getPosition();
+	ClosestPointOnPathInfo closest;
+	path->computePointOnPath(obj, ai->getLocomotorSet(), position, closest);
+	Real remaining = closest.distAlongPath;
+	for (const PathNode *node = path->getLastNode(); node; node = node->getPrevious())
+	{
+		const PathNode *next = node->getNextOptimized();
+		if (!next)
+		{
+			continue;
+		}
+		const Real length = distanceXY(*node->getPosition(), *next->getPosition());
+		if (length >= remaining)
+		{
+			return exposedLength(threats, position, *next->getPosition()) > PATHFIND_CELL_SIZE_F;
+		}
+		if (exposedLength(threats, *node->getPosition(), *next->getPosition()) > PATHFIND_CELL_SIZE_F)
+		{
+			return true;
+		}
+		remaining -= length;
+	}
+	return false;
+}
+#endif
+
 static inline Bool IS_IMPASSABLE(PathfindCell::CellType type) {
 	// Return true if cell is impassable to ground units. jba. [8/18/2003]
 	if (type==PathfindCell::CELL_IMPASSABLE) {
@@ -623,6 +810,13 @@ void Path::optimize( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfa
 					isPassable = true;
 				}
 			}
+#if RTS_ZEROHOUR
+			if (isPassable && s_routeThreats && node != anchor->getNext() &&
+				exposedLength(*s_routeThreats, *anchor->getPosition(), *node->getPosition()) > 0.0f)
+			{
+				isPassable = false;
+			}
+#endif
 			if (isPassable)
 			{
 				// anchor can directly see this node, make it next in the optimized path
@@ -6882,6 +7076,47 @@ Path *Pathfinder::getAircraftPathImpl( const Object *obj, const Coord3D *to )
 	Coord3D pos = *obj->getPosition();
 	pos.z = to->z;
 	thePath->prependNode( &pos, LAYER_GROUND );
+#if RTS_ZEROHOUR
+	if (usesTeamThreatRouting(obj))
+	{
+		TeamRouteThreats threats;
+		collectTeamRouteThreats(obj, adjDest, threats);
+		const Real directLength = distanceXY(pos, adjDest);
+		const Real directExposure = exposedLength(threats, pos, adjDest);
+		Real bestCost = directLength + 2.0f * directExposure;
+		Coord3D best = pos;
+		Region3D extent;
+		TheTerrainLogic->getMaximumPathfindExtent(&extent);
+		for (TeamRouteThreats::const_iterator it = threats.begin(); it != threats.end() && directExposure > 0.0f; ++it)
+		{
+			for (Int side = -1; side <= 1; side += 2)
+			{
+				Coord3D bend = it->position;
+				bend.x += side * (pos.y - adjDest.y) * it->radius * 1.5f / directLength;
+				bend.y += side * (adjDest.x - pos.x) * it->radius * 1.5f / directLength;
+				bend.z = adjDest.z;
+				const Real length = distanceXY(pos, bend) + distanceXY(bend, adjDest);
+				if (length > 1.5f * directLength || !extent.isInRegionNoZ(bend))
+				{
+					continue;
+				}
+				const Real cost = length + 2.0f * (exposedLength(threats, pos, bend) + exposedLength(threats, bend, adjDest));
+				if (cost < bestCost)
+				{
+					bestCost = cost;
+					best = bend;
+				}
+			}
+		}
+		if (bestCost < directLength + 2.0f * directExposure)
+		{
+			PathNode *bend = newInstance(PathNode);
+			bend->setPosition(&best);
+			bend->setLayer(LAYER_GROUND);
+			thePath->getFirstNode()->append(bend);
+		}
+	}
+#endif
 	Int limit = 20;
 	PathNode *curNode = thePath->getFirstNode();
 	while (curNode && curNode->getNext()) {
@@ -7290,7 +7525,11 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			canPathThroughUnits = obj->getAIUpdateInterface()->canPathThroughUnits();
 		}
 		Bool isCrusher = obj ? obj->getCrusherLevel() > 0 : false;
-		if (attackDistance==NO_ATTACK && !m_isTunneling && !locomotorSet.isDownhillOnly() && goalCell) {
+		Bool probeGoal = attackDistance==NO_ATTACK && !m_isTunneling && !locomotorSet.isDownhillOnly() && goalCell;
+#if RTS_ZEROHOUR
+		probeGoal = probeGoal && !s_routeThreats;
+#endif
+		if (probeGoal) {
 			ExamineCellsStruct info;
 			info.thePathfinder = this;
 			info.theLoco = &locomotorSet;
@@ -7459,6 +7698,18 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			}
 
 			newCostSoFar = newCell->costSoFar( parentCell );
+#if RTS_ZEROHOUR
+			if (s_routeThreats)
+			{
+				const Real offset = centerInCell ? 0.5f : 0.05f;
+				const Coord3D start = {(parentCell->getXIndex() + offset) * PATHFIND_CELL_SIZE_F,
+					(parentCell->getYIndex() + offset) * PATHFIND_CELL_SIZE_F, 0.0f};
+				const Coord3D end = {(newCellCoord.x + offset) * PATHFIND_CELL_SIZE_F,
+					(newCellCoord.y + offset) * PATHFIND_CELL_SIZE_F, 0.0f};
+				const Real exposure = exposedLength(*s_routeThreats, start, end);
+				newCostSoFar += static_cast<UnsignedInt>(2.0f * COST_ORTHOGONAL * exposure / PATHFIND_CELL_SIZE_F);
+			}
+#endif
 			if (info.allyMoving && dx<10 && dy<10) {
 				newCostSoFar += 3*COST_DIAGONAL;
 			}
@@ -7573,6 +7824,30 @@ Path *Pathfinder::findPathImpl( Object *obj, const LocomotorSet& locomotorSet, c
 		isHuman = false; // computer gets to cheat.
 	}
 
+#if RTS_ZEROHOUR
+	TeamRouteThreats threats;
+	if (usesTeamThreatRouting(obj))
+	{
+		collectTeamRouteThreats(obj, *rawTo, threats);
+	}
+	if (!threats.empty())
+	{
+		const TeamRouteThreats *previousThreats = s_routeThreats;
+		s_routeThreats = &threats;
+		m_zoneManager.setAllPassable();
+		Path *saferPath = internalFindPath(obj, locomotorSet, from, rawTo);
+		s_routeThreats = previousThreats;
+		if (saferPath && !didLastSearchHitCap())
+		{
+			return saferPath;
+		}
+		if (saferPath)
+		{
+			deleteInstance(saferPath);
+		}
+		beginSearchBudget(PFS_FIND);
+	}
+#endif
 	Int radius;
 	Bool centerInCell;
 	getRadiusAndCenter(obj, radius, centerInCell);

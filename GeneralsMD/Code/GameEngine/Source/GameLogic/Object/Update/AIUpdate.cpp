@@ -2257,7 +2257,7 @@ Bool AIUpdateInterface::computeQuickPath( const Coord3D *destination )
 
 
 	// First, see if our path already goes to the destination.
-	if (m_path) {
+	if (m_path && !Pathfinder::usesTeamThreatRouting(getObject())) {
 		PathNode *closeNode = nullptr;
 		closeNode = m_path->getLastNode();
 		if (closeNode && closeNode->getNextOptimized()==nullptr) {
@@ -2350,7 +2350,7 @@ Bool AIUpdateInterface::computePath( PathfindServicesInterface *pathServices, Co
 	// sanity check - if destination cell is invalid, don't bother pathing
 
 	LocomotorSurfaceTypeMask surfaces = m_locomotorSet.getValidSurfaces();
-	if (!m_isFinalGoal && TheAI->pathfinder()->isLinePassable( getObject(), surfaces,
+	if (!m_isFinalGoal && !Pathfinder::usesTeamThreatRouting(getObject()) && TheAI->pathfinder()->isLinePassable( getObject(), surfaces,
 			getObject()->getLayer(), *getObject()->getPosition(), originalDestination, false, true, m_locomotorSet.getRequiredWaterLevel())) {
 		return computeQuickPath(destination);
 	}

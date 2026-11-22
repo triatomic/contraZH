@@ -801,6 +801,11 @@ public:
 	void forceMapRecalculation();	///< Force pathfind map recomputation. If region is given, only that area is recomputed
 
 	/** Returns an aircraft path to the goal.  */
+#if RTS_ZEROHOUR
+	static Bool teamAvoidsThreats(const Object *obj);
+	static Bool usesTeamThreatRouting(const Object *obj);
+	Bool shouldRepathAroundTeamThreats(Object *obj);
+#endif
 	Path *getAircraftPath( const Object *obj, const Coord3D *to);
 	Path *findGroundPath( const Coord3D *from, const Coord3D *to, Int pathRadius,
 		Bool crusher);	///< Find a short, valid path of the desired width on the ground.
