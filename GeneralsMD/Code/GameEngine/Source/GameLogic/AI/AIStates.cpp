@@ -4370,6 +4370,12 @@ void AIFollowWaypointPathState::computeGoal(Bool useGroupOffsets)
 		}
 	}
 
+	if (hasNextWaypoint() && m_goalLayer == LAYER_GROUND && extent.isInRegionNoZ(dest) &&
+		extent.isInRegionNoZ(m_goalPosition))
+	{
+		TheAI->pathfinder()->adjustThreatenedWaypoint(obj, m_goalPosition);
+	}
+
 	if (!extent.isInRegionNoZ(m_goalPosition)) {
 		setAdjustsDestination(false); // moving off the map.
 		ai->getCurLocomotor()->setAllowInvalidPosition(true); // allow it to move off the map.
@@ -4588,6 +4594,10 @@ StateReturnType AIFollowWaypointPathState::update()
 
 	if (!m_appendGoalPosition && TheAI->pathfinder()->shouldRepathAroundTeamThreats(obj))
 	{
+		if (hasNextWaypoint() && m_goalLayer == LAYER_GROUND)
+		{
+			TheAI->pathfinder()->adjustThreatenedWaypoint(obj, m_goalPosition);
+		}
 		computePath();
 	}
 
@@ -4597,7 +4607,8 @@ StateReturnType AIFollowWaypointPathState::update()
 	// We may want to allow ourselves to bail out of this one early. In order to do this, we check and
 	// see if we're moving as a group, and then if our team is owned by an AI Skirmish player.
 	// If it is, then we compute the group centroid, and see if it is within some distance of the
-	if (m_moveAsGroup) {
+	Path *path = ai->getPath();
+	if (m_moveAsGroup && (!path || path->getTeamRouteThreats().empty())) {
 		if (obj->getControllingPlayer()->isSkirmishAIPlayer()) {
 			Team *team = obj->getTeam();
 			AIGroupPtr group = TheAI->createGroup();

@@ -823,6 +823,7 @@ public:
 	static Bool teamAvoidsThreats(const Object *obj);
 	static Bool usesTeamThreatRouting(const Object *obj);
 	Bool shouldRepathAroundTeamThreats(Object *obj);
+	void adjustThreatenedWaypoint(Object *obj, Coord3D &destination);
 #endif
 	Path *getAircraftPath( const Object *obj, const Coord3D *to);
 	Path *findGroundPath( const Coord3D *from, const Coord3D *to, Int pathRadius,

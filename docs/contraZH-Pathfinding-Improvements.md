@@ -15,6 +15,8 @@ older replays may play differently.
   and can replan the current leg if a new threat or a threat that has moved across their route
   puts them in firing range. They keep their current route as they pass threats they already
   planned for, including when no safer route was available.
+* If a visible threat covers an intermediate waypoint, the team can pass it at a nearby
+  point outside the threat buffer. The final destination stays where the script placed it.
 * Exact waypoint paths and explicit attack orders follow their usual rules.
 
 ## Search limits and retries

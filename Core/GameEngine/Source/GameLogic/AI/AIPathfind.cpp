@@ -248,6 +248,83 @@ Bool Pathfinder::usesTeamThreatRouting(const Object *obj)
 		state == AI_MOVE_TO;
 }
 
+void Pathfinder::adjustThreatenedWaypoint(Object *obj, Coord3D &destination)
+{
+	if (!usesTeamThreatRouting(obj))
+	{
+		return;
+	}
+
+	TeamRouteThreats threats;
+	collectTeamRouteThreats(obj, destination, threats);
+	const Coord3D start = *obj->getPosition();
+	const LocomotorSet &locomotorSet = obj->getAI()->getLocomotorSet();
+	const Bool ground = obj->getAI()->isDoingGroundMovement();
+	const Short bridgeHeight = obj->getRequiredBridgeHeight();
+	const Bool crusher = obj->getCrusherLevel() > 0;
+	Region3D extent;
+	TheTerrainLogic->getMaximumPathfindExtent(&extent);
+
+	Coord3D best = destination;
+	Real bestCost = 0.0f;
+	for (TeamRouteThreats::const_iterator threat = threats.begin(); threat != threats.end(); ++threat)
+	{
+		if (distanceXY(threat->position, destination) >= threat->radius)
+		{
+			continue;
+		}
+
+		const Int samples = 24;
+		const Real radius = threat->radius + 2.0f * PATHFIND_CELL_SIZE_F;
+		for (Int i = 0; i < samples; ++i)
+		{
+			const Real angle = i * (2.0f * PI / samples);
+			Coord3D point = destination;
+			point.x = threat->position.x + radius * WWMath::Cos(angle);
+			point.y = threat->position.y + radius * WWMath::Sin(angle);
+			if (!extent.isInRegionNoZ(point))
+			{
+				continue;
+			}
+
+			Bool exposed = false;
+			for (TeamRouteThreats::const_iterator other = threats.begin(); other != threats.end(); ++other)
+			{
+				if (distanceXY(other->position, point) < other->radius + PATHFIND_CELL_SIZE_F)
+				{
+					exposed = true;
+					break;
+				}
+			}
+			if (exposed)
+			{
+				continue;
+			}
+
+			const Real cost = 2.0f * distanceXY(destination, point) + distanceXY(start, point);
+			if (bestCost > 0.0f && cost >= bestCost)
+			{
+				continue;
+			}
+
+			if (ground)
+			{
+				point.z = TheTerrainLogic->getGroundHeight(point.x, point.y);
+				const PathfindLayerEnum layer = TheTerrainLogic->getLayerForDestination(&point);
+				if (!validMovementPosition(crusher, layer, locomotorSet, bridgeHeight, &point) ||
+					!clientSafeQuickDoesPathExist(locomotorSet, bridgeHeight, &start, &point))
+				{
+					continue;
+				}
+			}
+
+			best = point;
+			bestCost = cost;
+		}
+	}
+	destination = best;
+}
+
 Bool Pathfinder::shouldRepathAroundTeamThreats(Object *obj)
 {
 	if (!usesTeamThreatRouting(obj))
