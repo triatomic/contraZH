@@ -480,6 +480,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "AIDockMoveToExitState", 256, 32 },
 	{ "AIDockMoveToRallyState", 256, 32 },
 	{ "AIMoveToState", 600, 32 },
+	{ "AIHitAndRunRetreatState", 600, 32 },
 	{ "AIMoveOutOfTheWayState", 600, 32 },
 	{ "AIMoveAndTightenState", 600, 32 },
 	{ "AIMoveAwayFromRepulsorsState", 600, 32 },
