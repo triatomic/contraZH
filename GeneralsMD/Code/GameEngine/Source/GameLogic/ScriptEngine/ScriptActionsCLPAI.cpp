@@ -516,7 +516,7 @@ void AIPlayer::clpBuildNearestTeam(const ThingTemplate *tmpl, Team *team, Real a
 /** Stock buildBySupplies with a script angle. Supply centers face their dock and skip docks that
 	already have one queued. */
 //-------------------------------------------------------------------------------------------------
-void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplate, Real angle)
+void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplate, Real angle, Bool requiresSupplies)
 {
 	if( !tTemplate )
 	{
@@ -590,7 +590,7 @@ void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplat
 	if( valid )
 	{
 		newPos.z = 0;
-		m_player->addToPriorityBuildList( tTemplate->getName(), &newPos, angle, bestSupplyWarehouse->getID() );
+		m_player->addToPriorityBuildList( tTemplate->getName(), &newPos, angle, bestSupplyWarehouse->getID(), requiresSupplies );
 	}
 	else
 	{
@@ -653,7 +653,7 @@ Object *AIPlayer::clpFindSupplyCenter(Int minimumCash)
 			{
 				continue;
 			}
-			if( hasSupplyCenterAtSite( obj, radius, TRUE ) )
+			if( hasSupplyCenterAtSite( obj->getID(), &center, radius, TRUE ) )
 			{
 				continue;
 			}
@@ -1116,7 +1116,7 @@ void ScriptActions::doBuildObjectNearestTeamAngle(const AsciiString& playerName,
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptActions::doBuildSupplyCenterAngle(const AsciiString& player, const AsciiString& buildingType, Int cash, Real angle)
+void ScriptActions::doBuildSupplyCenterAngle(const AsciiString& player, const AsciiString& buildingType, Int cash, Real angle, Bool requiresSupplies)
 {
 	Player *thePlayer = TheScriptEngine->getPlayerFromAsciiString( player );
 	if( !thePlayer )
@@ -1134,7 +1134,7 @@ void ScriptActions::doBuildSupplyCenterAngle(const AsciiString& player, const As
 	{
 		return;
 	}
-	ai->clpBuildBySupplies( cash, tmpl, angle * (PI / 180.0f) );
+	ai->clpBuildBySupplies( cash, tmpl, angle * (PI / 180.0f), requiresSupplies );
 }
 
 //-------------------------------------------------------------------------------------------------

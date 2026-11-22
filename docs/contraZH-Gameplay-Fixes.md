@@ -98,11 +98,15 @@ An unfinished entrance cannot unload units from the shared network.
 
 ## AI supply sites track their warehouse
 
-New AI build orders placed by the supply placement scripts remember the warehouse that
-justified the placement. The AI skips new construction and rebuilding at those sites
-when the warehouse is empty, gone, or enemy-owned. The association survives save and
-load. A planned rebuild reserves its warehouse so placement scripts look for another
-site. Older saves use the planned center's position when checking reservations.
+The standard and rotated supply placement actions can rebuild after their warehouse runs
+dry, so the first supply center can keep unlocking prerequisite buildings. Use **Build
+near a supply source and rebuild while supplies remain** for expansion centers. Its
+standard and rotated versions skip rebuilding when the selected warehouse is empty,
+missing, or enemy-owned.
+
+A planned rebuild reserves its warehouse so placement scripts look for another site.
+The warehouse and rebuild rule survive save and load. Older saves without a warehouse
+association use the planned center's position to check reservations.
 
 ## AI supply sources respect allied bases
 

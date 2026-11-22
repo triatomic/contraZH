@@ -191,7 +191,7 @@ public:
 	/// Difficulty level for this player.
 	GameDifficulty getAIDifficulty() const;
 	void setAIDifficulty(GameDifficulty difficulty) {m_difficulty = difficulty;}
-	void buildBySupplies(Int minimumCash, const AsciiString &thingName ); ///< Builds a building by supplies.
+	void buildBySupplies(Int minimumCash, const AsciiString &thingName, Bool requiresSupplies); ///< Builds a building by supplies.
 	void buildSpecificBuildingNearestTeam( const AsciiString &thingName, const Team *team );
 	void buildUpgrade(const AsciiString &upgrade ); ///< Builds an upgrade.
 	/// A team is about to be destroyed.
@@ -215,7 +215,7 @@ public:
 	Bool clpTrainUnit(const ThingTemplate *thing);
 	void clpBuildNearPosition(const ThingTemplate *tmpl, const Coord3D *location, Real angle);
 	void clpBuildNearestTeam(const ThingTemplate *tmpl, Team *team, Real angle);
-	void clpBuildBySupplies(Int minimumCash, const ThingTemplate *tmpl, Real angle);
+	void clpBuildBySupplies(Int minimumCash, const ThingTemplate *tmpl, Real angle, Bool requiresSupplies);
 	Bool clpComputeSuperweaponTargetType(const SpecialPowerTemplate *power, Coord3D *retPos, Int playerNdx, Real weaponRadius, const AsciiString &objectType);
 	Object *clpFindSupplyCenter(Int minimumCash);
 
@@ -238,7 +238,7 @@ protected:
 	virtual Bool startTraining( WorkOrder *order, Bool busyOK, AsciiString teamName);	///< find a production building that can handle the order, and start building
 	virtual Bool isAGoodIdeaToBuildTeam( TeamPrototype *proto );		///< return true if team should be built
 	Bool canBuildAtSupplySite(ObjectID sourceID) const;
-	Bool hasSupplyCenterAtSite(const Object *source, Real legacyRadius, Bool includePending);
+	Bool hasSupplyCenterAtSite(ObjectID sourceID, const Coord3D *sourcePosition, Real legacyRadius, Bool includePending);
 	virtual void processBaseBuilding();		///< do base-building behaviors
 	virtual void processTeamBuilding();		///< do team-building behaviors
  	static Int getPlayerSuperweaponValue( Coord3D *center, Int playerNdx, Real radius, Bool includeMilitaryUnits = TRUE, const Player *viewer = nullptr );

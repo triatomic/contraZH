@@ -726,20 +726,19 @@ Bool AIPlayer::canBuildAtSupplySite(ObjectID sourceID) const
 }
 
 // ------------------------------------------------------------------------------------------------
-Bool AIPlayer::hasSupplyCenterAtSite(const Object *source, Real legacyRadius, Bool includePending)
+Bool AIPlayer::hasSupplyCenterAtSite(ObjectID sourceID, const Coord3D *sourcePosition, Real legacyRadius, Bool includePending)
 {
 	for (BuildListInfo *info = m_player->getBuildList(); info; info = info->getNext())
 	{
 		ObjectID boundSource = info->getSupplySiteSourceID();
-		if (boundSource != source->getID())
+		if (boundSource != sourceID)
 		{
-			if (boundSource != INVALID_ID || legacyRadius <= 0.0f)
+			if (boundSource != INVALID_ID || !sourcePosition)
 			{
 				continue;
 			}
-			const Coord3D *pos = source->getPosition();
-			Real dx = info->getLocation()->x - pos->x;
-			Real dy = info->getLocation()->y - pos->y;
+			Real dx = info->getLocation()->x - sourcePosition->x;
+			Real dy = info->getLocation()->y - sourcePosition->y;
 			if (dx * dx + dy * dy > legacyRadius * legacyRadius)
 			{
 				continue;
@@ -852,7 +851,7 @@ void AIPlayer::processBaseBuilding()
 				}
 			}
 			// check if this building has any "rebuilds" left
-			if (info->isBuildable() && canBuildAtSupplySite(info->getSupplySiteSourceID()))
+			if (info->isBuildable() && (!info->supplySiteRequiresSupplies() || canBuildAtSupplySite(info->getSupplySiteSourceID())))
 			{
 				Object *bldg = TheGameLogic->findObjectByID( info->getObjectID() );
 
@@ -1971,7 +1970,7 @@ void AIPlayer::buildUpgrade(const AsciiString &upgrade)
 // ------------------------------------------------------------------------------------------------
 /** Build a supply center near a supply source with minimumCash or more resources. */
 // ------------------------------------------------------------------------------------------------
-void AIPlayer::buildBySupplies(Int minimumCash, const AsciiString& thingName)
+void AIPlayer::buildBySupplies(Int minimumCash, const AsciiString& thingName, Bool requiresSupplies)
 {
 	const ThingTemplate* tTemplate = TheThingFactory->findTemplate(thingName);
 	if (!tTemplate)
@@ -2113,7 +2112,7 @@ void AIPlayer::buildBySupplies(Int minimumCash, const AsciiString& thingName)
 		}
 		TheTerrainVisual->removeAllBibs();	// isLocationLegalToBuild adds bib feedback, turn it off.  jba.
 		location.z = 0; // All build list locations are ground relative.
-		m_player->addToPriorityBuildList(thingName, &location, angle, bestSupplyWarehouse->getID());
+		m_player->addToPriorityBuildList(thingName, &location, angle, bestSupplyWarehouse->getID(), requiresSupplies);
 		m_curWarehouseID = bestSupplyWarehouse->getID();
 	}
 }
@@ -2358,7 +2357,7 @@ Object *AIPlayer::findSupplyCenter(Int minimumCash, Bool skipPlanned)
 
 				Real radius = SUPPLY_CENTER_CLOSE_DIST + obj->getGeometryInfo().getBoundingCircleRadius();
 				if (!ResourceGatheringManager::isSupplySourceAvailable(obj, m_player) ||
-					(skipPlanned && hasSupplyCenterAtSite(obj, radius, TRUE)))
+					(skipPlanned && hasSupplyCenterAtSite(obj->getID(), obj->getPosition(), radius, TRUE)))
 				{
 					continue;
 				}

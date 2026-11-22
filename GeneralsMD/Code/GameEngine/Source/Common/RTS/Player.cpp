@@ -704,14 +704,14 @@ void Player::addToBuildList(Object *obj)
 }
 
 //=============================================================================
-void Player::addToPriorityBuildList(AsciiString templateName, Coord3D *pos, Real angle, ObjectID supplySource)
+void Player::addToPriorityBuildList(AsciiString templateName, Coord3D *pos, Real angle, ObjectID supplySource, Bool requiresSupplies)
 {
 	BuildListInfo *newInfo = newInstance( BuildListInfo );
 	newInfo->setTemplateName(templateName);
 	newInfo->setLocation(*pos);
 	newInfo->setAngle(angle);
 	newInfo->markPriorityBuild();
-	newInfo->setSupplySiteSourceID(supplySource);
+	newInfo->setSupplySite(supplySource, requiresSupplies);
 	newInfo->setNumRebuilds(1);	 // Build once.
 	newInfo->setNextBuildList(m_pBuildList);
 	m_pBuildList = newInfo;
@@ -2713,11 +2713,11 @@ void Player::buildSpecificBuilding(const AsciiString &thingName)
 }
 
 //=============================================================================
-void Player::buildBySupplies(Int minimumCash, const AsciiString &thingName)
+void Player::buildBySupplies(Int minimumCash, const AsciiString &thingName, Bool requiresSupplies)
 {
 	if (m_ai)
 	{
-		m_ai->buildBySupplies(minimumCash, thingName);
+		m_ai->buildBySupplies(minimumCash, thingName, requiresSupplies);
 	}
 }
 

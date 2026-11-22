@@ -210,12 +210,12 @@ void AISkirmishPlayer::processBaseBuilding()
 				continue; // already built.
 			}
 			ObjectID supplySource = info->getSupplySiteSourceID();
-			if (!canBuildAtSupplySite(supplySource))
+			if (info->supplySiteRequiresSupplies() && !canBuildAtSupplySite(supplySource))
 			{
 				continue;
 			}
 			if (supplySource != INVALID_ID && curPlan->isKindOf(KINDOF_CASH_GENERATOR) &&
-				hasSupplyCenterAtSite(TheGameLogic->findObjectByID(supplySource), 0.0f, FALSE))
+				hasSupplyCenterAtSite(supplySource, nullptr, 0.0f, FALSE))
 			{
 				continue;
 			}
