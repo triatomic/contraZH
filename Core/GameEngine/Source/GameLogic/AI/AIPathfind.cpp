@@ -90,11 +90,14 @@ namespace
 	{
 		Coord3D position;
 		Real radius;
+		Real firingRadius;
 	};
 
 	typedef std::vector<TeamRouteThreat> TeamRouteThreats;
 	// The fine search and path smoothing share the same threat costs.
 	const TeamRouteThreats *s_routeThreats = nullptr;
+	enum ThreatClearance { THREAT_BUFFER, THREAT_FIRING_RANGE, THREAT_SOFT_COST };
+	ThreatClearance s_threatClearance = THREAT_SOFT_COST;
 
 	Real distanceXY(const Coord3D &from, const Coord3D &to)
 	{
@@ -130,10 +133,41 @@ namespace
 		return exposed;
 	}
 
+	Bool canCrossThreats(const TeamRouteThreats &threats, const Coord3D &from, const Coord3D &to, ThreatClearance clearance)
+	{
+		const Real dx = to.x - from.x;
+		const Real dy = to.y - from.y;
+		const Real lengthSquared = dx * dx + dy * dy;
+		if (lengthSquared == 0.0f)
+		{
+			return true;
+		}
+
+		for (TeamRouteThreats::const_iterator it = threats.begin(); it != threats.end(); ++it)
+		{
+			const Real x = it->position.x - from.x;
+			const Real y = it->position.y - from.y;
+			const Real along = x * dx + y * dy;
+			// A unit already inside a threat can move directly out of it.
+			if (along <= 0.0f)
+			{
+				continue;
+			}
+			const Real fraction = std::min(1.0f, along / lengthSquared);
+			const Real radius = clearance == THREAT_BUFFER ? it->radius : it->firingRadius;
+			if (sqr(x - fraction * dx) + sqr(y - fraction * dy) < sqr(radius))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
 	void collectTeamRouteThreats(const Object *obj, const Coord3D &destination, TeamRouteThreats &threats)
 	{
 		const Team *team = obj->getTeam();
 		Int targetMask = 0;
+		Real largestMemberRadius = 0.0f;
 		for (DLINK_ITERATOR<Object> it = team->iterate_TeamMemberList(); !it.done(); it.advance())
 		{
 			const Object *member = it.cur();
@@ -141,6 +175,7 @@ namespace
 			{
 				continue;
 			}
+			largestMemberRadius = std::max(largestMemberRadius, member->getGeometryInfo().getBoundingCircleRadius());
 			if (!member->isUsingAirborneLocomotor())
 			{
 				targetMask |= WEAPON_ANTI_GROUND;
@@ -188,7 +223,9 @@ namespace
 				continue;
 			}
 
-			const TeamRouteThreat threat = {*enemy->getPosition(), range + PATHFIND_CELL_SIZE_F};
+			const Real clearance = std::max(4.0f * PATHFIND_CELL_SIZE_F, 0.2f * range);
+			const Real footprint = enemy->getGeometryInfo().getBoundingCircleRadius() + largestMemberRadius;
+			const TeamRouteThreat threat = {*enemy->getPosition(), range + footprint + clearance, range + footprint};
 			const Real reach = threat.radius + margin;
 			if (threat.position.x >= std::min(start.x, destination.x) - reach &&
 				threat.position.x <= std::max(start.x, destination.x) + reach &&
@@ -1201,6 +1238,12 @@ void Path::computePointOnPath(
 				tryAhead = true;
 				veryClose = true;
 			}
+#if RTS_ZEROHOUR
+			if (Pathfinder::usesTeamThreatRouting(obj) && (!veryClose || offsetDist > 1.0f))
+			{
+				tryAhead = false;
+			}
+#endif
 			if (tryAhead)
 			{
 				// try next segment middle.
@@ -7688,6 +7731,22 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 				movementValid = false;
 			}
 
+#if RTS_ZEROHOUR
+			Real exposure = 0.0f;
+			if (s_routeThreats)
+			{
+				const Real offset = centerInCell ? 0.5f : 0.05f;
+				const Coord3D start = {(parentCell->getXIndex() + offset) * PATHFIND_CELL_SIZE_F,
+					(parentCell->getYIndex() + offset) * PATHFIND_CELL_SIZE_F, 0.0f};
+				const Coord3D end = {(newCellCoord.x + offset) * PATHFIND_CELL_SIZE_F,
+					(newCellCoord.y + offset) * PATHFIND_CELL_SIZE_F, 0.0f};
+				if (s_threatClearance != THREAT_SOFT_COST && !canCrossThreats(*s_routeThreats, start, end, s_threatClearance))
+				{
+					continue;
+				}
+				exposure = exposedLength(*s_routeThreats, start, end);
+			}
+#endif
 			if (movementValid && !newCell->getPinched()) {
 				//Note to self - only turn off tunneling after check for movement.jba.
 				m_isTunneling = false;
@@ -7702,16 +7761,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 
 			newCostSoFar = newCell->costSoFar( parentCell );
 #if RTS_ZEROHOUR
-			if (s_routeThreats)
-			{
-				const Real offset = centerInCell ? 0.5f : 0.05f;
-				const Coord3D start = {(parentCell->getXIndex() + offset) * PATHFIND_CELL_SIZE_F,
-					(parentCell->getYIndex() + offset) * PATHFIND_CELL_SIZE_F, 0.0f};
-				const Coord3D end = {(newCellCoord.x + offset) * PATHFIND_CELL_SIZE_F,
-					(newCellCoord.y + offset) * PATHFIND_CELL_SIZE_F, 0.0f};
-				const Real exposure = exposedLength(*s_routeThreats, start, end);
-				newCostSoFar += static_cast<UnsignedInt>(2.0f * COST_ORTHOGONAL * exposure / PATHFIND_CELL_SIZE_F);
-			}
+			newCostSoFar += static_cast<UnsignedInt>(4.0f * COST_ORTHOGONAL * exposure / PATHFIND_CELL_SIZE_F);
 #endif
 			if (info.allyMoving && dx<10 && dy<10) {
 				newCostSoFar += 3*COST_DIAGONAL;
@@ -7835,20 +7885,43 @@ Path *Pathfinder::findPathImpl( Object *obj, const LocomotorSet& locomotorSet, c
 	}
 	if (!threats.empty())
 	{
-		const TeamRouteThreats *previousThreats = s_routeThreats;
-		s_routeThreats = &threats;
-		m_zoneManager.setAllPassable();
-		Path *saferPath = internalFindPath(obj, locomotorSet, from, rawTo);
-		s_routeThreats = previousThreats;
-		if (saferPath && !didLastSearchHitCap())
+		for (Int pass = THREAT_BUFFER; pass <= THREAT_SOFT_COST; ++pass)
 		{
-			return saferPath;
+			const ThreatClearance clearance = static_cast<ThreatClearance>(pass);
+			Bool blockedDestination = false;
+			if (clearance != THREAT_SOFT_COST)
+			{
+				for (TeamRouteThreats::const_iterator it = threats.begin(); it != threats.end(); ++it)
+				{
+					const Real radius = clearance == THREAT_BUFFER ? it->radius : it->firingRadius;
+					if (distanceXY(it->position, *rawTo) < radius && distanceXY(it->position, *from) >= radius)
+					{
+						blockedDestination = true;
+						break;
+					}
+				}
+			}
+			if (blockedDestination)
+			{
+				continue;
+			}
+
+			s_routeThreats = &threats;
+			s_threatClearance = clearance;
+			m_zoneManager.setAllPassable();
+			Path *saferPath = internalFindPath(obj, locomotorSet, from, rawTo);
+			s_routeThreats = nullptr;
+			s_threatClearance = THREAT_SOFT_COST;
+			if (saferPath && !didLastSearchHitCap())
+			{
+				return saferPath;
+			}
+			if (saferPath)
+			{
+				deleteInstance(saferPath);
+			}
+			beginSearchBudget(PFS_FIND);
 		}
-		if (saferPath)
-		{
-			deleteInstance(saferPath);
-		}
-		beginSearchBudget(PFS_FIND);
 	}
 #endif
 	Int radius;

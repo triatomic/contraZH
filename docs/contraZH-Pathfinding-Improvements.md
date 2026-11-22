@@ -7,6 +7,10 @@ older replays may play differently.
 
 * **Team avoids threats** makes ordinary scripted move orders and waypoint paths favor routes with
   less exposure to visible enemy weapons that can target members of the team.
+* The threat radius includes weapon range, both units' footprints, and a buffer of 40 map units or
+  20% of weapon range, whichever is larger. Ground units first look for a route that stays outside
+  that radius, then try staying outside firing range alone. If neither search succeeds, the
+  fallback routes through exposure at a higher cost.
 * The team still follows the script's waypoint order. Units periodically check the remaining route
   and can replan the current leg if it crosses enemy fire. They keep moving if there is no safer
   route.
