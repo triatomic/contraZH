@@ -1979,9 +1979,10 @@ void AIPlayer::buildBySupplies(Int minimumCash, const AsciiString& thingName, Bo
 		return;
 	}
 
-	Object *bestSupplyWarehouse = findSupplyCenter(minimumCash, TRUE);
+	const Bool isSupplyCenter = tTemplate->isKindOf(KINDOF_CASH_GENERATOR);
+	Object *bestSupplyWarehouse = findSupplyCenter(minimumCash, isSupplyCenter);
 
-	if (!tTemplate->isKindOf(KINDOF_CASH_GENERATOR)) {
+	if (!isSupplyCenter) {
 		// Build by the current warehouse.
 		Object *curWarehouse = TheGameLogic->findObjectByID(m_curWarehouseID);
 		if (curWarehouse) {
@@ -1990,7 +1991,7 @@ void AIPlayer::buildBySupplies(Int minimumCash, const AsciiString& thingName, Bo
 	}
 
 
-	if (bestSupplyWarehouse && canBuildAtSupplySite(bestSupplyWarehouse->getID())) {
+	if (bestSupplyWarehouse && (!isSupplyCenter || canBuildAtSupplySite(bestSupplyWarehouse->getID()))) {
 		Coord3D location;
 		location = *bestSupplyWarehouse->getPosition();
 		// offset back towards the base.

@@ -533,7 +533,7 @@ void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplat
 			bestSupplyWarehouse = curWarehouse;
 		}
 	}
-	if( !bestSupplyWarehouse || !canBuildAtSupplySite(bestSupplyWarehouse->getID()) )
+	if( !bestSupplyWarehouse || (isCashGenerator && !canBuildAtSupplySite(bestSupplyWarehouse->getID())) )
 	{
 		return;
 	}
