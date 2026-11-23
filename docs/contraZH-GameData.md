@@ -1,5 +1,29 @@
 # GameData.ini
 
+## Veterancy experience defaults
+
+Set `ExperienceValueBonus_<rank>` for kill rewards and `ExperienceRequiredBonus_<rank>` for
+promotion thresholds in the `GameData` block. Both accept the suffixes `Veteran`, `Elite`,
+`Heroic`, `Four` and `Five`. The bonuses default to disabled. A negative setting disables
+a bonus and `0%` repeats the previous rank's number.
+
+```ini
+  ExperienceValueBonus_Veteran = 45%
+  ExperienceValueBonus_Elite   = 45%
+  ExperienceValueBonus_Heroic  = 45%
+  ExperienceRequiredBonus_Elite  = 45%
+  ExperienceRequiredBonus_Heroic = 45%
+```
+
+With these defaults, `ExperienceValue = 56` fills Veteran through Heroic, and
+`ExperienceRequired = 0 167` fills Elite and Heroic. Each bonus increases the previous rank's
+integer value and rounds to the nearest whole point. An omitted promotion threshold stays
+unreachable if the previous threshold is unreachable. The Veteran requirement bonus needs
+a positive Regular requirement as its base.
+
+The game applies bonuses when it reads the corresponding object field. Absolute numbers
+and [object percentages](contraZH-Objects-and-Modules.md#veterancy-experience) take precedence.
+
 ## Guard target visibility
 
 `GuardRequiresVisibility` defaults to `No`, preserving guard mode's ability to acquire

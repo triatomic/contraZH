@@ -1,5 +1,21 @@
 # Objects & Modules
 
+## Veterancy experience
+
+`ExperienceValue` and `ExperienceRequired` accept absolute numbers and percentage increases in the same list.
+
+```ini
+  ExperienceValue    = 56 +45% +45% 170
+  ExperienceRequired = 0 167 +45% +45%
+```
+
+Each percentage increases the previous rank's integer value and rounds to the nearest whole point.
+The ranks are Regular, Veteran, Elite, Heroic, Four and Five. Regular takes an absolute value.
+With the usual zero Regular requirement, Veteran also takes an absolute value.
+
+[GameData experience bonuses](contraZH-GameData.md#veterancy-experience-defaults) fill omitted ranks.
+Without a bonus for a rank, its kill reward carries forward and its promotion threshold is unreachable.
+
 ## JetAIUpdate return after unloading
 
 `ReturnToBaseAfterUnload = Yes` makes a jet return to its airfield on the next AI update after
