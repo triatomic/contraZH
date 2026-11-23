@@ -2252,6 +2252,23 @@ AIAttackMoveStateMachine::AIAttackMoveStateMachine(Object *owner, AsciiString na
 }
 
 //----------------------------------------------------------------------------------------------------------
+static void switchToHigherPriorityAircraft(AIUpdateInterface *ai, StateMachine *attackMachine)
+{
+	Object *target = attackMachine->getGoalObject();
+	if (attackMachine->getCurrentStateID() != AI_ATTACK_OBJECT || !target)
+	{
+		return;
+	}
+
+	Object *aircraft = ai->getHigherPriorityAircraft(target);
+	if (aircraft)
+	{
+		attackMachine->setGoalObject(aircraft);
+		attackMachine->setState(AI_ATTACK_OBJECT);
+	}
+}
+
+//-----------------------------------------------------------------------------------------------------------
 AIAttackMoveStateMachine::~AIAttackMoveStateMachine()
 {
 }
@@ -3977,6 +3994,7 @@ StateReturnType AIAttackMoveToState::update()
 	{
 		ai->setLocomotorGoalNone();
 		owner->clearModelConditionState(MODELCONDITION_MOVING);
+		switchToHigherPriorityAircraft(ai, m_attackMoveMachine);
 		m_attackMoveMachine->updateStateMachine();
 
 		// if the machine is now idling, then we need to attempt to get a new target
@@ -4891,6 +4909,7 @@ StateReturnType AIAttackFollowWaypointPathState::update()
 	{
 		ai->setLocomotorGoalNone();
 		owner->clearModelConditionState(MODELCONDITION_MOVING);
+		switchToHigherPriorityAircraft(ai, m_attackFollowMachine);
 		m_attackFollowMachine->updateStateMachine();
 
 		// if the machine is now idling, then we need to attempt to get a new target

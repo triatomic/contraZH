@@ -211,6 +211,16 @@ void AISkirmishPlayer::processBaseBuilding()
 			if (bldg) {
 				continue; // already built.
 			}
+			ObjectID supplySource = info->getSupplySiteSourceID();
+			if (info->supplySiteRequiresSupplies() && !canBuildAtSupplySite(supplySource))
+			{
+				continue;
+			}
+			if (supplySource != INVALID_ID && curPlan->isKindOf(KINDOF_CASH_GENERATOR) &&
+				hasSupplyCenterAtSite(supplySource, nullptr, 0.0f, FALSE))
+			{
+				continue;
+			}
 			// Make sure it is safe to build here.
 			if (!isLocationSafe(info->getLocation(), curPlan)) {
 				continue;

@@ -490,6 +490,12 @@ void ScriptEngine::initCLPTemplates()
 	curTemplate->m_uiStrings[3] = " available resources, rotated ";
 	curTemplate->m_uiStrings[4] = " degrees.\n\nNOTE:\nIf the angle is set to 361.00, randomize diagonally (45, -45, 135, -135).\nIf the angle is set to 362.00, randomize (0 - 359).";
 
+	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_SUPPLY_CENTER_ROTATED_WHILE_SUPPLIES_REMAIN];
+	*curTemplate = m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_SUPPLY_ROTATED];
+	curTemplate->m_internalName = "AI_PLAYER_BUILD_SUPPLY_CENTER_ROTATED_WHILE_SUPPLIES_REMAIN";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Rotated/Build near a supply source and rebuild while supplies remain.";
+	curTemplate->m_uiStrings[4] = " degrees. Rebuild while supplies remain.\n\nNOTE:\nIf the angle is set to 361.00, randomize diagonally (45, -45, 135, -135).\nIf the angle is set to 362.00, randomize (0 - 359).";
+
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_TYPE_ROTATED];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_TYPE_NEAREST_TYPE_ROTATED";
 	curTemplate->m_uiName = "CLP_AI/Player/AI/Rotated/AI player build nearest objectType with custom rotation.";

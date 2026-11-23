@@ -49,6 +49,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CollideModule.h"
+#include "GameLogic/Module/TunnelContain.h"
 #include "Common/TunnelTracker.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -111,15 +112,21 @@ static Bool hasAttackedMeAndICanReturnFire( State *thisState, void* /*userData*/
 
 static Object *findBestTunnel(Player *ownerPlayer, const Coord3D *pos)
 {
-	if (!ownerPlayer) return nullptr; // should never happen, but hey.  jba.
-	TunnelTracker *tunnels = ownerPlayer->getTunnelSystem();
+	TunnelTracker *tunnels = ownerPlayer ? ownerPlayer->getTunnelSystem() : nullptr;
+	if (!tunnels)
+	{
+		return nullptr;
+	}
 	Object *bestTunnel = nullptr;
 	Real bestDistSqr = 0;
 	const std::list<ObjectID> *allTunnels = tunnels->getContainerList();
 	for( std::list<ObjectID>::const_iterator iter = allTunnels->begin(); iter != allTunnels->end(); iter++ ) {
-		// For each ID, look it up and change its team.  We all get captured together.
 		Object *currentTunnel = TheGameLogic->findObjectByID( *iter );
-		if( currentTunnel ) {
+		ContainModuleInterface *contain = currentTunnel ? currentTunnel->getContain() : nullptr;
+		if (contain && contain->isTunnelContain() &&
+			currentTunnel->getControllingPlayer() == ownerPlayer &&
+			static_cast<TunnelContain *>(contain)->canUseNetworkExit())
+		{
 			Real dx = currentTunnel->getPosition()->x-pos->x;
 			Real dy = currentTunnel->getPosition()->y-pos->y;
 			Real distSqr = dx*dx+dy*dy;
@@ -741,9 +748,11 @@ StateReturnType AITNGuardIdleState::update()
 		}
 		if (getMachineOwner()->getContainedBy()) {
 			Object *bestTunnel = findBestTunnel(owner->getControllingPlayer(), nemesis->getPosition());
-			ExitInterface* goalExitInterface = bestTunnel->getContain() ? bestTunnel->getContain()->getContainExitInterface() : nullptr;
-			if( goalExitInterface == nullptr )
-				return STATE_FAILURE;
+			ExitInterface *goalExitInterface = bestTunnel ? bestTunnel->getContain()->getContainExitInterface() : nullptr;
+			if (!goalExitInterface)
+			{
+				return STATE_SLEEP(m_nextEnemyScanTime - now);
+			}
 
 			if( goalExitInterface->isExitBusy() )
 				return STATE_SLEEP(0);// Just wait a sec.

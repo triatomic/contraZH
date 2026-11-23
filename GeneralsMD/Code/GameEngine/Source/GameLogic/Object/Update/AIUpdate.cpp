@@ -5668,6 +5668,71 @@ void AIUpdateInterface::setLoadFactors(Real speed, Real turnRate, Real accel, Re
 
 
 //----------------------------------------------------------------------------------------------
+class PartitionFilterAttackMoveAircraft : public PartitionFilter
+{
+public:
+	PartitionFilterAttackMoveAircraft(const Object *source, const AttackPriorityInfo *priorities = nullptr, Int minimumPriority = 0) :
+		m_source(source), m_priorities(priorities), m_minimumPriority(minimumPriority) {}
+
+	virtual Bool allow(Object *target) override
+	{
+		if (!target->isKindOf(KINDOF_AIRCRAFT) || !target->isAirborneTarget())
+		{
+			return m_priorities == nullptr;
+		}
+		if (m_priorities && !target->isSignificantlyAboveTerrain() &&
+			TheAI->getAiData()->m_attackUsesLineOfSight && m_source->isKindOf(KINDOF_ATTACK_NEEDS_LINE_OF_SIGHT))
+		{
+			PartitionFilterLineOfSight lineOfSight(m_source);
+			if (!lineOfSight.allow(target))
+			{
+				return FALSE;
+			}
+		}
+		return (!m_priorities || m_priorities->getPriority(target->getTemplate()) > m_minimumPriority) &&
+			m_source->getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, target, CMD_FROM_AI) == ATTACKRESULT_POSSIBLE;
+	}
+
+#if defined(RTS_DEBUG)
+	virtual const char *debugGetName() override { return "PartitionFilterAttackMoveAircraft"; }
+#endif
+
+private:
+	const Object *m_source;
+	const AttackPriorityInfo *m_priorities;
+	Int m_minimumPriority;
+};
+
+//----------------------------------------------------------------------------------------------
+Object *AIUpdateInterface::getHigherPriorityAircraft(const Object *groundTarget)
+{
+	Object *obj = getObject();
+	const AttackPriorityInfo *priorities = getAttackInfo();
+	if (obj->getControllingPlayer()->getPlayerType() != PLAYER_COMPUTER || !priorities ||
+		priorities == TheScriptEngine->getDefaultAttackInfo() ||
+		(groundTarget->isKindOf(KINDOF_AIRCRAFT) && groundTarget->isAirborneTarget()) ||
+		isFireSuppressedByHoldFire() || obj->testStatus(OBJECT_STATUS_IS_USING_ABILITY))
+	{
+		return nullptr;
+	}
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	if (now < m_nextMoodCheckTime)
+	{
+		return nullptr;
+	}
+	m_nextMoodCheckTime = now + getAIUpdateModuleData()->m_moodAttackCheckRate;
+
+	const Real range = TheAI->getAdjustedVisionRangeForObject(obj, AI_VISIONFACTOR_OWNERTYPE | AI_VISIONFACTOR_MOOD);
+	if (range <= 0.0f)
+	{
+		return nullptr;
+	}
+	PartitionFilterAttackMoveAircraft aircraft(obj, priorities, priorities->getPriority(groundTarget->getTemplate()));
+	return TheAI->findClosestEnemy(obj, range, AI::CAN_ATTACK | AI::ATTACK_BUILDINGS, priorities, &aircraft);
+}
+
+//----------------------------------------------------------------------------------------------
 /**
  * Return the next object that our mood suggests we should attack.
  */
@@ -5739,6 +5804,13 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 
 	UnsignedInt now = TheGameLogic->getFrame();
 
+	// The attack approach state refuses to chase aircraft on these orders.
+	const AIStateType state = getAIStateType();
+	const Bool requireAircraftInRange = obj->getControllingPlayer()->getPlayerType() == PLAYER_COMPUTER &&
+		(state == AI_ATTACK_MOVE_TO || state == AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS ||
+			state == AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM);
+	PartitionFilterAttackMoveAircraft attackMoveAircraft(obj);
+
 	// Check if team auto targets same victim.
 	Object *teamVictim = nullptr;
 	if (calledByAI && obj->getTeam()->getPrototype()->getTemplateInfo()->m_attackCommonTarget)
@@ -5753,8 +5825,11 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 			}
 		}
 
-		if (teamVictim && getAttitude()>=ATTITUDE_NORMAL)
+		if (teamVictim && getAttitude() >= ATTITUDE_NORMAL &&
+			(!requireAircraftInRange || attackMoveAircraft.allow(teamVictim)))
+		{
 			return teamVictim;
+		}
 	}
 
 	DEBUG_ASSERTCRASH(m_nextMoodCheckTime != 0, ("m_nextMoodCheckTime should never be zero here."));
@@ -5801,7 +5876,8 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 		//Do not allow units that healed me to get acquired! They are our friends!!!
 		if( bmi->getLastDamageInfo()->in.m_damageType != DAMAGE_HEALING )
 		{
-			return TheGameLogic->findObjectByID(bmi->getLastDamageInfo()->in.m_sourceID);
+			Object *attacker = TheGameLogic->findObjectByID(bmi->getLastDamageInfo()->in.m_sourceID);
+			return attacker && (!requireAircraftInRange || attackMoveAircraft.allow(attacker)) ? attacker : nullptr;
 		}
 	}
 	UnsignedInt flags = AI::CAN_ATTACK;
@@ -5838,7 +5914,8 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 		flags |= AI::UNFOGGED;
 	}
 
-	Object *newVictim = TheAI->findClosestEnemy(obj, rangeToFindWithin, flags, getAttackInfo());
+	Object *newVictim = TheAI->findClosestEnemy(obj, rangeToFindWithin, flags, getAttackInfo(),
+		requireAircraftInRange ? &attackMoveAircraft : nullptr);
 
 /*
 DEBUG_LOG(("GNMT frame %d: %s %08lx (con %s %08lx) uses range %f, flags %08lx, %s finds %s %08lx",
@@ -6389,9 +6466,8 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	xfer->xferAsciiString(&attackName);
 	if (xfer->getXferMode() == XFER_LOAD)
 	{
-		if (attackName.isNotEmpty()) {
-			m_attackInfo = TheScriptEngine->getAttackInfo(attackName);
-		}
+		// The script engine restores the priority tables after the units are read.
+		m_attackInfoNameOnLoad = attackName;
 	}
 
 	xfer->xferInt(&m_waypointCount);
@@ -6648,6 +6724,12 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 void AIUpdateInterface::loadPostProcess()
 {
 	UpdateModule::loadPostProcess();
+
+	if (m_attackInfoNameOnLoad.isNotEmpty())
+	{
+		m_attackInfo = TheScriptEngine->getAttackInfo(m_attackInfoNameOnLoad);
+		m_attackInfoNameOnLoad.clear();
+	}
 
 	if (m_fixLocoInPostProcess && m_curLocomotorSet!=LOCOMOTORSET_INVALID)
 	{

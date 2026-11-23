@@ -122,6 +122,29 @@ Upgrade commands check funds, required sciences and queue space. A command that 
 checks must be issued again. Special powers still fire regardless of their timer, required
 science and cost, as in retail.
 
+## AI anti-air units keep moving between shots
+
+AI units following attack waypoints or attack-moving keep moving past aircraft outside
+weapon range. They stop to fire at aircraft in range, and can switch away from a lower
+priority ground target. Saved units regain their scripted attack priorities on load.
+
+## Tunnel evacuation requires an open endpoint
+
+AI tunnel guards and evacuation orders use completed, registered tunnel entrances.
+An unfinished entrance cannot unload units from the shared network.
+
+## AI supply sites track their warehouse
+
+The standard and rotated supply placement actions can rebuild after their warehouse runs
+dry, so the first supply center can keep unlocking prerequisite buildings. Use **Build
+near a supply source and rebuild while supplies remain** for expansion centers. Its
+standard and rotated versions skip rebuilding when the selected warehouse is empty,
+missing, or enemy-owned.
+
+A planned rebuild reserves its warehouse so placement scripts look for another site.
+The warehouse and rebuild rule survive save and load. Older saves without a warehouse
+association use the planned center's position to check reservations.
+
 ## AI supply sources respect allied bases
 
 AI supply construction skips sources already occupied by another player's supply center or

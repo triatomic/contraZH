@@ -1136,11 +1136,11 @@ void ScriptActions::doBuildBuilding(const AsciiString& buildingType)
 //-------------------------------------------------------------------------------------------------
 /** doBuildSupplyCenter */
 //-------------------------------------------------------------------------------------------------
-void ScriptActions::doBuildSupplyCenter(const AsciiString& player, const AsciiString& buildingType, Int cash)
+void ScriptActions::doBuildSupplyCenter(const AsciiString& player, const AsciiString& buildingType, Int cash, Bool requiresSupplies)
 {
 	Player* thePlayer = TheScriptEngine->getPlayerFromAsciiString(player);
 	if (thePlayer) {
-		thePlayer->buildBySupplies(cash, buildingType);
+		thePlayer->buildBySupplies(cash, buildingType, requiresSupplies);
 	}
 }
 
@@ -6791,7 +6791,9 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			doBuildBuilding(pAction->getParameter(0)->getString());
 			return;
 		case ScriptAction::AI_PLAYER_BUILD_SUPPLY_CENTER:
-			doBuildSupplyCenter(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getInt());
+		case ScriptAction::AI_PLAYER_BUILD_SUPPLY_CENTER_WHILE_SUPPLIES_REMAIN:
+			doBuildSupplyCenter(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getInt(),
+				pAction->getActionType() == ScriptAction::AI_PLAYER_BUILD_SUPPLY_CENTER_WHILE_SUPPLIES_REMAIN);
 			return;
 		case ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_TEAM:
 			doBuildObjectNearestTeam( pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getString() );

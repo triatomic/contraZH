@@ -298,6 +298,10 @@ protected:
 	ObjectID m_objectID;								///< the object on the map instantiated by this info
 	UnsignedInt m_objectTimestamp;			///< frame when object was built
 	Bool		 m_underConstruction;				///< True if being constructed by dozer.
+#if RTS_ZEROHOUR
+	ObjectID m_supplySiteSourceID;
+	Bool m_supplySiteRequiresSupplies;
+#endif
 	ObjectID m_resourceGatherers[MAX_RESOURCE_GATHERERS];	///< gatherers for this supply center type building.
 	Bool		 m_isSupplyBuilding;				///< Uses gatherers to get supplies.
 	Int			 m_desiredGatherers;				///< Number of gatherers desired.
@@ -355,6 +359,15 @@ public:
 	void setUnderConstruction(Bool construction) { m_underConstruction=construction;}
 	void markPriorityBuild() {m_priorityBuild = true; }
 	Bool isPriorityBuild() {return m_priorityBuild;}
+#if RTS_ZEROHOUR
+	ObjectID getSupplySiteSourceID() const { return m_supplySiteSourceID; }
+	Bool supplySiteRequiresSupplies() const { return m_supplySiteRequiresSupplies; }
+	void setSupplySite(ObjectID id, Bool requiresSupplies)
+	{
+		m_supplySiteSourceID = id;
+		m_supplySiteRequiresSupplies = requiresSupplies;
+	}
+#endif
 	Bool isAutomaticBuild() {return m_automaticallyBuild;}
 	void setExactPositionOnly(Bool exact) {m_exactPositionOnly = exact;}
 	Bool isExactPositionOnly() const {return m_exactPositionOnly;}

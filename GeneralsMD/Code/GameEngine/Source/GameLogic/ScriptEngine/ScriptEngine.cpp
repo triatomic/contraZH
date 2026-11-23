@@ -925,6 +925,12 @@ void ScriptEngine::init()
 	curTemplate->m_uiStrings[2] = " near a supply source with at least ";
 	curTemplate->m_uiStrings[3] = " available resources.";
 
+	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_SUPPLY_CENTER_WHILE_SUPPLIES_REMAIN];
+	*curTemplate = m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_SUPPLY_CENTER];
+	curTemplate->m_internalName = "AI_PLAYER_BUILD_SUPPLY_CENTER_WHILE_SUPPLIES_REMAIN";
+	curTemplate->m_uiName = "Player_/AI/Build near a supply source and rebuild while supplies remain.";
+	curTemplate->m_uiStrings[3] = " available resources and rebuild while supplies remain.";
+
   curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_TEAM];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_TYPE_NEAREST_TEAM";
 	curTemplate->m_uiName = "Player_/AI/AI player build nearest specified team.";
