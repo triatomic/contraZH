@@ -153,6 +153,8 @@ public:
 	// Color access
 	DynamicVectorClass<unsigned long> &	Get_Color_Array ()	{ return Colors; }
 
+	int	Get_Vertex_Count() const	{ return Vertices.Count(); }
+
 	// statics to access the Screen Resolution in Pixels
 	static void	Set_Screen_Resolution( const RectClass & screen );
 	static const RectClass & Get_Screen_Resolution()			{ return ScreenResolution; }

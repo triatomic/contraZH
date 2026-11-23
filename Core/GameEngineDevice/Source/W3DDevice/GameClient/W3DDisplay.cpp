@@ -739,7 +739,10 @@ void W3DDisplay::setup2DRenderState(TextureClass *tex, DrawImageMode mode, Bool 
 {
 	if (m_isBatching)
 	{
-		if (!m_batchNeedsInit && m_batchTexture == tex && m_batchMode == mode && m_batchGrayscale == grayscale)
+		// 16-bit indices address 65536 vertices, so a full batch draws before it takes more
+		const Int MAX_BATCH_VERTICES = 65536 - 256;
+		if (!m_batchNeedsInit && m_batchTexture == tex && m_batchMode == mode && m_batchGrayscale == grayscale &&
+			m_2DRender && m_2DRender->Get_Vertex_Count() < MAX_BATCH_VERTICES)
 		{
 			return;
 		}
