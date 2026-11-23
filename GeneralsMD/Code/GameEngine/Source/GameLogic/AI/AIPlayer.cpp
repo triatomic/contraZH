@@ -284,11 +284,20 @@ void AIPlayer::queueSupplyTruck()
 			continue;
 		}
 		SupplyTruckAIInterface *supplyAI = unit->getAI()->getSupplyTruckAIInterface();
-		if (!supplyAI ||
-			(!supplyAI->isCurrentlyFerryingSupplies() && !supplyAI->isForcedIntoWantingState()) ||
-			resources->getWorkerSupplyTruck(unit))
+		if (!supplyAI || resources->getWorkerSupplyTruck(unit))
 		{
 			continue;
+		}
+		if (!supplyAI->isOnSupplyAutopilot() && !supplyAI->isForcedIntoWantingState())
+		{
+			// A worker without a preferred dock is serving as a dozer, since dozer tasks clear it.
+			DozerAIInterface *dozerAI = unit->getAI()->getDozerAIInterface();
+			if (!unit->getAI()->isIdle() || !supplyAI->isAvailableForSupplying() ||
+				(dozerAI && (dozerAI->isAnyTaskPending() || supplyAI->getPreferredDockID() == INVALID_ID)))
+			{
+				continue;
+			}
+			supplyAI->setForceWantingState(TRUE);
 		}
 
 		ObjectID preferredDock = supplyAI->getPreferredDockID();

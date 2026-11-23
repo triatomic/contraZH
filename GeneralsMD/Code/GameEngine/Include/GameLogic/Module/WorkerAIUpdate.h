@@ -195,6 +195,7 @@ public:
 
 	virtual Bool isAvailableForSupplying() const override;
 	virtual Bool isCurrentlyFerryingSupplies() const override;
+	virtual Bool isOnSupplyAutopilot() const override;
 	virtual Real getWarehouseScanDistance() const override; ///< How far can I look for a warehouse?
 
 	virtual void setForceBusyState(Bool v) override { m_forcedBusyPending = v; }

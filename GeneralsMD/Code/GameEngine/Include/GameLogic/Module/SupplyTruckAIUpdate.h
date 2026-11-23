@@ -169,6 +169,7 @@ public:
 	// if the AI is idle, but subclasses might add further restrictions.
 	virtual Bool isAvailableForSupplying() const = 0;
 	virtual Bool isCurrentlyFerryingSupplies() const = 0;
+	virtual Bool isOnSupplyAutopilot() const = 0; ///< Ferrying, or regrouping before the next try
 	virtual Real getWarehouseScanDistance() const = 0; ///< How far can I look for a warehouse?
 
 	virtual void setForceWantingState(Bool v) = 0;
@@ -207,6 +208,7 @@ public:
 	// prevent supply-ferry behavior in some cases (eg, when toting passengers)
 	virtual Bool isAvailableForSupplying() const override;
 	virtual Bool isCurrentlyFerryingSupplies() const override;
+	virtual Bool isOnSupplyAutopilot() const override;
 	virtual Real getWarehouseScanDistance() const override; ///< How far can I look for a warehouse?
 
 	virtual void setForceWantingState(Bool v) override { m_forcePending = v; } // When a Supply Center creates us (or maybe other sources later), we need to hop into autopilot mode.
