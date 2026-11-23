@@ -249,6 +249,7 @@ set(WORLDBUILDER_SRC
     "include/SplashScreen.h"
     "include/StdAfx.h"
     "include/TeamBehavior.h"
+    "include/TeamHitAndRunOptions.h"
     "include/TeamGeneric.h"
     "include/TeamIdentity.h"
     "include/TeamReinforcement.h"

@@ -406,6 +406,11 @@
 #define IDC_CHECK5                      1171
 #define IDC_AVOID_THREATS               1171
 #define IDC_TEAM_HIT_AND_RUN            3900
+#define IDC_TEAM_HIT_AND_RUN_RELOAD     3901
+#define IDC_TEAM_HIT_AND_RUN_TIMER      3902
+#define IDC_TEAM_HIT_AND_RUN_RELOAD_PCT 3903
+#define IDC_TEAM_HIT_AND_RUN_DELAY      3904
+#define IDC_TEAM_HIT_AND_RUN_RETREAT    3905
 #define IDC_CLEANSCRIPTNAME             1171
 #define IDC_WARNINGS_CAPTION            1172
 #define IDC_CHECK6                      1172

@@ -371,7 +371,7 @@ protected:
 	}
 
 private:
-	void startNextLeg(const Team *team)
+	void startNextLeg(Team *team)
 	{
 		while (const Coord3D *point = team->getHitAndRunRetreatPoint(m_leg))
 		{
@@ -385,6 +385,7 @@ private:
 			}
 			stopMoving(EXIT_NORMAL);
 		}
+		team->notifyHitAndRunRetreatFinished(getMachineOwner()->getID());
 	}
 
 	void returnFire()
@@ -1072,7 +1073,7 @@ StateReturnType AIStateMachine::updateStateMachine()
 		const Bool wasRetreating = getTemporaryState() == AI_HIT_AND_RUN_RETREAT;
 		// execute this state
 		StateReturnType status = m_temporaryState->update();
-		if (m_temporaryStateFramEnd < TheGameLogic->getFrame()) {
+		if (!wasRetreating && m_temporaryStateFramEnd < TheGameLogic->getFrame()) {
 			// ran out of time.
 			if (status == STATE_CONTINUE) {
 				status = STATE_SUCCESS;

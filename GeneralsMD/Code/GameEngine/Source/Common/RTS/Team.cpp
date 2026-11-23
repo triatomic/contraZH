@@ -721,6 +721,13 @@ TeamTemplateInfo::TeamTemplateInfo(Dict *d) :
 
 	m_transportsReturn	= d->getBool(TheKey_teamTransportsReturn, &exists);
 	m_hitAndRun = d->getBool(TheKey_teamHitAndRun, &exists);
+	m_hitAndRunUseTimer = d->getBool(TheKey_teamHitAndRunUseTimer, &exists);
+	const Int retreatPercent = d->getInt(TheKey_teamHitAndRunRetreatPercent, &exists);
+	m_hitAndRunRetreatPercent = exists ? std::max(1, std::min(100, retreatPercent)) : HIT_AND_RUN_DEFAULT_PERCENT;
+	const Int reloadPercent = d->getInt(TheKey_teamHitAndRunReloadPercent, &exists);
+	m_hitAndRunReloadPercent = exists ? std::max(1, std::min(100, reloadPercent)) : HIT_AND_RUN_DEFAULT_PERCENT;
+	const Int delay = d->getInt(TheKey_teamHitAndRunDelaySeconds, &exists);
+	m_hitAndRunDelaySeconds = exists ? std::max(0, std::min((Int)HIT_AND_RUN_MAX_DELAY, delay)) : HIT_AND_RUN_DEFAULT_DELAY;
 	m_avoidThreats = d->getBool(TheKey_teamAvoidThreats, &exists);
 
 	m_attackCommonTarget = d->getBool(TheKey_teamAttackCommonTarget, &exists);
@@ -1312,6 +1319,7 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
 	m_hitAndRun(proto->getTemplateInfo()->m_hitAndRun),
 	m_hitAndRunRetreating(false),
 	m_hitAndRunRetreatMinEnd(0),
+	m_hitAndRunTimerStart(0),
 	m_hitAndRunRetreatPointCount(0),
 	m_active(false),
 	m_seeEnemy(false),
@@ -1836,6 +1844,7 @@ void Team::setHitAndRun(Bool enabled)
 		m_hitAndRun = enabled;
 		m_hitAndRunRetreating = false;
 		m_hitAndRunShots.clear();
+		m_hitAndRunFinishedRetreat.clear();
 	}
 }
 
@@ -1845,6 +1854,14 @@ void Team::recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil)
 	{
 		UnsignedInt &lastReload = m_hitAndRunShots[member];
 		lastReload = std::max(lastReload, reloadUntil);
+	}
+}
+
+void Team::notifyHitAndRunRetreatFinished(ObjectID member)
+{
+	if (m_hitAndRunRetreating && m_proto->getTemplateInfo()->m_hitAndRunUseTimer)
+	{
+		m_hitAndRunFinishedRetreat.insert(member);
 	}
 }
 
@@ -1888,12 +1905,23 @@ void Team::updateHitAndRun()
 	Int attackers = 0;
 	Int fired = 0;
 	Int reloaded = 0;
+	Bool allFinishedRetreat = true;
+	const TeamTemplateInfo *info = m_proto->getTemplateInfo();
 	Bool engaged = false;
 	const Waypoint *previousWaypoint = nullptr;
 	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
 		Object *obj = iter.cur();
-		if (!canHitAndRun(obj) || obj->getLargestWeaponRange() < 0.0f)
+		if (!canHitAndRun(obj))
+		{
+			continue;
+		}
+		if (m_hitAndRunRetreating && info->m_hitAndRunUseTimer &&
+			m_hitAndRunFinishedRetreat.find(obj->getID()) == m_hitAndRunFinishedRetreat.end())
+		{
+			allFinishedRetreat = false;
+		}
+		if (obj->getLargestWeaponRange() < 0.0f)
 		{
 			continue;
 		}
@@ -1920,17 +1948,34 @@ void Team::updateHitAndRun()
 		}
 	}
 
-	const Int required = (attackers + 1) / 2;
 	if (m_hitAndRunRetreating)
 	{
-		if (fired == 0 || (now >= m_hitAndRunRetreatMinEnd && reloaded >= std::min(fired, required)))
+		Bool ready;
+		if (info->m_hitAndRunUseTimer)
+		{
+			if (allFinishedRetreat && m_hitAndRunTimerStart == 0)
+			{
+				m_hitAndRunTimerStart = now;
+			}
+			ready = m_hitAndRunTimerStart != 0 &&
+				now - m_hitAndRunTimerStart >= (UnsignedInt)(info->m_hitAndRunDelaySeconds * LOGICFRAMES_PER_SECOND);
+		}
+		else
+		{
+			const Int reloadRequired = (attackers * info->m_hitAndRunReloadPercent + 99) / 100;
+			ready = reloaded >= std::min(fired, reloadRequired);
+		}
+
+		if (attackers == 0 || (now >= m_hitAndRunRetreatMinEnd && ready))
 		{
 			m_hitAndRunRetreating = false;
 			m_hitAndRunShots.clear();
+			m_hitAndRunFinishedRetreat.clear();
 		}
 		return;
 	}
 
+	const Int required = (attackers * info->m_hitAndRunRetreatPercent + 99) / 100;
 	if (fired == 0 || (!engaged && fired < required))
 	{
 		m_hitAndRunShots.clear();
@@ -1985,6 +2030,8 @@ void Team::updateHitAndRun()
 
 	m_hitAndRunRetreating = true;
 	m_hitAndRunRetreatMinEnd = now + 1;
+	m_hitAndRunTimerStart = 0;
+	m_hitAndRunFinishedRetreat.clear();
 	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
 		if (canHitAndRun(iter.cur()))
@@ -2767,7 +2814,7 @@ void Team::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 4;
+	XferVersion currentVersion = 5;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2940,6 +2987,30 @@ void Team::xfer( Xfer *xfer )
 				ObjectID id = it->first;
 				xfer->xferObjectID(&id);
 				xfer->xferUnsignedInt(&it->second);
+			}
+		}
+		if (version >= 5)
+		{
+			xfer->xferUnsignedInt(&m_hitAndRunTimerStart);
+			UnsignedInt count = m_hitAndRunFinishedRetreat.size();
+			xfer->xferUnsignedInt(&count);
+			if (xfer->getXferMode() == XFER_LOAD)
+			{
+				m_hitAndRunFinishedRetreat.clear();
+				for (UnsignedInt i = 0; i < count; ++i)
+				{
+					ObjectID id = INVALID_ID;
+					xfer->xferObjectID(&id);
+					m_hitAndRunFinishedRetreat.insert(id);
+				}
+			}
+			else
+			{
+				for (std::set<ObjectID>::const_iterator it = m_hitAndRunFinishedRetreat.begin(); it != m_hitAndRunFinishedRetreat.end(); ++it)
+				{
+					ObjectID id = *it;
+					xfer->xferObjectID(&id);
+				}
 			}
 		}
 	}

@@ -146,7 +146,12 @@ public:
 	Bool							m_isPerimeterDefense;					///< True if is a perimeter base defense team.
 	Bool							m_automaticallyReinforce;			///< True is team automatically tries to reinforce.
 	Bool							m_transportsReturn;						///< True if transports return to base after unloading.
+	enum { HIT_AND_RUN_DEFAULT_PERCENT = 50, HIT_AND_RUN_DEFAULT_DELAY = 5, HIT_AND_RUN_MAX_DELAY = 600 };
 	Bool							m_hitAndRun;
+	Bool							m_hitAndRunUseTimer;
+	Int							m_hitAndRunRetreatPercent;
+	Int							m_hitAndRunReloadPercent;
+	Int							m_hitAndRunDelaySeconds;
 	Bool							m_avoidThreats;								///< True if the team avoids threats.
 	Bool							m_attackCommonTarget;					///< True if the team attacks the same target unit.
 	Int								m_maxInstances;								///< Maximum number of instances of a team that is not singleton.
@@ -201,6 +206,8 @@ private:
 	Bool					m_hitAndRun;
 	Bool					m_hitAndRunRetreating;
 	UnsignedInt			m_hitAndRunRetreatMinEnd;
+	UnsignedInt			m_hitAndRunTimerStart;
+	std::set<ObjectID>	m_hitAndRunFinishedRetreat;
 	enum { HIT_AND_RUN_RETREAT_POINTS = 3 };
 	Coord3D				m_hitAndRunRetreatPoints[HIT_AND_RUN_RETREAT_POINTS];
 	Int					m_hitAndRunRetreatPointCount;
@@ -305,6 +312,7 @@ public:
 	void setHitAndRun(Bool enabled);
 	static Bool canHitAndRun(const Object *obj);
 	void recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil);
+	void notifyHitAndRunRetreatFinished(ObjectID member);
 	const Coord3D *getHitAndRunRetreatPoint(Int leg = 0) const
 	{
 		return m_hitAndRunRetreating && leg >= 0 && leg < m_hitAndRunRetreatPointCount ? &m_hitAndRunRetreatPoints[leg] : nullptr;

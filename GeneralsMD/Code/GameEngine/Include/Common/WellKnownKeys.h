@@ -341,6 +341,10 @@ DEFINE_KEY(teamTransportsReturn)
 */
 DEFINE_KEY(teamAvoidThreats)
 DEFINE_KEY(teamHitAndRun)
+DEFINE_KEY(teamHitAndRunRetreatPercent)
+DEFINE_KEY(teamHitAndRunReloadPercent)
+DEFINE_KEY(teamHitAndRunDelaySeconds)
+DEFINE_KEY(teamHitAndRunUseTimer)
 
 /**
 	Which: Team

@@ -298,6 +298,29 @@ void WBQtTeamSheetDialogClassic::setupBehaviorTab()
 	bindCheck(page, IDC_TRANSPORTS_RETURN, m_ui->transportsReturnCheck);
 	bindCheck(page, IDC_AVOID_THREATS, m_ui->avoidThreatsCheck);
 	bindCheck(page, IDC_TEAM_HIT_AND_RUN, m_ui->hitAndRunCheck);
+	m_ui->hitAndRunCheck->setToolTip(tr("Withdraw after a volley, then resume using the selected readiness rule."));
+	bindEdit(page, IDC_TEAM_HIT_AND_RUN_RELOAD_PCT, m_ui->hitAndRunReloadEdit, WB_QT_TEAMNOTIFY_KILLFOCUS);
+	bindEdit(page, IDC_TEAM_HIT_AND_RUN_DELAY, m_ui->hitAndRunDelayEdit, WB_QT_TEAMNOTIFY_KILLFOCUS);
+	bindEdit(page, IDC_TEAM_HIT_AND_RUN_RETREAT, m_ui->hitAndRunRetreatEdit, WB_QT_TEAMNOTIFY_KILLFOCUS);
+	const bool useTimer = WBQtTeamPage_GetCheck(page, IDC_TEAM_HIT_AND_RUN_TIMER) != 0;
+	m_ui->hitAndRunTimerRadio->setChecked(useTimer);
+	m_ui->hitAndRunReloadRadio->setChecked(!useTimer);
+	const auto updateHitAndRunControls = [this]()
+	{
+		const bool enabled = m_ui->hitAndRunCheck->isChecked();
+		const bool timer = m_ui->hitAndRunTimerRadio->isChecked();
+		m_ui->hitAndRunReloadRadio->setEnabled(enabled);
+		m_ui->hitAndRunTimerRadio->setEnabled(enabled);
+		m_ui->hitAndRunReloadEdit->setEnabled(enabled && !timer);
+		m_ui->hitAndRunDelayEdit->setEnabled(enabled && timer);
+	};
+	connect(m_ui->hitAndRunCheck, &QCheckBox::toggled, this, updateHitAndRunControls);
+	connect(m_ui->hitAndRunTimerRadio, &QRadioButton::toggled, this, [page, updateHitAndRunControls](bool on)
+	{
+		WBQtTeamPage_SetCheck(page, IDC_TEAM_HIT_AND_RUN_TIMER, on ? 1 : 0);
+		updateHitAndRunControls();
+	});
+	updateHitAndRunControls();
 	bindCombo(page, IDC_ENEMY_INTERACTIONS, readComboItems(page, IDC_ENEMY_INTERACTIONS), m_ui->enemyInteractionsCombo, WB_QT_TEAMNOTIFY_SELCHANGE);
 	bindCheck(page, IDC_ATTACK_COMMON_TARGET, m_ui->attackCommonTargetCheck);
 }
