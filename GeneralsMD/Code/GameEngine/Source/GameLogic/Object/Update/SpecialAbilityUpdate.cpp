@@ -288,6 +288,31 @@ UpdateSleepTime SpecialAbilityUpdate::update()
   }
 
 
+  SpecialPowerType powerType = data->m_specialPowerTemplate->getSpecialPowerType();
+  if (m_packingState != STATE_PACKING &&
+      (powerType == SPECIAL_INFANTRY_CAPTURE_BUILDING || powerType == SPECIAL_BLACKLOTUS_CAPTURE_BUILDING))
+  {
+    const Object *target = TheGameLogic->findObjectByID(m_targetID);
+    if (!target || target->getControllingPlayer() == getObject()->getControllingPlayer() ||
+        getObject()->getRelationship(target) == ALLIES)
+    {
+      ai->aiIdle(CMD_FROM_AI);
+      onExit(false);
+      return calcSleepTime();
+    }
+  }
+
+  if (m_packingState != STATE_PACKING && powerType == SPECIAL_BLACKLOTUS_STEAL_CASH_HACK)
+  {
+    const Object *target = TheGameLogic->findObjectByID(m_targetID);
+    if (!target || target->isEffectivelyDead() || target->isKindOf(KINDOF_REBUILD_HOLE))
+    {
+      ai->aiIdle(CMD_FROM_AI);
+      onExit(false);
+      return calcSleepTime();
+    }
+  }
+
   //STEP 2 & 5(6) -- Handles packing and unpacking in progress. If packing
   //then ends the special ability once complete. Things that don't pack
   //will never be handled, nor do things that aren't in a packing state.
@@ -309,8 +334,6 @@ UpdateSleepTime SpecialAbilityUpdate::update()
         shouldAbort = TRUE;
       else switch (data->m_specialPowerTemplate->getSpecialPowerType())
       {
-        case SPECIAL_INFANTRY_CAPTURE_BUILDING:
-        case SPECIAL_BLACKLOTUS_CAPTURE_BUILDING:
         case SPECIAL_HACKER_DISABLE_BUILDING:
         {
           if (target->getTeam() == getObject()->getTeam())
@@ -320,6 +343,8 @@ UpdateSleepTime SpecialAbilityUpdate::update()
           }
           FALLTHROUGH; //deliberately falling through...
         }
+        case SPECIAL_INFANTRY_CAPTURE_BUILDING:
+        case SPECIAL_BLACKLOTUS_CAPTURE_BUILDING:
         case SPECIAL_BLACKLOTUS_STEAL_CASH_HACK:
         case SPECIAL_BOOBY_TRAP:
         {
@@ -859,7 +884,7 @@ void SpecialAbilityUpdate::startPacking(Bool success)
   if (ai)
     ai->aiBusy(CMD_FROM_AI);
 
-  if (success)
+  if (success && data->m_specialPowerTemplate->getSpecialPowerType() != SPECIAL_BLACKLOTUS_STEAL_CASH_HACK)
   {
     AudioEventRTS event;
     switch( data->m_specialPowerTemplate->getSpecialPowerType() )
@@ -873,9 +898,6 @@ void SpecialAbilityUpdate::startPacking(Bool success)
       case SPECIAL_BLACKLOTUS_CONTROL_VEHICLE_HACK:
       case SPECIAL_BLACKLOTUS_DISABLE_VEHICLE_HACK:
         event = *getObject()->getTemplate()->getPerUnitSound( "VoiceDisableVehicleComplete" );
-        break;
-      case SPECIAL_BLACKLOTUS_STEAL_CASH_HACK:
-        event = *getObject()->getTemplate()->getPerUnitSound( "VoiceStealCashComplete" );
         break;
       default:
         event = *getObject()->getTemplate()->getVoiceTaskComplete();
@@ -1668,6 +1690,11 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
           //Steal the cash
           targetMoney->withdraw( cash );
           objectMoney->deposit( cash );
+
+          AudioEventRTS event = *object->getTemplate()->getPerUnitSound( "VoiceStealCashComplete" );
+          event.setObjectID( object->getID() );
+          TheAudio->addAudioEvent( &event );
+
           Player* controller = object->getControllingPlayer();
           if (controller)
             controller->getScoreKeeper()->addMoneyEarned( cash );

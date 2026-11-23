@@ -41,3 +41,10 @@ void INI::parseCommandSetDefinition( INI *ini )
 {
 	ControlBar::parseCommandSetDefinition(ini);
 }
+
+#if RTS_ZEROHOUR
+void INI::parseCommandSetExtendDefinition( INI *ini )
+{
+	ControlBar::parseCommandSetDefinition(ini, TRUE);
+}
+#endif

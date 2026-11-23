@@ -248,6 +248,9 @@ public:
 	static void parseVideoDefinition( INI* ini );
 	static void parseCommandButtonDefinition( INI *ini );
 	static void parseCommandSetDefinition( INI *ini );
+#if RTS_ZEROHOUR
+	static void parseCommandSetExtendDefinition( INI *ini );
+#endif
 	static void parseUpgradeDefinition( INI *ini );
 	static void parseMouseDefinition( INI* ini );
 	static void parseMouseCursorDefinition( INI* ini );

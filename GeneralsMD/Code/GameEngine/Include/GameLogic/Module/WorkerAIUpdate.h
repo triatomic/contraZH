@@ -195,6 +195,7 @@ public:
 
 	virtual Bool isAvailableForSupplying() const override;
 	virtual Bool isCurrentlyFerryingSupplies() const override;
+	virtual Bool isOnSupplyAutopilot() const override;
 	virtual Real getWarehouseScanDistance() const override; ///< How far can I look for a warehouse?
 
 	virtual void setForceBusyState(Bool v) override { m_forcedBusyPending = v; }
@@ -203,6 +204,7 @@ public:
 	virtual void setForceWantingState(Bool v) override { m_forcePending = v; }
 	virtual Bool isForcedIntoWantingState() const override { return m_forcePending; }
 	virtual ObjectID getPreferredDockID() const override { return m_preferredDock; }
+	virtual void setPreferredDockID(ObjectID dock) override { m_preferredDock = dock; }
 	virtual UnsignedInt getActionDelayForDock( Object *dock ) override;
 
 // worker specific

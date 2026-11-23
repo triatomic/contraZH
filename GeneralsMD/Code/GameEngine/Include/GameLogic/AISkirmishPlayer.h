@@ -90,7 +90,6 @@ protected:
 	virtual void checkReadyTeams() override;
 	virtual void checkQueuedTeams() override;
 	virtual void doTeamBuilding() override;
-	virtual Object *findDozer(const Coord3D *pos) override;
 	virtual void queueDozer() override;
 
 protected:

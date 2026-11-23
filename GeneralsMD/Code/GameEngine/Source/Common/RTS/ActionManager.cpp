@@ -1214,6 +1214,11 @@ Bool ActionManager::canCaptureBuilding( const Object *obj, const Object *objectT
 	if (isObjectShroudedForAction(obj, objectToCapture, commandSource))
 		return FALSE;
 
+	if (obj->getControllingPlayer() == objectToCapture->getControllingPlayer())
+	{
+		return FALSE;
+	}
+
 	Relationship r = obj->getRelationship(objectToCapture);
 
 	// ensure that it's capturable, and not allied

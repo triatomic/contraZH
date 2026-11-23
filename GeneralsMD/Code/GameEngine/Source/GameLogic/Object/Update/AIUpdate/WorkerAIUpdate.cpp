@@ -149,6 +149,13 @@ Bool WorkerAIUpdate::isCurrentlyFerryingSupplies() const
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool WorkerAIUpdate::isOnSupplyAutopilot() const
+{
+	return isCurrentlyFerryingSupplies() ||
+		(m_supplyTruckStateMachine && m_supplyTruckStateMachine->getCurrentStateID() == ST_REGROUPING);
+}
+
+//-------------------------------------------------------------------------------------------------
 Bool WorkerAIUpdate::isAvailableForSupplying() const
 {
 	return true;

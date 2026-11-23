@@ -284,7 +284,8 @@ Object* CommandButtonHuntUpdate::scanClosestTarget()
 		if( !spTemplate )
 			return nullptr;  // isn't going to happen.
 		isBlackLotusVehicleHack = 	(spTemplate->getSpecialPowerType() == SPECIAL_BLACKLOTUS_DISABLE_VEHICLE_HACK);
-		isCaptureBuilding = 	(spTemplate->getSpecialPowerType() == SPECIAL_INFANTRY_CAPTURE_BUILDING);
+		isCaptureBuilding = spTemplate->getSpecialPowerType() == SPECIAL_INFANTRY_CAPTURE_BUILDING ||
+			spTemplate->getSpecialPowerType() == SPECIAL_BLACKLOTUS_CAPTURE_BUILDING;
 		if (isCaptureBuilding)
 		{
 			filters[3] = nullptr;  // It's ok (in fact necessary for oil derricks) to capture special buildings.

@@ -676,9 +676,7 @@ void ThingTemplate::parseIntList(INI* ini, void *instance, void* store, const vo
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Read a variable-length list of ints (up to LEVEL_COUNT) into a per-veterancy-level array. Returns
-	the number of values actually provided. Used by the veterancy experience parsers so that INI lines
-	which only specify the original four ranks still parse after LEVEL_FOUR/LEVEL_FIVE were added. */
+// Skill point lists may omit ranks added after HEROIC.
 //-------------------------------------------------------------------------------------------------
 static Int parseVeterancyIntList(INI* ini, Int* intList)
 {
@@ -691,26 +689,70 @@ static Int parseVeterancyIntList(INI* ini, Int* intList)
 }
 
 //-------------------------------------------------------------------------------------------------
+static Int applyExperienceBonus(Int previous, double percent)
+{
+	const double increase = previous * percent / 100.0;
+	const double value = previous + increase;
+	const double rounded = value + ((value < 0.0) ? -0.5 : 0.5);
+	if( rounded >= INT_MAX )
+	{
+		return INT_MAX;
+	}
+	if( rounded <= INT_MIN )
+	{
+		return INT_MIN;
+	}
+	return (Int)rounded;
+}
+
+//-------------------------------------------------------------------------------------------------
+static void parseExperienceList(INI* ini, Int* experience, const double* bonuses, Bool required)
+{
+	Int level = LEVEL_REGULAR;
+	for( const char* token = ini->getNextTokenOrNull(); token != nullptr && level < LEVEL_COUNT; token = ini->getNextTokenOrNull() )
+	{
+		if( token[strlen(token) - 1] == '%' )
+		{
+			const double percent = GlobalData::scanExperienceBonus(token);
+			if( percent < 0.0
+				|| level == LEVEL_REGULAR || (required && level == LEVEL_VETERAN && experience[LEVEL_REGULAR] <= 0) )
+			{
+				throw INI_INVALID_DATA;
+			}
+			experience[level] = applyExperienceBonus(experience[level - 1], percent);
+		}
+		else
+		{
+			experience[level] = INI::scanInt(token);
+		}
+		++level;
+	}
+
+	for( ; level < LEVEL_COUNT; ++level )
+	{
+		const Int previous = (level > LEVEL_REGULAR) ? experience[level - 1] : 0;
+		if( level > LEVEL_REGULAR && bonuses && bonuses[level] >= 0.0f
+			&& !(required && level == LEVEL_VETERAN && previous <= 0) )
+		{
+			experience[level] = applyExperienceBonus(previous, bonuses[level]);
+		}
+		else
+		{
+			experience[level] = required ? INT_MAX : previous;
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 void ThingTemplate::parseExperienceValueList(INI* ini, void *instance, void* store, const void* userData)
 {
-	// Trailing (unspecified) levels inherit the last specified value, so a unit granted FOUR/FIVE is
-	// worth the same as its highest defined rank (normally HEROIC).
-	Int *intList = (Int*)store;
-	Int n = parseVeterancyIntList(ini, intList);
-	Int fill = (n > 0) ? intList[n - 1] : 0;
-	for( Int i = n; i < LEVEL_COUNT; ++i )
-		intList[i] = fill;
+	parseExperienceList(ini, (Int*)store, TheGlobalData ? TheGlobalData->m_experienceValueBonus : nullptr, FALSE);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ThingTemplate::parseExperienceRequiredList(INI* ini, void *instance, void* store, const void* userData)
 {
-	// Trailing (unspecified) levels are unreachable by default (INT_MAX), so objects cannot climb into
-	// FOUR/FIVE naturally unless the INI explicitly provides a requirement for them.
-	Int *intList = (Int*)store;
-	Int n = parseVeterancyIntList(ini, intList);
-	for( Int i = n; i < LEVEL_COUNT; ++i )
-		intList[i] = INT_MAX;
+	parseExperienceList(ini, (Int*)store, TheGlobalData ? TheGlobalData->m_experienceRequiredBonus : nullptr, TRUE);
 }
 
 //-------------------------------------------------------------------------------------------------

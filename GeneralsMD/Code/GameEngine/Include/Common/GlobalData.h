@@ -139,6 +139,7 @@ public:
 
 	static void getDefaultResolution( Int &width, Int &height );	///< the primary desktop mode, or 800x600 when it is unreadable or smaller
 	static void parseGameDataDefinition( INI* ini );
+	static double scanExperienceBonus(const char* token);
 	static void reloadEditedIni();		///< picks up render tuning keys from GameData.ini saved while the game runs, in cheat builds
 	void parseCustomDefinition();
 
@@ -594,6 +595,8 @@ public:
 	Int m_maxParticleCount;						///< maximum number of particles that can exist
 	Int m_maxFieldParticleCount;			///< maximum number of field-type particles that can exist (roughly)
 	WeaponBonusSet* m_weaponBonusSet;
+	double m_experienceValueBonus[LEVEL_COUNT];
+	double m_experienceRequiredBonus[LEVEL_COUNT];
 	Real m_healthBonus[LEVEL_COUNT];			///< global bonuses to health for veterancy.
 	Real m_defaultStructureRubbleHeight;	///< for rubbled structures, compress height to this if none specified
 
@@ -750,7 +753,7 @@ public:
   Bool m_queueReorder;            ///< Right click moves a build queue entry one position earlier; off unless GameData enables it
   Bool m_noOccupantFriendlyFire;  ///< spares the container a passenger is riding in from its own splash; off unless GameData enables it
   Bool m_batchParticles;          ///< draws same-looking particle systems in one batch; off unless GameData enables it
-  Bool m_particleAtlas;           ///< packs particle textures into shared premultiplied pages so mixed systems batch together; off unless GameData enables it
+  Bool m_textureAtlas;            ///< packs particle textures into shared atlas pages so mixed systems batch together; off unless GameData enables it
   Bool m_skipTranslucencySort;    ///< skips the per-triangle translucency sorter; off unless GameData or the LOD level enables it
   Bool m_backToFront;             ///< with the sorter off, draws whole particle systems far to near; off unless GameData enables it
   Bool m_useBloom;                ///< Options.ini Bloom: glow around additive particles
