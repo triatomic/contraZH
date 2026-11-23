@@ -243,7 +243,7 @@ public:
 	// ~Team();
 
 	/// return the prototype used to create this team
-	const TeamPrototype *getPrototype() { return m_proto; }
+	const TeamPrototype *getPrototype() const { return m_proto; }
 
 	void setID( TeamID id ) { m_id = id; }
 	TeamID getID() const { return m_id; }
