@@ -20,6 +20,7 @@ loads earlier.
 | Block | File | What the child changes |
 |---|---|---|
 | `ArmorExtend` | Armor.ini | Damage type values, set or multiplied |
+| `CommandSetExtend` | CommandSet.ini | Adds, replaces, or clears individual slots |
 | `LocomotorExtend` | Locomotor.ini | Any Locomotor key |
 | `WeaponExtend` | Weapon.ini | Any Weapon key |
 | `ObjectExtend` | Object INIs | Keys, modules, WeaponSet, ArmorSet |
@@ -45,6 +46,19 @@ Notes:
 child needs a new default, then the types that differ from it.
 * A missing parent is an INI error.
 * Contra's Armor.ini names the parent in the header instead of the old `;Base armor is` comment.
+
+## CommandSet.ini
+
+```
+CommandSetExtend EliteBarracksCommandSet BarracksCommandSet
+  2 = Command_TrainEliteInfantry
+  RemoveSlot = 5
+End
+```
+
+A numbered entry sets that slot. `RemoveSlot = <slot>` clears one slot and leaves all other
+slot numbers intact. Slots run from 1 to 32. The parser applies entries in order, so the
+last entry for a slot wins. You can also use `RemoveSlot` in a map's `CommandSet` override.
 
 ## Locomotor.ini
 

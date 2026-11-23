@@ -898,6 +898,9 @@ const FieldParse CommandSet::m_commandSetFieldParseTable[] =
 	{ "30",			CommandSet::parseCommandButton, (void *)29,		offsetof( CommandSet, m_command ) },
 	{ "31",			CommandSet::parseCommandButton, (void *)30,		offsetof( CommandSet, m_command ) },
 	{ "32",			CommandSet::parseCommandButton, (void *)31,		offsetof( CommandSet, m_command ) },
+#if RTS_ZEROHOUR
+	{ "RemoveSlot", CommandSet::parseRemoveSlot, nullptr, offsetof( CommandSet, m_command ) },
+#endif
 	{ nullptr,			nullptr,														 nullptr,				0	}
 
 };
@@ -994,6 +997,31 @@ void CommandSet::parseCommandButton( INI* ini, void *instance, void *store, cons
 	buttonArray[ buttonIndex ] = commandButton;
 
 }
+
+#if RTS_ZEROHOUR
+void CommandSet::parseRemoveSlot( INI* ini, void *instance, void *store, const void *userData )
+{
+	const char *token = ini->getNextToken();
+	char *end;
+	const long slot = strtol(token, &end, 10);
+	if( *end != '\0' || slot < 1 || slot > MAX_COMMANDS_PER_SET )
+	{
+		DEBUG_CRASH(( "[LINE: %d in '%s'] Invalid RemoveSlot value '%s'", ini->getLineNum(), ini->getFilename().str(), token ));
+		throw INI_INVALID_DATA;
+	}
+
+	const CommandButton **buttonArray = (const CommandButton **)store;
+	buttonArray[slot - 1] = nullptr;
+}
+
+void CommandSet::friend_copySlotsFrom(const CommandSet& parent)
+{
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		m_command[i] = parent.m_command[i];
+	}
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -2252,7 +2280,7 @@ CommandButton *ControlBar::newCommandButtonOverride( CommandButton *buttonToOver
 //-------------------------------------------------------------------------------------------------
 /** Parse a command set */
 //-------------------------------------------------------------------------------------------------
-/*static*/ void ControlBar::parseCommandSetDefinition( INI *ini )
+/*static*/ void ControlBar::parseCommandSetDefinition( INI *ini, Bool extend )
 {
 	AsciiString name;
 	CommandSet *commandSet;
@@ -2260,6 +2288,21 @@ CommandButton *ControlBar::newCommandButtonOverride( CommandButton *buttonToOver
 	// read the name
 	const char* c = ini->getNextToken();
 	name.set( c );
+
+#if RTS_ZEROHOUR
+	const CommandSet *parent = nullptr;
+	if( extend )
+	{
+		const AsciiString parentName(ini->getNextToken());
+		parent = TheControlBar->findCommandSet(parentName);
+		if( !parent || name == parentName )
+		{
+			DEBUG_CRASH(( "[LINE: %d in '%s'] CommandSetExtend %s requires a distinct, previously defined parent (%s)",
+				ini->getLineNum(), ini->getFilename().str(), name.str(), parentName.str() ));
+			throw INI_INVALID_DATA;
+		}
+	}
+#endif
 
 	// find existing item if present
 	commandSet = TheControlBar->findNonConstCommandSet( name );
@@ -2285,11 +2328,24 @@ CommandButton *ControlBar::newCommandButtonOverride( CommandButton *buttonToOver
 
 		//@todo SUPPORT OVERRIDES -- JM
 	} else {
+#if RTS_ZEROHOUR
+		if( extend )
+		{
+			commandSet = (CommandSet*)commandSet->friend_getFinalOverride();
+		}
+#endif
 		commandSet = TheControlBar->newCommandSetOverride(commandSet);
 	}
 
 	// sanity
 	DEBUG_ASSERTCRASH( commandSet, ("parseCommandSetDefinition: Unable to allocate set '%s'", name.str()) );
+
+#if RTS_ZEROHOUR
+	if( parent )
+	{
+		commandSet->friend_copySlotsFrom(*parent);
+	}
+#endif
 
 	// parse the ini definition
 	ini->initFromINI( commandSet, commandSet->friend_getFieldParse() );
