@@ -4,7 +4,7 @@
 
 Set `ExperienceValueBonus_<rank>` for kill rewards and `ExperienceRequiredBonus_<rank>` for
 promotion thresholds in the `GameData` block. Both accept the suffixes `Veteran`, `Elite`,
-`Heroic`, `Four` and `Five`. The bonuses default to disabled. A negative setting disables
+`Heroic`, `Four` and `Five`. The bonuses take whole-number percentages and default to disabled. A negative setting disables
 a bonus and `0%` repeats the previous rank's number.
 
 ```ini

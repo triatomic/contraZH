@@ -2,7 +2,7 @@
 
 ## Veterancy experience
 
-`ExperienceValue` and `ExperienceRequired` accept absolute numbers and percentage increases in the same list.
+`ExperienceValue` and `ExperienceRequired` accept absolute numbers and whole-number percentage increases in the same list.
 
 ```ini
   ExperienceValue    = 56 +45% +45% 170
