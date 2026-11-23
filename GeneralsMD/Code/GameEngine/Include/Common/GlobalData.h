@@ -139,7 +139,7 @@ public:
 
 	static void getDefaultResolution( Int &width, Int &height );	///< the primary desktop mode, or 800x600 when it is unreadable or smaller
 	static void parseGameDataDefinition( INI* ini );
-	static Int scanExperienceBonus(const char* token);
+	static double scanExperienceBonus(const char* token);
 	static void reloadEditedIni();		///< picks up render tuning keys from GameData.ini saved while the game runs, in cheat builds
 	void parseCustomDefinition();
 
@@ -595,8 +595,8 @@ public:
 	Int m_maxParticleCount;						///< maximum number of particles that can exist
 	Int m_maxFieldParticleCount;			///< maximum number of field-type particles that can exist (roughly)
 	WeaponBonusSet* m_weaponBonusSet;
-	Int m_experienceValueBonus[LEVEL_COUNT];
-	Int m_experienceRequiredBonus[LEVEL_COUNT];
+	double m_experienceValueBonus[LEVEL_COUNT];
+	double m_experienceRequiredBonus[LEVEL_COUNT];
 	Real m_healthBonus[LEVEL_COUNT];			///< global bonuses to health for veterancy.
 	Real m_defaultStructureRubbleHeight;	///< for rubbled structures, compress height to this if none specified
 

@@ -66,27 +66,25 @@
 
 #include "GameNetwork/FirewallHelper.h"
 
-#include <errno.h>
-#include <limits.h>
+#include <float.h>
 #include <stdlib.h>
 
-Int GlobalData::scanExperienceBonus(const char* token)
+double GlobalData::scanExperienceBonus(const char* token)
 {
 	char* end;
-	errno = 0;
-	const long percent = strtol(token, &end, 10);
+	const double percent = strtod(token, &end);
 	if( end == token || (*end != '\0' && (*end != '%' || end[1] != '\0'))
-		|| errno == ERANGE || percent < INT_MIN || percent > INT_MAX )
+		|| !(percent >= -DBL_MAX && percent <= DBL_MAX) )
 	{
 		throw INI_INVALID_DATA;
 	}
-	return (Int)percent;
+	return percent;
 }
 
 //-------------------------------------------------------------------------------------------------
 static void parseExperienceBonus(INI* ini, void* instance, void* store, const void* userData)
 {
-	*(Int*)store = GlobalData::scanExperienceBonus(ini->getNextToken());
+	*(double*)store = GlobalData::scanExperienceBonus(ini->getNextToken());
 }
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
@@ -1611,8 +1609,8 @@ GlobalData::GlobalData()
 #endif
 
 	for (i = LEVEL_FIRST; i <= LEVEL_LAST; ++i)
-		m_experienceValueBonus[i] = -1;
-		m_experienceRequiredBonus[i] = -1;
+		m_experienceValueBonus[i] = -1.0f;
+		m_experienceRequiredBonus[i] = -1.0f;
 		m_healthBonus[i] = 1.0f;
 
 	for (i = 0; i < PLAYERTYPE_COUNT; ++i)

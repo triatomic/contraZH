@@ -2,14 +2,15 @@
 
 ## Veterancy experience
 
-`ExperienceValue` and `ExperienceRequired` accept absolute numbers and whole-number percentage increases in the same list.
+`ExperienceValue` and `ExperienceRequired` accept absolute numbers and percentage increases in the same list.
 
 ```ini
   ExperienceValue    = 56 +45% +45% 170
   ExperienceRequired = 0 167 +45% +45%
 ```
 
-Each percentage increases the previous rank's integer value and rounds to the nearest whole point.
+Percentages can include decimals. For example, `56 +45.5%` gives 81 XP.
+Each step rounds to the nearest whole point before the next percentage is applied.
 The ranks are Regular, Veteran, Elite, Heroic, Four and Five. Regular takes an absolute value.
 With the usual zero Regular requirement, Veteran also takes an absolute value.
 

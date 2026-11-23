@@ -689,10 +689,11 @@ static Int parseVeterancyIntList(INI* ini, Int* intList)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Int applyExperienceBonus(Int previous, Int percent)
+static Int applyExperienceBonus(Int previous, double percent)
 {
-	const Int64 increase = (Int64)previous * percent;
-	const Int64 rounded = previous + (increase + ((increase < 0) ? -50 : 50)) / 100;
+	const double increase = previous * percent / 100.0;
+	const double value = previous + increase;
+	const double rounded = value + ((value < 0.0) ? -0.5 : 0.5);
 	if( rounded >= INT_MAX )
 	{
 		return INT_MAX;
@@ -705,15 +706,15 @@ static Int applyExperienceBonus(Int previous, Int percent)
 }
 
 //-------------------------------------------------------------------------------------------------
-static void parseExperienceList(INI* ini, Int* experience, const Int* bonuses, Bool required)
+static void parseExperienceList(INI* ini, Int* experience, const double* bonuses, Bool required)
 {
 	Int level = LEVEL_REGULAR;
 	for( const char* token = ini->getNextTokenOrNull(); token != nullptr && level < LEVEL_COUNT; token = ini->getNextTokenOrNull() )
 	{
 		if( token[strlen(token) - 1] == '%' )
 		{
-			const Int percent = GlobalData::scanExperienceBonus(token);
-			if( percent < 0
+			const double percent = GlobalData::scanExperienceBonus(token);
+			if( percent < 0.0
 				|| level == LEVEL_REGULAR || (required && level == LEVEL_VETERAN && experience[LEVEL_REGULAR] <= 0) )
 			{
 				throw INI_INVALID_DATA;
@@ -730,7 +731,7 @@ static void parseExperienceList(INI* ini, Int* experience, const Int* bonuses, B
 	for( ; level < LEVEL_COUNT; ++level )
 	{
 		const Int previous = (level > LEVEL_REGULAR) ? experience[level - 1] : 0;
-		if( level > LEVEL_REGULAR && bonuses && bonuses[level] >= 0
+		if( level > LEVEL_REGULAR && bonuses && bonuses[level] >= 0.0f
 			&& !(required && level == LEVEL_VETERAN && previous <= 0) )
 		{
 			experience[level] = applyExperienceBonus(previous, bonuses[level]);
