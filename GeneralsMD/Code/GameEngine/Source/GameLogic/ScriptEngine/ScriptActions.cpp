@@ -5899,7 +5899,7 @@ void ScriptActions::doTeamUseCommandButtonOnNearestBuildingClass( const AsciiStr
 //-------------------------------------------------------------------------------------------------
 /** doTeamUseCommandButtonOnNearestObjectType */
 //-------------------------------------------------------------------------------------------------
-void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString& teamName, const AsciiString& commandAbility, const AsciiString& objectType )
+void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString& teamName, const AsciiString& commandAbility, const AsciiString& objectType, UnsignedInt affiliation, Bool match )
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
 	if (!team) {
@@ -5929,34 +5929,29 @@ void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString
 		return;
 	}
 
+	PartitionFilterPlayerAffiliation filterAffiliation(team->getControllingPlayer(), affiliation, match);
 	Object *bestObj = nullptr;
 
 	//First look for a specific object type (object lists will fail)
 	const ThingTemplate *thingTemplate = TheThingFactory->findTemplate( objectType, FALSE );
 	if( thingTemplate )
 	{
-		PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES | ALLOW_NEUTRAL, true);
 		PartitionFilterThing f2(thingTemplate, true);
 		PartitionFilterValidCommandButtonTarget f3(srcObj, commandButton, true, CMD_FROM_SCRIPT);
 		PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 		PartitionFilterSameMapStatus filterMapStatus(srcObj);
-		PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, &filterFair, nullptr };
+		PartitionFilter *filters[] = { &filterAffiliation, &f2, &f3, &filterMapStatus, &filterFair, nullptr };
 
 		Coord3D pos;
 		theGroup->getCenter(&pos);
 
 		bestObj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
-#if RETAIL_COMPATIBLE_CRC
-		if (!bestObj)
-			return;
-#endif
 	}
 	else
 	{
 		ObjectTypes *objectTypes = TheScriptEngine->getObjectTypes( objectType );
 		if( objectTypes )
 		{
-			PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES | ALLOW_NEUTRAL, true);
 			PartitionFilterValidCommandButtonTarget f3(srcObj, commandButton, true, CMD_FROM_SCRIPT);
 			PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 			PartitionFilterSameMapStatus f4(srcObj);
@@ -5973,7 +5968,7 @@ void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString
 				if( thisType )
 				{
 					PartitionFilterThing f2( thisType, true );
-					PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterFair, nullptr };
+					PartitionFilter *filters[] = { &filterAffiliation, &f2, &f3, &f4, &filterFair, nullptr };
 
 					Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters, &dist );
 					if( obj )
@@ -5989,10 +5984,9 @@ void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString
 		}
 	}
 
-#if !RETAIL_COMPATIBLE_CRC
-	if (!bestObj)
+	if (!bestObj) {
 		return;
-#endif
+	}
 
 	// already been checked for validity
 	theGroup->groupDoCommandButtonAtObject(commandButton, bestObj, CMD_FROM_SCRIPT);
@@ -7738,7 +7732,13 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			doTeamUseCommandButtonOnNearestBuildingClass(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getInt());
 			return;
 		case ScriptAction::TEAM_ALL_USE_COMMANDBUTTON_ON_NEAREST_OBJECTTYPE:
-			doTeamUseCommandButtonOnNearestObjectType(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getString());
+			doTeamUseCommandButtonOnNearestObjectType(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getString(), ALLOW_ENEMIES | ALLOW_NEUTRAL | ALLOW_ALLIES, true);
+			return;
+		case ScriptAction::TEAM_ALL_USE_COMMANDBUTTON_ON_NEAREST_ENEMY_OBJECTTYPE:
+			doTeamUseCommandButtonOnNearestObjectType(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getString(), ALLOW_ALLIES | ALLOW_NEUTRAL, false);
+			return;
+		case ScriptAction::TEAM_ALL_USE_COMMANDBUTTON_ON_NEAREST_FRIENDLY_OBJECTTYPE:
+			doTeamUseCommandButtonOnNearestObjectType(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getString(), ALLOW_ALLIES, true);
 			return;
 		case ScriptAction::TEAM_PARTIAL_USE_COMMANDBUTTON:
 			doTeamPartialUseCommandButton(pAction->getParameter(0)->getReal(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getString());
