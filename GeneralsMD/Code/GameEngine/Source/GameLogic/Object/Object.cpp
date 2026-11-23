@@ -6215,18 +6215,9 @@ static Bool canUseScriptedBuildingCommand( Object *object, const CommandButton *
 
 		case GUI_COMMAND_SPECIAL_POWER:
 		{
+			// Scripts fire powers regardless of timer, science and cost, as in retail.
 			const SpecialPowerTemplate *power = button->getSpecialPowerTemplate();
-			if (!TheSpecialPowerStore->canUseSpecialPower(object, power))
-			{
-				return FALSE;
-			}
-			SpecialPowerModuleInterface *module = object->getSpecialPowerModule(power);
-			if (!module->isReadyForCommand(button->getOptions()) ||
-				(power->getCost() > 0 && player->getMoney()->countMoney() < static_cast<UnsignedInt>(power->getCost())))
-			{
-				return FALSE;
-			}
-			const SpecialAbilityUpdate *ability = object->findSpecialAbilityUpdate(power->getSpecialPowerType());
+			const SpecialAbilityUpdate *ability = power ? object->findSpecialAbilityUpdate(power->getSpecialPowerType()) : nullptr;
 			return !ability || !ability->isPowerCurrentlyInUse(button);
 		}
 

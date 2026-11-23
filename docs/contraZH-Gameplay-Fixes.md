@@ -102,8 +102,9 @@ toward their own workforce.
 ## Scripted building commands respect prerequisites
 
 Team command-button scripts can use a building's abilities once construction finishes.
-Upgrade commands check funds, required sciences and queue space. Special powers check
-their prerequisites and readiness. A command that fails these checks must be issued again.
+Upgrade commands check funds, required sciences and queue space. A command that fails these
+checks must be issued again. Special powers still fire regardless of their timer, required
+science and cost, as in retail.
 
 ## AI supply sources respect allied bases
 
