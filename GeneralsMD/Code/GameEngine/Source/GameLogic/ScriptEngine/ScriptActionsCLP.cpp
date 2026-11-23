@@ -86,7 +86,9 @@ Bool ScriptActions::executeCLPAction( ScriptAction *pAction )
 			doBuildObjectNearestTeamAngle(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getString(), pAction->getParameter(3)->getReal());
 			return TRUE;
 		case ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_SUPPLY_ROTATED:
-			doBuildSupplyCenterAngle(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getInt(), pAction->getParameter(3)->getReal());
+		case ScriptAction::AI_PLAYER_BUILD_SUPPLY_CENTER_ROTATED_WHILE_SUPPLIES_REMAIN:
+			doBuildSupplyCenterAngle(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getString(), pAction->getParameter(2)->getInt(), pAction->getParameter(3)->getReal(),
+				pAction->getActionType() == ScriptAction::AI_PLAYER_BUILD_SUPPLY_CENTER_ROTATED_WHILE_SUPPLIES_REMAIN);
 			return TRUE;
 		case ScriptAction::AI_PLAYER_BUILD_DEFENSE_FRONT_FROM_VECTOR_ROTATED_PERCENT:
 			doAIPlayerBuildDefenseStructureFromVector(false, pAction->getParameter(0)->getReal(), pAction->getParameter(1)->getReal());

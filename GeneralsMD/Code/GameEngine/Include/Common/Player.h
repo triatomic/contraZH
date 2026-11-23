@@ -600,7 +600,7 @@ public:
 	void setBuildList(BuildListInfo *pBuildList);			///< sets the build list.
 	BuildListInfo *getBuildList() { return m_pBuildList; }		///< returns the build list. (build list might be modified by the solo AI)
 	void addToBuildList(Object *obj);			///< Adds this to the build list.	 Used for factories placed instead of in build list.
-	void addToPriorityBuildList(AsciiString templateName, Coord3D *pos, Real angle);			///< Adds this to the build list.	 Used for factories placed instead of in build list.
+	void addToPriorityBuildList(AsciiString templateName, Coord3D *pos, Real angle, ObjectID supplySource = INVALID_ID, Bool requiresSupplies = FALSE);			///< Adds this to the build list.	 Used for factories placed instead of in build list.
 
 	// CLP_AI script support; clpPrependToBuildList is defined in ScriptActionsCLPAI.cpp.
 	AIPlayer *getAIPlayer() const { return m_ai; }
@@ -643,7 +643,7 @@ public:
 	void buildSpecificBuilding(const AsciiString &thingName);
 
 	/// Build a building near a supply dump with at least cash.  Gets passed to aiPlayer.
-	void buildBySupplies(Int minimumCash, const AsciiString &thingName);
+	void buildBySupplies(Int minimumCash, const AsciiString &thingName, Bool requiresSupplies);
 
 	/// Build an instance of a specific building nearest specified team.  Gets passed to aiPlayer.
 	void buildSpecificBuildingNearestTeam( const AsciiString &thingName, const Team *team );

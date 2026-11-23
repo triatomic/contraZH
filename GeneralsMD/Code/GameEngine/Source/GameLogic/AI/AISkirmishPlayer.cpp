@@ -124,6 +124,8 @@ void AISkirmishPlayer::processBaseBuilding()
 		BuildListInfo	*powerInfo = nullptr;
 		Bool isUnderPowered = !m_player->getEnergy()->hasSufficientPower();
 		Bool powerUnderConstruction = false;
+		Object *buildDozer = nullptr;
+		Object *powerDozer = nullptr;
 		for( BuildListInfo *info = m_player->getBuildList(); info; info = info->getNext() )
 		{
 			AsciiString name = info->getTemplateName();
@@ -209,64 +211,60 @@ void AISkirmishPlayer::processBaseBuilding()
 			if (bldg) {
 				continue; // already built.
 			}
+			ObjectID supplySource = info->getSupplySiteSourceID();
+			if (info->supplySiteRequiresSupplies() && !canBuildAtSupplySite(supplySource))
+			{
+				continue;
+			}
+			if (supplySource != INVALID_ID && curPlan->isKindOf(KINDOF_CASH_GENERATOR) &&
+				hasSupplyCenterAtSite(supplySource, nullptr, 0.0f, FALSE))
+			{
+				continue;
+			}
 			// Make sure it is safe to build here.
 			if (!isLocationSafe(info->getLocation(), curPlan)) {
 				continue;
 			}
-			if (info->isPriorityBuild()) {
-				// Always take priority build, unless we already have priority build.
-				if (!isPriority) {
-					bldgPlan = curPlan;
-					bldgInfo = info;
-					isPriority = true;
-				}
-			}
-			if (curPlan->isKindOf(KINDOF_FS_POWER)) {
-				if (powerPlan==nullptr && !curPlan->isKindOf(KINDOF_CASH_GENERATOR)) {
-					if (isUnderPowered || info->isAutomaticBuild()) {
-						powerPlan = curPlan;
-						powerInfo = info;
-					}
-				}
-			}
-			if (!info->isAutomaticBuild()) {
-				continue; // marked to not build automatically.
-			}
-			Object *dozer = findDozer(info->getLocation());
-			if (dozer==nullptr) {
-				if (isUnderPowered) {
-					queueDozer();
-				}
-				continue;
-			}
-			if (TheBuildAssistant->canMakeUnit(dozer, bldgPlan)!=CANMAKE_OK) {
-				if (info->isBuildable()) {
-					AsciiString bldgName = info->getTemplateName();
-					bldgName.concat(" - Dozer unable to build - money or technology missing.");
-					TheScriptEngine->AppendDebugMessage(bldgName, false);
-				}
-				continue;
-			}
-			// check if this building has any "rebuilds" left
-			if (info->isBuildable())
+			const Bool priorityCandidate = info->isPriorityBuild() && !isPriority;
+			const Bool powerCandidate = powerPlan == nullptr && curPlan->isKindOf(KINDOF_FS_POWER) &&
+				!curPlan->isKindOf(KINDOF_CASH_GENERATOR) && (isUnderPowered || info->isAutomaticBuild());
+			const Bool normalCandidate = bldgPlan == nullptr && info->isAutomaticBuild() && info->isBuildable() &&
+				m_player->getMoney()->countMoney() >= curPlan->calcCostToBuild(m_player);
+			if (!priorityCandidate && !powerCandidate && !normalCandidate)
 			{
-				if (bldgPlan == nullptr) {
-					bldgPlan = curPlan;
-					bldgInfo = info;
-				}
+				continue;
+			}
+			Object *dozer = findDozer(info->getLocation(), curPlan);
+			if (dozer == nullptr)
+			{
+				continue;
+			}
+			if (priorityCandidate || normalCandidate)
+			{
+				bldgPlan = curPlan;
+				bldgInfo = info;
+				buildDozer = dozer;
+				isPriority = priorityCandidate;
+			}
+			if (powerCandidate)
+			{
+				powerPlan = curPlan;
+				powerInfo = info;
+				powerDozer = dozer;
 			}
 		}
 		if (powerInfo && powerPlan && !powerPlan->isEquivalentTo(bldgPlan)) {
 			if (!powerUnderConstruction) {
 				bldgPlan = powerPlan;
 				bldgInfo = powerInfo;
+				buildDozer = powerDozer;
 				DEBUG_LOG(("Forcing build of power plant."));
 			}
 		}
 		if (bldgPlan && bldgInfo) {
 #ifdef USE_DOZER
 			// dozer-construct the building
-			bldg = buildStructureWithDozer(bldgPlan, bldgInfo);
+			bldg = buildStructureWithDozer(bldgPlan, bldgInfo, buildDozer);
 			// store the object with the build order
 			if (bldg)
 			{
@@ -1191,16 +1189,6 @@ void AISkirmishPlayer::queueDozer()
 {
 	AIPlayer::queueDozer();
 }
-
-//----------------------------------------------------------------------------------------------------------
-/**
- * Finds a dozer that isn't building or collecting resources.
- */
-Object * AISkirmishPlayer::findDozer( const Coord3D *pos )
-{
-	return AIPlayer::findDozer(pos);
-}
-
 
 //----------------------------------------------------------------------------------------------------------
 /**

@@ -216,6 +216,10 @@ static GameWindow *   comboBoxCastMode            = nullptr;
 static GameWindow *   comboBoxTextureFilter       = nullptr;
 static GameWindow *   comboBoxAnisotropy          = nullptr;
 static GameWindow *   comboBoxRenderFPSLimit      = nullptr;
+static GameWindow *   comboBoxCursorCapture       = nullptr;
+static GameWindow *   sliderMoneyVolume           = nullptr;
+static GameWindow *   textEntrySystemTimeFontSize = nullptr;
+static GameWindow *   textEntryGameTimeFontSize   = nullptr;
 static GameWindow *   checkNumericalHealth        = nullptr;
 static GameWindow *   checkSmartPips              = nullptr;
 static GameWindow *   checkSelectionCircle        = nullptr;
@@ -286,6 +290,16 @@ static const Int ShadowMapResolutions[] = { 512, 1024, 2048, 4096 };
 static const Int SuperSamplingPercents[] = { 100, 150, 200, WW3D::SUPER_SAMPLING_16K };
 static const char *const PathTracingModeNames[] = { "Off", "Quality", "Fast" };
 static const Int RenderFPSLimits[] = { 30, 60, 120, 240, 0 };
+// Combo order None, In game, Always, Auto
+static const CursorCaptureMode CursorCapturePresets[] =
+{
+	0,
+	CursorCaptureMode_EnabledInWindowedGame | CursorCaptureMode_EnabledInFullscreenGame,
+	CursorCaptureMode_EnabledInWindowedGame | CursorCaptureMode_EnabledInWindowedMenu | CursorCaptureMode_EnabledInFullscreenGame | CursorCaptureMode_EnabledInFullscreenMenu,
+	CursorCaptureMode_Default,
+};
+static const Int MaxTimeFontSize = 99;
+static const Int DefaultTimeFontSize = 8;
 static_assert( ARRAY_SIZE(HealthBarModeNames) == HealthBarDisplayMode_Count, "HealthBarModeNames out of date" );
 static const char *const AlliedDecalModeNames[] = { "Hidden", "House", "Army" };
 static_assert( ARRAY_SIZE(AlliedDecalModeNames) == AlliedDecalMode_Count, "AlliedDecalModeNames out of date" );
@@ -594,6 +608,19 @@ static Int levelIndex( const Int *levels, Int count, Int level )
 	return 0;
 }
 
+// A combination the combo does not offer selects nothing and is kept on save
+static Int cursorCaptureIndex( CursorCaptureMode mode )
+{
+	for (Int i = 0; i < ARRAY_SIZE(CursorCapturePresets); ++i)
+	{
+		if (CursorCapturePresets[i] == mode)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
 // A tabbed layout spreads the Game Options and Shaders controls over its pages
 static Bool hasGameOptions()
 {
@@ -683,6 +710,14 @@ static void populateGameOptions()
 	setEntryInt( textEntryBloomThreshold, bloomPercent( pref->getBloomThreshold() ) );
 	setEntryInt( textEntryBloomSize, bloomPercent( pref->getBloomSize() ) );
 
+	setComboPos( comboBoxCursorCapture, cursorCaptureIndex( pref->getCursorCaptureMode() ) );
+	if (sliderMoneyVolume)
+	{
+		GadgetSliderSetPosition( sliderMoneyVolume, MIN( REAL_TO_INT( pref->getMoneyTransactionVolume() ), 100 ) );
+	}
+	setEntryInt( textEntrySystemTimeFontSize, pref->getSystemTimeFontSize() );
+	setEntryInt( textEntryGameTimeFontSize, pref->getGameTimeFontSize() );
+
 	updateGameOptionsEnables();
 }
 
@@ -737,6 +772,14 @@ static void setGameOptionsDefaults()
 	setEntryInt( textEntryBloomStrength, 50 );
 	setEntryInt( textEntryBloomThreshold, 25 );
 	setEntryInt( textEntryBloomSize, 100 );
+
+	setComboPos( comboBoxCursorCapture, cursorCaptureIndex( CursorCaptureMode_Default ) );
+	if (sliderMoneyVolume)
+	{
+		GadgetSliderSetPosition( sliderMoneyVolume, REAL_TO_INT( TheAudio->getAudioSettings()->m_defaultMoneyTransactionVolume * 100.0f ) );
+	}
+	setEntryInt( textEntrySystemTimeFontSize, DefaultTimeFontSize );
+	setEntryInt( textEntryGameTimeFontSize, DefaultTimeFontSize );
 
 	updateGameOptionsEnables();
 }
@@ -1159,9 +1202,13 @@ static void saveOptions()
 	TheWritableGlobalData->m_doubleClickAttackMove = GadgetCheckBoxIsChecked( checkDoubleClickAttackMove );
 	(*pref)["UseDoubleClickAttackMove"] = TheWritableGlobalData->m_doubleClickAttackMove ? "yes" : "no";
 
-	// TheSuperHackers @todo Add combo box ?
 	{
 		CursorCaptureMode mode = pref->getCursorCaptureMode();
+		const Int preset = getComboPos( comboBoxCursorCapture, -1 );
+		if (preset >= 0 && preset < ARRAY_SIZE(CursorCapturePresets))
+		{
+			mode = CursorCapturePresets[preset];
+		}
 		(*pref)["CursorCaptureEnabledInWindowedGame"] = (mode & CursorCaptureMode_EnabledInWindowedGame) ? "yes" : "no";
 		(*pref)["CursorCaptureEnabledInWindowedMenu"] = (mode & CursorCaptureMode_EnabledInWindowedMenu) ? "yes" : "no";
 		(*pref)["CursorCaptureEnabledInFullscreenGame"] = (mode & CursorCaptureMode_EnabledInFullscreenGame) ? "yes" : "no";
@@ -1446,9 +1493,13 @@ static void saveOptions()
 
 	//-------------------------------------------------------------------------------------------------
 	// Money tick volume
-	// TheSuperHackers @todo Add options slider ?
 	{
 		val = pref->getMoneyTransactionVolume();
+		// A stored volume above the slider's range stays while the slider sits at its top
+		if (sliderMoneyVolume && (val <= 100 || GadgetSliderGetPosition( sliderMoneyVolume ) < 100))
+		{
+			val = GadgetSliderGetPosition( sliderMoneyVolume );
+		}
 		AsciiString prefString;
 		prefString.format("%d", val);
 		(*pref)["MoneyTransactionVolume"] = prefString;
@@ -1507,23 +1558,25 @@ static void saveOptions()
 
 	//-------------------------------------------------------------------------------------------------
 	// Set System Time Font Size
-	val = pref->getSystemTimeFontSize(); // TheSuperHackers @todo replace with options input when applicable
+	val = getEntryInt( textEntrySystemTimeFontSize, 0, MaxTimeFontSize, pref->getSystemTimeFontSize() );
 	if (val >= 0)
 	{
 		AsciiString prefString;
 		prefString.format("%d", val);
 		(*pref)["SystemTimeFontSize"] = prefString;
+		TheWritableGlobalData->m_systemTimeFontSize = val;
 		TheInGameUI->refreshSystemTimeResources();
 	}
 
 	//-------------------------------------------------------------------------------------------------
 	// Set Game Time Font Size
-	val = pref->getGameTimeFontSize(); // TheSuperHackers @todo replace with options input when applicable
+	val = getEntryInt( textEntryGameTimeFontSize, 0, MaxTimeFontSize, pref->getGameTimeFontSize() );
 	if (val >= 0)
 	{
 		AsciiString prefString;
 		prefString.format("%d", val);
 		(*pref)["GameTimeFontSize"] = prefString;
+		TheWritableGlobalData->m_gameTimeFontSize = val;
 		TheInGameUI->refreshGameTimeResources();
 	}
 
@@ -2002,6 +2055,10 @@ static void initGameOptionsWindows()
 	checkVSync = findOptionsWindow( "OptionsMenu.wnd:CheckVSync" );
 	checkLowLatency = findOptionsWindow( "OptionsMenu.wnd:CheckLowLatency" );
 	checkSmoothUnitMotion = findOptionsWindow( "OptionsMenu.wnd:CheckSmoothUnitMotion" );
+	comboBoxCursorCapture = findOptionsWindow( "OptionsMenu.wnd:ComboBoxCursorCapture" );
+	sliderMoneyVolume = findOptionsWindow( "OptionsMenu.wnd:SliderMoneyVolume" );
+	textEntrySystemTimeFontSize = findOptionsWindow( "OptionsMenu.wnd:TextEntrySystemTimeFontSize" );
+	textEntryGameTimeFontSize = findOptionsWindow( "OptionsMenu.wnd:TextEntryGameTimeFontSize" );
 
 	if (ButtonGameOptions)
 	{
@@ -2087,6 +2144,10 @@ static void initGameOptionsWindows()
 	setTooltip( comboBoxCastMode, "TOOLTIP:CastMode" );
 	setTooltip( comboBoxTextureFilter, "TOOLTIP:TextureFilter" );
 	setTooltip( comboBoxAnisotropy, "TOOLTIP:Anisotropy" );
+	setTooltip( comboBoxCursorCapture, "TOOLTIP:CursorCapture" );
+	setTooltip( sliderMoneyVolume, "TOOLTIP:MoneyVolume" );
+	setTooltip( textEntrySystemTimeFontSize, "TOOLTIP:SystemTimeFontSize" );
+	setTooltip( textEntryGameTimeFontSize, "TOOLTIP:GameTimeFontSize" );
 	if (comboBoxGridHotkeyLayout)
 	{
 		comboBoxGridHotkeyLayout->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( "TOOLTIP:GridHotkeyRows",
@@ -2108,6 +2169,7 @@ static void initGameOptionsWindows()
 	addComboEntries( comboBoxCastMode, "GUI:CastMode", CastMode_Count );
 	addComboEntries( comboBoxTextureFilter, "GUI:TextureFilter", TextureFilterClass::TEXTURE_FILTER_COUNT );
 	addComboEntries( comboBoxAnisotropy, "GUI:Anisotropy", ARRAY_SIZE(AnisotropyLevels) );
+	addComboEntries( comboBoxCursorCapture, "GUI:CursorCapture", ARRAY_SIZE(CursorCapturePresets) );
 	if (comboBoxGridHotkeyLayout)
 	{
 		GadgetComboBoxReset( comboBoxGridHotkeyLayout );

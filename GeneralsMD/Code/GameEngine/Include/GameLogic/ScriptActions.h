@@ -129,7 +129,7 @@ protected:
 	void doAttack(const AsciiString& attackerName, const AsciiString& victimName);
 	void doNamedAttack(const AsciiString& attackerName, const AsciiString& victimName);
 	void doBuildBuilding(const AsciiString& buildingType);
-	void doBuildSupplyCenter(const AsciiString& playerName, const AsciiString& buildingType, Int cash);
+	void doBuildSupplyCenter(const AsciiString& playerName, const AsciiString& buildingType, Int cash, Bool requiresSupplies);
 	void doBuildObjectNearestTeam( const AsciiString& playerName, const AsciiString& buildingType, const AsciiString& teamName );
 	void doBuildUpgrade(const AsciiString& playerName, const AsciiString& upgrade);
 	void doBuildBaseDefense(Bool flank);
@@ -343,7 +343,7 @@ protected:
 	void doTeamUseCommandButtonOnNearestKindof( const AsciiString& teamName, const AsciiString& commandAbility, Int kindofBit );
 	void doTeamUseCommandButtonOnNearestBuilding( const AsciiString& teamName, const AsciiString& commandAbility );
 	void doTeamUseCommandButtonOnNearestBuildingClass( const AsciiString& teamName, const AsciiString& commandAbility, Int kindofBit );
-	void doTeamUseCommandButtonOnNearestObjectType( const AsciiString& teamName, const AsciiString& commandAbility, const AsciiString& objectType );
+	void doTeamUseCommandButtonOnNearestObjectType( const AsciiString& teamName, const AsciiString& commandAbility, const AsciiString& objectType, UnsignedInt affiliation, Bool match );
 	void doTeamPartialUseCommandButton( Real percentage, const AsciiString& teamName, const AsciiString& commandAbility );
 	void doTeamCaptureNearestUnownedFactionUnit( const AsciiString& teamName );
 	void doCreateTeamFromCapturedUnits( const AsciiString& playerName, const AsciiString& teamName );
@@ -392,7 +392,7 @@ protected:
 	void doPlayerSurrender(const AsciiString& playerName);
 	void doPlayerBuildUnit(const AsciiString& unitName, const AsciiString& playerName);
 	void doBuildObjectNearestTeamAngle(const AsciiString& playerName, const AsciiString& buildingType, const AsciiString& teamName, Real angle);
-	void doBuildSupplyCenterAngle(const AsciiString& player, const AsciiString& buildingType, Int cash, Real angle);
+	void doBuildSupplyCenterAngle(const AsciiString& player, const AsciiString& buildingType, Int cash, Real angle, Bool requiresSupplies);
 	void doBuildObjectNearestTypeAngle(const AsciiString& playerName, const AsciiString& buildingType, const AsciiString& objectType, Real angle, Int selectionMode);
 	void doBuildObjectNearestKindOfAngle(const AsciiString& playerName, const AsciiString& buildingType, Int kindOf, Real angle, Int selectionMode);
 	void doBuildObjectNearestTypeAngleArea(const AsciiString& playerName, const AsciiString& buildingType, const AsciiString& objectType, const AsciiString& triggerArea, Real angle, Int selectionMode);

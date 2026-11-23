@@ -1036,6 +1036,13 @@ GameWindow* IMEManager::getWindow()
 
 WideChar IMEManager::convertCharToWide( WPARAM wParam )
 {
+#if defined(RTS_ZEROHOUR)
+	if ( IsWindowUnicode( ApplicationHWnd ) )
+	{
+		return (WideChar)(wParam & 0xffff);
+	}
+#endif
+
 	char dcbsString[3];
 
 	if ( wParam&0xff00 )

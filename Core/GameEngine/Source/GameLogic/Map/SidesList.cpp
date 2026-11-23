@@ -941,6 +941,10 @@ m_buildingName(AsciiString::TheEmptyString)
 	m_rallyPointOffset.x = 0.0f;
 	m_rallyPointOffset.y = 0.0f;
 	m_selected = FALSE;
+#if RTS_ZEROHOUR
+	m_supplySiteSourceID = INVALID_ID;
+	m_supplySiteRequiresSupplies = FALSE;
+#endif
 
 	Int i;
 	for (i=0; i<MAX_RESOURCE_GATHERERS; i++)
@@ -1029,7 +1033,11 @@ void BuildListInfo::xfer( Xfer *xfer )
 {
 
 	// version
+#if RTS_ZEROHOUR
+	XferVersion currentVersion = 4;
+#else
 	XferVersion currentVersion = 2;
+#endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1059,6 +1067,20 @@ void BuildListInfo::xfer( Xfer *xfer )
 	if (version>=2) {
 		xfer->xferInt(&m_currentGatherers);
 	}
+#if RTS_ZEROHOUR
+	if (version >= 3)
+	{
+		xfer->xferObjectID(&m_supplySiteSourceID);
+	}
+	if (version >= 4)
+	{
+		xfer->xferBool(&m_supplySiteRequiresSupplies);
+	}
+	else if (version == 3 && xfer->getXferMode() == XFER_LOAD)
+	{
+		m_supplySiteRequiresSupplies = m_supplySiteSourceID != INVALID_ID;
+	}
+#endif
 
 }
 

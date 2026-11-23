@@ -3,6 +3,15 @@
 Fixes are on by default unless an entry says otherwise. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Skirmish AI skips unavailable structures
+
+Skirmish AI checks whether an available builder can construct each candidate before it
+selects a build order. A structure missing from the builders' current command sets
+stays on the build list and can become eligible after an upgrade. Super Weapon General
+can list both power buildings in AIData and build the one unlocked by its branch choice.
+
+This changes the simulation.
+
 ## Script control for automatic team reinforcement
 
 - Use **Enable or disable automatic reinforcement** under **Team > AI** to change whether an existing team can receive automatic replacements. The change applies when the AI next looks for a team to reinforce. Replacements already queued can finish.
@@ -43,6 +52,13 @@ Map `AIData` overrides can change the distances. Larger searches check more cand
 
 This changes the simulation and can change older replay playback. Multiplayer clients need
 matching engine versions.
+
+## Black Lotus cash hacking stops when the target is destroyed
+
+Black Lotus stops hacking when the target building is destroyed or reduced to a rebuild hole.
+She plays her cash hack completion line after each successful withdrawal.
+
+This changes the simulation and can change older replay playback. ([#252](https://github.com/triatomic/contraZH/issues/252))
 
 ## The Demolisher keeps attacking after its first shot
 
@@ -95,6 +111,50 @@ target before detonating. Previously, these close shots exploded at the barrel. 
 to curved and linear flight paths, including projectiles that tumble or keep a fixed orientation.
 
 Changes the simulation and older replay playback for affected shots.
+
+## Capture orders stop when ownership changes
+
+Infantry and Black Lotus abandon capture orders when the building becomes theirs or an ally's,
+even while they are still approaching. Units hunting with a capture ability can then look for
+another target.
+
+## AI supply centers count their collectors and queues
+
+`ResourceGatherersEasy`, `ResourceGatherersNormal` and `ResourceGatherersHard` set the target
+number of collectors per supply center. The target includes collectors that come with the center.
+The AI counts active collectors and queued replacements, moves available collectors to centers
+that are short, and fills remaining vacancies at those centers. Mobile supply truck crews count
+toward their own workforce.
+
+## Scripted building commands respect prerequisites
+
+Team command-button scripts can use a building's abilities once construction finishes.
+Upgrade commands check funds, required sciences and queue space. A command that fails these
+checks must be issued again. Special powers still fire regardless of their timer, required
+science and cost, as in retail.
+
+## AI anti-air units keep moving between shots
+
+AI units following attack waypoints or attack-moving keep moving past aircraft outside
+weapon range. They stop to fire at aircraft in range, and can switch away from a lower
+priority ground target. Saved units regain their scripted attack priorities on load.
+
+## Tunnel evacuation requires an open endpoint
+
+AI tunnel guards and evacuation orders use completed, registered tunnel entrances.
+An unfinished entrance cannot unload units from the shared network.
+
+## AI supply sites track their warehouse
+
+The standard and rotated supply placement actions can rebuild after their warehouse runs
+dry, so the first supply center can keep unlocking prerequisite buildings. Use **Build
+near a supply source and rebuild while supplies remain** for expansion centers. Its
+standard and rotated versions skip rebuilding when the selected warehouse is empty,
+missing, or enemy-owned.
+
+A planned rebuild reserves its warehouse so placement scripts look for another site.
+The warehouse and rebuild rule survive save and load. Older saves without a warehouse
+association use the planned center's position to check reservations.
 
 ## AI supply sources respect allied bases
 

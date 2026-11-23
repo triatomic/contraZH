@@ -1606,7 +1606,7 @@ BEGIN
     GROUPBOX        "Initial Team Behavior",IDC_STATIC,15,172,172,27
     CONTROL         "Transports return to base after unloading.",IDC_TRANSPORTS_RETURN,
                     "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,15,151,179,8
-    CONTROL         "Team avoids threats.",IDC_AVOID_THREATS,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,15,162,179,8
+    CONTROL         "Team avoids threats.",IDC_AVOID_THREATS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,162,179,8
     RTEXT           "On All Clear:",IDC_STATIC,13,59,61,8
     COMBOBOX        IDC_ON_ALL_CLEAR,85,58,132,173,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
     GROUPBOX        "",IDC_STATIC,7,36,216,37

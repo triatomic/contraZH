@@ -2475,6 +2475,23 @@ AIAttackMoveStateMachine::AIAttackMoveStateMachine(Object *owner, AsciiString na
 }
 
 //----------------------------------------------------------------------------------------------------------
+static void switchToHigherPriorityAircraft(AIUpdateInterface *ai, StateMachine *attackMachine)
+{
+	Object *target = attackMachine->getGoalObject();
+	if (attackMachine->getCurrentStateID() != AI_ATTACK_OBJECT || !target)
+	{
+		return;
+	}
+
+	Object *aircraft = ai->getHigherPriorityAircraft(target);
+	if (aircraft)
+	{
+		attackMachine->setGoalObject(aircraft);
+		attackMachine->setState(AI_ATTACK_OBJECT);
+	}
+}
+
+//-----------------------------------------------------------------------------------------------------------
 AIAttackMoveStateMachine::~AIAttackMoveStateMachine()
 {
 }
@@ -2620,6 +2637,11 @@ StateReturnType AIMoveToState::update()
 			}
 		}
 
+	}
+
+	if (TheAI->pathfinder()->shouldRepathAroundTeamThreats(obj))
+	{
+		computePath();
 	}
 
 	return AIInternalMoveToState::update();
@@ -3870,7 +3892,7 @@ StateReturnType AIFollowPathState::update()
 			m_retryCount--;
 		}	else {
 			ppi = ai->friend_getPathPointInfo(m_index);
-			if (ppi->m_cmdNodeID == obj->getCurrentCommand() && ppi->m_cmdNodeID != obj->getLastCommandInMoveStreak())
+			if (ppi && ppi->m_cmdNodeID == obj->getCurrentCommand() && ppi->m_cmdNodeID != obj->getLastCommandInMoveStreak())
 				TheCommandSequence->removeCurrentCommand(obj);
 			++m_index;
 		}
@@ -4195,6 +4217,7 @@ StateReturnType AIAttackMoveToState::update()
 	{
 		ai->setLocomotorGoalNone();
 		owner->clearModelConditionState(MODELCONDITION_MOVING);
+		switchToHigherPriorityAircraft(ai, m_attackMoveMachine);
 		m_attackMoveMachine->updateStateMachine();
 
 		// if the machine is now idling, then we need to attempt to get a new target
@@ -4591,6 +4614,12 @@ void AIFollowWaypointPathState::computeGoal(Bool useGroupOffsets)
 		}
 	}
 
+	if (hasNextWaypoint() && m_goalLayer == LAYER_GROUND && extent.isInRegionNoZ(dest) &&
+		extent.isInRegionNoZ(m_goalPosition))
+	{
+		TheAI->pathfinder()->adjustThreatenedWaypoint(obj, m_goalPosition);
+	}
+
 	if (!extent.isInRegionNoZ(m_goalPosition)) {
 		setAdjustsDestination(false); // moving off the map.
 		ai->getCurLocomotor()->setAllowInvalidPosition(true); // allow it to move off the map.
@@ -4807,13 +4836,23 @@ StateReturnType AIFollowWaypointPathState::update()
 		}
 	}
 
+	if (!m_appendGoalPosition && TheAI->pathfinder()->shouldRepathAroundTeamThreats(obj))
+	{
+		if (hasNextWaypoint() && m_goalLayer == LAYER_GROUND)
+		{
+			computeGoal(false);
+		}
+		computePath();
+	}
+
 	// do movement
 	StateReturnType status = AIInternalMoveToState::update();
 
 	// We may want to allow ourselves to bail out of this one early. In order to do this, we check and
 	// see if we're moving as a group, and then if our team is owned by an AI Skirmish player.
 	// If it is, then we compute the group centroid, and see if it is within some distance of the
-	if (m_moveAsGroup) {
+	Path *path = ai->getPath();
+	if (m_moveAsGroup && (!path || path->getTeamRouteThreats().empty())) {
 		if (obj->getControllingPlayer()->isSkirmishAIPlayer()) {
 			Team *team = obj->getTeam();
 			AIGroupPtr group = TheAI->createGroup();
@@ -5096,6 +5135,7 @@ StateReturnType AIAttackFollowWaypointPathState::update()
 	{
 		ai->setLocomotorGoalNone();
 		owner->clearModelConditionState(MODELCONDITION_MOVING);
+		switchToHigherPriorityAircraft(ai, m_attackFollowMachine);
 		m_attackFollowMachine->updateStateMachine();
 
 		// if the machine is now idling, then we need to attempt to get a new target

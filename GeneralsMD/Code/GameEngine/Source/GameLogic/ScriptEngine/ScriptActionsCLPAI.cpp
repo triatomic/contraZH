@@ -248,36 +248,6 @@ static Bool clpPlaceNear(const Coord3D *location, const ThingTemplate *tmpl, Rea
 }
 
 //-------------------------------------------------------------------------------------------------
-/** True if the player's build list still has an unbuilt supply center near pos. */
-//-------------------------------------------------------------------------------------------------
-static Bool clpHasPendingSupplyCenter(Player *player, const Coord3D *pos, Real radius)
-{
-	for( BuildListInfo *info = player->getBuildList(); info; info = info->getNext() )
-	{
-		if( info->getObjectID() != INVALID_ID || !info->isBuildable() )
-		{
-			continue;
-		}
-		if( !info->isPriorityBuild() && !info->isAutomaticBuild() )
-		{
-			continue;
-		}
-		const ThingTemplate *tmpl = TheThingFactory->findTemplate( info->getTemplateName(), FALSE );
-		if( !tmpl || !tmpl->isKindOf( KINDOF_CASH_GENERATOR ) )
-		{
-			continue;
-		}
-		Real dx = info->getLocation()->x - pos->x;
-		Real dy = info->getLocation()->y - pos->y;
-		if( dx * dx + dy * dy <= radius * radius )
-		{
-			return TRUE;
-		}
-	}
-	return FALSE;
-}
-
-//-------------------------------------------------------------------------------------------------
 /** Stock getPlayerSuperweaponValue, with objects of objectType worth five times as much. */
 //-------------------------------------------------------------------------------------------------
 static Int clpSuperweaponValueType(const Coord3D *center, Int playerNdx, Real radius, const AsciiString &objectType, Bool includeMilitaryUnits, const Player *viewer)
@@ -546,7 +516,7 @@ void AIPlayer::clpBuildNearestTeam(const ThingTemplate *tmpl, Team *team, Real a
 /** Stock buildBySupplies with a script angle. Supply centers face their dock and skip docks that
 	already have one queued. */
 //-------------------------------------------------------------------------------------------------
-void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplate, Real angle)
+void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplate, Real angle, Bool requiresSupplies)
 {
 	if( !tTemplate )
 	{
@@ -563,7 +533,7 @@ void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplat
 			bestSupplyWarehouse = curWarehouse;
 		}
 	}
-	if( !bestSupplyWarehouse )
+	if( !bestSupplyWarehouse || (isCashGenerator && !canBuildAtSupplySite(bestSupplyWarehouse->getID())) )
 	{
 		return;
 	}
@@ -620,7 +590,7 @@ void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplat
 	if( valid )
 	{
 		newPos.z = 0;
-		m_player->addToPriorityBuildList( tTemplate->getName(), &newPos, angle );
+		m_player->addToPriorityBuildList( tTemplate->getName(), &newPos, angle, bestSupplyWarehouse->getID(), requiresSupplies );
 	}
 	else
 	{
@@ -683,7 +653,7 @@ Object *AIPlayer::clpFindSupplyCenter(Int minimumCash)
 			{
 				continue;
 			}
-			if( clpHasPendingSupplyCenter( m_player, &center, radius ) )
+			if( hasSupplyCenterAtSite( obj->getID(), &center, radius, TRUE ) )
 			{
 				continue;
 			}
@@ -1146,7 +1116,7 @@ void ScriptActions::doBuildObjectNearestTeamAngle(const AsciiString& playerName,
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptActions::doBuildSupplyCenterAngle(const AsciiString& player, const AsciiString& buildingType, Int cash, Real angle)
+void ScriptActions::doBuildSupplyCenterAngle(const AsciiString& player, const AsciiString& buildingType, Int cash, Real angle, Bool requiresSupplies)
 {
 	Player *thePlayer = TheScriptEngine->getPlayerFromAsciiString( player );
 	if( !thePlayer )
@@ -1164,7 +1134,7 @@ void ScriptActions::doBuildSupplyCenterAngle(const AsciiString& player, const As
 	{
 		return;
 	}
-	ai->clpBuildBySupplies( cash, tmpl, angle * (PI / 180.0f) );
+	ai->clpBuildBySupplies( cash, tmpl, angle * (PI / 180.0f), requiresSupplies );
 }
 
 //-------------------------------------------------------------------------------------------------

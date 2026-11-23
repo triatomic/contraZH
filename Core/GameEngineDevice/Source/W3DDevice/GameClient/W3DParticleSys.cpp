@@ -31,7 +31,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameClient/Color.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
-#include "W3DDevice/GameClient/W3DParticleAtlas.h"
+#include "W3DDevice/GameClient/W3DTextureAtlas.h"
 #include "W3DDevice/GameClient/W3DTerrainParticles.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
@@ -84,7 +84,7 @@ static const ShaderClass &shaderForType(ParticleSystemInfo::ParticleShaderType t
 	}
 }
 
-// Atlas pages hold alpha art with its colour times its alpha and additive art with no alpha, so one blend draws both.
+// Alpha sprites send colour times alpha and additive sprites send no alpha, so one blend draws both.
 static ShaderClass premultipliedShader()
 {
 	ShaderClass shader = ShaderClass::_PresetAlphaSpriteShader;
@@ -150,9 +150,9 @@ W3DParticleSystemManager::~W3DParticleSystemManager()
 void W3DParticleSystemManager::reset()
 {
 	ParticleSystemManager::reset();
-	if (TheW3DParticleAtlas)
+	if (TheW3DTextureAtlas)
 	{
-		TheW3DParticleAtlas->reset();
+		TheW3DTextureAtlas->reset();
 	}
 }
 
@@ -221,11 +221,6 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	if (TheW3DSoftParticles)
 	{
 		TheW3DSoftParticles->beginPass(rinfo);
-	}
-
-	if (TheW3DParticleAtlas)
-	{
-		TheW3DParticleAtlas->beginFrame();
 	}
 
 	//reset each frame
@@ -654,7 +649,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 {
 	const Bool drawSmudge = TheSmudgeManager && !TheSmudgeManager->isReplaced() && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 	const Bool batchParticles = TheGlobalData->m_batchParticles;
-	const Bool useAtlas = TheGlobalData->m_particleAtlas && pass == DRAW_MAIN && TheW3DParticleAtlas != nullptr;
+	const Bool useAtlas = TheGlobalData->m_textureAtlas && pass == DRAW_MAIN && TheW3DTextureAtlas != nullptr;
 
 	unsigned int personalities[MAX_POINTS_PER_GROUP];
 
@@ -742,17 +737,17 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		Bool atlased = FALSE;
 		if (useAtlas && effects == 0 && sys->isUsingParticles() && !useTerrainConformingParticles)
 		{
-			const W3DParticleAtlas::TextureMode mode = (shaderType == ParticleSystemInfo::ALPHA) ? W3DParticleAtlas::ALPHA :
-				(shaderType == ParticleSystemInfo::ADDITIVE) ? W3DParticleAtlas::ADDITIVE : W3DParticleAtlas::UNMODIFIED;
-			TextureClass *page = TheW3DParticleAtlas->find(texture.Peek(), mode, atlasRect);
+			const W3DTextureAtlas::TextureMode mode = (shaderType == ParticleSystemInfo::ALPHA) ? W3DTextureAtlas::ALPHA : W3DTextureAtlas::UNMODIFIED;
+			TextureClass *page = TheW3DTextureAtlas->find(texture.Peek(), mode, atlasRect);
 			if (page != nullptr)
 			{
 				batchTexture = page;
 				atlased = TRUE;
-				premultiplied = mode != W3DParticleAtlas::UNMODIFIED;
+				premultiplied = shaderType == ParticleSystemInfo::ALPHA || shaderType == ParticleSystemInfo::ADDITIVE;
 			}
 		}
 		const Bool premultipliedAlpha = premultiplied && shaderType == ParticleSystemInfo::ALPHA;
+		const Bool premultipliedAdditive = premultiplied && shaderType == ParticleSystemInfo::ADDITIVE;
 
 		const Bool canBatch = (batchParticles || atlased) && sys->isUsingParticles() && !useTerrainConformingParticles;
 		if (!canBatch || finishedBatch(*sys, batchTexture, premultiplied, effects, effectData))
@@ -840,6 +835,11 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 				RGBAArray[pointCount].X = clamp(0.0f, RGBAArray[pointCount].X, 1.0f) * alpha;
 				RGBAArray[pointCount].Y = clamp(0.0f, RGBAArray[pointCount].Y, 1.0f) * alpha;
 				RGBAArray[pointCount].Z = clamp(0.0f, RGBAArray[pointCount].Z, 1.0f) * alpha;
+			}
+			else if (premultipliedAdditive)
+			{
+				// the shared blend adds a sprite whose alpha is zero
+				RGBAArray[pointCount].W = 0.0f;
 			}
 
 			angleArray[pointCount] = (uint8)(p->getAngle() * 255.0f / (2.0f * PI));
