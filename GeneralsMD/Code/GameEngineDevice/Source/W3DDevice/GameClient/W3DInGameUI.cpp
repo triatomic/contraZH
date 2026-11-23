@@ -549,12 +549,9 @@ void W3DInGameUI::drawActionLines()
 
 				const Real fade1 = min( start / fade, 1.0f );
 				const Real fade2 = min( end / fade, 1.0f );
-				const Int sx = REAL_TO_INT( x1 );
-				const Int sy = REAL_TO_INT( y1 );
-				const Int ex = REAL_TO_INT( x2 );
-				const Int ey = REAL_TO_INT( y2 );
 
-				TheDisplay->drawLine( sx, sy, ex, ey, lineWidth,
+				// rounded ends would tilt each short dash off the line's angle
+				TheDisplay->drawSubPixelLine( x1, y1, x2, y2, lineWidth,
 					( (UnsignedInt)REAL_TO_INT( lineAlpha * fade1 ) << 24 ) | rgb,
 					( (UnsignedInt)REAL_TO_INT( lineAlpha * fade2 ) << 24 ) | rgb );
 			}

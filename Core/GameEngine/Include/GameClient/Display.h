@@ -150,6 +150,12 @@ public:
 	/// draw a line on the display in pixel coordinates with the specified 2 colors
 	virtual void drawLine( Int startX, Int startY, Int endX, Int endY,
 												 Real lineWidth, UnsignedInt lineColor1, UnsignedInt lineColor2 ) = 0;
+	/// draw a line on the display at sub-pixel coordinates with the specified 2 colors
+	virtual void drawSubPixelLine( Real startX, Real startY, Real endX, Real endY,
+												 Real lineWidth, UnsignedInt lineColor1, UnsignedInt lineColor2 )
+	{
+		drawLine( REAL_TO_INT( startX ), REAL_TO_INT( startY ), REAL_TO_INT( endX ), REAL_TO_INT( endY ), lineWidth, lineColor1, lineColor2 );
+	}
 	/// draw a rect border on the display in pixel coordinates with the specified color
 	virtual void drawOpenRect( Int startX, Int startY, Int width, Int height,
 														 Real lineWidth, UnsignedInt lineColor ) = 0;

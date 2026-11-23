@@ -2748,6 +2748,25 @@ void W3DDisplay::drawLine( Int startX, Int startY,
 
 }
 
+// W3DDisplay::drawSubPixelLine ===============================================
+/** draw a line on the display at sub-pixel coordinates with the specified 2 colors */
+//=============================================================================
+void W3DDisplay::drawSubPixelLine( Real startX, Real startY,
+													 Real endX, Real endY,
+													 Real lineWidth,
+													 UnsignedInt lineColor1, UnsignedInt lineColor2 )
+{
+	setup2DRenderState(nullptr, DRAW_IMAGE_ALPHA, FALSE);
+
+	m_2DRender->Add_Line( Vector2( startX, startY ), Vector2( endX, endY ),
+												lineWidth, lineColor1, lineColor2 );
+
+	if (!m_isBatching)
+	{
+		m_2DRender->Render();
+	}
+}
+
 
 // W3DDisplay::drawOpenRect ===================================================
 //=============================================================================
