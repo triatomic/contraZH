@@ -1322,7 +1322,6 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
 	m_hitAndRun(proto->getTemplateInfo()->m_hitAndRun),
 	m_hitAndRunRetreating(false),
 	m_hitAndRunRetreatMinEnd(0),
-	m_hitAndRunTimerStart(0),
 	m_hitAndRunFirstShotFrame(0),
 	m_hitAndRunRetreatPointCount(0),
 	m_active(false),
@@ -1848,7 +1847,6 @@ void Team::setHitAndRun(Bool enabled)
 		m_hitAndRun = enabled;
 		m_hitAndRunRetreating = false;
 		m_hitAndRunShots.clear();
-		m_hitAndRunFinishedRetreat.clear();
 	}
 }
 
@@ -1862,14 +1860,6 @@ void Team::recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil)
 		}
 		UnsignedInt &lastReload = m_hitAndRunShots[member];
 		lastReload = std::max(lastReload, reloadUntil);
-	}
-}
-
-void Team::notifyHitAndRunRetreatFinished(ObjectID member)
-{
-	if (m_hitAndRunRetreating && m_proto->getTemplateInfo()->m_hitAndRunUseTimer)
-	{
-		m_hitAndRunFinishedRetreat.insert(member);
 	}
 }
 
@@ -1913,7 +1903,6 @@ void Team::updateHitAndRun()
 	Int attackers = 0;
 	Int fired = 0;
 	Int reloaded = 0;
-	Bool allFinishedRetreat = true;
 	const TeamTemplateInfo *info = m_proto->getTemplateInfo();
 	Bool engaged = false;
 	const Waypoint *previousWaypoint = nullptr;
@@ -1923,11 +1912,6 @@ void Team::updateHitAndRun()
 		if (!canHitAndRun(obj))
 		{
 			continue;
-		}
-		if (m_hitAndRunRetreating && info->m_hitAndRunUseTimer &&
-			m_hitAndRunFinishedRetreat.find(obj->getID()) == m_hitAndRunFinishedRetreat.end())
-		{
-			allFinishedRetreat = false;
 		}
 		if (obj->getLargestWeaponRange() < 0.0f)
 		{
@@ -1958,27 +1942,13 @@ void Team::updateHitAndRun()
 
 	if (m_hitAndRunRetreating)
 	{
-		Bool ready;
-		if (info->m_hitAndRunUseTimer)
-		{
-			if (allFinishedRetreat && m_hitAndRunTimerStart == 0)
-			{
-				m_hitAndRunTimerStart = now;
-			}
-			ready = m_hitAndRunTimerStart != 0 &&
-				now - m_hitAndRunTimerStart >= (UnsignedInt)(info->m_hitAndRunDelaySeconds * LOGICFRAMES_PER_SECOND);
-		}
-		else
-		{
-			const Int reloadRequired = (attackers * info->m_hitAndRunReloadPercent + 99) / 100;
-			ready = reloaded >= std::min(fired, reloadRequired);
-		}
+		const Int reloadRequired = (attackers * info->m_hitAndRunReloadPercent + 99) / 100;
+		const Bool ready = info->m_hitAndRunUseTimer || reloaded >= std::min(fired, reloadRequired);
 
 		if (attackers == 0 || (now >= m_hitAndRunRetreatMinEnd && ready))
 		{
 			m_hitAndRunRetreating = false;
 			m_hitAndRunShots.clear();
-			m_hitAndRunFinishedRetreat.clear();
 		}
 		return;
 	}
@@ -2040,9 +2010,8 @@ void Team::updateHitAndRun()
 	}
 
 	m_hitAndRunRetreating = true;
-	m_hitAndRunRetreatMinEnd = now + 1;
-	m_hitAndRunTimerStart = 0;
-	m_hitAndRunFinishedRetreat.clear();
+	const Int retreatFrames = info->m_hitAndRunUseTimer ? info->m_hitAndRunDelaySeconds * LOGICFRAMES_PER_SECOND : 0;
+	m_hitAndRunRetreatMinEnd = now + std::max(1, retreatFrames);
 	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
 		if (canHitAndRun(iter.cur()))
@@ -2825,7 +2794,7 @@ void Team::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 6;
+	XferVersion currentVersion = 7;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -3004,28 +2973,21 @@ void Team::xfer( Xfer *xfer )
 		{
 			xfer->xferUnsignedInt(&m_hitAndRunFirstShotFrame);
 		}
-		if (version >= 5)
+		if (version >= 5 && version < 7)
 		{
-			xfer->xferUnsignedInt(&m_hitAndRunTimerStart);
-			UnsignedInt count = m_hitAndRunFinishedRetreat.size();
+			UnsignedInt oldTimerStart = 0;
+			UnsignedInt count = 0;
+			xfer->xferUnsignedInt(&oldTimerStart);
 			xfer->xferUnsignedInt(&count);
-			if (xfer->getXferMode() == XFER_LOAD)
+			for (UnsignedInt i = 0; i < count; ++i)
 			{
-				m_hitAndRunFinishedRetreat.clear();
-				for (UnsignedInt i = 0; i < count; ++i)
-				{
-					ObjectID id = INVALID_ID;
-					xfer->xferObjectID(&id);
-					m_hitAndRunFinishedRetreat.insert(id);
-				}
+				ObjectID id = INVALID_ID;
+				xfer->xferObjectID(&id);
 			}
-			else
+			const TeamTemplateInfo *info = m_proto->getTemplateInfo();
+			if (m_hitAndRunRetreating && info->m_hitAndRunUseTimer)
 			{
-				for (std::set<ObjectID>::const_iterator it = m_hitAndRunFinishedRetreat.begin(); it != m_hitAndRunFinishedRetreat.end(); ++it)
-				{
-					ObjectID id = *it;
-					xfer->xferObjectID(&id);
-				}
+				m_hitAndRunRetreatMinEnd += std::max(1, info->m_hitAndRunDelaySeconds * LOGICFRAMES_PER_SECOND) - 1;
 			}
 		}
 	}

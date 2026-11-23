@@ -208,9 +208,7 @@ private:
 	Bool					m_hitAndRun;
 	Bool					m_hitAndRunRetreating;
 	UnsignedInt			m_hitAndRunRetreatMinEnd;
-	UnsignedInt			m_hitAndRunTimerStart;
 	UnsignedInt			m_hitAndRunFirstShotFrame;
-	std::set<ObjectID>	m_hitAndRunFinishedRetreat;
 	enum { HIT_AND_RUN_RETREAT_POINTS = 3 };
 	Coord3D				m_hitAndRunRetreatPoints[HIT_AND_RUN_RETREAT_POINTS];
 	Int					m_hitAndRunRetreatPointCount;
@@ -315,7 +313,6 @@ public:
 	void setHitAndRun(Bool enabled);
 	static Bool canHitAndRun(const Object *obj);
 	void recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil);
-	void notifyHitAndRunRetreatFinished(ObjectID member);
 	const Coord3D *getHitAndRunRetreatPoint(Int leg = 0) const
 	{
 		return m_hitAndRunRetreating && leg >= 0 && leg < m_hitAndRunRetreatPointCount ? &m_hitAndRunRetreatPoints[leg] : nullptr;

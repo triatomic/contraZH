@@ -20,11 +20,11 @@ inline const TeamHitAndRunField *getTeamHitAndRunField(Int control)
 	static const TeamHitAndRunField fields[] =
 	{
 		{ IDC_TEAM_HIT_AND_RUN_RELOAD_PCT, TheKey_teamHitAndRunReloadPercent, 1, 100, TeamTemplateInfo::HIT_AND_RUN_DEFAULT_PERCENT,
-			"Resume when this percentage of the team has fired and reloaded in the current volley. If fewer units fired, wait for all of them." },
+			"Attack when this percentage of ground attackers have fired and reloaded in the current volley. If fewer units fired, wait for all of them." },
 		{ IDC_TEAM_HIT_AND_RUN_DELAY, TheKey_teamHitAndRunDelaySeconds, 0, TeamTemplateInfo::HIT_AND_RUN_MAX_DELAY, TeamTemplateInfo::HIT_AND_RUN_DEFAULT_DELAY,
-			"Wait this many seconds after the team finishes retreating before attacking again." },
+			"Attack this many seconds after the team starts retreating." },
 		{ IDC_TEAM_HIT_AND_RUN_RETREAT, TheKey_teamHitAndRunRetreatPercent, 1, 100, TeamTemplateInfo::HIT_AND_RUN_DEFAULT_PERCENT,
-			"Retreat after this percentage of the team's mobile ground attackers has fired in the current volley." },
+			"Retreat after this percentage of the team's ground attackers have fired in the current volley." },
 		{ IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY, TheKey_teamHitAndRunRetreatDelaySeconds, 0, TeamTemplateInfo::HIT_AND_RUN_MAX_DELAY, TeamTemplateInfo::HIT_AND_RUN_DEFAULT_DELAY,
 			"Retreat this many seconds after the team's first shot in the current volley." }
 	};

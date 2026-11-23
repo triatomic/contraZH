@@ -371,7 +371,7 @@ protected:
 	}
 
 private:
-	void startNextLeg(Team *team)
+	void startNextLeg(const Team *team)
 	{
 		while (const Coord3D *point = team->getHitAndRunRetreatPoint(m_leg))
 		{
@@ -385,7 +385,6 @@ private:
 			}
 			stopMoving(EXIT_NORMAL);
 		}
-		team->notifyHitAndRunRetreatFinished(getMachineOwner()->getID());
 	}
 
 	void returnFire()
