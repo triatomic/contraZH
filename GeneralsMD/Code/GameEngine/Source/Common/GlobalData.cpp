@@ -66,6 +66,27 @@
 
 #include "GameNetwork/FirewallHelper.h"
 
+#include <float.h>
+#include <stdlib.h>
+
+double GlobalData::scanExperienceBonus(const char* token)
+{
+	char* end;
+	const double percent = strtod(token, &end);
+	if( end == token || (*end != '\0' && (*end != '%' || end[1] != '\0'))
+		|| !(percent >= -DBL_MAX && percent <= DBL_MAX) )
+	{
+		throw INI_INVALID_DATA;
+	}
+	return percent;
+}
+
+//-------------------------------------------------------------------------------------------------
+static void parseExperienceBonus(INI* ini, void* instance, void* store, const void* userData)
+{
+	*(double*)store = GlobalData::scanExperienceBonus(ini->getNextToken());
+}
+
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 GlobalData* TheWritableGlobalData = nullptr;				///< The global data singleton
 
@@ -728,6 +749,17 @@ static const char *DistanceFogPresetNames[] = { "SUN", "DESERT", "FUTURISTIC", "
 	{ "MovementPenaltyDamageState",	INI::parseIndexList,	TheBodyDamageTypeNames,	 offsetof( GlobalData, m_movementPenaltyDamageState ) },
 
 // you cannot set this; it always has a value of 100%.
+	{ "ExperienceValueBonus_Veteran",	parseExperienceBonus, nullptr,	offsetof( GlobalData, m_experienceValueBonus[LEVEL_VETERAN]) },
+	{ "ExperienceValueBonus_Elite",	parseExperienceBonus, nullptr,	offsetof( GlobalData, m_experienceValueBonus[LEVEL_ELITE]) },
+	{ "ExperienceValueBonus_Heroic",	parseExperienceBonus, nullptr,	offsetof( GlobalData, m_experienceValueBonus[LEVEL_HEROIC]) },
+	{ "ExperienceValueBonus_Four",	parseExperienceBonus, nullptr,	offsetof( GlobalData, m_experienceValueBonus[LEVEL_FOUR]) },
+	{ "ExperienceValueBonus_Five",	parseExperienceBonus, nullptr,	offsetof( GlobalData, m_experienceValueBonus[LEVEL_FIVE]) },
+	{ "ExperienceRequiredBonus_Veteran",	parseExperienceBonus, nullptr,	offsetof( GlobalData, m_experienceRequiredBonus[LEVEL_VETERAN]) },
+	{ "ExperienceRequiredBonus_Elite",	parseExperienceBonus, nullptr,	offsetof( GlobalData, m_experienceRequiredBonus[LEVEL_ELITE]) },
+	{ "ExperienceRequiredBonus_Heroic",	parseExperienceBonus, nullptr,	offsetof( GlobalData, m_experienceRequiredBonus[LEVEL_HEROIC]) },
+	{ "ExperienceRequiredBonus_Four",	parseExperienceBonus, nullptr,	offsetof( GlobalData, m_experienceRequiredBonus[LEVEL_FOUR]) },
+	{ "ExperienceRequiredBonus_Five",	parseExperienceBonus, nullptr,	offsetof( GlobalData, m_experienceRequiredBonus[LEVEL_FIVE]) },
+
 //{ "HealthBonus_Regular",				INI::parsePercentToReal, nullptr,	offsetof( GlobalData, m_healthBonus[LEVEL_REGULAR]) },
 	{ "HealthBonus_Veteran",				INI::parsePercentToReal, nullptr,	offsetof( GlobalData, m_healthBonus[LEVEL_VETERAN]) },
 	{ "HealthBonus_Elite",					INI::parsePercentToReal, nullptr,	offsetof( GlobalData, m_healthBonus[LEVEL_ELITE]) },
@@ -1577,7 +1609,11 @@ GlobalData::GlobalData()
 #endif
 
 	for (i = LEVEL_FIRST; i <= LEVEL_LAST; ++i)
+	{
+		m_experienceValueBonus[i] = -1.0;
+		m_experienceRequiredBonus[i] = -1.0;
 		m_healthBonus[i] = 1.0f;
+	}
 
 	for (i = 0; i < PLAYERTYPE_COUNT; ++i)
 	{
