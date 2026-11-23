@@ -656,6 +656,7 @@ public:
 	virtual StateReturnType onEnter() override;
 	virtual void onExit( StateExitType status ) override;
 	virtual StateReturnType update() override;
+	const Waypoint *getCurrentWaypoint() const { return m_currentWaypoint; }
 
 protected:
 	// snapshot interface
@@ -852,13 +853,13 @@ public:
 	virtual StateReturnType onEnter() override;
 	virtual void onExit( StateExitType status ) override;
 	virtual StateReturnType update() override;
+	Int getCurPathIndex() const { return m_index; }
 
 	// ShigureUi 28/10/2026 only used by AIStateMachine::addToGoalPath()
 	void friend_recheckFinalDestination(Int index);
 
 protected:
 
-	Int getCurPathIndex() const { return m_index; }
 	void setAdjustFinalDestination(Bool b) { m_adjustFinal = b; }
 	void setAdjustFinalDestinationEvenIfNotDoingGroundMovement(Bool b) { m_adjustFinalOverride = b; }
 

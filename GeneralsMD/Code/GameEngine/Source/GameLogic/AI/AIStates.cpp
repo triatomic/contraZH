@@ -1112,6 +1112,25 @@ StateReturnType AIStateMachine::updateStateMachine()
 						order = AI_IDLE;
 					}
 				}
+				else if (order == AI_FOLLOW_WAYPOINT_PATH_AS_TEAM || order == AI_FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS ||
+					order == AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM || order == AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS)
+				{
+					// onEnter restarts a path from its first point, so resume at the point the unit was heading to
+					const Waypoint *way = static_cast<AIFollowWaypointPathState *>(internalGetState(order))->getCurrentWaypoint();
+					if (way)
+					{
+						setGoalWaypoint(way);
+					}
+				}
+				else if (order == AI_FOLLOW_PATH)
+				{
+					const Int index = static_cast<AIFollowPathState *>(internalGetState(order))->getCurPathIndex();
+					if (index > 0 && index < (Int)m_goalPath.size())
+					{
+						m_goalPath.erase(m_goalPath.begin(), m_goalPath.begin() + index);
+						m_goalPathInfo.erase(m_goalPathInfo.begin(), m_goalPathInfo.begin() + index);
+					}
+				}
 				setState(order);
 			}
 		}
