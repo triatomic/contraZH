@@ -1852,7 +1852,7 @@ void Team::addHitAndRunRetreatPoint(const Coord3D &point)
 {
 	Region3D bounds;
 	TheTerrainLogic->getMaximumPathfindExtent(&bounds);
-	if ((point.x == 0.0f && point.y == 0.0f) || !bounds.isInRegionNoZ(point) ||
+	if ((std::abs(point.x) < PATHFIND_CELL_SIZE_F && std::abs(point.y) < PATHFIND_CELL_SIZE_F) || !bounds.isInRegionNoZ(point) ||
 		m_hitAndRunRetreatPointCount >= HIT_AND_RUN_RETREAT_POINTS)
 	{
 		return;

@@ -273,6 +273,42 @@ static Team *getHitAndRunTeam(Object *obj)
 	return player && player->getPlayerType() == PLAYER_COMPUTER ? team : nullptr;
 }
 
+static Bool isHitAndRunOrigin(const Coord3D *point)
+{
+	return point && std::abs(point->x) < PATHFIND_CELL_SIZE_F && std::abs(point->y) < PATHFIND_CELL_SIZE_F;
+}
+
+static Object *getHitAndRunAttackTarget(Object *obj)
+{
+	Team *team = getHitAndRunTeam(obj);
+	if (!team || team->getHitAndRunRetreatPoint())
+	{
+		return nullptr;
+	}
+
+	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
+	{
+		Object *member = iter.cur();
+		if (member == obj || !Team::canHitAndRun(member) || !member->getAI()->isAttacking())
+		{
+			continue;
+		}
+
+		Object *target = member->getAI()->getCurrentVictim();
+		if (!target || target->isEffectivelyDead() || obj->getRelationship(target) != ENEMIES)
+		{
+			continue;
+		}
+
+		const CanAttackResult result = obj->getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, target, CMD_FROM_AI);
+		if (result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING)
+		{
+			return target;
+		}
+	}
+	return nullptr;
+}
+
 class AIHitAndRunRetreatState : public AIInternalMoveToState
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(AIHitAndRunRetreatState, "AIHitAndRunRetreatState")
@@ -296,10 +332,17 @@ public:
 		{
 			return STATE_SUCCESS;
 		}
-		if (m_moving && AIInternalMoveToState::update() != STATE_CONTINUE)
+		if (m_moving)
 		{
-			stopMoving(EXIT_NORMAL);
-			startNextLeg(team);
+			AIUpdateInterface *ai = getMachineOwner()->getAI();
+			Path *path = ai->getPath();
+			const Bool originGoal = !ai->isWaitingForPath() && path && path->getLastNode() &&
+				isHitAndRunOrigin(path->getLastNode()->getPosition());
+			if (originGoal || AIInternalMoveToState::update() != STATE_CONTINUE)
+			{
+				stopMoving(EXIT_NORMAL);
+				startNextLeg(team);
+			}
 		}
 		returnFire();
 		return STATE_CONTINUE;
@@ -316,6 +359,11 @@ public:
 	}
 
 protected:
+	virtual Bool computePath() override
+	{
+		return !isHitAndRunOrigin(getGoalPos()) && AIInternalMoveToState::computePath();
+	}
+
 	virtual void xfer(Xfer *xfer) override
 	{
 		AIInternalMoveToState::xfer(xfer);
@@ -1050,7 +1098,21 @@ StateReturnType AIStateMachine::updateStateMachine()
 			m_temporaryState = nullptr;
 			if (wasRetreating && getCurrentStateID() != INVALID_STATE_ID)
 			{
-				setState(getCurrentStateID());
+				StateID order = getCurrentStateID();
+				if ((order == AI_ATTACK_MOVE_TO || order == AI_MOVE_TO) && !getGoalObject() &&
+					isHitAndRunOrigin(getGoalPosition()))
+				{
+					const Coord3D *givenGoal = getOwner()->getAI()->getGivenGoal();
+					if (givenGoal && !isHitAndRunOrigin(givenGoal))
+					{
+						setGoalPosition(givenGoal);
+					}
+					else
+					{
+						order = AI_IDLE;
+					}
+				}
+				setState(order);
 			}
 		}
 	}
@@ -1676,7 +1738,11 @@ StateReturnType AIIdleState::update()
 			if ((moodAdjust & MAA_Affect_Range_IgnoreAll) == 0)
 			{
 				// If we're supposed to attack based on mood, etc, then we will do so.
-				Object* enemy = ai->getNextMoodTarget( true, true );
+				Object *enemy = getHitAndRunAttackTarget(obj);
+				if (!enemy)
+				{
+					enemy = ai->getNextMoodTarget( true, true );
+				}
 				if (enemy)
 				{
 	 				ai->aiAttackObject(enemy, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
@@ -4142,8 +4208,11 @@ StateReturnType AIAttackMoveToState::update()
 			return STATE_CONTINUE;
 		}
 
-		Object* nextObjectToAttack;
-		nextObjectToAttack = ai->getNextMoodTarget( !forceRetargetThisFrame, false );
+		Object *nextObjectToAttack = getHitAndRunAttackTarget(owner);
+		if (!nextObjectToAttack)
+		{
+			nextObjectToAttack = ai->getNextMoodTarget( !forceRetargetThisFrame, false );
+		}
 		if (nextObjectToAttack != nullptr)
 		{
 			ai->friend_endingMove();
@@ -5033,9 +5102,9 @@ StateReturnType AIAttackFollowWaypointPathState::update()
 			return STATE_CONTINUE;
 		}
 
-		Object* nextObjectToAttack;
+		Object *nextObjectToAttack = getHitAndRunAttackTarget(owner);
+		if (!nextObjectToAttack)
 		{
-
 			nextObjectToAttack = ai->getNextMoodTarget( !forceRetargetThisFrame, false );
 		}
 		if (nextObjectToAttack != nullptr)
