@@ -173,12 +173,12 @@ Notes:
 * Particle systems with nothing on screen are now skipped regardless of the option.
 * Ported from TheSuperHackers commit `de20ae0cb` (Ronin and Mauller).
 
-## ParticleAtlas
+## TextureAtlas
 
-* `ParticleAtlas = No` - (Default. `Yes` packs particle textures into shared atlas pages, so alpha
+* `TextureAtlas = No` - (Default. `Yes` packs particle textures into shared atlas pages, so alpha
 and additive systems with different textures batch into the same draws.)
 
-Plain alpha and additive particle systems draw from 2048x2048 pages with premultiplied blending.
+Plain alpha and additive particle systems draw from 2304x2304 pages with premultiplied blending.
 One blend state covers both modes, and the translucency sorter merges neighbouring triangles that
 share a page into one draw. Batches no longer break on texture or blend changes.
 Alpha-test and multiply systems also share pages, keeping their original texels and blend modes.
@@ -187,8 +187,9 @@ Notes:
 * Implies batching for the systems it covers, whatever `BatchParticles` says.
 * Additive particles now depth-sort with smoke instead of drawing after it, so smoke in front of
 a fire covers it.
-* Textures are packed the first time they draw, at most four per frame, and the pages are cleared between maps. Up to four
-pages per map; textures that do not fit draw as before.
+* Textures are packed the first time they draw, at most two per frame, and the pages are cleared between maps. Up to four
+pages per map; when they fill up, the oldest page is emptied and its textures pack again as they draw.
+* The key was named `ParticleAtlas` before; an exe reads only the name it was built with.
 * Not covered: streak, volume and terrain-conforming systems, systems with
 the flame, cryo, electric or disruption shaders, non power-of-two textures and ones smaller than
 16 pixels. The glow pass also keeps the old path.

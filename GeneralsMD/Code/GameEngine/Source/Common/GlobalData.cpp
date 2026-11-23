@@ -238,7 +238,7 @@ static const char *DistanceFogPresetNames[] = { "SUN", "DESERT", "FUTURISTIC", "
 	{ "QueueReorder",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_queueReorder ) },
 	{ "NoOccupantFriendlyFire",			INI::parseBool,				nullptr,			offsetof( GlobalData, m_noOccupantFriendlyFire ) },
 	{ "BatchParticles",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_batchParticles ) },
-	{ "ParticleAtlas",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_particleAtlas ) },
+	{ "TextureAtlas",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_textureAtlas ) },
 	{ "SkipTranslucencySort",			INI::parseBool,				nullptr,			offsetof( GlobalData, m_skipTranslucencySort ) },
 	{ "BackToFront",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_backToFront ) },
 	{ "DumpAssetUsage",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_dumpAssetUsage ) },
@@ -943,7 +943,7 @@ GlobalData::GlobalData()
   m_queueReorder = FALSE;
   m_noOccupantFriendlyFire = FALSE;
   m_batchParticles = FALSE;
-  m_particleAtlas = FALSE;
+  m_textureAtlas = FALSE;
   m_skipTranslucencySort = FALSE;
   m_backToFront = FALSE;
   m_useBloom = TRUE;

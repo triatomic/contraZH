@@ -649,7 +649,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 {
 	const Bool drawSmudge = TheSmudgeManager && !TheSmudgeManager->isReplaced() && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 	const Bool batchParticles = TheGlobalData->m_batchParticles;
-	const Bool useAtlas = TheGlobalData->m_particleAtlas && pass == DRAW_MAIN && TheW3DTextureAtlas != nullptr;
+	const Bool useAtlas = TheGlobalData->m_textureAtlas && pass == DRAW_MAIN && TheW3DTextureAtlas != nullptr;
 
 	unsigned int personalities[MAX_POINTS_PER_GROUP];
 
