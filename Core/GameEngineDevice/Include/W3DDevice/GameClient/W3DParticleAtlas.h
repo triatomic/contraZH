@@ -28,14 +28,14 @@
 #include <map>
 #include <vector>
 
-// Alpha and additive textures share premultiplied blending; other modes keep their original texels.
+// ALPHA stores the art times its alpha, so alpha sprites can share one blend with additive ones.
 class W3DParticleAtlas
 {
 public:
 	W3DParticleAtlas();
 	~W3DParticleAtlas();
 
-	enum TextureMode { UNMODIFIED, ALPHA, ADDITIVE, MODE_COUNT };
+	enum TextureMode { UNMODIFIED, ALPHA, MODE_COUNT };
 
 	/// the page holding the texture's converted art and its rectangle in uv, or null when it has no place; valid only for the frame that asked
 	TextureClass *find(TextureClass *source, TextureMode mode, Vector4 &rect);

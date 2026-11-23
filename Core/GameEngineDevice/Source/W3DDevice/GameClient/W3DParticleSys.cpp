@@ -84,7 +84,7 @@ static const ShaderClass &shaderForType(ParticleSystemInfo::ParticleShaderType t
 	}
 }
 
-// Atlas pages hold alpha art with its colour times its alpha and additive art with no alpha, so one blend draws both.
+// Alpha sprites send colour times alpha and additive sprites send no alpha, so one blend draws both.
 static ShaderClass premultipliedShader()
 {
 	ShaderClass shader = ShaderClass::_PresetAlphaSpriteShader;
@@ -737,17 +737,17 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		Bool atlased = FALSE;
 		if (useAtlas && effects == 0 && sys->isUsingParticles() && !useTerrainConformingParticles)
 		{
-			const W3DParticleAtlas::TextureMode mode = (shaderType == ParticleSystemInfo::ALPHA) ? W3DParticleAtlas::ALPHA :
-				(shaderType == ParticleSystemInfo::ADDITIVE) ? W3DParticleAtlas::ADDITIVE : W3DParticleAtlas::UNMODIFIED;
+			const W3DParticleAtlas::TextureMode mode = (shaderType == ParticleSystemInfo::ALPHA) ? W3DParticleAtlas::ALPHA : W3DParticleAtlas::UNMODIFIED;
 			TextureClass *page = TheW3DParticleAtlas->find(texture.Peek(), mode, atlasRect);
 			if (page != nullptr)
 			{
 				batchTexture = page;
 				atlased = TRUE;
-				premultiplied = mode != W3DParticleAtlas::UNMODIFIED;
+				premultiplied = shaderType == ParticleSystemInfo::ALPHA || shaderType == ParticleSystemInfo::ADDITIVE;
 			}
 		}
 		const Bool premultipliedAlpha = premultiplied && shaderType == ParticleSystemInfo::ALPHA;
+		const Bool premultipliedAdditive = premultiplied && shaderType == ParticleSystemInfo::ADDITIVE;
 
 		const Bool canBatch = (batchParticles || atlased) && sys->isUsingParticles() && !useTerrainConformingParticles;
 		if (!canBatch || finishedBatch(*sys, batchTexture, premultiplied, effects, effectData))
@@ -835,6 +835,11 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 				RGBAArray[pointCount].X = clamp(0.0f, RGBAArray[pointCount].X, 1.0f) * alpha;
 				RGBAArray[pointCount].Y = clamp(0.0f, RGBAArray[pointCount].Y, 1.0f) * alpha;
 				RGBAArray[pointCount].Z = clamp(0.0f, RGBAArray[pointCount].Z, 1.0f) * alpha;
+			}
+			else if (premultipliedAdditive)
+			{
+				// the shared blend adds a sprite whose alpha is zero
+				RGBAArray[pointCount].W = 0.0f;
 			}
 
 			angleArray[pointCount] = (uint8)(p->getAngle() * 255.0f / (2.0f * PI));

@@ -359,17 +359,6 @@ Bool W3DParticleAtlas::copyToCell(const TextureClass &source, const TextureClass
 		{
 			premultiply_alpha(art, pitch, width, height);
 		}
-		else if (fromSource && mode == ADDITIVE)
-		{
-			for (Int row = 0; row < height; ++row)
-			{
-				UnsignedInt *line = (UnsignedInt *)(art + row * pitch);
-				for (Int column = 0; column < width; ++column)
-				{
-					line[column] &= 0x00FFFFFFu;
-				}
-			}
-		}
 
 		Fill_Padding(cell, pitch, width, height, padding, wrapU, wrapV);
 		pageSurface->Unlock();
