@@ -278,25 +278,14 @@ class AIHitAndRunRetreatState : public AIInternalMoveToState
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(AIHitAndRunRetreatState, "AIHitAndRunRetreatState")
 public:
 	AIHitAndRunRetreatState(StateMachine *machine) :
-		AIInternalMoveToState(machine, "AIHitAndRunRetreatState"), m_moving(false)
+		AIInternalMoveToState(machine, "AIHitAndRunRetreatState"), m_leg(0), m_moving(false)
 	{
 	}
 
 	virtual StateReturnType onEnter() override
 	{
-		const Coord3D *point = getMachineOwner()->getTeam()->getHitAndRunRetreatPoint();
-		if (!point)
-		{
-			return STATE_FAILURE;
-		}
-
-		setGoalPos(point);
-		setAdjustsDestination(true);
-		m_moving = true;
-		if (AIInternalMoveToState::onEnter() != STATE_CONTINUE)
-		{
-			stopMoving(EXIT_NORMAL);
-		}
+		m_leg = 0;
+		startNextLeg(getMachineOwner()->getTeam());
 		return STATE_CONTINUE;
 	}
 
@@ -310,9 +299,13 @@ public:
 		if (m_moving && AIInternalMoveToState::update() != STATE_CONTINUE)
 		{
 			stopMoving(EXIT_NORMAL);
+			startNextLeg(team);
 		}
+		returnFire();
 		return STATE_CONTINUE;
 	}
+
+	void xferLeg(Xfer *xfer) { xfer->xferInt(&m_leg); }
 
 	virtual void onExit(StateExitType status) override
 	{
@@ -330,12 +323,57 @@ protected:
 	}
 
 private:
+	void startNextLeg(const Team *team)
+	{
+		while (const Coord3D *point = team->getHitAndRunRetreatPoint(m_leg))
+		{
+			++m_leg;
+			setGoalPos(point);
+			setAdjustsDestination(true);
+			m_moving = true;
+			if (AIInternalMoveToState::onEnter() == STATE_CONTINUE)
+			{
+				return;
+			}
+			stopMoving(EXIT_NORMAL);
+		}
+	}
+
+	void returnFire()
+	{
+		Object *obj = getMachineOwner();
+		AIUpdateInterface *ai = obj->getAI();
+		const BodyModuleInterface *body = obj->getBodyModule();
+		Object *attacker = body ? TheGameLogic->findObjectByID(body->getClearableLastAttacker()) : nullptr;
+		if (!attacker || attacker->isEffectivelyDead() || obj->getRelationship(attacker) != ENEMIES)
+		{
+			return;
+		}
+
+		WeaponSlotType slot;
+		const Weapon *weapon = obj->getCurrentWeapon(&slot);
+		if (!weapon || !weapon->isWithinAttackRange(obj, attacker))
+		{
+			return;
+		}
+		const WhichTurretType turret = ai->getWhichTurretForWeaponSlot(slot, nullptr);
+		if (turret != TURRET_INVALID)
+		{
+			Object *target = ai->getTurretTargetObject(turret);
+			if (!target || !weapon->isWithinAttackRange(obj, target))
+			{
+				ai->setTurretTargetObject(turret, attacker);
+			}
+		}
+	}
+
 	void stopMoving(StateExitType status)
 	{
 		AIInternalMoveToState::onExit(status);
 		m_moving = false;
 	}
 
+	Int m_leg;
 	Bool m_moving;
 };
 EMPTY_DTOR(AIHitAndRunRetreatState)
@@ -838,7 +876,7 @@ void AIStateMachine::crc( Xfer *xfer )
 void AIStateMachine::xfer( Xfer *xfer )
 {
   // version
-  XferVersion currentVersion = 2;
+  XferVersion currentVersion = 3;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -911,6 +949,10 @@ void AIStateMachine::xfer( Xfer *xfer )
 	}
 
 	xfer->xferUnsignedInt(&m_temporaryStateFramEnd);
+	if (version >= 3 && id == AI_HIT_AND_RUN_RETREAT && m_temporaryState)
+	{
+		static_cast<AIHitAndRunRetreatState *>(m_temporaryState)->xferLeg(xfer);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -6040,10 +6082,6 @@ StateReturnType AIAttackFireWeaponState::update()
 	const AIUpdateInterface* ai = obj->getAI();
 	const CommandSourceType cmdSource = ai->getLastCommandSource();
 	Team *team = getHitAndRunTeam(obj);
-	if (team && team->getHitAndRunRetreatPoint())
-	{
-		return STATE_FAILURE;
-	}
 	const Bool fireAllAtGround = !m_att->isAttackingObject() && ai->forceFiresAllWeapons() && !obj->isCurWeaponLocked();
 	if (fireAllAtGround && !m_att->ownsWeaponSlot(wslot))
 	{
@@ -6054,6 +6092,13 @@ StateReturnType AIAttackFireWeaponState::update()
 			return STATE_FAILURE;
 		}
 		weapon = obj->getWeaponInWeaponSlot(wslot);
+	}
+
+	if (team && team->getHitAndRunRetreatPoint() &&
+		(!victim || obj->getRelationship(victim) != ENEMIES || !weapon->isWithinAttackRange(obj, victim) ||
+		 (ai->mustHoldStillToFire() && ai->isMoving())))
+	{
+		return STATE_FAILURE;
 	}
 
 	WeaponStatus status = weapon->getStatus();

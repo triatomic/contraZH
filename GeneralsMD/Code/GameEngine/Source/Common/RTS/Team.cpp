@@ -41,6 +41,7 @@
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -1311,6 +1312,7 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
 	m_hitAndRun(proto->getTemplateInfo()->m_hitAndRun),
 	m_hitAndRunRetreating(false),
 	m_hitAndRunRetreatMinEnd(0),
+	m_hitAndRunRetreatPointCount(0),
 	m_active(false),
 	m_seeEnemy(false),
 	m_prevSeeEnemy(false),
@@ -1322,7 +1324,10 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
 	m_wasIdle(false)
 {
 	m_created = FALSE;
-	m_hitAndRunRetreatPoint.zero();
+	for (Int i = 0; i < HIT_AND_RUN_RETREAT_POINTS; ++i)
+	{
+		m_hitAndRunRetreatPoints[i].zero();
+	}
 	m_commonAttackTarget = INVALID_ID;
 
 	// allocate new relation map pools
@@ -1843,6 +1848,29 @@ void Team::recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil)
 	}
 }
 
+void Team::addHitAndRunRetreatPoint(const Coord3D &point)
+{
+	Region3D bounds;
+	TheTerrainLogic->getMaximumPathfindExtent(&bounds);
+	if ((point.x == 0.0f && point.y == 0.0f) || !bounds.isInRegionNoZ(point) ||
+		m_hitAndRunRetreatPointCount >= HIT_AND_RUN_RETREAT_POINTS)
+	{
+		return;
+	}
+
+	if (m_hitAndRunRetreatPointCount > 0)
+	{
+		Coord3D delta = point;
+		delta.sub(m_hitAndRunRetreatPoints[m_hitAndRunRetreatPointCount - 1]);
+		delta.z = 0.0f;
+		if (delta.length() < PATHFIND_CELL_SIZE_F)
+		{
+			return;
+		}
+	}
+	m_hitAndRunRetreatPoints[m_hitAndRunRetreatPointCount++] = point;
+}
+
 void Team::updateHitAndRun()
 {
 	if (!m_hitAndRun || m_hitAndRunShots.empty())
@@ -1913,42 +1941,50 @@ void Team::updateHitAndRun()
 		return;
 	}
 
+	m_hitAndRunRetreatPointCount = 0;
 	if (previousWaypoint)
 	{
-		m_hitAndRunRetreatPoint = *previousWaypoint->getLocation();
+		addHitAndRunRetreatPoint(*previousWaypoint->getLocation());
 	}
-	else
+
+	AsciiString name;
+	name.format("%s%d", OUTER_PERIMETER, player->getMpStartIndex() + 1);
+	const PolygonTrigger *perimeter = TheTerrainLogic->getTriggerAreaByName(name);
+	if (perimeter && perimeter->getNumPoints() >= 3)
 	{
-		AsciiString name;
-		name.format("%s%d", OUTER_PERIMETER, player->getMpStartIndex() + 1);
-		const PolygonTrigger *perimeter = TheTerrainLogic->getTriggerAreaByName(name);
-		if (perimeter)
+		Coord3D center;
+		perimeter->getCenterPoint(&center);
+		addHitAndRunRetreatPoint(center);
+	}
+
+	const Int pointsBeforeBase = m_hitAndRunRetreatPointCount;
+	Coord3D base;
+	if (player->getAiBaseCenter(&base))
+	{
+		addHitAndRunRetreatPoint(base);
+	}
+	if (m_hitAndRunRetreatPointCount == pointsBeforeBase)
+	{
+		name.format("Player_%d_Start", player->getMpStartIndex() + 1);
+		const Waypoint *start = TheTerrainLogic->getWaypointByName(name);
+		if (start)
 		{
-			perimeter->getCenterPoint(&m_hitAndRunRetreatPoint);
+			addHitAndRunRetreatPoint(*start->getLocation());
 		}
-		else if (!player->getAiBaseCenter(&m_hitAndRunRetreatPoint))
+		else if (m_proto->getTemplateInfo()->m_hasHomeLocation)
 		{
-			const TeamTemplateInfo *info = m_proto->getTemplateInfo();
-			name.format("Player_%d_Start", player->getMpStartIndex() + 1);
-			const Waypoint *start = TheTerrainLogic->getWaypointByName(name);
-			if (info->m_hasHomeLocation)
-			{
-				m_hitAndRunRetreatPoint = info->m_homeLocation;
-			}
-			else if (start)
-			{
-				m_hitAndRunRetreatPoint = *start->getLocation();
-			}
-			else
-			{
-				m_hitAndRunShots.clear();
-				return;
-			}
+			addHitAndRunRetreatPoint(m_proto->getTemplateInfo()->m_homeLocation);
 		}
 	}
 
+	if (m_hitAndRunRetreatPointCount == 0)
+	{
+		m_hitAndRunShots.clear();
+		return;
+	}
+
 	m_hitAndRunRetreating = true;
-	m_hitAndRunRetreatMinEnd = now + LOGICFRAMES_PER_SECOND;
+	m_hitAndRunRetreatMinEnd = now + 1;
 	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
 		if (canHitAndRun(iter.cur()))
@@ -2731,7 +2767,7 @@ void Team::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 3;
+	XferVersion currentVersion = 4;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2868,7 +2904,23 @@ void Team::xfer( Xfer *xfer )
 	{
 		xfer->xferBool(&m_hitAndRunRetreating);
 		xfer->xferUnsignedInt(&m_hitAndRunRetreatMinEnd);
-		xfer->xferCoord3D(&m_hitAndRunRetreatPoint);
+		xfer->xferCoord3D(&m_hitAndRunRetreatPoints[0]);
+		if (version >= 4)
+		{
+			xfer->xferInt(&m_hitAndRunRetreatPointCount);
+			if (m_hitAndRunRetreatPointCount < 0 || m_hitAndRunRetreatPointCount > HIT_AND_RUN_RETREAT_POINTS)
+			{
+				throw SC_INVALID_DATA;
+			}
+			for (Int i = 1; i < m_hitAndRunRetreatPointCount; ++i)
+			{
+				xfer->xferCoord3D(&m_hitAndRunRetreatPoints[i]);
+			}
+		}
+		else
+		{
+			m_hitAndRunRetreatPointCount = m_hitAndRunRetreating ? 1 : 0;
+		}
 		UnsignedInt shotCount = m_hitAndRunShots.size();
 		xfer->xferUnsignedInt(&shotCount);
 		if (xfer->getXferMode() == XFER_LOAD)

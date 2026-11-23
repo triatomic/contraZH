@@ -201,7 +201,10 @@ private:
 	Bool					m_hitAndRun;
 	Bool					m_hitAndRunRetreating;
 	UnsignedInt			m_hitAndRunRetreatMinEnd;
-	Coord3D				m_hitAndRunRetreatPoint;
+	enum { HIT_AND_RUN_RETREAT_POINTS = 3 };
+	Coord3D				m_hitAndRunRetreatPoints[HIT_AND_RUN_RETREAT_POINTS];
+	Int					m_hitAndRunRetreatPointCount;
+	void addHitAndRunRetreatPoint(const Coord3D &point);
 	std::map<ObjectID, UnsignedInt> m_hitAndRunShots;
 	void updateHitAndRun();
 	Bool					m_active;						///< True if a team is complete.  False while members are being added.
@@ -302,7 +305,10 @@ public:
 	void setHitAndRun(Bool enabled);
 	static Bool canHitAndRun(const Object *obj);
 	void recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil);
-	const Coord3D *getHitAndRunRetreatPoint() const { return m_hitAndRunRetreating ? &m_hitAndRunRetreatPoint : nullptr; }
+	const Coord3D *getHitAndRunRetreatPoint(Int leg = 0) const
+	{
+		return m_hitAndRunRetreating && leg >= 0 && leg < m_hitAndRunRetreatPointCount ? &m_hitAndRunRetreatPoints[leg] : nullptr;
+	}
 
 	void setRecruitable(Bool recruitable) {m_isRecruitablitySet = true; m_isRecruitable = recruitable;}
 

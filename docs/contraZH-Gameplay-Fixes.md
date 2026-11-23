@@ -5,7 +5,7 @@ it changes the simulation (older replays no longer play back identically) or onl
 
 ## AI team hit and run
 
-- Enable **Hit and run** in the WorldBuilder Team Behavior tab. The team follows its scripted orders until at least half of its mobile ground attackers fire. The team retreats together toward a previous waypoint or its own base perimeter. It resumes its orders after at least half of its attackers have fired and reloaded in that volley, with a one-second minimum withdrawal. This changes the simulation when enabled.
+- Enable **Hit and run** in the WorldBuilder Team Behavior tab. At least half of the mobile ground attackers must fire before the team falls back along a shared route. Units head toward an earlier waypoint, their base perimeter, then into their base as needed. Turrets can return fire at enemies already in range without changing the retreat order. The team turns back as soon as half of its attackers have fired and reloaded in the current volley.
 - Use **Enable or disable hit-and-run behavior** under **Team > AI** to change the setting on a team during play.
 
 ## AI construction uses legal, reachable sites
