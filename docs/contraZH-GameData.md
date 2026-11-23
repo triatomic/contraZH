@@ -1,5 +1,29 @@
 # GameData.ini
 
+## Veterancy experience defaults
+
+Set `ExperienceValueBonus_<rank>` for kill rewards and `ExperienceRequiredBonus_<rank>` for
+promotion thresholds in the `GameData` block. Both accept the suffixes `Veteran`, `Elite`,
+`Heroic`, `Four` and `Five`. The bonuses accept decimals such as `45.5%` and default to disabled. A negative setting disables
+a bonus and `0%` repeats the previous rank's number.
+
+```ini
+  ExperienceValueBonus_Veteran = 45%
+  ExperienceValueBonus_Elite   = 45%
+  ExperienceValueBonus_Heroic  = 45%
+  ExperienceRequiredBonus_Elite  = 45%
+  ExperienceRequiredBonus_Heroic = 45%
+```
+
+With these defaults, `ExperienceValue = 56` fills Veteran through Heroic, and
+`ExperienceRequired = 0 167` fills Elite and Heroic. Each bonus increases the previous rank's
+integer value and rounds to the nearest whole point. An omitted promotion threshold stays
+unreachable if the previous threshold is unreachable. The Veteran requirement bonus needs
+a positive Regular requirement as its base.
+
+The game applies bonuses when it reads the corresponding object field. Absolute numbers
+and [object percentages](contraZH-Objects-and-Modules.md#veterancy-experience) take precedence.
+
 ## Guard target visibility
 
 `GuardRequiresVisibility` defaults to `No`, preserving guard mode's ability to acquire
@@ -173,12 +197,12 @@ Notes:
 * Particle systems with nothing on screen are now skipped regardless of the option.
 * Ported from TheSuperHackers commit `de20ae0cb` (Ronin and Mauller).
 
-## ParticleAtlas
+## TextureAtlas
 
-* `ParticleAtlas = No` - (Default. `Yes` packs particle textures into shared atlas pages, so alpha
+* `TextureAtlas = No` - (Default. `Yes` packs particle textures into shared atlas pages, so alpha
 and additive systems with different textures batch into the same draws.)
 
-Plain alpha and additive particle systems draw from 2048x2048 pages with premultiplied blending.
+Plain alpha and additive particle systems draw from 2304x2304 pages with premultiplied blending.
 One blend state covers both modes, and the translucency sorter merges neighbouring triangles that
 share a page into one draw. Batches no longer break on texture or blend changes.
 Alpha-test and multiply systems also share pages, keeping their original texels and blend modes.
@@ -187,8 +211,9 @@ Notes:
 * Implies batching for the systems it covers, whatever `BatchParticles` says.
 * Additive particles now depth-sort with smoke instead of drawing after it, so smoke in front of
 a fire covers it.
-* Textures are packed the first time they draw, at most four per frame, and the pages are cleared between maps. Up to four
-pages per map; textures that do not fit draw as before.
+* Textures are packed the first time they draw, at most two per frame, and the pages are cleared between maps. Up to four
+pages per map; when they fill up, the oldest page is emptied and its textures pack again as they draw.
+* The key was named `ParticleAtlas` before; an exe reads only the name it was built with.
 * Not covered: streak, volume and terrain-conforming systems, systems with
 the flame, cryo, electric or disruption shaders, non power-of-two textures and ones smaller than
 16 pixels. The glow pass also keeps the old path.

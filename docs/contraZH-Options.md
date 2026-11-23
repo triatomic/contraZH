@@ -200,6 +200,13 @@ Shaders panels. The tab logic is adapted from the tabbed menu by simonx645.
 * Controls are still found by name, so they can sit on any page.
 * A `TabHotkeys` button needs no page. It opens the [Hotkeys screen](#hotkeys-screen) over the menu,
   and the page that was showing stays. The stepping keys skip it.
+* **Display > Cursor capture** offers None, In game, Always and Auto. In game captures the cursor in
+  matches, Always also captures it in menus, and Auto captures it in game when windowed and always when
+  fullscreen. It writes the four `CursorCaptureEnabledIn*` keys. A hand-edited combination that no entry
+  matches shows no selection and stays as it is.
+* **Audio > Money volume** sets `MoneyTransactionVolume`, 0-100.
+* **Interface > System clock size** and **Game timer size** set `SystemTimeFontSize` and
+  `GameTimeFontSize`, 0-99. 0 hides the clock or the timer.
 
 ## Hotkeys screen
 

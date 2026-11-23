@@ -3,6 +3,15 @@
 Always on, no `Options.ini` key. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Skirmish AI skips unavailable structures
+
+Skirmish AI checks whether an available builder can construct each candidate before it
+selects a build order. A structure missing from the builders' current command sets
+stays on the build list and can become eligible after an upgrade. Super Weapon General
+can list both power buildings in AIData and build the one unlocked by its branch choice.
+
+This changes the simulation.
+
 ## AI construction uses legal, reachable sites
 
 AI builders search nearby sites when a planned building overlaps an obstacle, sits on
@@ -32,6 +41,13 @@ Map `AIData` overrides can change the distances. Larger searches check more cand
 
 This changes the simulation and can change older replay playback. Multiplayer clients need
 matching engine versions.
+
+## Black Lotus cash hacking stops when the target is destroyed
+
+Black Lotus stops hacking when the target building is destroyed or reduced to a rebuild hole.
+She plays her cash hack completion line after each successful withdrawal.
+
+This changes the simulation and can change older replay playback. ([#252](https://github.com/triatomic/contraZH/issues/252))
 
 ## The Demolisher keeps attacking after its first shot
 

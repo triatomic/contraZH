@@ -1944,14 +1944,23 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		cmdNode = TheCommandSequence->newSinglePosCommand(CommandSequence::COMMAND_DO_MOVETO, pos);
 
 
+	Bool routeAroundThreats = false;
+	if (cmdSource == CMD_FROM_SCRIPT)
+	{
+		routeAroundThreats = std::find_if(m_memberList.begin(), m_memberList.end(), Pathfinder::teamAvoidsThreats) != m_memberList.end();
+	}
+
 	Group_Goal_Scope groupGoalScope;	// "groupgoals": the table is emptied however this returns
 	if (!addWaypoint && !isFormation && !reverse) {
 		if (PathTuning::GroupGoals) {
 			Group_Goals_Assign(m_memberList, pos, cmdSource);
 		}
-		friend_computeGroundPath(pos, cmdSource);
-		friend_moveInfantryToPos(pos, cmdNode, cmdSource, columnUnits);
-		friend_moveVehicleToPos(pos, cmdNode, cmdSource, columnUnits);
+		if (!routeAroundThreats)
+		{
+			friend_computeGroundPath(pos, cmdSource);
+			friend_moveInfantryToPos(pos, cmdNode, cmdSource, columnUnits);
+			friend_moveVehicleToPos(pos, cmdNode, cmdSource, columnUnits);
+		}
 	}
 	if (m_dirty)
 		recompute();
@@ -2010,7 +2019,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		}
 	}
 
-	if (isFormation && !reverse) {
+	if (isFormation && !reverse && !routeAroundThreats) {
 		friend_computeGroundPath(pos, cmdSource);
 		friend_moveFormationToPos(pos, cmdSource);
 		return;

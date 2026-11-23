@@ -16,7 +16,7 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: W3DParticleAtlas.h //////////////////////////////////////////////////////////////////////
+// FILE: W3DTextureAtlas.h ///////////////////////////////////////////////////////////////////////
 
 #pragma once
 
@@ -28,14 +28,14 @@
 #include <map>
 #include <vector>
 
-// Alpha and additive textures share premultiplied blending; other modes keep their original texels.
-class W3DParticleAtlas
+// ALPHA stores the art times its alpha, so alpha sprites can share one blend with additive ones.
+class W3DTextureAtlas
 {
 public:
-	W3DParticleAtlas();
-	~W3DParticleAtlas();
+	W3DTextureAtlas();
+	~W3DTextureAtlas();
 
-	enum TextureMode { UNMODIFIED, ALPHA, ADDITIVE, MODE_COUNT };
+	enum TextureMode { UNMODIFIED, ALPHA, MODE_COUNT };
 
 	/// the page holding the texture's converted art and its rectangle in uv, or null when it has no place; valid only for the frame that asked
 	TextureClass *find(TextureClass *source, TextureMode mode, Vector4 &rect);
@@ -63,17 +63,17 @@ private:
 
 	struct Location
 	{
-		TextureClass *page;	///< null when the texture was refused
+		TextureClass *page;	///< null when no page had room
 		Vector4 rect;
-		Bool neverFits;		///< refused for its size, so an eviction keeps the refusal
 	};
 
 	typedef std::map<StringClass, Location> LocationMap;
 
 	void evictOldestPage();
 	Bool hasPackBudget();
-	Location pack(const TextureClass &source, TextureMode mode);
-	Bool place(Int width, Int height, Int &page, Int &x, Int &y);
+	Bool pack(const TextureClass &source, TextureMode mode, Location &location);
+	Bool place(Int width, Int height, Int &page, Int &shelf, Int &x, Int &y);
+	void unplace(Int width, Int page, Int shelf);
 	Bool addPage();
 	static Bool copyToCell(const TextureClass &source, const TextureClass *page, TextureMode mode, Int left, Int top);
 
@@ -86,4 +86,4 @@ private:
 	Bool m_disabled;
 };
 
-extern W3DParticleAtlas *TheW3DParticleAtlas;	///< owned by W3DDisplay, so its textures go before the device; null when headless
+extern W3DTextureAtlas *TheW3DTextureAtlas;	///< owned by W3DDisplay, so its textures go before the device; null when headless

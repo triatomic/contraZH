@@ -3,6 +3,22 @@
 These changes are always on. They change the simulation, so all players need the same build and
 older replays may play differently.
 
+## Scripted team movement
+
+* **Team avoids threats** makes ordinary scripted move orders and waypoint paths favor routes with
+  less exposure to visible enemy weapons that can target members of the team.
+* The threat radius includes weapon range, both units' footprints, and a buffer of 40 map units or
+  20% of weapon range, whichever is larger. Ground units first look for a route that stays outside
+  that radius, then try staying outside firing range alone. If neither search succeeds, the
+  fallback routes through exposure at a higher cost.
+* The team still follows the script's waypoint order. Units periodically check the remaining route
+  and can replan the current leg if a new threat or a threat that has moved across their route
+  puts them in firing range. They keep their current route as they pass threats they already
+  planned for, including when no safer route was available.
+* If a visible threat covers an intermediate waypoint, the team can pass it at a nearby
+  point outside the threat buffer. The final destination stays where the script placed it.
+* Exact waypoint paths and explicit attack orders follow their usual rules.
+
 ## Search limits and retries
 
 * A full pathfind queue retries refused requests after a few frames. The queue holds 2047 pending
