@@ -41,6 +41,7 @@ const Int SPAWN_UPDATE_RATE = LOGICFRAMES_PER_SECOND/2; ///< This is a low prior
 
 //-------------------------------------------------------------------------------------------------
 class ThingTemplate;
+enum KindOfType CPP_11(: Int);
 enum CanAttackResult CPP_11(: Int);
 
 //-------------------------------------------------------------------------------------------------
@@ -123,6 +124,7 @@ public:
 	virtual void revealSlaves() = 0;
 	virtual Bool doSlavesHaveFreedom() const = 0;
 	virtual Int getSlaveCount() const = 0;
+	virtual Int countPendingOneShotSpawns(KindOfType kind) const { return 0; }
 };
 
 // ------------------------------------------------------------------------------------------------
@@ -179,6 +181,7 @@ public:
 	virtual void revealSlaves() override;
 	virtual Bool doSlavesHaveFreedom() const override { return getSpawnBehaviorModuleData()->m_slavesHaveFreeWill; }
 	virtual Int getSlaveCount() const override { return m_spawnCount; }
+	virtual Int countPendingOneShotSpawns(KindOfType kind) const override;
 
 	// **********************************************************************************************
 	// our own methods

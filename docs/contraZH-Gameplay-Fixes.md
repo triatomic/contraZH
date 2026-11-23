@@ -101,6 +101,27 @@ to curved and linear flight paths, including projectiles that tumble or keep a f
 
 Changes the simulation and older replay playback for affected shots.
 
+## Capture orders stop when ownership changes
+
+Infantry and Black Lotus abandon capture orders when the building becomes theirs or an ally's,
+even while they are still approaching. Units hunting with a capture ability can then look for
+another target.
+
+## AI supply centers count their collectors and queues
+
+`ResourceGatherersEasy`, `ResourceGatherersNormal` and `ResourceGatherersHard` set the target
+number of collectors per supply center. The target includes collectors that come with the center.
+The AI counts active collectors and queued replacements, moves available collectors to centers
+that are short, and fills remaining vacancies at those centers. Mobile supply truck crews count
+toward their own workforce.
+
+## Scripted building commands respect prerequisites
+
+Team command-button scripts can use a building's abilities once construction finishes.
+Upgrade commands check funds, required sciences and queue space. A command that fails these
+checks must be issued again. Special powers still fire regardless of their timer, required
+science and cost, as in retail.
+
 ## AI supply sources respect allied bases
 
 AI supply construction skips sources already occupied by another player's supply center or
