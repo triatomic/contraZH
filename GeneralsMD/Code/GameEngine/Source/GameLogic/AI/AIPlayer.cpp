@@ -515,10 +515,12 @@ Object *AIPlayer::buildStructureNow(const ThingTemplate *bldgPlan, BuildListInfo
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-Object *AIPlayer::buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildListInfo *info)
+Object *AIPlayer::buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildListInfo *info, Object *dozer)
 {
-	// Find a dozer.
-	Object *dozer = findDozer(info->getLocation());
+	if (dozer == nullptr)
+	{
+		dozer = findDozer(info->getLocation());
+	}
 	if (dozer==nullptr) {
 		return nullptr;
 	}
@@ -3282,7 +3284,7 @@ enum GameDifficulty AIPlayer::getAIDifficulty() const
 /**
  * Finds a dozer that isn't building or collecting resources.
  */
-Object * AIPlayer::findDozer( const Coord3D *pos )
+Object * AIPlayer::findDozer( const Coord3D *pos, const ThingTemplate *plan )
 {
 	// Add any factories placed to the build list.
 	Object *obj;
@@ -3322,6 +3324,10 @@ Object * AIPlayer::findDozer( const Coord3D *pos )
 					needDozer = false; // dozer exists, may be busy.
 					if (dozerAI->isTaskPending(DOZER_TASK_BUILD)) {
 						continue; // already building.
+					}
+					if (plan && TheBuildAssistant->canMakeUnit(obj, plan, false) != CANMAKE_OK)
+					{
+						continue;
 					}
 					if (!dozerAI->isAnyTaskPending()) {
 						dozer = obj; // prefer an idle dozer
