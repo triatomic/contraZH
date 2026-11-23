@@ -231,7 +231,7 @@ protected:
 	virtual void checkQueuedTeams();
 	virtual void doTeamBuilding();
 	virtual void doUpgradesAndSkills();
-	virtual Object *findDozer(const Coord3D *pos);
+	virtual Object *findDozer(const Coord3D *pos, const ThingTemplate *plan = nullptr);
 	virtual void queueDozer();
 	virtual Bool selectTeamToBuild();			///< determine the next team to build
 	virtual Bool selectTeamToReinforce( Int minPriority );			///< determine the next team to reinforce
@@ -250,7 +250,7 @@ protected:
 protected:
 	Bool isPossibleToBuildTeam( TeamPrototype *proto, Bool requireIdleFactory, Bool &needMoney );		///< return true if team can be considered for building
 	Object *buildStructureNow(const ThingTemplate *bldgPlan, BuildListInfo *info );		///< Build a base buiding.
-	Object *buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildListInfo *info );		///< Build a base buiding.
+	Object *buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildListInfo *info, Object *dozer = nullptr);		///< Build a base buiding.
 	void clearTeamsInQueue();			///< Delete all teams in the build queue.
 	void computeCenterAndRadiusOfBase(Coord3D *center, Real *radius);
 	Object *findFactory(const ThingTemplate *thing, Bool busyOK); ///< Find a factory to build a unit.  If force is true, may return a busy factory.

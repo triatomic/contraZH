@@ -3,6 +3,15 @@
 Always on, no `Options.ini` key. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Skirmish AI skips unavailable structures
+
+Skirmish AI checks whether an available builder can construct each candidate before it
+selects a build order. A structure missing from the builders' current command sets
+stays on the build list and can become eligible after an upgrade. Super Weapon General
+can list both power buildings in AIData and build the one unlocked by its branch choice.
+
+This changes the simulation.
+
 ## AI construction uses legal, reachable sites
 
 AI builders search nearby sites when a planned building overlaps an obstacle, sits on
