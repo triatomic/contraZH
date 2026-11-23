@@ -381,8 +381,8 @@ the command bar when the layout has no such window.
 
 ## Action lines
 
-A faint line from each selected unit to where its order sends it, fading in from the unit and
-ending in a small dot. Units moving together share one line. Lines last as long as the order and follow a
+A dashed line with a dark outline from each selected unit to where its order sends it, fading in
+from the unit and ending in an outlined dot. Units moving together share one line. Lines last as long as the order and follow a
 chased target.
 
 * `ActionLines = Off` - (`Off` | `All` | `AttackOnly`. Game Options > Action lines. `AttackOnly` draws

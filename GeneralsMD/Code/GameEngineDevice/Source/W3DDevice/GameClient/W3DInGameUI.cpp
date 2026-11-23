@@ -482,19 +482,19 @@ static UnsignedInt actionLineColor( InGameUI::ActionLineKind kind )
 	switch( kind )
 	{
 		case InGameUI::ACTION_LINE_ATTACK_MOVE:
-			return 0x66FF66CC;
+			return 0x00FF66CC;
 		case InGameUI::ACTION_LINE_ATTACK:
 		case InGameUI::ACTION_LINE_ATTACK_GROUND:
-			return 0x66FF5555;
+			return 0x00FF5555;
 		case InGameUI::ACTION_LINE_GUARD:
-			return 0x6655CCFF;
+			return 0x0055CCFF;
 		default:
-			return 0x6655FF55;
+			return 0x0055FF55;
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
-/** A faint line per bunch of selected units, ending in a dot on the destination. */
+/** A dashed line per bunch of selected units, ending in an outlined dot on the destination. */
 //-------------------------------------------------------------------------------------------------
 void W3DInGameUI::drawActionLines()
 {
@@ -503,6 +503,16 @@ void W3DInGameUI::drawActionLines()
 	{
 		return;
 	}
+
+	const Real dashLength = 7.0f;
+	const Real dashPeriod = 12.0f;
+	const Real startFade = 16.0f;
+	const Real coreWidth = 2.0f;
+	const Real outlineWidth = 4.0f;
+	const Real coreAlpha = 217.0f;
+	const Real outlineAlpha = 115.0f;
+	const Real screenWidth = (Real)TheDisplay->getWidth();
+	const Real screenHeight = (Real)TheDisplay->getHeight();
 
 	for( std::vector<ActionLine>::const_iterator it = lines.begin(); it != lines.end(); ++it )
 	{
@@ -514,11 +524,49 @@ void W3DInGameUI::drawActionLines()
 			continue;
 		}
 
-		// clear at the unit, so the lines do not crowd the selection
-		const UnsignedInt lineColor = actionLineColor( it->kind );
-		TheDisplay->drawLine( from.x, from.y, to.x, to.y, 1.0f, lineColor & 0x00FFFFFF, lineColor );
+		const UnsignedInt rgb = actionLineColor( it->kind );
+		const Real dx = (Real)( to.x - from.x );
+		const Real dy = (Real)( to.y - from.y );
+		const Real length = sqrtf( dx * dx + dy * dy );
+		if( length >= 1.0f )
+		{
+			// clear at the unit, so the lines do not crowd the selection
+			const Real fade = min( startFade, length * 0.5f );
 
-		TheDisplay->drawFillRect( to.x - 2, to.y - 2, 5, 5, ( lineColor & 0x00FFFFFF ) | 0xCC000000 );
+			// counting from the destination keeps the pattern still while the unit moves
+			for( Real end = length; end > 0.0f; end -= dashPeriod )
+			{
+				const Real start = max( end - dashLength, 0.0f );
+				const Real x1 = from.x + dx * start / length;
+				const Real y1 = from.y + dy * start / length;
+				const Real x2 = from.x + dx * end / length;
+				const Real y2 = from.y + dy * end / length;
+
+				// projected off-screen points can lie thousands of pixels away
+				if( ( x1 < 0.0f && x2 < 0.0f ) || ( x1 > screenWidth && x2 > screenWidth ) ||
+						( y1 < 0.0f && y2 < 0.0f ) || ( y1 > screenHeight && y2 > screenHeight ) )
+				{
+					continue;
+				}
+
+				const Real fade1 = min( start / fade, 1.0f );
+				const Real fade2 = min( end / fade, 1.0f );
+				const Int sx = REAL_TO_INT( x1 );
+				const Int sy = REAL_TO_INT( y1 );
+				const Int ex = REAL_TO_INT( x2 );
+				const Int ey = REAL_TO_INT( y2 );
+
+				TheDisplay->drawLine( sx, sy, ex, ey, outlineWidth,
+					(UnsignedInt)REAL_TO_INT( outlineAlpha * fade1 ) << 24,
+					(UnsignedInt)REAL_TO_INT( outlineAlpha * fade2 ) << 24 );
+				TheDisplay->drawLine( sx, sy, ex, ey, coreWidth,
+					( (UnsignedInt)REAL_TO_INT( coreAlpha * fade1 ) << 24 ) | rgb,
+					( (UnsignedInt)REAL_TO_INT( coreAlpha * fade2 ) << 24 ) | rgb );
+			}
+		}
+
+		TheDisplay->drawFillRect( to.x - 3, to.y - 3, 7, 7, 0x99000000 );
+		TheDisplay->drawFillRect( to.x - 2, to.y - 2, 5, 5, rgb | 0xFF000000 );
 	}
 }
 
