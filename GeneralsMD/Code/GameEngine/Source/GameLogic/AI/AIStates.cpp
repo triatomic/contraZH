@@ -377,7 +377,7 @@ private:
 		{
 			++m_leg;
 			setGoalPos(point);
-			setAdjustsDestination(true);
+			setAdjustsDestination(getMachineOwner()->getAI()->isDoingGroundMovement());
 			m_moving = true;
 			if (AIInternalMoveToState::onEnter() == STATE_CONTINUE)
 			{

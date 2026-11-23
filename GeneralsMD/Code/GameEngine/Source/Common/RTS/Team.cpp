@@ -1838,7 +1838,7 @@ Bool Team::hasAnyObjects() const
 Bool Team::canHitAndRun(const Object *obj)
 {
 	return obj && obj->getAI() && obj->isMobile() && !obj->isEffectivelyDead() &&
-		!obj->isKindOf(KINDOF_AIRCRAFT) && !obj->isKindOf(KINDOF_PROJECTILE);
+		!obj->getAI()->getJetAIUpdate() && !obj->isKindOf(KINDOF_PROJECTILE);
 }
 
 void Team::setHitAndRun(Bool enabled)

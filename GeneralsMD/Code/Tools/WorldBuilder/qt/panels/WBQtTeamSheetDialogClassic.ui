@@ -500,20 +500,20 @@
                <item>
                 <widget class="QRadioButton" name="hitAndRunReloadRadio">
                  <property name="accessibleName"><string>% of team reloaded</string></property>
-                 <property name="toolTip"><string>Attack when this percentage of ground attackers have fired and reloaded in the current volley. If fewer units fired, wait for all of them.</string></property>
+                 <property name="toolTip"><string>Attack when this percentage of attackers have fired and reloaded in the current volley. If fewer units fired, wait for all of them.</string></property>
                 </widget>
                </item>
                <item>
                 <widget class="QLineEdit" name="hitAndRunReloadEdit">
                  <property name="maximumWidth"><number>52</number></property>
                  <property name="accessibleName"><string>% of team reloaded</string></property>
-                 <property name="toolTip"><string>Attack when this percentage of ground attackers have fired and reloaded in the current volley. If fewer units fired, wait for all of them.</string></property>
+                 <property name="toolTip"><string>Attack when this percentage of attackers have fired and reloaded in the current volley. If fewer units fired, wait for all of them.</string></property>
                 </widget>
                </item>
                <item>
                 <widget class="QLabel" name="hitAndRunReloadEditUnit">
                  <property name="text"><string>% of team reloaded</string></property>
-                 <property name="toolTip"><string>Attack when this percentage of ground attackers have fired and reloaded in the current volley. If fewer units fired, wait for all of them.</string></property>
+                 <property name="toolTip"><string>Attack when this percentage of attackers have fired and reloaded in the current volley. If fewer units fired, wait for all of them.</string></property>
                 </widget>
                </item>
                <item>
@@ -553,20 +553,20 @@
                <item>
                 <widget class="QRadioButton" name="hitAndRunRetreatPercentRadio">
                  <property name="accessibleName"><string>% of team fired</string></property>
-                 <property name="toolTip"><string>Retreat when this percentage of the team's ground attackers have fired.</string></property>
+                 <property name="toolTip"><string>Retreat when this percentage of the team's attackers have fired.</string></property>
                 </widget>
                </item>
                <item>
                 <widget class="QLineEdit" name="hitAndRunRetreatEdit">
                  <property name="maximumWidth"><number>52</number></property>
                  <property name="accessibleName"><string>% of team fired</string></property>
-                 <property name="toolTip"><string>Retreat when this percentage of the team's ground attackers have fired.</string></property>
+                 <property name="toolTip"><string>Retreat when this percentage of the team's attackers have fired.</string></property>
                 </widget>
                </item>
                <item>
                 <widget class="QLabel" name="hitAndRunRetreatEditUnit">
                  <property name="text"><string>% of team fired</string></property>
-                 <property name="toolTip"><string>Retreat when this percentage of the team's ground attackers have fired.</string></property>
+                 <property name="toolTip"><string>Retreat when this percentage of the team's attackers have fired.</string></property>
                 </widget>
                </item>
                <item>
