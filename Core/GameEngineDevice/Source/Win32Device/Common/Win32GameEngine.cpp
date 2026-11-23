@@ -158,11 +158,19 @@ void Win32GameEngine::serviceWindowsOS()
 	// see if we have any messages to process, a nullptr window handle tells the
 	// OS to look at the main window associated with the calling thread, us!
 	//
+#if defined(RTS_ZEROHOUR)
+	while( PeekMessageW( &msg, nullptr, 0, 0, PM_NOREMOVE ) )
+#else
 	while( PeekMessage( &msg, nullptr, 0, 0, PM_NOREMOVE ) )
+#endif
 	{
 
 		// get the message
+#if defined(RTS_ZEROHOUR)
+		returnValue = GetMessageW( &msg, nullptr, 0, 0 );
+#else
 		returnValue = GetMessage( &msg, nullptr, 0, 0 );
+#endif
 
 		// this is one possible way to check for quitting conditions as a message
 		// of WM_QUIT will cause GetMessage() to return 0
@@ -179,7 +187,11 @@ void Win32GameEngine::serviceWindowsOS()
 		TheMessageTime = msg.time;
 		// translate and dispatch the message
 		TranslateMessage( &msg );
+#if defined(RTS_ZEROHOUR)
+		DispatchMessageW( &msg );
+#else
 		DispatchMessage( &msg );
+#endif
 		TheMessageTime = 0;
 
 	}

@@ -721,7 +721,7 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 	}
 	return 0;*/
 
-	return DefWindowProc( hWnd, message, wParam, lParam );
+	return DefWindowProcW( hWnd, message, wParam, lParam );
 
 }
 
@@ -736,12 +736,12 @@ static Bool initializeAppWindows( HINSTANCE hInstance, Int nCmdShow, Bool runWin
 
 	// register the window class
 
-  WNDCLASS wndClass = { CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS, WndProc, 0, 0, hInstance,
-                       LoadIcon (hInstance, MAKEINTRESOURCE(IDI_ApplicationIcon)),
+  WNDCLASSW wndClass = { CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS, WndProc, 0, 0, hInstance,
+                       LoadIconW (hInstance, MAKEINTRESOURCEW(IDI_ApplicationIcon)),
                        nullptr/*LoadCursor(nullptr, IDC_ARROW)*/,
                        (HBRUSH)GetStockObject(BLACK_BRUSH), nullptr,
-	                     TEXT("Game Window") };
-  RegisterClass( &wndClass );
+	                     L"Game Window" };
+  RegisterClassW( &wndClass );
 
    // Create our main window
 	windowStyle =  WS_POPUP|WS_VISIBLE;
@@ -764,8 +764,8 @@ static Bool initializeAppWindows( HINSTANCE hInstance, Int nCmdShow, Bool runWin
 
 	gInitializing = true;
 
-  HWND hWnd = CreateWindow( TEXT("Game Window"),
-                            TEXT("Command and Conquer Generals"),
+  HWND hWnd = CreateWindowW( L"Game Window",
+                            L"Command and Conquer Generals",
                             windowStyle,
 														(GetSystemMetrics( SM_CXSCREEN ) / 2) - (startWidth / 2), // original position X
 														(GetSystemMetrics( SM_CYSCREEN ) / 2) - (startHeight / 2),// original position Y
