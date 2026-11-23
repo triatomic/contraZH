@@ -33,6 +33,13 @@ Map `AIData` overrides can change the distances. Larger searches check more cand
 This changes the simulation and can change older replay playback. Multiplayer clients need
 matching engine versions.
 
+## Black Lotus cash hacking stops when the target is destroyed
+
+Black Lotus stops hacking when the target building is destroyed or reduced to a rebuild hole.
+She plays her cash hack completion line after each successful withdrawal.
+
+This changes the simulation and can change older replay playback. ([#252](https://github.com/triatomic/contraZH/issues/252))
+
 ## The Demolisher keeps attacking after its first shot
 
 The Demolisher waits out the cooldown before starting its next wind-up. It keeps attacking
