@@ -4596,7 +4596,7 @@ StateReturnType AIFollowWaypointPathState::update()
 	{
 		if (hasNextWaypoint() && m_goalLayer == LAYER_GROUND)
 		{
-			TheAI->pathfinder()->adjustThreatenedWaypoint(obj, m_goalPosition);
+			computeGoal(false);
 		}
 		computePath();
 	}
