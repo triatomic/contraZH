@@ -47,6 +47,8 @@ public:
 // Implementation
 protected:
 	Dict *m_teamDict;
+	CToolTipCtrl m_hitAndRunHelp;
+	void updateHitAndRunControls();
 protected:
 	void setupScript(NameKeyType keyScript, int idcScript);
 	void updateScript(NameKeyType keyScript, int idcScript);
@@ -60,6 +62,10 @@ protected:
 	virtual BOOL OnInitDialog() override;
 	afx_msg void OnTransportsReturn();
 	afx_msg void OnAvoidThreats();
+	afx_msg void OnHitAndRun();
+	afx_msg void OnHitAndRunMode(UINT control);
+	afx_msg void OnHitAndRunValue(UINT control);
+	virtual BOOL PreTranslateMessage(MSG *message) override;
 	afx_msg void OnSelchangeOnEnemySighted();
 	afx_msg void OnSelchangeOnDestroyed();
 	afx_msg void OnSelchangeOnUnitDestroyed();

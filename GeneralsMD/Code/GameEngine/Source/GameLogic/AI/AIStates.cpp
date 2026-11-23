@@ -261,6 +261,171 @@ void AttackStateMachine::loadPostProcess()
 //----------------------------------------------------------------------------------------------------------
 static Bool inWeaponRangeObject(State *thisState, void* userData);
 
+static Team *getHitAndRunTeam(Object *obj)
+{
+	Team *team = obj->getTeam();
+	if (!team || !team->doesHitAndRun() || !Team::canHitAndRun(obj))
+	{
+		return nullptr;
+	}
+
+	const Player *player = team->getControllingPlayer();
+	return player && player->getPlayerType() == PLAYER_COMPUTER ? team : nullptr;
+}
+
+static Bool isHitAndRunOrigin(const Coord3D *point)
+{
+	return point && std::abs(point->x) < PATHFIND_CELL_SIZE_F && std::abs(point->y) < PATHFIND_CELL_SIZE_F;
+}
+
+static Object *getHitAndRunAttackTarget(Object *obj)
+{
+	Team *team = getHitAndRunTeam(obj);
+	if (!team || team->getHitAndRunRetreatPoint())
+	{
+		return nullptr;
+	}
+
+	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
+	{
+		Object *member = iter.cur();
+		if (member == obj || !Team::canHitAndRun(member) || !member->getAI()->isAttacking())
+		{
+			continue;
+		}
+
+		Object *target = member->getAI()->getCurrentVictim();
+		if (!target || target->isEffectivelyDead() || obj->getRelationship(target) != ENEMIES)
+		{
+			continue;
+		}
+
+		const CanAttackResult result = obj->getAbleToAttackSpecificObject(ATTACK_NEW_TARGET, target, CMD_FROM_AI);
+		if (result == ATTACKRESULT_POSSIBLE || result == ATTACKRESULT_POSSIBLE_AFTER_MOVING)
+		{
+			return target;
+		}
+	}
+	return nullptr;
+}
+
+class AIHitAndRunRetreatState : public AIInternalMoveToState
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(AIHitAndRunRetreatState, "AIHitAndRunRetreatState")
+public:
+	AIHitAndRunRetreatState(StateMachine *machine) :
+		AIInternalMoveToState(machine, "AIHitAndRunRetreatState"), m_leg(0), m_moving(false)
+	{
+	}
+
+	virtual StateReturnType onEnter() override
+	{
+		m_leg = 0;
+		startNextLeg(getMachineOwner()->getTeam());
+		return STATE_CONTINUE;
+	}
+
+	virtual StateReturnType update() override
+	{
+		Team *team = getHitAndRunTeam(getMachineOwner());
+		if (!team || !team->getHitAndRunRetreatPoint())
+		{
+			return STATE_SUCCESS;
+		}
+		if (m_moving)
+		{
+			AIUpdateInterface *ai = getMachineOwner()->getAI();
+			Path *path = ai->getPath();
+			const Bool originGoal = !ai->isWaitingForPath() && path && path->getLastNode() &&
+				isHitAndRunOrigin(path->getLastNode()->getPosition());
+			if (originGoal || AIInternalMoveToState::update() != STATE_CONTINUE)
+			{
+				stopMoving(EXIT_NORMAL);
+				startNextLeg(team);
+			}
+		}
+		returnFire();
+		return STATE_CONTINUE;
+	}
+
+	void xferLeg(Xfer *xfer) { xfer->xferInt(&m_leg); }
+
+	virtual void onExit(StateExitType status) override
+	{
+		if (m_moving)
+		{
+			stopMoving(status);
+		}
+	}
+
+protected:
+	virtual Bool computePath() override
+	{
+		return !isHitAndRunOrigin(getGoalPos()) && AIInternalMoveToState::computePath();
+	}
+
+	virtual void xfer(Xfer *xfer) override
+	{
+		AIInternalMoveToState::xfer(xfer);
+		xfer->xferBool(&m_moving);
+	}
+
+private:
+	void startNextLeg(const Team *team)
+	{
+		while (const Coord3D *point = team->getHitAndRunRetreatPoint(m_leg))
+		{
+			++m_leg;
+			setGoalPos(point);
+			setAdjustsDestination(getMachineOwner()->getAI()->isDoingGroundMovement());
+			m_moving = true;
+			if (AIInternalMoveToState::onEnter() == STATE_CONTINUE)
+			{
+				return;
+			}
+			stopMoving(EXIT_NORMAL);
+		}
+	}
+
+	void returnFire()
+	{
+		Object *obj = getMachineOwner();
+		AIUpdateInterface *ai = obj->getAI();
+		const BodyModuleInterface *body = obj->getBodyModule();
+		Object *attacker = body ? TheGameLogic->findObjectByID(body->getClearableLastAttacker()) : nullptr;
+		if (!attacker || attacker->isEffectivelyDead() || obj->getRelationship(attacker) != ENEMIES)
+		{
+			return;
+		}
+
+		WeaponSlotType slot;
+		const Weapon *weapon = obj->getCurrentWeapon(&slot);
+		if (!weapon || !weapon->isWithinAttackRange(obj, attacker))
+		{
+			return;
+		}
+		const WhichTurretType turret = ai->getWhichTurretForWeaponSlot(slot, nullptr);
+		if (turret != TURRET_INVALID)
+		{
+			Object *target = ai->getTurretTargetObject(turret);
+			if (!target || !weapon->isWithinAttackRange(obj, target))
+			{
+				ai->setTurretTargetObject(turret, attacker);
+			}
+		}
+	}
+
+	void stopMoving(StateExitType status)
+	{
+		AIInternalMoveToState::onExit(status);
+		m_moving = false;
+	}
+
+	Int m_leg;
+	Bool m_moving;
+};
+EMPTY_DTOR(AIHitAndRunRetreatState)
+
 //----------------------------------------------------------------------------------------------------------
 /**
  * Create an AI state machine. Define all of the states the machine
@@ -328,6 +493,10 @@ AttackStateMachine::AttackStateMachine( Object *obj, AIAttackState* att, AsciiSt
 								AttackStateMachine::AIM_AT_TARGET,
 								attackingObject ? objectConditions : positionConditions );
 
+	defineState(AttackStateMachine::HIT_AND_RUN_WITHDRAW, newInstance(AIMoveToState)(this),
+		AttackStateMachine::HIT_AND_RUN_WAIT, AttackStateMachine::HIT_AND_RUN_WAIT);
+	defineState(AttackStateMachine::HIT_AND_RUN_WAIT, newInstance(AIIdleState)(this, AIIdleState::DO_NOT_LOOK_FOR_TARGETS),
+		AttackStateMachine::HIT_AND_RUN_WAIT, AttackStateMachine::HIT_AND_RUN_WAIT);
 
 	if (obj->isKindOf(KINDOF_IMMOBILE) == FALSE)
 	{
@@ -690,6 +859,7 @@ AIStateMachine::AIStateMachine( Object *obj, AsciiString name ) : StateMachine( 
 	defineState( AI_IDLE,																	newInstance(AIIdleState)( this, AIIdleState::LOOK_FOR_TARGETS), AI_IDLE, AI_IDLE );
 	defineState( AI_MOVE_TO,															newInstance(AIMoveToState)( this ), AI_IDLE, AI_IDLE );
 	defineState( AI_MOVE_OUT_OF_THE_WAY,									newInstance(AIMoveOutOfTheWayState)( this ), AI_IDLE, AI_IDLE );
+	defineState(AI_HIT_AND_RUN_RETREAT, newInstance(AIHitAndRunRetreatState)(this), AI_IDLE, AI_IDLE);
 	defineState( AI_MOVE_AND_TIGHTEN,											newInstance(AIMoveAndTightenState)( this ), AI_IDLE, AI_IDLE );
 	defineState( AI_MOVE_AWAY_FROM_REPULSORS,							newInstance(AIMoveAwayFromRepulsorsState)( this ), AI_WANDER_IN_PLACE, AI_WANDER_IN_PLACE );
 	defineState( AI_WANDER_IN_PLACE,											newInstance(AIWanderInPlaceState)( this ), AI_MOVE_AWAY_FROM_REPULSORS, AI_MOVE_AWAY_FROM_REPULSORS );
@@ -754,7 +924,7 @@ void AIStateMachine::crc( Xfer *xfer )
 void AIStateMachine::xfer( Xfer *xfer )
 {
   // version
-  XferVersion currentVersion = 2;
+  XferVersion currentVersion = 3;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -827,6 +997,10 @@ void AIStateMachine::xfer( Xfer *xfer )
 	}
 
 	xfer->xferUnsignedInt(&m_temporaryStateFramEnd);
+	if (version >= 3 && id == AI_HIT_AND_RUN_RETREAT && m_temporaryState)
+	{
+		static_cast<AIHitAndRunRetreatState *>(m_temporaryState)->xferLeg(xfer);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -886,11 +1060,19 @@ StateReturnType AIStateMachine::updateStateMachine()
 	#endif
 	//end -extraLogging
 
+	const Team *team = getHitAndRunTeam(getOwner());
+	if (team && team->getHitAndRunRetreatPoint() && getOwner()->getAI()->isSameMachine(this) &&
+		getTemporaryState() != AI_HIT_AND_RUN_RETREAT && !isLocked())
+	{
+		setTemporaryState(AI_HIT_AND_RUN_RETREAT, 60 * LOGICFRAMES_PER_SECOND);
+	}
+
 	if (m_temporaryState)
 	{
+		const Bool wasRetreating = getTemporaryState() == AI_HIT_AND_RUN_RETREAT;
 		// execute this state
 		StateReturnType status = m_temporaryState->update();
-		if (m_temporaryStateFramEnd < TheGameLogic->getFrame()) {
+		if (!wasRetreating && m_temporaryStateFramEnd < TheGameLogic->getFrame()) {
 			// ran out of time.
 			if (status == STATE_CONTINUE) {
 				status = STATE_SUCCESS;
@@ -914,6 +1096,43 @@ StateReturnType AIStateMachine::updateStateMachine()
 		{
 			m_temporaryState->onExit(EXIT_NORMAL);
 			m_temporaryState = nullptr;
+			if (wasRetreating && getCurrentStateID() != INVALID_STATE_ID)
+			{
+				StateID order = getCurrentStateID();
+				if ((order == AI_ATTACK_MOVE_TO || order == AI_MOVE_TO) && !getGoalObject() &&
+					isHitAndRunOrigin(getGoalPosition()))
+				{
+					const Coord3D *givenGoal = getOwner()->getAI()->getGivenGoal();
+					if (givenGoal && !isHitAndRunOrigin(givenGoal))
+					{
+						setGoalPosition(givenGoal);
+					}
+					else
+					{
+						order = AI_IDLE;
+					}
+				}
+				else if (order == AI_FOLLOW_WAYPOINT_PATH_AS_TEAM || order == AI_FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS ||
+					order == AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM || order == AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS)
+				{
+					// onEnter restarts a path from its first point, so resume at the point the unit was heading to
+					const Waypoint *way = static_cast<AIFollowWaypointPathState *>(internalGetState(order))->getCurrentWaypoint();
+					if (way)
+					{
+						setGoalWaypoint(way);
+					}
+				}
+				else if (order == AI_FOLLOW_PATH)
+				{
+					const Int index = static_cast<AIFollowPathState *>(internalGetState(order))->getCurPathIndex();
+					if (index > 0 && index < (Int)m_goalPath.size())
+					{
+						m_goalPath.erase(m_goalPath.begin(), m_goalPath.begin() + index);
+						m_goalPathInfo.erase(m_goalPathInfo.begin(), m_goalPathInfo.begin() + index);
+					}
+				}
+				setState(order);
+			}
 		}
 	}
 	StateReturnType retType = StateMachine::updateStateMachine();
@@ -1538,7 +1757,11 @@ StateReturnType AIIdleState::update()
 			if ((moodAdjust & MAA_Affect_Range_IgnoreAll) == 0)
 			{
 				// If we're supposed to attack based on mood, etc, then we will do so.
-				Object* enemy = ai->getNextMoodTarget( true, true );
+				Object *enemy = getHitAndRunAttackTarget(obj);
+				if (!enemy)
+				{
+					enemy = ai->getNextMoodTarget( true, true );
+				}
 				if (enemy)
 				{
 	 				ai->aiAttackObject(enemy, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI);
@@ -4027,8 +4250,11 @@ StateReturnType AIAttackMoveToState::update()
 			return STATE_CONTINUE;
 		}
 
-		Object* nextObjectToAttack;
-		nextObjectToAttack = ai->getNextMoodTarget( !forceRetargetThisFrame, false );
+		Object *nextObjectToAttack = getHitAndRunAttackTarget(owner);
+		if (!nextObjectToAttack)
+		{
+			nextObjectToAttack = ai->getNextMoodTarget( !forceRetargetThisFrame, false );
+		}
 		if (nextObjectToAttack != nullptr)
 		{
 			ai->friend_endingMove();
@@ -4935,9 +5161,9 @@ StateReturnType AIAttackFollowWaypointPathState::update()
 			return STATE_CONTINUE;
 		}
 
-		Object* nextObjectToAttack;
+		Object *nextObjectToAttack = getHitAndRunAttackTarget(owner);
+		if (!nextObjectToAttack)
 		{
-
 			nextObjectToAttack = ai->getNextMoodTarget( !forceRetargetThisFrame, false );
 		}
 		if (nextObjectToAttack != nullptr)
@@ -5983,6 +6209,7 @@ StateReturnType AIAttackFireWeaponState::update()
 
 	const AIUpdateInterface* ai = obj->getAI();
 	const CommandSourceType cmdSource = ai->getLastCommandSource();
+	Team *team = getHitAndRunTeam(obj);
 	const Bool fireAllAtGround = !m_att->isAttackingObject() && ai->forceFiresAllWeapons() && !obj->isCurWeaponLocked();
 	if (fireAllAtGround && !m_att->ownsWeaponSlot(wslot))
 	{
@@ -5993,6 +6220,13 @@ StateReturnType AIAttackFireWeaponState::update()
 			return STATE_FAILURE;
 		}
 		weapon = obj->getWeaponInWeaponSlot(wslot);
+	}
+
+	if (team && team->getHitAndRunRetreatPoint() &&
+		(!victim || obj->getRelationship(victim) != ENEMIES || !weapon->isWithinAttackRange(obj, victim) ||
+		 (ai->mustHoldStillToFire() && ai->isMoving())))
+	{
+		return STATE_FAILURE;
 	}
 
 	WeaponStatus status = weapon->getStatus();
@@ -6128,6 +6362,19 @@ StateReturnType AIAttackFireWeaponState::update()
 		obj->notifyFiringTrackerShotFired(syncedWeapon, INVALID_ID);
 	}
 
+
+	if (team && ai->isAttacking())
+	{
+		const UnsignedInt now = TheGameLogic->getFrame();
+		for (Int slot = PRIMARY_WEAPON; slot < WEAPONSLOT_COUNT; ++slot)
+		{
+			const Weapon *fired = obj->getWeaponInWeaponSlot((WeaponSlotType)slot);
+			if (fired && fired->getLastShotFrame() == now && fired->getStatus() != OUT_OF_AMMO)
+			{
+				team->recordHitAndRunShot(obj->getID(), fired->getPossibleNextShotFrame());
+			}
+		}
+	}
 
 	m_att->notifyFired();
 
@@ -6418,6 +6665,13 @@ StateReturnType AIAttackState::update()
 	}
 
 	Object* source = getMachineOwner();
+	const StateID attackState = m_attackMachine->getCurrentStateID();
+	if (attackState == AttackStateMachine::HIT_AND_RUN_WITHDRAW || attackState == AttackStateMachine::HIT_AND_RUN_WAIT)
+	{
+		m_attackMachine->setGoalObject(getMachineGoalObject());
+		m_attackMachine->setGoalPosition(getMachineGoalPosition());
+		return CONVERT_SLEEP_TO_CONTINUE(m_attackMachine->setState(AttackStateMachine::CHASE_TARGET));
+	}
 
 	// if all of our weapons are out of ammo, can't attack.
 	// (this can happen for units which never auto-reload, like the Raptor)

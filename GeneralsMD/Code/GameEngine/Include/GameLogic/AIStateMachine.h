@@ -104,6 +104,7 @@ enum AIStateType CPP_11(: Int)
 	AI_BUSY,																	///< This is a state that things will be in when they are busy doing random stuff that doesn't require AI interaction.
 	AI_EXIT_INSTANTLY,												///< exit this obj, without waiting -- do it in the onEnter! This frame!
 	AI_GUARD_RETALIATE,												///< attacks attacker but with restrictions (hybrid of attack and guard).
+	AI_HIT_AND_RUN_RETREAT,
 };
 
 struct PathPointInfo
@@ -213,6 +214,8 @@ enum StateType CPP_11(: Int)
 		APPROACH_TARGET,											///< Approach a non-moving target.
 		AIM_AT_TARGET,												///< rotate to face GoalObject or GoalPosition
 		FIRE_WEAPON,													///< fire the machine owner's current weapon
+		HIT_AND_RUN_WITHDRAW,
+		HIT_AND_RUN_WAIT,
 	};
 	AttackStateMachine( Object *owner, AIAttackState* att, AsciiString name, Bool follow, Bool attackingObject, Bool forceAttacking );
 
@@ -653,6 +656,7 @@ public:
 	virtual StateReturnType onEnter() override;
 	virtual void onExit( StateExitType status ) override;
 	virtual StateReturnType update() override;
+	const Waypoint *getCurrentWaypoint() const { return m_currentWaypoint; }
 
 protected:
 	// snapshot interface
@@ -849,13 +853,13 @@ public:
 	virtual StateReturnType onEnter() override;
 	virtual void onExit( StateExitType status ) override;
 	virtual StateReturnType update() override;
+	Int getCurPathIndex() const { return m_index; }
 
 	// ShigureUi 28/10/2026 only used by AIStateMachine::addToGoalPath()
 	void friend_recheckFinalDestination(Int index);
 
 protected:
 
-	Int getCurPathIndex() const { return m_index; }
 	void setAdjustFinalDestination(Bool b) { m_adjustFinal = b; }
 	void setAdjustFinalDestinationEvenIfNotDoingGroundMovement(Bool b) { m_adjustFinalOverride = b; }
 

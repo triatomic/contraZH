@@ -22,6 +22,7 @@
 #include "StdAfx.h"
 #include "WorldBuilder.h"
 #include "TeamBehavior.h"
+#include "TeamHitAndRunOptions.h"
 #include "EditParameter.h"
 #include "Common/WellKnownKeys.h"
 #include "GameLogic/AI.h"
@@ -52,6 +53,10 @@ BEGIN_MESSAGE_MAP(TeamBehavior, CPropertyPage)
 	ON_CBN_SELCHANGE(IDC_ON_CREATE_SCRIPT, OnSelchangeOnCreateScript)
 	ON_BN_CLICKED(IDC_TRANSPORTS_RETURN, OnTransportsReturn)
 	ON_BN_CLICKED(IDC_AVOID_THREATS, OnAvoidThreats)
+	ON_BN_CLICKED(IDC_TEAM_HIT_AND_RUN, OnHitAndRun)
+	ON_CONTROL_RANGE(BN_CLICKED, IDC_TEAM_HIT_AND_RUN_RELOAD, IDC_TEAM_HIT_AND_RUN_TIMER, OnHitAndRunMode)
+	ON_CONTROL_RANGE(BN_CLICKED, IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE, IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE, OnHitAndRunMode)
+	ON_CONTROL_RANGE(EN_KILLFOCUS, IDC_TEAM_HIT_AND_RUN_RELOAD_PCT, IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY, OnHitAndRunValue)
 	ON_CBN_SELCHANGE(IDC_ON_ENEMY_SIGHTED, OnSelchangeOnEnemySighted)
 	ON_CBN_SELCHANGE(IDC_ON_DESTROYED, OnSelchangeOnDestroyed)
 	ON_CBN_SELCHANGE(IDC_ON_UNIT_DESTROYED_SCRIPT, OnSelchangeOnUnitDestroyed)
@@ -139,6 +144,29 @@ BOOL TeamBehavior::OnInitDialog()
 	Bool avoid = m_teamDict->getBool(TheKey_teamAvoidThreats, &exists);
 	pCheck->SetCheck(avoid?1:0);
 
+	pCheck = (CButton *) GetDlgItem(IDC_TEAM_HIT_AND_RUN);
+	pCheck->SetCheck(m_teamDict->getBool(TheKey_teamHitAndRun, &exists) ? 1 : 0);
+	const Bool useTimer = m_teamDict->getBool(TheKey_teamHitAndRunUseTimer, &exists);
+	CheckRadioButton(IDC_TEAM_HIT_AND_RUN_RELOAD, IDC_TEAM_HIT_AND_RUN_TIMER,
+		useTimer ? IDC_TEAM_HIT_AND_RUN_TIMER : IDC_TEAM_HIT_AND_RUN_RELOAD);
+	const Bool retreatTimer = m_teamDict->getBool(TheKey_teamHitAndRunRetreatUseTimer, &exists);
+	CheckRadioButton(IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE, IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE,
+		retreatTimer ? IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE : IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE);
+	m_hitAndRunHelp.Create(this, TTS_ALWAYSTIP);
+	m_hitAndRunHelp.SetMaxTipWidth(300);
+	m_hitAndRunHelp.AddTool(pCheck, "Withdraw after a volley, then resume attacking using the selected readiness rule.");
+	for (Int control = IDC_TEAM_HIT_AND_RUN_RELOAD_PCT; control <= IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY; ++control)
+	{
+		const TeamHitAndRunField &field = *getTeamHitAndRunField(control);
+		SetDlgItemInt(control, getTeamHitAndRunValue(m_teamDict, field), FALSE);
+		m_hitAndRunHelp.AddTool(GetDlgItem(control), field.help);
+	}
+	m_hitAndRunHelp.AddTool(GetDlgItem(IDC_TEAM_HIT_AND_RUN_RELOAD), getTeamHitAndRunField(IDC_TEAM_HIT_AND_RUN_RELOAD_PCT)->help);
+	m_hitAndRunHelp.AddTool(GetDlgItem(IDC_TEAM_HIT_AND_RUN_TIMER), getTeamHitAndRunField(IDC_TEAM_HIT_AND_RUN_DELAY)->help);
+	m_hitAndRunHelp.AddTool(GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE), getTeamHitAndRunField(IDC_TEAM_HIT_AND_RUN_RETREAT)->help);
+	m_hitAndRunHelp.AddTool(GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE), getTeamHitAndRunField(IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY)->help);
+	updateHitAndRunControls();
+
 	pCheck = (CButton *) GetDlgItem(IDC_ATTACK_COMMON_TARGET);
 	Bool attack = m_teamDict->getBool(TheKey_teamAttackCommonTarget, &exists);
 	pCheck->SetCheck(attack?1:0);
@@ -172,6 +200,58 @@ void TeamBehavior::OnAvoidThreats()
 	CButton *pCheck = (CButton *) GetDlgItem(IDC_AVOID_THREATS);
 	Bool checked = 	pCheck->GetCheck()==1;
 	m_teamDict->setBool(TheKey_teamAvoidThreats, checked);
+}
+
+void TeamBehavior::OnHitAndRun()
+{
+	CButton *pCheck = (CButton *) GetDlgItem(IDC_TEAM_HIT_AND_RUN);
+	m_teamDict->setBool(TheKey_teamHitAndRun, pCheck->GetCheck() == 1);
+	updateHitAndRunControls();
+}
+
+void TeamBehavior::OnHitAndRunMode(UINT control)
+{
+	if (control == IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE || control == IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE)
+	{
+		m_teamDict->setBool(TheKey_teamHitAndRunRetreatUseTimer, control == IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE);
+	}
+	else
+	{
+		m_teamDict->setBool(TheKey_teamHitAndRunUseTimer, control == IDC_TEAM_HIT_AND_RUN_TIMER);
+	}
+	updateHitAndRunControls();
+}
+
+void TeamBehavior::OnHitAndRunValue(UINT control)
+{
+	CString text;
+	GetDlgItemText(control, text);
+	const TeamHitAndRunField &field = *getTeamHitAndRunField(control);
+	SetDlgItemInt(control, setTeamHitAndRunValue(m_teamDict, field, text), FALSE);
+}
+
+void TeamBehavior::updateHitAndRunControls()
+{
+	const BOOL enabled = IsDlgButtonChecked(IDC_TEAM_HIT_AND_RUN) == BST_CHECKED;
+	const BOOL useTimer = IsDlgButtonChecked(IDC_TEAM_HIT_AND_RUN_TIMER) == BST_CHECKED;
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RELOAD)->EnableWindow(enabled);
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_TIMER)->EnableWindow(enabled);
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RELOAD_PCT)->EnableWindow(enabled && !useTimer);
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_DELAY)->EnableWindow(enabled && useTimer);
+	const BOOL retreatTimer = IsDlgButtonChecked(IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE) == BST_CHECKED;
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE)->EnableWindow(enabled);
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE)->EnableWindow(enabled);
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT)->EnableWindow(enabled && !retreatTimer);
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY)->EnableWindow(enabled && retreatTimer);
+}
+
+BOOL TeamBehavior::PreTranslateMessage(MSG *message)
+{
+	if (m_hitAndRunHelp.GetSafeHwnd())
+	{
+		m_hitAndRunHelp.RelayEvent(message);
+	}
+	return CPropertyPage::PreTranslateMessage(message);
 }
 
 void TeamBehavior::OnSelchangeOnEnemySighted()

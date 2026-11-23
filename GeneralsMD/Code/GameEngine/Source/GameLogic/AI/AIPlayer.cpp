@@ -1627,14 +1627,14 @@ Bool AIPlayer::selectTeamToReinforce( Int minPriority )
 			}
 		}
 		if (busy) continue;
-		if (proto->getTemplateInfo()->m_automaticallyReinforce && proto->getTemplateInfo()->m_productionPriority>curPriority) {
+		if (proto->getTemplateInfo()->m_productionPriority>curPriority) {
 			// Check the team instances.
 			for (DLINK_ITERATOR<Team> iter = proto->iterate_TeamInstanceList(); !iter.done(); iter.advance())
 			{
 				Team *team = iter.cur();
-				if (team->hasAnyUnits() == false)
+				if (!team->isAutoReinforceEnabled() || !team->hasAnyUnits())
 				{
-					continue; // empty.
+					continue;
 				}
 				const TCreateUnitsInfo *unitInfo = &team->getPrototype()->getTemplateInfo()->m_unitsInfo[0];
 				for( int i=0; i<team->getPrototype()->getTemplateInfo()->m_numUnitsInfo; i++ )

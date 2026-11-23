@@ -146,6 +146,14 @@ public:
 	Bool							m_isPerimeterDefense;					///< True if is a perimeter base defense team.
 	Bool							m_automaticallyReinforce;			///< True is team automatically tries to reinforce.
 	Bool							m_transportsReturn;						///< True if transports return to base after unloading.
+	enum { HIT_AND_RUN_DEFAULT_PERCENT = 50, HIT_AND_RUN_DEFAULT_DELAY = 5, HIT_AND_RUN_MAX_DELAY = 600 };
+	Bool							m_hitAndRun;
+	Bool							m_hitAndRunUseTimer;
+	Bool							m_hitAndRunRetreatUseTimer;
+	Int							m_hitAndRunRetreatPercent;
+	Int							m_hitAndRunReloadPercent;
+	Int							m_hitAndRunDelaySeconds;
+	Int							m_hitAndRunRetreatDelaySeconds;
 	Bool							m_avoidThreats;								///< True if the team avoids threats.
 	Bool							m_attackCommonTarget;					///< True if the team attacks the same target unit.
 	Int								m_maxInstances;								///< Maximum number of instances of a team that is not singleton.
@@ -197,6 +205,17 @@ private:
 	AsciiString		m_state;						///< Name of the current AI state.
 
 	Bool					m_enteredOrExited;  ///< True if a team member entered or exited a trigger area this frame.
+	Bool					m_autoReinforce;
+	Bool					m_hitAndRun;
+	Bool					m_hitAndRunRetreating;
+	UnsignedInt			m_hitAndRunRetreatMinEnd;
+	UnsignedInt			m_hitAndRunFirstShotFrame;
+	enum { HIT_AND_RUN_RETREAT_POINTS = 3 };
+	Coord3D				m_hitAndRunRetreatPoints[HIT_AND_RUN_RETREAT_POINTS];
+	Int					m_hitAndRunRetreatPointCount;
+	void addHitAndRunRetreatPoint(const Coord3D &point);
+	std::map<ObjectID, UnsignedInt> m_hitAndRunShots;
+	void updateHitAndRun();
 	Bool					m_active;						///< True if a team is complete.  False while members are being added.
 	Bool					m_created;					///< True when first activated.
 
@@ -291,6 +310,18 @@ public:
 	/**
 		Set the team's AI recruitablity.
 	*/
+	Bool isAutoReinforceEnabled() const { return m_autoReinforce; }
+	void setAutoReinforce(Bool enabled) { m_autoReinforce = enabled; }
+
+	Bool doesHitAndRun() const { return m_hitAndRun; }
+	void setHitAndRun(Bool enabled);
+	static Bool canHitAndRun(const Object *obj);
+	void recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil);
+	const Coord3D *getHitAndRunRetreatPoint(Int leg = 0) const
+	{
+		return m_hitAndRunRetreating && leg >= 0 && leg < m_hitAndRunRetreatPointCount ? &m_hitAndRunRetreatPoints[leg] : nullptr;
+	}
+
 	void setRecruitable(Bool recruitable) {m_isRecruitablitySet = true; m_isRecruitable = recruitable;}
 
 	/**

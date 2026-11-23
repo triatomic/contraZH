@@ -7217,6 +7217,26 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 		case ScriptAction::MAP_SHROUD_ALL:
 			doShroudMapEntire(pAction->getParameter(0)->getString());
 			return;
+		case ScriptAction::TEAM_SET_AUTO_REINFORCE:
+		{
+			Team *team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			if (team)
+			{
+				team->setAutoReinforce(pAction->getParameter(1)->getInt() != 0);
+			}
+			break;
+		}
+
+		case ScriptAction::TEAM_SET_HIT_AND_RUN:
+		{
+			Team *team = TheScriptEngine->getTeamNamed(pAction->getParameter(0)->getString());
+			if (team)
+			{
+				team->setHitAndRun(pAction->getParameter(1)->getInt() != 0);
+			}
+			break;
+		}
+
 		case ScriptAction::TEAM_AVAILABLE_FOR_RECRUITMENT:
 			doTeamAvailableForRecruitment(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
 			return;

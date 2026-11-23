@@ -340,6 +340,13 @@ DEFINE_KEY(teamTransportsReturn)
 	Usage: True if the team avoids threats.
 */
 DEFINE_KEY(teamAvoidThreats)
+DEFINE_KEY(teamHitAndRun)
+DEFINE_KEY(teamHitAndRunRetreatPercent)
+DEFINE_KEY(teamHitAndRunReloadPercent)
+DEFINE_KEY(teamHitAndRunDelaySeconds)
+DEFINE_KEY(teamHitAndRunUseTimer)
+DEFINE_KEY(teamHitAndRunRetreatUseTimer)
+DEFINE_KEY(teamHitAndRunRetreatDelaySeconds)
 
 /**
 	Which: Team

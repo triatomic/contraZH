@@ -1,6 +1,6 @@
 # Gameplay Fixes
 
-Always on, no `Options.ini` key. Each entry says whether
+Fixes are on by default unless an entry says otherwise. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
 ## Skirmish AI skips unavailable structures
@@ -11,6 +11,17 @@ stays on the build list and can become eligible after an upgrade. Super Weapon G
 can list both power buildings in AIData and build the one unlocked by its branch choice.
 
 This changes the simulation.
+
+## Script control for automatic team reinforcement
+
+- Use **Enable or disable automatic reinforcement** under **Team > AI** to change whether an existing team can receive automatic replacements. The change applies when the AI next looks for a team to reinforce. Replacements already queued can finish.
+
+## AI team hit and run
+
+- Enable **Hit and run** in the WorldBuilder Team Behavior tab. Idle and attack-moving units can join a teammate's attack. The team withdraws along a shared route, and turrets can return fire at enemies in range. Ground units and mobile aircraft such as helicopters can take part. Aircraft with jet AI use their own return-to-airfield behavior.
+- **Attack after** resumes the attack when the chosen percentage of attackers have fired and reloaded in the current volley (default 50%), or after a delay from the start of the retreat (default 5 seconds). If fewer units fired than the reload threshold, the team waits for all of those units to reload.
+- **Retreat after** withdraws the team when the chosen percentage of attackers have fired (default 50%), or after a delay from the first shot of the current volley (default 5 seconds).
+- Use **Enable or disable hit-and-run behavior** under **Team > AI** to change the setting on a team during play.
 
 ## AI construction uses legal, reachable sites
 

@@ -41,6 +41,7 @@
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/BodyModule.h"
@@ -719,6 +720,17 @@ TeamTemplateInfo::TeamTemplateInfo(Dict *d) :
 	}
 
 	m_transportsReturn	= d->getBool(TheKey_teamTransportsReturn, &exists);
+	m_hitAndRun = d->getBool(TheKey_teamHitAndRun, &exists);
+	m_hitAndRunUseTimer = d->getBool(TheKey_teamHitAndRunUseTimer, &exists);
+	m_hitAndRunRetreatUseTimer = d->getBool(TheKey_teamHitAndRunRetreatUseTimer, &exists);
+	const Int retreatDelay = d->getInt(TheKey_teamHitAndRunRetreatDelaySeconds, &exists);
+	m_hitAndRunRetreatDelaySeconds = exists ? std::max(0, std::min((Int)HIT_AND_RUN_MAX_DELAY, retreatDelay)) : HIT_AND_RUN_DEFAULT_DELAY;
+	const Int retreatPercent = d->getInt(TheKey_teamHitAndRunRetreatPercent, &exists);
+	m_hitAndRunRetreatPercent = exists ? std::max(1, std::min(100, retreatPercent)) : HIT_AND_RUN_DEFAULT_PERCENT;
+	const Int reloadPercent = d->getInt(TheKey_teamHitAndRunReloadPercent, &exists);
+	m_hitAndRunReloadPercent = exists ? std::max(1, std::min(100, reloadPercent)) : HIT_AND_RUN_DEFAULT_PERCENT;
+	const Int delay = d->getInt(TheKey_teamHitAndRunDelaySeconds, &exists);
+	m_hitAndRunDelaySeconds = exists ? std::max(0, std::min((Int)HIT_AND_RUN_MAX_DELAY, delay)) : HIT_AND_RUN_DEFAULT_DELAY;
 	m_avoidThreats = d->getBool(TheKey_teamAvoidThreats, &exists);
 
 	m_attackCommonTarget = d->getBool(TheKey_teamAttackCommonTarget, &exists);
@@ -1307,6 +1319,12 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
   m_id( id ),
 	m_proto(proto),
 	m_enteredOrExited(false),
+	m_autoReinforce(proto->getTemplateInfo()->m_automaticallyReinforce),
+	m_hitAndRun(proto->getTemplateInfo()->m_hitAndRun),
+	m_hitAndRunRetreating(false),
+	m_hitAndRunRetreatMinEnd(0),
+	m_hitAndRunFirstShotFrame(0),
+	m_hitAndRunRetreatPointCount(0),
 	m_active(false),
 	m_seeEnemy(false),
 	m_prevSeeEnemy(false),
@@ -1318,6 +1336,10 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
 	m_wasIdle(false)
 {
 	m_created = FALSE;
+	for (Int i = 0; i < HIT_AND_RUN_RETREAT_POINTS; ++i)
+	{
+		m_hitAndRunRetreatPoints[i].zero();
+	}
 	m_commonAttackTarget = INVALID_ID;
 
 	// allocate new relation map pools
@@ -1759,6 +1781,11 @@ Bool Team::hasAnyUnits() const
 // ------------------------------------------------------------------------
 Bool Team::isIdle() const
 {
+	if (m_hitAndRunRetreating)
+	{
+		return false;
+	}
+
 	Bool idle = true; // assume idle.
 	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
@@ -1808,6 +1835,193 @@ Bool Team::hasAnyObjects() const
 	return false;
 }
 
+Bool Team::canHitAndRun(const Object *obj)
+{
+	return obj && obj->getAI() && obj->isMobile() && !obj->isEffectivelyDead() &&
+		!obj->getAI()->getJetAIUpdate() && !obj->isKindOf(KINDOF_PROJECTILE);
+}
+
+void Team::setHitAndRun(Bool enabled)
+{
+	if (m_hitAndRun != enabled)
+	{
+		m_hitAndRun = enabled;
+		m_hitAndRunRetreating = false;
+		m_hitAndRunShots.clear();
+	}
+}
+
+void Team::recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil)
+{
+	if (m_hitAndRun && !m_hitAndRunRetreating)
+	{
+		if (m_hitAndRunShots.empty())
+		{
+			m_hitAndRunFirstShotFrame = TheGameLogic->getFrame();
+		}
+		UnsignedInt &lastReload = m_hitAndRunShots[member];
+		lastReload = std::max(lastReload, reloadUntil);
+	}
+}
+
+void Team::addHitAndRunRetreatPoint(const Coord3D &point)
+{
+	Region3D bounds;
+	TheTerrainLogic->getMaximumPathfindExtent(&bounds);
+	if ((std::abs(point.x) < PATHFIND_CELL_SIZE_F && std::abs(point.y) < PATHFIND_CELL_SIZE_F) || !bounds.isInRegionNoZ(point) ||
+		m_hitAndRunRetreatPointCount >= HIT_AND_RUN_RETREAT_POINTS)
+	{
+		return;
+	}
+
+	if (m_hitAndRunRetreatPointCount > 0)
+	{
+		Coord3D delta = point;
+		delta.sub(m_hitAndRunRetreatPoints[m_hitAndRunRetreatPointCount - 1]);
+		delta.z = 0.0f;
+		if (delta.length() < PATHFIND_CELL_SIZE_F)
+		{
+			return;
+		}
+	}
+	m_hitAndRunRetreatPoints[m_hitAndRunRetreatPointCount++] = point;
+}
+
+void Team::updateHitAndRun()
+{
+	if (!m_hitAndRun || m_hitAndRunShots.empty())
+	{
+		return;
+	}
+
+	Player *player = getControllingPlayer();
+	if (!player || player->getPlayerType() != PLAYER_COMPUTER)
+	{
+		return;
+	}
+
+	const UnsignedInt now = TheGameLogic->getFrame();
+	Int attackers = 0;
+	Int fired = 0;
+	Int reloaded = 0;
+	const TeamTemplateInfo *info = m_proto->getTemplateInfo();
+	Bool engaged = false;
+	const Waypoint *previousWaypoint = nullptr;
+	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
+	{
+		Object *obj = iter.cur();
+		if (!canHitAndRun(obj))
+		{
+			continue;
+		}
+		if (obj->getLargestWeaponRange() < 0.0f)
+		{
+			continue;
+		}
+
+		++attackers;
+		AIUpdateInterface *ai = obj->getAI();
+		engaged = engaged || ai->isAttacking();
+		if (!previousWaypoint && !m_hitAndRunRetreating)
+		{
+			previousWaypoint = TheTerrainLogic->getWaypointByID(ai->getPriorWaypointID());
+			if (!previousWaypoint)
+			{
+				previousWaypoint = ai->getCompletedWaypoint();
+			}
+		}
+		std::map<ObjectID, UnsignedInt>::const_iterator shot = m_hitAndRunShots.find(obj->getID());
+		if (shot != m_hitAndRunShots.end())
+		{
+			++fired;
+			if (now >= shot->second)
+			{
+				++reloaded;
+			}
+		}
+	}
+
+	if (m_hitAndRunRetreating)
+	{
+		const Int reloadRequired = (attackers * info->m_hitAndRunReloadPercent + 99) / 100;
+		const Bool ready = info->m_hitAndRunUseTimer || reloaded >= std::min(fired, reloadRequired);
+
+		if (attackers == 0 || (now >= m_hitAndRunRetreatMinEnd && ready))
+		{
+			m_hitAndRunRetreating = false;
+			m_hitAndRunShots.clear();
+		}
+		return;
+	}
+
+	const Int required = (attackers * info->m_hitAndRunRetreatPercent + 99) / 100;
+	if (attackers == 0 || (!info->m_hitAndRunRetreatUseTimer && (fired == 0 || (!engaged && fired < required))))
+	{
+		m_hitAndRunShots.clear();
+		return;
+	}
+	const Bool shouldRetreat = info->m_hitAndRunRetreatUseTimer ?
+		now - m_hitAndRunFirstShotFrame >= (UnsignedInt)(info->m_hitAndRunRetreatDelaySeconds * LOGICFRAMES_PER_SECOND) :
+		fired >= required;
+	if (!shouldRetreat)
+	{
+		return;
+	}
+
+	m_hitAndRunRetreatPointCount = 0;
+	if (previousWaypoint)
+	{
+		addHitAndRunRetreatPoint(*previousWaypoint->getLocation());
+	}
+
+	AsciiString name;
+	name.format("%s%d", OUTER_PERIMETER, player->getMpStartIndex() + 1);
+	const PolygonTrigger *perimeter = TheTerrainLogic->getTriggerAreaByName(name);
+	if (perimeter && perimeter->getNumPoints() >= 3)
+	{
+		Coord3D center;
+		perimeter->getCenterPoint(&center);
+		addHitAndRunRetreatPoint(center);
+	}
+
+	const Int pointsBeforeBase = m_hitAndRunRetreatPointCount;
+	Coord3D base;
+	if (player->getAiBaseCenter(&base))
+	{
+		addHitAndRunRetreatPoint(base);
+	}
+	if (m_hitAndRunRetreatPointCount == pointsBeforeBase)
+	{
+		name.format("Player_%d_Start", player->getMpStartIndex() + 1);
+		const Waypoint *start = TheTerrainLogic->getWaypointByName(name);
+		if (start)
+		{
+			addHitAndRunRetreatPoint(*start->getLocation());
+		}
+		else if (m_proto->getTemplateInfo()->m_hasHomeLocation)
+		{
+			addHitAndRunRetreatPoint(m_proto->getTemplateInfo()->m_homeLocation);
+		}
+	}
+
+	if (m_hitAndRunRetreatPointCount == 0)
+	{
+		m_hitAndRunShots.clear();
+		return;
+	}
+
+	m_hitAndRunRetreating = true;
+	const Int retreatFrames = info->m_hitAndRunUseTimer ? info->m_hitAndRunDelaySeconds * LOGICFRAMES_PER_SECOND : 0;
+	m_hitAndRunRetreatMinEnd = now + std::max(1, retreatFrames);
+	for (DLINK_ITERATOR<Object> iter = iterate_TeamMemberList(); !iter.done(); iter.advance())
+	{
+		if (canHitAndRun(iter.cur()))
+		{
+			iter.cur()->getAI()->notifyTeamRetreat();
+		}
+	}
+}
+
 // ------------------------------------------------------------------------
 /** Clears m_enteredExited, checks & clears m_created. */
 void Team::updateState()
@@ -1816,6 +2030,7 @@ void Team::updateState()
 	if (!m_active) {
 		return;
 	}
+	updateHitAndRun();
 	const TeamTemplateInfo *pInfo = m_proto->getTemplateInfo();
 	if (m_created)
 	{
@@ -2580,7 +2795,7 @@ void Team::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2702,6 +2917,85 @@ void Team::xfer( Xfer *xfer )
 
 	// player relations
 	xfer->xferSnapshot( m_playerRelations );
+
+	if (version >= 2)
+	{
+		xfer->xferBool(&m_hitAndRun);
+	}
+	if (version == 2)
+	{
+		UnsignedInt oldFrame = 0;
+		xfer->xferUnsignedInt(&oldFrame);
+		xfer->xferUnsignedInt(&oldFrame);
+	}
+	if (version >= 3)
+	{
+		xfer->xferBool(&m_hitAndRunRetreating);
+		xfer->xferUnsignedInt(&m_hitAndRunRetreatMinEnd);
+		xfer->xferCoord3D(&m_hitAndRunRetreatPoints[0]);
+		if (version >= 4)
+		{
+			xfer->xferInt(&m_hitAndRunRetreatPointCount);
+			if (m_hitAndRunRetreatPointCount < 0 || m_hitAndRunRetreatPointCount > HIT_AND_RUN_RETREAT_POINTS)
+			{
+				throw SC_INVALID_DATA;
+			}
+			for (Int i = 1; i < m_hitAndRunRetreatPointCount; ++i)
+			{
+				xfer->xferCoord3D(&m_hitAndRunRetreatPoints[i]);
+			}
+		}
+		else
+		{
+			m_hitAndRunRetreatPointCount = m_hitAndRunRetreating ? 1 : 0;
+		}
+		UnsignedInt shotCount = m_hitAndRunShots.size();
+		xfer->xferUnsignedInt(&shotCount);
+		if (xfer->getXferMode() == XFER_LOAD)
+		{
+			m_hitAndRunShots.clear();
+			for (UnsignedInt i = 0; i < shotCount; ++i)
+			{
+				ObjectID id = INVALID_ID;
+				xfer->xferObjectID(&id);
+				xfer->xferUnsignedInt(&m_hitAndRunShots[id]);
+			}
+		}
+		else
+		{
+			for (std::map<ObjectID, UnsignedInt>::iterator it = m_hitAndRunShots.begin(); it != m_hitAndRunShots.end(); ++it)
+			{
+				ObjectID id = it->first;
+				xfer->xferObjectID(&id);
+				xfer->xferUnsignedInt(&it->second);
+			}
+		}
+		if (version >= 6)
+		{
+			xfer->xferUnsignedInt(&m_hitAndRunFirstShotFrame);
+		}
+		if (version >= 5 && version < 7)
+		{
+			UnsignedInt oldTimerStart = 0;
+			UnsignedInt count = 0;
+			xfer->xferUnsignedInt(&oldTimerStart);
+			xfer->xferUnsignedInt(&count);
+			for (UnsignedInt i = 0; i < count; ++i)
+			{
+				ObjectID id = INVALID_ID;
+				xfer->xferObjectID(&id);
+			}
+			const TeamTemplateInfo *info = m_proto->getTemplateInfo();
+			if (m_hitAndRunRetreating && info->m_hitAndRunUseTimer)
+			{
+				m_hitAndRunRetreatMinEnd += std::max(1, info->m_hitAndRunDelaySeconds * LOGICFRAMES_PER_SECOND) - 1;
+			}
+		}
+	}
+	if (version >= 8)
+	{
+		xfer->xferBool(&m_autoReinforce);
+	}
 
 }
 

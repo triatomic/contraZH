@@ -740,6 +740,8 @@ protected:
 
 public:
 
+	void notifyTeamRetreat() { wakeUpNow(); }
+
 	Bool isSameMachine(AIStateMachine* stateMachine) { return stateMachine == m_stateMachine; }
 
 	StateID getCurrentStateID() const { return getStateMachine()->getCurrentStateID(); }	///< return the id of the current state of the machine

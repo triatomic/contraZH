@@ -22,6 +22,7 @@
 #include "Common/FileSystem.h"
 #include "GameLogic/SidesList.h"
 #include "qt/panels/WBQtTeamsBridge.h"
+#include "TeamHitAndRunOptions.h"
 #include "qt/WBQtMessageBox.h"
 #include <vector>
 
@@ -1125,6 +1126,9 @@ namespace
 			switch (ctrlId)
 			{
 				case IDC_TRANSPORTS_RETURN:    return TheKey_teamTransportsReturn;
+				case IDC_TEAM_HIT_AND_RUN:    return TheKey_teamHitAndRun;
+				case IDC_TEAM_HIT_AND_RUN_TIMER: return TheKey_teamHitAndRunUseTimer;
+				case IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE: return TheKey_teamHitAndRunRetreatUseTimer;
 				case IDC_AVOID_THREATS:        return TheKey_teamAvoidThreats;
 				case IDC_PERIMETER_DEFENSE:    return TheKey_teamIsPerimeterDefense;
 				case IDC_BASE_DEFENSE:         return TheKey_teamIsBaseDefense;
@@ -1568,6 +1572,12 @@ extern "C" void WBQtTeamPage_GetText(int page, int ctrlId, char *buf, int cap)
 	}
 	if (page == WB_QT_TEAMPAGE_BEHAVIOR)
 	{
+		if (const TeamHitAndRunField *field = getTeamHitAndRunField(ctrlId))
+		{
+			text.format("%d", getTeamHitAndRunValue(s_qtSheetDict, *field));
+			copyOut(text.str(), buf, cap);
+			return;
+		}
 		if (ctrlId == IDC_PERCENT_DESTROYED)
 		{
 			// == TeamBehavior::OnInitDialog: rounded percent, 0.5 default.
@@ -1689,6 +1699,11 @@ extern "C" void WBQtTeamPage_SetText(int page, int ctrlId, const char *text, int
 
 	if (page == WB_QT_TEAMPAGE_BEHAVIOR)
 	{
+		if (const TeamHitAndRunField *field = getTeamHitAndRunField(ctrlId))
+		{
+			setTeamHitAndRunValue(s_qtSheetDict, *field, value.str());
+			return;
+		}
 		if (ctrlId == IDC_PERCENT_DESTROYED)
 		{
 			// == TeamBehavior::OnChangePercentDestroyed.
