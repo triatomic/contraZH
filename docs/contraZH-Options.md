@@ -381,7 +381,7 @@ the command bar when the layout has no such window.
 
 ## Action lines
 
-A dashed line with a dark outline from each selected unit to where its order sends it, fading in
+A dashed line from each selected unit to where its order sends it, fading in
 from the unit and ending in an outlined dot. Units moving together share one line. Lines last as long as the order and follow a
 chased target.
 

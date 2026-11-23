@@ -507,10 +507,8 @@ void W3DInGameUI::drawActionLines()
 	const Real dashLength = 7.0f;
 	const Real dashPeriod = 12.0f;
 	const Real startFade = 16.0f;
-	const Real coreWidth = 2.0f;
-	const Real outlineWidth = 4.0f;
-	const Real coreAlpha = 217.0f;
-	const Real outlineAlpha = 115.0f;
+	const Real lineWidth = 2.0f;
+	const Real lineAlpha = 217.0f;
 	const Real screenWidth = (Real)TheDisplay->getWidth();
 	const Real screenHeight = (Real)TheDisplay->getHeight();
 
@@ -556,12 +554,9 @@ void W3DInGameUI::drawActionLines()
 				const Int ex = REAL_TO_INT( x2 );
 				const Int ey = REAL_TO_INT( y2 );
 
-				TheDisplay->drawLine( sx, sy, ex, ey, outlineWidth,
-					(UnsignedInt)REAL_TO_INT( outlineAlpha * fade1 ) << 24,
-					(UnsignedInt)REAL_TO_INT( outlineAlpha * fade2 ) << 24 );
-				TheDisplay->drawLine( sx, sy, ex, ey, coreWidth,
-					( (UnsignedInt)REAL_TO_INT( coreAlpha * fade1 ) << 24 ) | rgb,
-					( (UnsignedInt)REAL_TO_INT( coreAlpha * fade2 ) << 24 ) | rgb );
+				TheDisplay->drawLine( sx, sy, ex, ey, lineWidth,
+					( (UnsignedInt)REAL_TO_INT( lineAlpha * fade1 ) << 24 ) | rgb,
+					( (UnsignedInt)REAL_TO_INT( lineAlpha * fade2 ) << 24 ) | rgb );
 			}
 		}
 
