@@ -205,6 +205,7 @@ private:
 	AsciiString		m_state;						///< Name of the current AI state.
 
 	Bool					m_enteredOrExited;  ///< True if a team member entered or exited a trigger area this frame.
+	Bool					m_autoReinforce;
 	Bool					m_hitAndRun;
 	Bool					m_hitAndRunRetreating;
 	UnsignedInt			m_hitAndRunRetreatMinEnd;
@@ -309,6 +310,9 @@ public:
 	/**
 		Set the team's AI recruitablity.
 	*/
+	Bool isAutoReinforceEnabled() const { return m_autoReinforce; }
+	void setAutoReinforce(Bool enabled) { m_autoReinforce = enabled; }
+
 	Bool doesHitAndRun() const { return m_hitAndRun; }
 	void setHitAndRun(Bool enabled);
 	static Bool canHitAndRun(const Object *obj);

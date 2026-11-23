@@ -1319,6 +1319,7 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
   m_id( id ),
 	m_proto(proto),
 	m_enteredOrExited(false),
+	m_autoReinforce(proto->getTemplateInfo()->m_automaticallyReinforce),
 	m_hitAndRun(proto->getTemplateInfo()->m_hitAndRun),
 	m_hitAndRunRetreating(false),
 	m_hitAndRunRetreatMinEnd(0),
@@ -2794,7 +2795,7 @@ void Team::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 7;
+	XferVersion currentVersion = 8;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2990,6 +2991,10 @@ void Team::xfer( Xfer *xfer )
 				m_hitAndRunRetreatMinEnd += std::max(1, info->m_hitAndRunDelaySeconds * LOGICFRAMES_PER_SECOND) - 1;
 			}
 		}
+	}
+	if (version >= 8)
+	{
+		xfer->xferBool(&m_autoReinforce);
 	}
 
 }

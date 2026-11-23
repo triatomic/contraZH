@@ -705,6 +705,7 @@ public:
 		AREA_TRANSFER_TO_PLAYER,
 		TEAM_MANAGE_SUPPLY_TRUCKS,
 		TEAM_SET_HIT_AND_RUN,
+		TEAM_SET_AUTO_REINFORCE,
 		// add new items here, please
 		NUM_ITEMS
 	};

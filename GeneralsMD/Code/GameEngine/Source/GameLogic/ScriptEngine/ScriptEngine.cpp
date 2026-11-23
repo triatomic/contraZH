@@ -4112,6 +4112,17 @@ void ScriptEngine::init()
 	curTemplate->m_uiStrings[0] = "Build a shipyard ";
 	curTemplate->m_uiStrings[1] = ", at next free shipyard waypoint.";
 
+	curTemplate = &m_actionTemplates[ScriptAction::TEAM_SET_AUTO_REINFORCE];
+	curTemplate->m_internalName = "TEAM_SET_AUTO_REINFORCE";
+	curTemplate->m_uiName = "Team_/AI/Enable or disable automatic reinforcement.";
+	curTemplate->m_numParameters = 2;
+	curTemplate->m_parameters[0] = Parameter::TEAM;
+	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
+	curTemplate->m_numUiStrings = 3;
+	curTemplate->m_uiStrings[0] = "Set automatic reinforcement for team ";
+	curTemplate->m_uiStrings[1] = " to ";
+	curTemplate->m_uiStrings[2] = ".";
+
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_SET_HIT_AND_RUN];
 	curTemplate->m_internalName = "TEAM_SET_HIT_AND_RUN";
 	curTemplate->m_uiName = "Team_/AI/Enable or disable hit-and-run behavior.";

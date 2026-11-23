@@ -3,6 +3,10 @@
 Fixes are on by default unless an entry says otherwise. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Script control for automatic team reinforcement
+
+- Use **Enable or disable automatic reinforcement** under **Team > AI** to change whether an existing team can receive automatic replacements. The change applies when the AI next looks for a team to reinforce. Replacements already queued can finish.
+
 ## AI team hit and run
 
 - Enable **Hit and run** in the WorldBuilder Team Behavior tab. Idle and attack-moving units can join a teammate's attack. The team withdraws along a shared route, and turrets can return fire at enemies in range.
