@@ -519,9 +519,15 @@ public:
 	CommandSet* friend_getNext() { return m_next; }
 	const FieldParse* friend_getFieldParse() const { return m_commandSetFieldParseTable; }
 	void friend_addToList(CommandSet** listHead);
+#if RTS_ZEROHOUR
+	void friend_copySlotsFrom(const CommandSet& parent);
+#endif
 
 private:
 
+#if RTS_ZEROHOUR
+	static void parseRemoveSlot( INI* ini, void *instance, void *store, const void *userData );
+#endif
 	static const FieldParse m_commandSetFieldParseTable[];		///< the parse table
 	static void parseCommandButton( INI* ini, void *instance, void *store, const void *userData );
 
@@ -905,7 +911,7 @@ public:
 	void getBackgroundMarkerPos(Int *x, Int *y);
 
 
-	static void parseCommandSetDefinition( INI *ini );
+	static void parseCommandSetDefinition( INI *ini, Bool extend = FALSE );
 	static void parseCommandButtonDefinition( INI *ini );
 
 	void drawTransitionHandler();
