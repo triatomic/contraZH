@@ -149,9 +149,11 @@ public:
 	enum { HIT_AND_RUN_DEFAULT_PERCENT = 50, HIT_AND_RUN_DEFAULT_DELAY = 5, HIT_AND_RUN_MAX_DELAY = 600 };
 	Bool							m_hitAndRun;
 	Bool							m_hitAndRunUseTimer;
+	Bool							m_hitAndRunRetreatUseTimer;
 	Int							m_hitAndRunRetreatPercent;
 	Int							m_hitAndRunReloadPercent;
 	Int							m_hitAndRunDelaySeconds;
+	Int							m_hitAndRunRetreatDelaySeconds;
 	Bool							m_avoidThreats;								///< True if the team avoids threats.
 	Bool							m_attackCommonTarget;					///< True if the team attacks the same target unit.
 	Int								m_maxInstances;								///< Maximum number of instances of a team that is not singleton.
@@ -207,6 +209,7 @@ private:
 	Bool					m_hitAndRunRetreating;
 	UnsignedInt			m_hitAndRunRetreatMinEnd;
 	UnsignedInt			m_hitAndRunTimerStart;
+	UnsignedInt			m_hitAndRunFirstShotFrame;
 	std::set<ObjectID>	m_hitAndRunFinishedRetreat;
 	enum { HIT_AND_RUN_RETREAT_POINTS = 3 };
 	Coord3D				m_hitAndRunRetreatPoints[HIT_AND_RUN_RETREAT_POINTS];

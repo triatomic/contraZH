@@ -722,6 +722,9 @@ TeamTemplateInfo::TeamTemplateInfo(Dict *d) :
 	m_transportsReturn	= d->getBool(TheKey_teamTransportsReturn, &exists);
 	m_hitAndRun = d->getBool(TheKey_teamHitAndRun, &exists);
 	m_hitAndRunUseTimer = d->getBool(TheKey_teamHitAndRunUseTimer, &exists);
+	m_hitAndRunRetreatUseTimer = d->getBool(TheKey_teamHitAndRunRetreatUseTimer, &exists);
+	const Int retreatDelay = d->getInt(TheKey_teamHitAndRunRetreatDelaySeconds, &exists);
+	m_hitAndRunRetreatDelaySeconds = exists ? std::max(0, std::min((Int)HIT_AND_RUN_MAX_DELAY, retreatDelay)) : HIT_AND_RUN_DEFAULT_DELAY;
 	const Int retreatPercent = d->getInt(TheKey_teamHitAndRunRetreatPercent, &exists);
 	m_hitAndRunRetreatPercent = exists ? std::max(1, std::min(100, retreatPercent)) : HIT_AND_RUN_DEFAULT_PERCENT;
 	const Int reloadPercent = d->getInt(TheKey_teamHitAndRunReloadPercent, &exists);
@@ -1320,6 +1323,7 @@ Team::Team(TeamPrototype *proto, TeamID id ) :
 	m_hitAndRunRetreating(false),
 	m_hitAndRunRetreatMinEnd(0),
 	m_hitAndRunTimerStart(0),
+	m_hitAndRunFirstShotFrame(0),
 	m_hitAndRunRetreatPointCount(0),
 	m_active(false),
 	m_seeEnemy(false),
@@ -1852,6 +1856,10 @@ void Team::recordHitAndRunShot(ObjectID member, UnsignedInt reloadUntil)
 {
 	if (m_hitAndRun && !m_hitAndRunRetreating)
 	{
+		if (m_hitAndRunShots.empty())
+		{
+			m_hitAndRunFirstShotFrame = TheGameLogic->getFrame();
+		}
 		UnsignedInt &lastReload = m_hitAndRunShots[member];
 		lastReload = std::max(lastReload, reloadUntil);
 	}
@@ -1976,12 +1984,15 @@ void Team::updateHitAndRun()
 	}
 
 	const Int required = (attackers * info->m_hitAndRunRetreatPercent + 99) / 100;
-	if (fired == 0 || (!engaged && fired < required))
+	if (attackers == 0 || (!info->m_hitAndRunRetreatUseTimer && (fired == 0 || (!engaged && fired < required))))
 	{
 		m_hitAndRunShots.clear();
 		return;
 	}
-	if (fired < required)
+	const Bool shouldRetreat = info->m_hitAndRunRetreatUseTimer ?
+		now - m_hitAndRunFirstShotFrame >= (UnsignedInt)(info->m_hitAndRunRetreatDelaySeconds * LOGICFRAMES_PER_SECOND) :
+		fired >= required;
+	if (!shouldRetreat)
 	{
 		return;
 	}
@@ -2814,7 +2825,7 @@ void Team::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 5;
+	XferVersion currentVersion = 6;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -2988,6 +2999,10 @@ void Team::xfer( Xfer *xfer )
 				xfer->xferObjectID(&id);
 				xfer->xferUnsignedInt(&it->second);
 			}
+		}
+		if (version >= 6)
+		{
+			xfer->xferUnsignedInt(&m_hitAndRunFirstShotFrame);
 		}
 		if (version >= 5)
 		{

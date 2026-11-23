@@ -302,6 +302,10 @@ void WBQtTeamSheetDialogClassic::setupBehaviorTab()
 	bindEdit(page, IDC_TEAM_HIT_AND_RUN_RELOAD_PCT, m_ui->hitAndRunReloadEdit, WB_QT_TEAMNOTIFY_KILLFOCUS);
 	bindEdit(page, IDC_TEAM_HIT_AND_RUN_DELAY, m_ui->hitAndRunDelayEdit, WB_QT_TEAMNOTIFY_KILLFOCUS);
 	bindEdit(page, IDC_TEAM_HIT_AND_RUN_RETREAT, m_ui->hitAndRunRetreatEdit, WB_QT_TEAMNOTIFY_KILLFOCUS);
+	bindEdit(page, IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY, m_ui->hitAndRunRetreatDelayEdit, WB_QT_TEAMNOTIFY_KILLFOCUS);
+	const bool useRetreatTimer = WBQtTeamPage_GetCheck(page, IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE) != 0;
+	m_ui->hitAndRunRetreatTimerRadio->setChecked(useRetreatTimer);
+	m_ui->hitAndRunRetreatPercentRadio->setChecked(!useRetreatTimer);
 	const bool useTimer = WBQtTeamPage_GetCheck(page, IDC_TEAM_HIT_AND_RUN_TIMER) != 0;
 	m_ui->hitAndRunTimerRadio->setChecked(useTimer);
 	m_ui->hitAndRunReloadRadio->setChecked(!useTimer);
@@ -313,11 +317,21 @@ void WBQtTeamSheetDialogClassic::setupBehaviorTab()
 		m_ui->hitAndRunTimerRadio->setEnabled(enabled);
 		m_ui->hitAndRunReloadEdit->setEnabled(enabled && !timer);
 		m_ui->hitAndRunDelayEdit->setEnabled(enabled && timer);
+		const bool retreatTimer = m_ui->hitAndRunRetreatTimerRadio->isChecked();
+		m_ui->hitAndRunRetreatPercentRadio->setEnabled(enabled);
+		m_ui->hitAndRunRetreatTimerRadio->setEnabled(enabled);
+		m_ui->hitAndRunRetreatEdit->setEnabled(enabled && !retreatTimer);
+		m_ui->hitAndRunRetreatDelayEdit->setEnabled(enabled && retreatTimer);
 	};
 	connect(m_ui->hitAndRunCheck, &QCheckBox::toggled, this, updateHitAndRunControls);
 	connect(m_ui->hitAndRunTimerRadio, &QRadioButton::toggled, this, [page, updateHitAndRunControls](bool on)
 	{
 		WBQtTeamPage_SetCheck(page, IDC_TEAM_HIT_AND_RUN_TIMER, on ? 1 : 0);
+		updateHitAndRunControls();
+	});
+	connect(m_ui->hitAndRunRetreatTimerRadio, &QRadioButton::toggled, this, [page, updateHitAndRunControls](bool on)
+	{
+		WBQtTeamPage_SetCheck(page, IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE, on ? 1 : 0);
 		updateHitAndRunControls();
 	});
 	updateHitAndRunControls();

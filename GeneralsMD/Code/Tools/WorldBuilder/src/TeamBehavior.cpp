@@ -55,7 +55,8 @@ BEGIN_MESSAGE_MAP(TeamBehavior, CPropertyPage)
 	ON_BN_CLICKED(IDC_AVOID_THREATS, OnAvoidThreats)
 	ON_BN_CLICKED(IDC_TEAM_HIT_AND_RUN, OnHitAndRun)
 	ON_CONTROL_RANGE(BN_CLICKED, IDC_TEAM_HIT_AND_RUN_RELOAD, IDC_TEAM_HIT_AND_RUN_TIMER, OnHitAndRunMode)
-	ON_CONTROL_RANGE(EN_KILLFOCUS, IDC_TEAM_HIT_AND_RUN_RELOAD_PCT, IDC_TEAM_HIT_AND_RUN_RETREAT, OnHitAndRunValue)
+	ON_CONTROL_RANGE(BN_CLICKED, IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE, IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE, OnHitAndRunMode)
+	ON_CONTROL_RANGE(EN_KILLFOCUS, IDC_TEAM_HIT_AND_RUN_RELOAD_PCT, IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY, OnHitAndRunValue)
 	ON_CBN_SELCHANGE(IDC_ON_ENEMY_SIGHTED, OnSelchangeOnEnemySighted)
 	ON_CBN_SELCHANGE(IDC_ON_DESTROYED, OnSelchangeOnDestroyed)
 	ON_CBN_SELCHANGE(IDC_ON_UNIT_DESTROYED_SCRIPT, OnSelchangeOnUnitDestroyed)
@@ -148,10 +149,13 @@ BOOL TeamBehavior::OnInitDialog()
 	const Bool useTimer = m_teamDict->getBool(TheKey_teamHitAndRunUseTimer, &exists);
 	CheckRadioButton(IDC_TEAM_HIT_AND_RUN_RELOAD, IDC_TEAM_HIT_AND_RUN_TIMER,
 		useTimer ? IDC_TEAM_HIT_AND_RUN_TIMER : IDC_TEAM_HIT_AND_RUN_RELOAD);
+	const Bool retreatTimer = m_teamDict->getBool(TheKey_teamHitAndRunRetreatUseTimer, &exists);
+	CheckRadioButton(IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE, IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE,
+		retreatTimer ? IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE : IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE);
 	m_hitAndRunHelp.Create(this, TTS_ALWAYSTIP);
 	m_hitAndRunHelp.SetMaxTipWidth(300);
 	m_hitAndRunHelp.AddTool(pCheck, "Withdraw after a volley, then resume attacking using the selected readiness rule.");
-	for (Int control = IDC_TEAM_HIT_AND_RUN_RELOAD_PCT; control <= IDC_TEAM_HIT_AND_RUN_RETREAT; ++control)
+	for (Int control = IDC_TEAM_HIT_AND_RUN_RELOAD_PCT; control <= IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY; ++control)
 	{
 		const TeamHitAndRunField &field = *getTeamHitAndRunField(control);
 		SetDlgItemInt(control, getTeamHitAndRunValue(m_teamDict, field), FALSE);
@@ -159,6 +163,8 @@ BOOL TeamBehavior::OnInitDialog()
 	}
 	m_hitAndRunHelp.AddTool(GetDlgItem(IDC_TEAM_HIT_AND_RUN_RELOAD), getTeamHitAndRunField(IDC_TEAM_HIT_AND_RUN_RELOAD_PCT)->help);
 	m_hitAndRunHelp.AddTool(GetDlgItem(IDC_TEAM_HIT_AND_RUN_TIMER), getTeamHitAndRunField(IDC_TEAM_HIT_AND_RUN_DELAY)->help);
+	m_hitAndRunHelp.AddTool(GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE), getTeamHitAndRunField(IDC_TEAM_HIT_AND_RUN_RETREAT)->help);
+	m_hitAndRunHelp.AddTool(GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE), getTeamHitAndRunField(IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY)->help);
 	updateHitAndRunControls();
 
 	pCheck = (CButton *) GetDlgItem(IDC_ATTACK_COMMON_TARGET);
@@ -205,7 +211,14 @@ void TeamBehavior::OnHitAndRun()
 
 void TeamBehavior::OnHitAndRunMode(UINT control)
 {
-	m_teamDict->setBool(TheKey_teamHitAndRunUseTimer, control == IDC_TEAM_HIT_AND_RUN_TIMER);
+	if (control == IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE || control == IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE)
+	{
+		m_teamDict->setBool(TheKey_teamHitAndRunRetreatUseTimer, control == IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE);
+	}
+	else
+	{
+		m_teamDict->setBool(TheKey_teamHitAndRunUseTimer, control == IDC_TEAM_HIT_AND_RUN_TIMER);
+	}
 	updateHitAndRunControls();
 }
 
@@ -225,6 +238,11 @@ void TeamBehavior::updateHitAndRunControls()
 	GetDlgItem(IDC_TEAM_HIT_AND_RUN_TIMER)->EnableWindow(enabled);
 	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RELOAD_PCT)->EnableWindow(enabled && !useTimer);
 	GetDlgItem(IDC_TEAM_HIT_AND_RUN_DELAY)->EnableWindow(enabled && useTimer);
+	const BOOL retreatTimer = IsDlgButtonChecked(IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE) == BST_CHECKED;
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT_PERCENT_MODE)->EnableWindow(enabled);
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE)->EnableWindow(enabled);
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT)->EnableWindow(enabled && !retreatTimer);
+	GetDlgItem(IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY)->EnableWindow(enabled && retreatTimer);
 }
 
 BOOL TeamBehavior::PreTranslateMessage(MSG *message)

@@ -1128,6 +1128,7 @@ namespace
 				case IDC_TRANSPORTS_RETURN:    return TheKey_teamTransportsReturn;
 				case IDC_TEAM_HIT_AND_RUN:    return TheKey_teamHitAndRun;
 				case IDC_TEAM_HIT_AND_RUN_TIMER: return TheKey_teamHitAndRunUseTimer;
+				case IDC_TEAM_HIT_AND_RUN_RETREAT_TIMER_MODE: return TheKey_teamHitAndRunRetreatUseTimer;
 				case IDC_AVOID_THREATS:        return TheKey_teamAvoidThreats;
 				case IDC_PERIMETER_DEFENSE:    return TheKey_teamIsPerimeterDefense;
 				case IDC_BASE_DEFENSE:         return TheKey_teamIsBaseDefense;

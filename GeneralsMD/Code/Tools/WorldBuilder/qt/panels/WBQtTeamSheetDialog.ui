@@ -579,56 +579,111 @@
            </layout>
           </item>
           <item row="8" column="0" colspan="4">
-           <layout class="QGridLayout" name="hitAndRunOptions">
-            <item row="0" column="0">
-             <widget class="QRadioButton" name="hitAndRunReloadRadio">
-              <property name="text"><string>Reload ready</string></property>
-              <property name="toolTip"><string>Resume after this percentage of the team has fired and reloaded in the current volley. If fewer units fired, wait for all of them.</string></property>
+           <layout class="QVBoxLayout" name="hitAndRunOptions">
+            <item>
+             <widget class="QLabel" name="hitAndRunHeading0">
+              <property name="text"><string>Attack after</string></property>
              </widget>
             </item>
-            <item row="0" column="1">
-             <widget class="QLineEdit" name="hitAndRunReloadEdit">
-              <property name="maximumWidth"><number>64</number></property>
-              <property name="toolTip"><string>Resume after this percentage of the team has fired and reloaded in the current volley. If fewer units fired, wait for all of them.</string></property>
+            <item>
+             <widget class="QWidget" name="hitAndRunRow0">
+              <layout class="QHBoxLayout" name="hitAndRunRowLayout0">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="topMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+               <property name="bottomMargin"><number>0</number></property>
+               <item>
+                <widget class="QRadioButton" name="hitAndRunReloadRadio">
+                 <property name="accessibleName"><string>% of team reloaded</string></property>
+                 <property name="toolTip"><string>Attack when this percentage of the team has fired and reloaded. If fewer units fired, wait for all of them.</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="hitAndRunReloadEdit">
+                 <property name="maximumWidth"><number>52</number></property>
+                 <property name="accessibleName"><string>% of team reloaded</string></property>
+                 <property name="toolTip"><string>Attack when this percentage of the team has fired and reloaded. If fewer units fired, wait for all of them.</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="hitAndRunReloadEditUnit">
+                 <property name="text"><string>% of team reloaded</string></property>
+                 <property name="toolTip"><string>Attack when this percentage of the team has fired and reloaded. If fewer units fired, wait for all of them.</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QRadioButton" name="hitAndRunTimerRadio">
+                 <property name="accessibleName"><string>sec after retreating</string></property>
+                 <property name="toolTip"><string>Attack this many seconds after the team finishes retreating.</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="hitAndRunDelayEdit">
+                 <property name="maximumWidth"><number>52</number></property>
+                 <property name="accessibleName"><string>sec after retreating</string></property>
+                 <property name="toolTip"><string>Attack this many seconds after the team finishes retreating.</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="hitAndRunDelayEditUnit">
+                 <property name="text"><string>sec after retreating</string></property>
+                 <property name="toolTip"><string>Attack this many seconds after the team finishes retreating.</string></property>
+                </widget>
+               </item>
+              </layout>
              </widget>
             </item>
-            <item row="0" column="2">
-             <widget class="QLabel" name="hitAndRunReloadEditUnit">
-              <property name="text"><string>%</string></property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QRadioButton" name="hitAndRunTimerRadio">
-              <property name="text"><string>Time ready</string></property>
-              <property name="toolTip"><string>Wait this many seconds after the team finishes retreating before attacking again.</string></property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QLineEdit" name="hitAndRunDelayEdit">
-              <property name="maximumWidth"><number>64</number></property>
-              <property name="toolTip"><string>Wait this many seconds after the team finishes retreating before attacking again.</string></property>
-             </widget>
-            </item>
-            <item row="1" column="2">
-             <widget class="QLabel" name="hitAndRunDelayEditUnit">
-              <property name="text"><string>sec</string></property>
-             </widget>
-            </item>
-            <item row="2" column="0">
-             <widget class="QLabel" name="hitAndRunRetreatLabel">
+            <item>
+             <widget class="QLabel" name="hitAndRunHeading1">
               <property name="text"><string>Retreat after</string></property>
-              <property name="toolTip"><string>Withdraw after this percentage of the mobile ground attackers has fired in the current volley.</string></property>
              </widget>
             </item>
-            <item row="2" column="1">
-             <widget class="QLineEdit" name="hitAndRunRetreatEdit">
-              <property name="maximumWidth"><number>64</number></property>
-              <property name="toolTip"><string>Withdraw after this percentage of the mobile ground attackers has fired in the current volley.</string></property>
-             </widget>
-            </item>
-            <item row="2" column="2">
-             <widget class="QLabel" name="hitAndRunRetreatEditUnit">
-              <property name="text"><string>%</string></property>
+            <item>
+             <widget class="QWidget" name="hitAndRunRow1">
+              <layout class="QHBoxLayout" name="hitAndRunRowLayout1">
+               <property name="leftMargin"><number>0</number></property>
+               <property name="topMargin"><number>0</number></property>
+               <property name="rightMargin"><number>0</number></property>
+               <property name="bottomMargin"><number>0</number></property>
+               <item>
+                <widget class="QRadioButton" name="hitAndRunRetreatPercentRadio">
+                 <property name="accessibleName"><string>% of team fired</string></property>
+                 <property name="toolTip"><string>Retreat when this percentage of the team's mobile ground attackers has fired.</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="hitAndRunRetreatEdit">
+                 <property name="maximumWidth"><number>52</number></property>
+                 <property name="accessibleName"><string>% of team fired</string></property>
+                 <property name="toolTip"><string>Retreat when this percentage of the team's mobile ground attackers has fired.</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="hitAndRunRetreatEditUnit">
+                 <property name="text"><string>% of team fired</string></property>
+                 <property name="toolTip"><string>Retreat when this percentage of the team's mobile ground attackers has fired.</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QRadioButton" name="hitAndRunRetreatTimerRadio">
+                 <property name="accessibleName"><string>sec after firing</string></property>
+                 <property name="toolTip"><string>Retreat this many seconds after the team's first shot in the current volley.</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="hitAndRunRetreatDelayEdit">
+                 <property name="maximumWidth"><number>52</number></property>
+                 <property name="accessibleName"><string>sec after firing</string></property>
+                 <property name="toolTip"><string>Retreat this many seconds after the team's first shot in the current volley.</string></property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="hitAndRunRetreatDelayEditUnit">
+                 <property name="text"><string>sec after firing</string></property>
+                 <property name="toolTip"><string>Retreat this many seconds after the team's first shot in the current volley.</string></property>
+                </widget>
+               </item>
+              </layout>
              </widget>
             </item>
            </layout>

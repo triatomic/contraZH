@@ -24,7 +24,9 @@ inline const TeamHitAndRunField *getTeamHitAndRunField(Int control)
 		{ IDC_TEAM_HIT_AND_RUN_DELAY, TheKey_teamHitAndRunDelaySeconds, 0, TeamTemplateInfo::HIT_AND_RUN_MAX_DELAY, TeamTemplateInfo::HIT_AND_RUN_DEFAULT_DELAY,
 			"Wait this many seconds after the team finishes retreating before attacking again." },
 		{ IDC_TEAM_HIT_AND_RUN_RETREAT, TheKey_teamHitAndRunRetreatPercent, 1, 100, TeamTemplateInfo::HIT_AND_RUN_DEFAULT_PERCENT,
-			"Retreat after this percentage of the team's mobile ground attackers has fired in the current volley." }
+			"Retreat after this percentage of the team's mobile ground attackers has fired in the current volley." },
+		{ IDC_TEAM_HIT_AND_RUN_RETREAT_DELAY, TheKey_teamHitAndRunRetreatDelaySeconds, 0, TeamTemplateInfo::HIT_AND_RUN_MAX_DELAY, TeamTemplateInfo::HIT_AND_RUN_DEFAULT_DELAY,
+			"Retreat this many seconds after the team's first shot in the current volley." }
 	};
 
 	for (Int i = 0; i < sizeof(fields) / sizeof(fields[0]); ++i)

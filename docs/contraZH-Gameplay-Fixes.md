@@ -6,9 +6,8 @@ it changes the simulation (older replays no longer play back identically) or onl
 ## AI team hit and run
 
 - Enable **Hit and run** in the WorldBuilder Team Behavior tab. Idle and attack-moving units can join a teammate's attack. The team withdraws along a shared route, and turrets can return fire at enemies in range.
-- **Retreat after** sets the percentage of mobile ground attackers that must fire before the team withdraws. It defaults to 50%.
-- **Reload ready** resumes the attack once the chosen percentage of attackers has fired and reloaded in the current volley. It defaults to 50%. If fewer units fired, the team waits for all of those units to reload.
-- **Time ready** resumes the attack after the team finishes withdrawing and waits for the chosen delay. It defaults to 5 seconds.
+- **Attack after** resumes the attack when the chosen percentage of attackers has fired and reloaded in the current volley (default 50%), or after a delay once the team finishes retreating (default 5 seconds). If fewer units fired than the reload threshold, the team waits for all of those units to reload.
+- **Retreat after** withdraws the team when the chosen percentage of mobile ground attackers has fired (default 50%), or after a delay from the first shot of the current volley (default 5 seconds).
 - Use **Enable or disable hit-and-run behavior** under **Team > AI** to change the setting on a team during play.
 
 ## AI construction uses legal, reachable sites
