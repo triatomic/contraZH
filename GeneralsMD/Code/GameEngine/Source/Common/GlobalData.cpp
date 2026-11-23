@@ -1609,9 +1609,11 @@ GlobalData::GlobalData()
 #endif
 
 	for (i = LEVEL_FIRST; i <= LEVEL_LAST; ++i)
-		m_experienceValueBonus[i] = -1.0f;
-		m_experienceRequiredBonus[i] = -1.0f;
+	{
+		m_experienceValueBonus[i] = -1.0;
+		m_experienceRequiredBonus[i] = -1.0;
 		m_healthBonus[i] = 1.0f;
+	}
 
 	for (i = 0; i < PLAYERTYPE_COUNT; ++i)
 	{
