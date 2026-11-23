@@ -31,7 +31,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameClient/Color.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
-#include "W3DDevice/GameClient/W3DParticleAtlas.h"
+#include "W3DDevice/GameClient/W3DTextureAtlas.h"
 #include "W3DDevice/GameClient/W3DTerrainParticles.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
@@ -150,9 +150,9 @@ W3DParticleSystemManager::~W3DParticleSystemManager()
 void W3DParticleSystemManager::reset()
 {
 	ParticleSystemManager::reset();
-	if (TheW3DParticleAtlas)
+	if (TheW3DTextureAtlas)
 	{
-		TheW3DParticleAtlas->reset();
+		TheW3DTextureAtlas->reset();
 	}
 }
 
@@ -649,7 +649,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 {
 	const Bool drawSmudge = TheSmudgeManager && !TheSmudgeManager->isReplaced() && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 	const Bool batchParticles = TheGlobalData->m_batchParticles;
-	const Bool useAtlas = TheGlobalData->m_particleAtlas && pass == DRAW_MAIN && TheW3DParticleAtlas != nullptr;
+	const Bool useAtlas = TheGlobalData->m_particleAtlas && pass == DRAW_MAIN && TheW3DTextureAtlas != nullptr;
 
 	unsigned int personalities[MAX_POINTS_PER_GROUP];
 
@@ -737,8 +737,8 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		Bool atlased = FALSE;
 		if (useAtlas && effects == 0 && sys->isUsingParticles() && !useTerrainConformingParticles)
 		{
-			const W3DParticleAtlas::TextureMode mode = (shaderType == ParticleSystemInfo::ALPHA) ? W3DParticleAtlas::ALPHA : W3DParticleAtlas::UNMODIFIED;
-			TextureClass *page = TheW3DParticleAtlas->find(texture.Peek(), mode, atlasRect);
+			const W3DTextureAtlas::TextureMode mode = (shaderType == ParticleSystemInfo::ALPHA) ? W3DTextureAtlas::ALPHA : W3DTextureAtlas::UNMODIFIED;
+			TextureClass *page = TheW3DTextureAtlas->find(texture.Peek(), mode, atlasRect);
 			if (page != nullptr)
 			{
 				batchTexture = page;

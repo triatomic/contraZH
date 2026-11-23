@@ -16,13 +16,13 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// W3DParticleAtlas.cpp ///////////////////////////////////////////////////////////////////////////
+// W3DTextureAtlas.cpp ////////////////////////////////////////////////////////////////////////////
 // Shared premultiplied pages for particle textures, following TheSuperHackers' TextureAtlasClass
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Lib/BaseType.h"
 #include "WWLib/always.h"
-#include "W3DDevice/GameClient/W3DParticleAtlas.h"
+#include "W3DDevice/GameClient/W3DTextureAtlas.h"
 #include "Common/Debug.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/surfaceclass.h"
@@ -70,9 +70,9 @@ void Fill_Padding(UnsignedByte *cell, Int pitch, Int width, Int height, Int padd
 
 }
 
-W3DParticleAtlas *TheW3DParticleAtlas = nullptr;
+W3DTextureAtlas *TheW3DTextureAtlas = nullptr;
 
-W3DParticleAtlas::W3DParticleAtlas()
+W3DTextureAtlas::W3DTextureAtlas()
 {
 	m_packsThisFrame = 0;
 	m_packFrame = 0;
@@ -81,12 +81,12 @@ W3DParticleAtlas::W3DParticleAtlas()
 	m_disabled = FALSE;
 }
 
-W3DParticleAtlas::~W3DParticleAtlas()
+W3DTextureAtlas::~W3DTextureAtlas()
 {
 	reset();
 }
 
-void W3DParticleAtlas::reset()
+void W3DTextureAtlas::reset()
 {
 	for (Int i = 0; i < MODE_COUNT; ++i)
 	{
@@ -99,7 +99,7 @@ void W3DParticleAtlas::reset()
 	m_disabled = FALSE;
 }
 
-TextureClass *W3DParticleAtlas::find(TextureClass *source, TextureMode mode, Vector4 &rect)
+TextureClass *W3DTextureAtlas::find(TextureClass *source, TextureMode mode, Vector4 &rect)
 {
 	if (m_disabled || source == nullptr || source->Get_Texture_Name().Is_Empty())
 	{
@@ -143,7 +143,7 @@ TextureClass *W3DParticleAtlas::find(TextureClass *source, TextureMode mode, Vec
 }
 
 // Textures refused for space are forgotten with the oldest page's, so both pack again when drawn.
-void W3DParticleAtlas::evictOldestPage()
+void W3DTextureAtlas::evictOldestPage()
 {
 	TextureClass *evicted = m_pages.front().texture.Peek();
 	for (Int i = 0; i < MODE_COUNT; ++i)
@@ -170,7 +170,7 @@ void W3DParticleAtlas::evictOldestPage()
 }
 
 // FALSE stores nothing, since an eviction would not cure the refusal and the texture is asked about again when drawn.
-Bool W3DParticleAtlas::pack(const TextureClass &source, TextureMode mode, Location &location)
+Bool W3DTextureAtlas::pack(const TextureClass &source, TextureMode mode, Location &location)
 {
 	// A texture can be initialised without a D3D texture, for example with texturing disabled.
 	if (source.Peek_D3D_Texture() == nullptr)
@@ -214,7 +214,7 @@ Bool W3DParticleAtlas::pack(const TextureClass &source, TextureMode mode, Locati
 }
 
 // Same-height shelves first, then a new shelf on the first page with room, then a new page.
-Bool W3DParticleAtlas::place(Int width, Int height, Int &page, Int &shelf, Int &x, Int &y)
+Bool W3DTextureAtlas::place(Int width, Int height, Int &page, Int &shelf, Int &x, Int &y)
 {
 	for (size_t p = 0; p < m_pages.size(); ++p)
 	{
@@ -261,7 +261,7 @@ Bool W3DParticleAtlas::place(Int width, Int height, Int &page, Int &shelf, Int &
 }
 
 // The cell just placed is always the last on its shelf, and an emptied last shelf frees its rows too.
-void W3DParticleAtlas::unplace(Int width, Int page, Int shelf)
+void W3DTextureAtlas::unplace(Int width, Int page, Int shelf)
 {
 	Page &owner = m_pages[page];
 	owner.shelves[shelf].used -= width;
@@ -272,7 +272,7 @@ void W3DParticleAtlas::unplace(Int width, Int page, Int shelf)
 	}
 }
 
-Bool W3DParticleAtlas::addPage()
+Bool W3DTextureAtlas::addPage()
 {
 	if (m_pages.size() >= MAX_PAGES)
 	{
@@ -289,7 +289,7 @@ Bool W3DParticleAtlas::addPage()
 		{
 			texture->Release();
 		}
-		DEBUG_CRASH(("Particle atlas: page has the wrong mip count, format or size, atlas disabled"));
+		DEBUG_CRASH(("Texture atlas: page has the wrong mip count, format or size, atlas disabled"));
 		m_disabled = TRUE;
 		return FALSE;
 	}
@@ -309,12 +309,12 @@ Bool W3DParticleAtlas::addPage()
 	filter.Set_V_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_CLAMP);
 
 	m_pages.push_back(page);
-	DEBUG_LOG(("Particle atlas: page %d of %d, %dx%d, %d mips", (Int)m_pages.size(), (Int)MAX_PAGES, (Int)PAGE_SIZE, (Int)PAGE_SIZE, (Int)LEVELS));
+	DEBUG_LOG(("Texture atlas: page %d of %d, %dx%d, %d mips", (Int)m_pages.size(), (Int)MAX_PAGES, (Int)PAGE_SIZE, (Int)PAGE_SIZE, (Int)LEVELS));
 	return TRUE;
 }
 
 // The source's own mips are kept, since rebuilding them from the top level shifts legacy sprites.
-Bool W3DParticleAtlas::copyToCell(const TextureClass &source, const TextureClass *page, TextureMode mode, Int left, Int top)
+Bool W3DTextureAtlas::copyToCell(const TextureClass &source, const TextureClass *page, TextureMode mode, Int left, Int top)
 {
 	const Int sourceLevels = (Int)source.Peek_D3D_Texture()->GetLevelCount();
 	const Int width0 = source.Get_Width();
@@ -376,7 +376,7 @@ Bool W3DParticleAtlas::copyToCell(const TextureClass &source, const TextureClass
 	return TRUE;
 }
 
-Bool W3DParticleAtlas::hasPackBudget()
+Bool W3DTextureAtlas::hasPackBudget()
 {
 	if (m_packFrame != WW3D::Get_Frame_Count())
 	{

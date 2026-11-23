@@ -16,7 +16,7 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: W3DParticleAtlas.h //////////////////////////////////////////////////////////////////////
+// FILE: W3DTextureAtlas.h ///////////////////////////////////////////////////////////////////////
 
 #pragma once
 
@@ -29,11 +29,11 @@
 #include <vector>
 
 // ALPHA stores the art times its alpha, so alpha sprites can share one blend with additive ones.
-class W3DParticleAtlas
+class W3DTextureAtlas
 {
 public:
-	W3DParticleAtlas();
-	~W3DParticleAtlas();
+	W3DTextureAtlas();
+	~W3DTextureAtlas();
 
 	enum TextureMode { UNMODIFIED, ALPHA, MODE_COUNT };
 
@@ -86,4 +86,4 @@ private:
 	Bool m_disabled;
 };
 
-extern W3DParticleAtlas *TheW3DParticleAtlas;	///< owned by W3DDisplay, so its textures go before the device; null when headless
+extern W3DTextureAtlas *TheW3DTextureAtlas;	///< owned by W3DDisplay, so its textures go before the device; null when headless
