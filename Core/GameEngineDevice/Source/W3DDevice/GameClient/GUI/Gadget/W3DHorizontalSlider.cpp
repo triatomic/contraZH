@@ -50,6 +50,9 @@
 #include "GameClient/GameWindowGlobal.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GadgetSlider.h"
+#include "GameClient/DisplayString.h"
+#include "GameClient/GameFont.h"
+#include "GameClient/GlobalLanguage.h"
 #include "W3DDevice/GameClient/W3DGadget.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 
@@ -64,6 +67,58 @@
 // PRIVATE PROTOTYPES /////////////////////////////////////////////////////////
 
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////
+
+// drawSliderValue ============================================================
+/** Draw the slider position as a number centred above the thumb */
+//=============================================================================
+static void drawSliderValue( GameWindow *window, WinInstanceData *instData )
+{
+	SliderData *s = (SliderData *)window->winGetUserData();
+	GameWindow *thumb = window->winGetChild();
+	if( s == nullptr || thumb == nullptr )
+	{
+		return;
+	}
+
+	UnicodeString value;
+	value.format( L"%d", s->position );
+	instData->setText( value );
+
+	DisplayString *text = instData->getTextDisplayString();
+	if( text == nullptr )
+	{
+		return;
+	}
+
+	GameFont *font = window->winGetFont();
+	if( TheGlobalLanguageData != nullptr )
+	{
+		GameFont *valueFont = TheWindowManager->winFindFont( "Arial", TheGlobalLanguageData->adjustFontSize( 8 ), FALSE );
+		if( valueFont != nullptr )
+		{
+			font = valueFont;
+		}
+	}
+	if( font != nullptr && text->getFont() != font )
+	{
+		text->setFont( font );
+	}
+
+	ICoord2D origin, thumbPos, thumbSize;
+	Int width, height;
+	window->winGetScreenPosition( &origin.x, &origin.y );
+	thumb->winGetScreenPosition( &thumbPos.x, &thumbPos.y );
+	thumb->winGetSize( &thumbSize.x, &thumbSize.y );
+	text->getSize( &width, &height );
+
+	Color textColor = GameMakeColor( 255, 255, 255, 255 );
+	if( BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED ) == FALSE )
+	{
+		textColor = GameMakeColor( 128, 128, 128, 255 );
+	}
+
+	text->draw( thumbPos.x + thumbSize.x / 2 - width / 2, origin.y - height, textColor, GameMakeColor( 0, 0, 0, 255 ) );
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////
@@ -128,6 +183,7 @@ void W3DGadgetHorizontalSliderDraw( GameWindow *window, WinInstanceData *instDat
 
 	}
 
+	drawSliderValue( window, instData );
 
 }
 
@@ -215,6 +271,8 @@ void W3DGadgetHorizontalSliderImageDraw( GameWindow *window,
 																	start.x, start.y,
 																	end.x, end.y );
 	}
+
+	drawSliderValue( window, instData );
 }
 
 // W3DGadgetHorizontalSliderImageDraw =========================================
