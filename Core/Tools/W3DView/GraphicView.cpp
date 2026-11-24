@@ -1859,6 +1859,7 @@ CGraphicView::OnMouseMove
     CPoint point
 )
 {
+	int iDeltaX = m_lastPoint.x-point.x;
 	int iDeltaY = m_lastPoint.y-point.y;
 
 	// Get the document to display
