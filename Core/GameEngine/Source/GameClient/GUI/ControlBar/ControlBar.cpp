@@ -1133,6 +1133,7 @@ ControlBar::ControlBar()
 	m_specialPowerLayout = nullptr;
 	m_smartSelectionParent = nullptr;
 	m_smartSelectionMoneyWindow = nullptr;
+	m_smartSelectionPowerWindow = nullptr;
 	m_cameoRowBlocker = nullptr;
 	for( i = 0; i < MAX_SMART_SELECTION_BUTTONS; i++ )
 	{
@@ -1544,6 +1545,7 @@ void ControlBar::init()
 		{
 			win->winSetTooltipFunc(commandButtonTooltip);
 		}
+		m_smartSelectionPowerWindow = win;
 		win = TheWindowManager->winGetWindowFromId(nullptr,TheNameKeyGenerator->nameToKey("ControlBar.wnd:MoneyDisplay"));
 		if(win)
 		{

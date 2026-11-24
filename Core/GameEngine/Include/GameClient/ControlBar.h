@@ -1156,6 +1156,7 @@ protected:
 	std::vector<SmartSelectionGroup> m_smartSelectionGroups;	///< one per type in a mixed selection, one per object otherwise
 	GameWindow *m_smartSelectionParent;												///< top level container for the row, created in code
 	GameWindow *m_smartSelectionMoneyWindow;									///< the money display the row must not run into
+	GameWindow *m_smartSelectionPowerWindow;									///< the power bar the row must not run into
 	GameWindow *m_cameoRowBlocker;														///< invisible top level window that keeps clicks on the housing off the world
 	GameWindow *m_smartSelectionButtons[ MAX_SMART_SELECTION_BUTTONS ];
 	ICoord2D m_smartSelectionButtonSize;

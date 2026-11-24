@@ -995,19 +995,33 @@ void ControlBar::updateSmartSelection()
 	const Int cameoHeight = m_smartSelectionButtonSize.y;
 	Int rowY = getCameoStackBottom( layout ) - cameoHeight;
 
-	// the money display rises out of the frame, so a bare row long enough to reach its housing
-	// lifts above it instead of running into it
-	const Int rowRight = layout.cameoLeft + getCameoRowWidth( (Int)m_smartSelectionGroups.size() );
-	if( !layout.housed && m_smartSelectionMoneyWindow && !m_smartSelectionMoneyWindow->winIsHidden() )
+	// the money display and the power bar rise out of a bare frame, so a row that would run into
+	// one lifts above it; the second pass catches a window the first lift moved the row into
+	if( !layout.housed )
 	{
-		ICoord2D moneyPos;
-		m_smartSelectionMoneyWindow->winGetScreenPosition( &moneyPos.x, &moneyPos.y );
-		// the housing slopes out about a cameo's width left of the money text
-		const Int housingMargin = m_smartSelectionButtonSize.x;
-		const Int liftedY = moneyPos.y - CAMEO_ROW_GAP - cameoHeight;
-		if( rowRight > moneyPos.x - housingMargin && liftedY < rowY )
+		const Int rowRight = layout.cameoLeft + getCameoRowWidth( (Int)m_smartSelectionGroups.size() );
+		GameWindow *obstacles[] = { m_smartSelectionMoneyWindow, m_smartSelectionPowerWindow };
+		// the money housing slopes out about a cameo's width left of the money text
+		const Int margins[] = { m_smartSelectionButtonSize.x, 0 };
+		for( Int pass = 0; pass < 2; pass++ )
 		{
-			rowY = liftedY;
+			for( Int i = 0; i < (Int)ARRAY_SIZE( obstacles ); i++ )
+			{
+				GameWindow *obstacle = obstacles[ i ];
+				if( obstacle == nullptr || obstacle->winIsHidden() )
+				{
+					continue;
+				}
+				ICoord2D pos, size;
+				obstacle->winGetScreenPosition( &pos.x, &pos.y );
+				obstacle->winGetSize( &size.x, &size.y );
+				const Bool besideRow = rowRight > pos.x - margins[ i ] && layout.cameoLeft < pos.x + size.x;
+				const Bool levelWithRow = pos.y < rowY + cameoHeight + CAMEO_ROW_GAP && pos.y + size.y > rowY;
+				if( besideRow && levelWithRow )
+				{
+					rowY = pos.y - CAMEO_ROW_GAP - cameoHeight;
+				}
+			}
 		}
 	}
 
