@@ -75,7 +75,7 @@ static void drawSliderValue( GameWindow *window, WinInstanceData *instData )
 {
 	SliderData *s = (SliderData *)window->winGetUserData();
 	GameWindow *thumb = window->winGetChild();
-	if( s == nullptr || thumb == nullptr )
+	if( s == nullptr || thumb == nullptr || s->hideValue )
 	{
 		return;
 	}

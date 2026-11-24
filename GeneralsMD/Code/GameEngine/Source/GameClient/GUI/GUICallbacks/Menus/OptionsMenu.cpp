@@ -2326,6 +2326,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	checkDoubleClickAttackMove   = TheWindowManager->winGetWindowFromId( nullptr, checkDoubleClickAttackMoveID );
 	sliderScrollSpeedID	   = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:SliderScrollSpeed" );
 	sliderScrollSpeed		   = TheWindowManager->winGetWindowFromId( nullptr,  sliderScrollSpeedID);
+	GadgetSliderHideValue( sliderScrollSpeed, TRUE );
 	// The layout may predate these controls, so they stay optional
 	checkMaxCameraHeight = findOptionsWindow( "OptionsMenu.wnd:CheckMaxCameraHeight", checkMaxCameraHeightID );
 	textEntryMaxCameraHeight = findOptionsWindow( "OptionsMenu.wnd:TextEntryMaxCameraHeight", textEntryMaxCameraHeightID );
@@ -2407,6 +2408,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 
 	sliderTextureResolutionID = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:LowResSlider" );
 	sliderTextureResolution = TheWindowManager->winGetWindowFromId( nullptr, sliderTextureResolutionID );
+	GadgetSliderHideValue( sliderTextureResolution, TRUE );
 
 	check3DShadowsID = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:Check3DShadows" );
 	check3DShadows   = TheWindowManager->winGetWindowFromId( nullptr, check3DShadowsID);

@@ -98,6 +98,19 @@ inline Int GadgetSliderGetPosition( GameWindow *win )
 	return -1;
 }
 
+inline void GadgetSliderHideValue( GameWindow *win, Bool hide )
+{
+	if( win == nullptr )
+	{
+		return;
+	}
+	SliderData *sData = (SliderData *)win->winGetUserData();
+	if( sData != nullptr )
+	{
+		sData->hideValue = hide;
+	}
+}
+
 // sliders are drawn from pieces, a left/top, right/bottom, repeating center, and small repeating center
 inline void GadgetSliderSetEnabledImages( GameWindow *g, const Image *left, const Image *right, const Image *center, const Image *smallCenter )
 {

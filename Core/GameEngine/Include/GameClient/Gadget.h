@@ -266,6 +266,7 @@ typedef struct _SliderData
 	// should not be initialized by the user
 	Real				numTicks;					// Number of ticks between min and max
 	Int					position;					// Current position of the slider
+	Bool				hideValue;				// No number is drawn above the thumb
 
 } SliderData;
 
