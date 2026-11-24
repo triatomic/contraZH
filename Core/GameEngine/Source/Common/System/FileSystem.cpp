@@ -255,6 +255,18 @@ void FileSystem::clearArchiveOnly(const Char *filename) const
 }
 
 //============================================================================
+// FileSystem::clearExistenceCache
+//============================================================================
+
+void FileSystem::clearExistenceCache()
+{
+#if ENABLE_FILESYSTEM_EXISTENCE_CACHE
+	FastCriticalSectionClass::LockClass lock(m_fileExistMutex);
+	m_fileExist.clear();
+#endif
+}
+
+//============================================================================
 // FileSystem::getLooseFileInfo
 //============================================================================
 

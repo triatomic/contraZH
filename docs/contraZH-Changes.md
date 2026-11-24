@@ -6,6 +6,7 @@ Everything here is additional to upstream; the rest of these docs still applies.
 * Most changes are client-side and read from `Options.ini`; each setting states its default.
 * [Gameplay Fixes](contraZH-Gameplay-Fixes.md) are always on and fix retail simulation bugs.
 * A few simulation rules are read from the mod's `GameData.ini`; each states its default.
+* The [interface style](contraZH-Options.md#display) (`InterfaceStyle`) switches between the classical, Pro bar and Contra control bars from the Options menu, without the launcher or a restart.
 * NVIDIA cards now load DXT1 textures natively, as AMD and Intel cards do. This halves their memory use and makes one-bit alpha visible.
 * DDS textures whose size is not a power of two, such as 510 x 510 or 600 x 600, now load every mip level correctly. Their lower mips drew as coloured block noise from a distance.
 * The map editor has its own page, [WorldBuilder Qt](WorldBuilder-Qt.md).

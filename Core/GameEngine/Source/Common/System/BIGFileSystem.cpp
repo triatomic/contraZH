@@ -237,6 +237,13 @@ void BIGFileSystem::closeArchiveFile(const Char *filename) {
 
 	// may need to do some other processing here first.
 
+	for (MountedArchiveList::iterator mountIt = m_mountedArchives.begin(); mountIt != m_mountedArchives.end(); ++mountIt) {
+		if (mountIt->archiveFile == it->second) {
+			m_mountedArchives.erase(mountIt);
+			break;
+		}
+	}
+
 	delete (it->second);
 	m_archiveFileMap.erase(it);
 }
@@ -251,6 +258,43 @@ Bool BIGFileSystem::loadArchiveFilesFromDirectory(AsciiString dir, AsciiString f
 
 	FilenameList filenameList;
 	TheLocalFileSystem->getFileListInDirectory(dir, "", fileMask, filenameList, TRUE);
+
+	// The launcher disables an interface style by renaming its archives to .ctr, so those mount too
+	FilenameList disabledList;
+	TheLocalFileSystem->getFileListInDirectory(dir, "", "*.ctr", disabledList, TRUE);
+	for (FilenameListIter disabledIt = disabledList.begin(); disabledIt != disabledList.end(); ++disabledIt) {
+		if (getArchiveInterfaceStyle(*disabledIt) != InterfaceStyle_Unset) {
+			filenameList.insert(*disabledIt);
+		}
+	}
+
+	if (m_interfaceStyle == InterfaceStyle_Unset) {
+		Bool hasProBig = FALSE;
+		Bool hasClassicBig = FALSE;
+		for (FilenameListIter styleIt = filenameList.begin(); styleIt != filenameList.end(); ++styleIt) {
+			if (!styleIt->endsWithNoCase(".big")) {
+				continue;
+			}
+			const Int style = getArchiveInterfaceStyle(*styleIt);
+			if (style == InterfaceStyle_Pro) {
+				hasProBig = TRUE;
+			}
+			else if (style == InterfaceStyle_Classic) {
+				hasClassicBig = TRUE;
+			}
+		}
+
+		if (hasProBig) {
+			m_interfaceStyle = InterfaceStyle_Pro;
+		}
+		else if (hasClassicBig) {
+			m_interfaceStyle = InterfaceStyle_Classic;
+		}
+		else {
+			m_interfaceStyle = InterfaceStyle_Contra;
+		}
+		DEBUG_LOG(("BIGFileSystem::loadArchiveFilesFromDirectory - archive extensions select interface style %d", m_interfaceStyle));
+	}
 
 	Bool actuallyAdded = FALSE;
 	FilenameListIter it = filenameList.begin();
@@ -269,8 +313,7 @@ Bool BIGFileSystem::loadArchiveFilesFromDirectory(AsciiString dir, AsciiString f
 
 		if (archiveFile != nullptr) {
 			DEBUG_LOG(("BIGFileSystem::loadArchiveFilesFromDirectory - loading %s into the directory tree.", (*it).str()));
-			loadIntoDirectoryTree(archiveFile, overwrite);
-			m_archiveFileMap[(*it)] = archiveFile;
+			mountArchiveFile(*it, archiveFile, overwrite);
 			DEBUG_LOG(("BIGFileSystem::loadArchiveFilesFromDirectory - %s inserted into the archive file map.", (*it).str()));
 			actuallyAdded = TRUE;
 		}
@@ -289,8 +332,7 @@ void BIGFileSystem::loadMods()
 
 		if (archiveFile != nullptr) {
 			DEBUG_LOG(("BIGFileSystem::loadMods - loading %s into the directory tree.", TheGlobalData->m_modBIG.str()));
-			loadIntoDirectoryTree(archiveFile, TRUE);
-			m_archiveFileMap[TheGlobalData->m_modBIG] = archiveFile;
+			mountArchiveFile(TheGlobalData->m_modBIG, archiveFile, TRUE);
 			DEBUG_LOG(("BIGFileSystem::loadMods - %s inserted into the archive file map.", TheGlobalData->m_modBIG.str()));
 		}
 		else

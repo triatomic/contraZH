@@ -31,6 +31,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/ArchiveFileSystem.h"
 #include "Common/AudioSettings.h"
 #include "Common/GameAudio.h"
 #include "Common/GameLOD.h"
@@ -279,6 +280,31 @@ HouseColorMode OptionPreferences::getHouseColorMode(void) const
 		return (HouseColorMode)mode;
 
 	return HouseColorMode_Default;
+}
+
+// Options.ini: InterfaceStyle = Classic | Pro | Contra
+Int OptionPreferences::getInterfaceStyle(void) const
+{
+	OptionPreferences::const_iterator it = find("InterfaceStyle");
+	if (it == end())
+	{
+		return InterfaceStyle_Unset;
+	}
+
+	if (stricmp(it->second.str(), "Classic") == 0)
+	{
+		return InterfaceStyle_Classic;
+	}
+	if (stricmp(it->second.str(), "Pro") == 0)
+	{
+		return InterfaceStyle_Pro;
+	}
+	if (stricmp(it->second.str(), "Contra") == 0)
+	{
+		return InterfaceStyle_Contra;
+	}
+
+	return InterfaceStyle_Unset;
 }
 
 // TheSuperHackers @feature Draw each command bar cameo's keyboard hotkey over the cameo.

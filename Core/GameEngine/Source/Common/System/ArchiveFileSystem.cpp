@@ -102,6 +102,7 @@ ArchiveFileSystem *TheArchiveFileSystem = nullptr;
 // ArchivedFileInfo
 //------------------------------------------------------
 ArchiveFileSystem::ArchiveFileSystem()
+	: m_interfaceStyle(InterfaceStyle_Unset)
 {
 }
 
@@ -306,9 +307,108 @@ ArchiveFile* ArchiveFileSystem::getArchiveFile(const AsciiString& filename, File
 
 void ArchiveFileSystem::getFileListInDirectory(const AsciiString& currentDirectory, const AsciiString& originalDirectory, const AsciiString& searchName, FilenameList &filenameList, Bool searchSubdirectories) const
 {
-	ArchiveFileMap::const_iterator it = m_archiveFileMap.begin();
-	while (it != m_archiveFileMap.end()) {
-		it->second->getFileListInDirectory(currentDirectory, originalDirectory, searchName, filenameList, searchSubdirectories);
+	MountedArchiveList::const_iterator it = m_mountedArchives.begin();
+	while (it != m_mountedArchives.end()) {
+		if (isArchiveEnabled(*it)) {
+			it->archiveFile->getFileListInDirectory(currentDirectory, originalDirectory, searchName, filenameList, searchSubdirectories);
+		}
 		it++;
+	}
+}
+
+Int ArchiveFileSystem::getArchiveInterfaceStyle(const AsciiString& name)
+{
+	const char *baseName = name.reverseFind('\\');
+	const char *slash = name.reverseFind('/');
+	if (slash != nullptr && (baseName == nullptr || slash > baseName))
+	{
+		baseName = slash;
+	}
+	AsciiString lowerName = (baseName != nullptr) ? baseName + 1 : name.str();
+	lowerName.toLower();
+
+	if (strstr(lowerName.str(), "controlbarpro") != nullptr)
+	{
+		return InterfaceStyle_Pro;
+	}
+	if (strstr(lowerName.str(), "controlbarstandard") != nullptr)
+	{
+		return InterfaceStyle_Classic;
+	}
+	return InterfaceStyle_Unset;
+}
+
+Bool ArchiveFileSystem::isArchiveEnabled(const MountedArchive& archive) const
+{
+	return archive.style == InterfaceStyle_Unset || archive.style == m_interfaceStyle;
+}
+
+Bool ArchiveFileSystem::hasInterfaceStyle(Int style) const
+{
+	if (style == InterfaceStyle_Contra)
+	{
+		return TRUE;
+	}
+	for (MountedArchiveList::const_iterator it = m_mountedArchives.begin(); it != m_mountedArchives.end(); ++it)
+	{
+		if (it->style == style)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+void ArchiveFileSystem::setInterfaceStyle(Int style)
+{
+	if (style < 0 || style >= InterfaceStyle_Count || !hasInterfaceStyle(style))
+	{
+		style = InterfaceStyle_Contra;
+	}
+	if (style == m_interfaceStyle)
+	{
+		return;
+	}
+
+	DEBUG_LOG(("ArchiveFileSystem::setInterfaceStyle - switching from style %d to %d", m_interfaceStyle, style));
+	m_interfaceStyle = style;
+	rebuildDirectoryTree();
+
+	if (TheFileSystem != nullptr)
+	{
+		TheFileSystem->clearExistenceCache();
+	}
+}
+
+void ArchiveFileSystem::mountArchiveFile(const AsciiString& name, ArchiveFile *archiveFile, Bool overwrite)
+{
+	m_archiveFileMap[name] = archiveFile;
+
+	MountedArchive archive;
+	archive.archiveFile = archiveFile;
+	archive.overwrite = overwrite;
+	archive.style = getArchiveInterfaceStyle(name);
+	m_mountedArchives.push_back(archive);
+
+	if (isArchiveEnabled(archive))
+	{
+		loadIntoDirectoryTree(archiveFile, overwrite);
+	}
+	else
+	{
+		DEBUG_LOG(("ArchiveFileSystem::mountArchiveFile - %s belongs to interface style %d and stays out of the directory tree", name.str(), archive.style));
+	}
+}
+
+void ArchiveFileSystem::rebuildDirectoryTree()
+{
+	m_rootDirectory = ArchivedDirectoryInfo();
+
+	for (MountedArchiveList::const_iterator it = m_mountedArchives.begin(); it != m_mountedArchives.end(); ++it)
+	{
+		if (isArchiveEnabled(*it))
+		{
+			loadIntoDirectoryTree(it->archiveFile, it->overwrite);
+		}
 	}
 }

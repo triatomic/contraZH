@@ -32,6 +32,7 @@
 
 #include "gamespy/ghttp/ghttp.h"
 
+#include "Common/ArchiveFileSystem.h"
 #include "Common/AudioAffect.h"
 #include "Common/AudioSettings.h"
 #include "Common/GameAudio.h"
@@ -210,6 +211,7 @@ static GameWindow *   buttonMainDefaults          = nullptr;
 static GameWindow *   comboBoxHealthBars          = nullptr;
 static GameWindow *   comboBoxAlliedDecals        = nullptr;
 static GameWindow *   comboBoxHouseColors         = nullptr;
+static GameWindow *   comboBoxInterfaceStyle      = nullptr;
 static GameWindow *   comboBoxBuildTimers         = nullptr;
 static GameWindow *   comboBoxActionLines         = nullptr;
 static GameWindow *   comboBoxCastMode            = nullptr;
@@ -305,6 +307,8 @@ static const char *const AlliedDecalModeNames[] = { "Hidden", "House", "Army" };
 static_assert( ARRAY_SIZE(AlliedDecalModeNames) == AlliedDecalMode_Count, "AlliedDecalModeNames out of date" );
 static const char *const HouseColorModeNames[] = { "Default", "Basic" };
 static_assert( ARRAY_SIZE(HouseColorModeNames) == HouseColorMode_Count, "HouseColorModeNames out of date" );
+static const char *const InterfaceStyleNames[] = { "Classic", "Pro", "Contra" };
+static_assert( ARRAY_SIZE(InterfaceStyleNames) == InterfaceStyle_Count, "InterfaceStyleNames out of date" );
 static_assert( ARRAY_SIZE(BuildTimerModeNames) == BuildTimerDisplayMode_Count, "BuildTimerModeNames out of date" );
 static const char *const ActionLineModeNames[] = { "Off", "All", "AttackOnly" };
 static_assert( ARRAY_SIZE(ActionLineModeNames) == ActionLineMode_Count, "ActionLineModeNames out of date" );
@@ -689,6 +693,7 @@ static void populateGameOptions()
 	setComboPos( comboBoxHealthBars, pref->getHealthBarDisplayMode() );
 	setComboPos( comboBoxAlliedDecals, pref->getAlliedDecalMode() );
 	setComboPos( comboBoxHouseColors, pref->getHouseColorMode() );
+	setComboPos( comboBoxInterfaceStyle, TheArchiveFileSystem->getInterfaceStyle() );
 	setComboPos( comboBoxBuildTimers, pref->getBuildTimerDisplayMode() );
 	setComboPos( comboBoxActionLines, pref->getActionLineMode() );
 	setComboPos( comboBoxCastMode, pref->getCastMode() );
@@ -1646,6 +1651,27 @@ static void saveOptions()
 	}
 
 	//-------------------------------------------------------------------------------------------------
+	// Interface style
+	Bool rebuildInterface = FALSE;
+	if (comboBoxInterfaceStyle && comboBoxInterfaceStyle->winGetEnabled())
+	{
+		const Int oldStyle = TheArchiveFileSystem->getInterfaceStyle();
+		Int style = clamp( 0, getComboPos( comboBoxInterfaceStyle, oldStyle ), (Int)InterfaceStyle_Count - 1 );
+		if (style != oldStyle)
+		{
+			TheArchiveFileSystem->setInterfaceStyle( style );
+		}
+		if (TheArchiveFileSystem->getInterfaceStyle() != oldStyle)
+		{
+			// Images and textures keep their names across styles, so their contents must reload
+			TheMappedImageCollection->load( 512 );
+			TheDisplay->invalidateTextures();
+			rebuildInterface = TRUE;
+		}
+		(*pref)["InterfaceStyle"] = InterfaceStyleNames[ TheArchiveFileSystem->getInterfaceStyle() ];
+	}
+
+	//-------------------------------------------------------------------------------------------------
 	// Resolution
 	//
 	// TheSuperHackers @bugfix xezon 12/06/2025 Now performs the resolution change at the very end of
@@ -1696,10 +1722,7 @@ static void saveOptions()
 				prefString.format("%d %d", xres, yres );
 				(*pref)["Resolution"] = prefString;
 
-				// The control bar goes first so its full screen roots stay below the rebuilt shell, as at launch
-				TheInGameUI->recreateControlBar();
-				TheShell->recreateWindowLayouts();
-				TheInGameUI->refreshCustomUiResources();
+				rebuildInterface = TRUE;
 			}
 			else
 			{
@@ -1709,6 +1732,14 @@ static void saveOptions()
 	}
 
 	// MUST NEVER ADD ANOTHER OPTION HERE AT THE END !
+
+	if (rebuildInterface)
+	{
+		// The control bar goes first so its full screen roots stay below the rebuilt shell, as at launch
+		TheInGameUI->recreateControlBar();
+		TheShell->recreateWindowLayouts();
+		TheInGameUI->refreshCustomUiResources();
+	}
 }
 
 static void DestroyOptionsLayout() {
@@ -1998,6 +2029,7 @@ static void initGameOptionsWindows()
 	comboBoxHealthBars = findOptionsWindow( "OptionsMenu.wnd:ComboBoxHealthBars" );
 	comboBoxAlliedDecals = findOptionsWindow( "OptionsMenu.wnd:ComboBoxAlliedDecals" );
 	comboBoxHouseColors = findOptionsWindow( "OptionsMenu.wnd:ComboBoxHouseColors" );
+	comboBoxInterfaceStyle = findOptionsWindow( "OptionsMenu.wnd:ComboBoxInterfaceStyle" );
 	comboBoxBuildTimers = findOptionsWindow( "OptionsMenu.wnd:ComboBoxBuildTimers" );
 	comboBoxActionLines = findOptionsWindow( "OptionsMenu.wnd:ComboBoxActionLines" );
 	comboBoxCastMode = findOptionsWindow( "OptionsMenu.wnd:ComboBoxCastMode" );
@@ -2069,6 +2101,7 @@ static void initGameOptionsWindows()
 	setLabelText( "OptionsMenu.wnd:HealthBarsLabel", "GUI:HealthBars" );
 	setLabelText( "OptionsMenu.wnd:AlliedDecalsLabel", "GUI:AlliedDecals" );
 	setLabelText( "OptionsMenu.wnd:HouseColorsLabel", "GUI:HouseColors" );
+	setLabelText( "OptionsMenu.wnd:InterfaceStyleLabel", "GUI:InterfaceStyle" );
 	setLabelText( "OptionsMenu.wnd:BuildTimersLabel", "GUI:BuildTimers" );
 	setLabelText( "OptionsMenu.wnd:ActionLinesLabel", "GUI:ActionLines" );
 	setLabelText( "OptionsMenu.wnd:InputGroupLabel", "GUI:GameOptionsInput" );
@@ -2139,6 +2172,7 @@ static void initGameOptionsWindows()
 	setTooltip( comboBoxHealthBars, "TOOLTIP:HealthBars" );
 	setTooltip( comboBoxAlliedDecals, "TOOLTIP:AlliedDecals" );
 	setTooltip( comboBoxHouseColors, "TOOLTIP:HouseColors" );
+	setTooltip( comboBoxInterfaceStyle, "TOOLTIP:InterfaceStyle" );
 	setTooltip( comboBoxBuildTimers, "TOOLTIP:BuildTimers" );
 	setTooltip( comboBoxActionLines, "TOOLTIP:ActionLines" );
 	setTooltip( comboBoxCastMode, "TOOLTIP:CastMode" );
@@ -2164,6 +2198,7 @@ static void initGameOptionsWindows()
 	addComboEntries( comboBoxHealthBars, "GUI:HealthBars", HealthBarDisplayMode_Count );
 	addComboEntries( comboBoxAlliedDecals, "GUI:AlliedDecals", AlliedDecalMode_Count );
 	addComboEntries( comboBoxHouseColors, "GUI:HouseColors", HouseColorMode_Count );
+	addComboEntries( comboBoxInterfaceStyle, "GUI:InterfaceStyle", InterfaceStyle_Count );
 	addComboEntries( comboBoxBuildTimers, "GUI:BuildTimers", BuildTimerDisplayMode_Count );
 	addComboEntries( comboBoxActionLines, "GUI:ActionLines", ActionLineMode_Count );
 	addComboEntries( comboBoxCastMode, "GUI:CastMode", CastMode_Count );
@@ -2797,6 +2832,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 		if (comboBoxResolution)
 			comboBoxResolution->winEnable(FALSE);
 
+		enableWindow( comboBoxInterfaceStyle, FALSE );
 		enableWindow( checkBorderlessWindow, FALSE );
 		enableWindow( checkWindowed, FALSE );
 

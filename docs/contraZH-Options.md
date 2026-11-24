@@ -58,6 +58,15 @@ disguised unit takes the color of the side it pretends to be, and an observer wa
 sees the default colors. Only this client's view changes. `Ctrl + Shift + G` cycles it in game for the
 session. Needs `ComboBoxHouseColors` and `HouseColorsLabel` in `OptionsMenu.wnd` for the menu
 control.)
+* `InterfaceStyle = Contra` - (`Classic` | `Pro` | `Contra`. Picks the control bar and menu art.
+`Classic` uses the archives named `*ControlBarStandard*`, `Pro` those named `*ControlBarPro*`, and
+`Contra` uses neither. The game mounts these archives whether they end in `.big` or `.ctr`, and
+keeps only the chosen style's files visible. Without this key, the style whose archive ends in
+`.big` is used, as the launcher sets it; once the key is saved it wins over the launcher. The
+Interface style combo applies the change at once from the main menu and is locked during a match.
+A style with no archive present falls back to `Contra`. An archive that sorts earlier by name
+still wins over a style archive, and a loose file wins over both. Needs `ComboBoxInterfaceStyle`
+and `InterfaceStyleLabel` in `OptionsMenu.wnd` for the menu control.)
 * `NumericalHealth = No` - (Yes prints hit points beside the health bar, wherever a bar shows.)
 * `VeterancyLevel = No` - (Yes draws a beveled, antialiased gold veterancy icon that fills from bottom to top on the
 selected unit's portrait, with outlined current XP / next-rank XP text below it. A single chevron,

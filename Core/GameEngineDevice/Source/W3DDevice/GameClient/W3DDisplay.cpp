@@ -3626,6 +3626,13 @@ void W3DDisplay::preloadTextureAssets( AsciiString texture )
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+void W3DDisplay::invalidateTextures()
+{
+	WW3D::_Invalidate_Textures();
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 void W3DDisplay::doSmartAssetPurgeAndPreload(const char* usageFileName)
 {
 	if (!m_assetManager || !usageFileName || !*usageFileName)

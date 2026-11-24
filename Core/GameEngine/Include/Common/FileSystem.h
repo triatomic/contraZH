@@ -174,6 +174,8 @@ public:
 
 	static void setLiveLooseFiles(Bool live);	///< check the loose file on every read, even when a probe found only the archived one
 
+	void clearExistenceCache();	///< forget every cached probe, for when the archive directory tree changes
+
 protected:
 	Bool isKnownArchiveOnlyRead(const Char *filename, Int access) const;	///< whether a read can skip the loose file the probe already missed
 	void clearArchiveOnly(const Char *filename) const;	///< a loose copy was seen, so reads must try it again

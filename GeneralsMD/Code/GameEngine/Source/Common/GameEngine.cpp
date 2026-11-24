@@ -592,6 +592,17 @@ void GameEngine::init()
 		NGMP_OnlineServicesManager::Settings.Initialize();
 #endif
 
+		// A saved interface style replaces the one the archive extensions gave at mount time
+		setStartupStage("Interface style");
+		{
+			OptionPreferences optionPref;
+			const Int style = optionPref.getInterfaceStyle();
+			if (style != InterfaceStyle_Unset)
+			{
+				TheArchiveFileSystem->setInterfaceStyle(style);
+			}
+		}
+
 		setStartupStage("Mount mod archives");
 		TheArchiveFileSystem->loadMods();
 

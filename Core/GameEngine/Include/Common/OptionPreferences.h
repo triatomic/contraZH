@@ -158,6 +158,7 @@ public:
 	HealthBarDisplayMode getHealthBarDisplayMode() const;
 	AlliedDecalMode getAlliedDecalMode() const;
 	HouseColorMode getHouseColorMode() const;
+	Int getInterfaceStyle() const;	///< an InterfaceStyle, or InterfaceStyle_Unset when none is saved
 	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
 	ActionLineMode getActionLineMode() const;
 	CastMode getCastMode() const;
