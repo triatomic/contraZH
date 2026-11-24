@@ -3101,7 +3101,9 @@ Bool JetAIUpdate::isParkedInHangar() const
 {
 	// We do not check if the Aircraft actually needs a runway/hangar here,
 	// so we can ignore those cases earlier already
-	return isReloading() || !(getFlag(TAKEOFF_IN_PROGRESS)
+	return isReloading() || !(isTaxiingToParking()
+		|| getFlag(ALLOW_AIR_LOCO)
+		|| getFlag(TAKEOFF_IN_PROGRESS)
 		|| getFlag(LANDING_IN_PROGRESS)
 		|| getObject()->isSignificantlyAboveTerrain()
 		|| isMoving()

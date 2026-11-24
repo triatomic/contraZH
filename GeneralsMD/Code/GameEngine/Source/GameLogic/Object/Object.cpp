@@ -2848,13 +2848,6 @@ void Object::updateUpgradeModules()
 	if( getControllingPlayer() == nullptr )
 		return;  // This can only happen in game teardown.  No upgrades for you without a player.  Weird crashes are bad.
 
-	const UpgradeMaskType& playerMask = getControllingPlayer()->getCompletedUpgradeMask();
-	const UpgradeMaskType& objectMask = getObjectCompletedUpgradeMask();
-	UpgradeMaskType maskToCheck = playerMask;
-	maskToCheck.set( objectMask );
-	// We need to add in all of the already owned upgrades to handle "AND" requiring upgrades.
-	// We combine all the masks in case someone has a Object AND Player combination
-
 	for (BehaviorModule** module = m_behaviors; *module; ++module)
 	{
 		UpgradeModuleInterface* upgrade = (*module)->getUpgrade();
@@ -2863,6 +2856,9 @@ void Object::updateUpgradeModules()
 
 		if( !upgrade->isAlreadyUpgraded() )
 		{
+			// An earlier upgrade module may have removed an upgrade.
+			UpgradeMaskType maskToCheck = getControllingPlayer()->getCompletedUpgradeMask();
+			maskToCheck.set( getObjectCompletedUpgradeMask() );
 			upgrade->attemptUpgrade( maskToCheck );
 		}
 	}

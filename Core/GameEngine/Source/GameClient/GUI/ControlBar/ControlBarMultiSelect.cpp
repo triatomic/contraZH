@@ -619,6 +619,8 @@ void ControlBar::updateContextMultiSelect()
 	const CommandButton *command;
 	GameWindow *win;
 	Int objectsThatCanDoCommand[ MAX_COMMANDS_PER_SET ];
+	Int objectsWithActiveUpgrade[ MAX_COMMANDS_PER_SET ] = { 0 };
+	Int focusedObjectCount = 0;
 	Int i;
 
 	// zero the array that counts how many objects can do each command
@@ -663,6 +665,8 @@ void ControlBar::updateContextMultiSelect()
 		{
 			continue;
 		}
+
+		++focusedObjectCount;
 
 		//ShigureUi 07/09/2026 check if there is any production exists in order to populate build queue
 		pu = obj->getProductionUpdateInterface();
@@ -727,7 +731,17 @@ void ControlBar::updateContextMultiSelect()
 			//If button is a CHECK_LIKE, then update it's status now.
 			if( BitIsSet( command->getOptions(), CHECK_LIKE ) )
 			{
-				GadgetCheckLikeButtonSetVisualCheck( win, availability == COMMAND_ACTIVE );
+				if( command->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE )
+				{
+					if( availability == COMMAND_ACTIVE )
+					{
+						++objectsWithActiveUpgrade[ i ];
+					}
+				}
+				else
+				{
+					GadgetCheckLikeButtonSetVisualCheck( win, availability == COMMAND_ACTIVE );
+				}
 			}
 
 			if( availability == COMMAND_AVAILABLE || availability == COMMAND_ACTIVE )
@@ -756,6 +770,13 @@ void ControlBar::updateContextMultiSelect()
 		// don't consider slots that don't have commands
 		if( m_commonCommands[ i ] == nullptr )
 			continue;
+
+		if( m_commonCommands[ i ]->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE &&
+				BitIsSet( m_commonCommands[ i ]->getOptions(), CHECK_LIKE ) )
+		{
+			GadgetCheckLikeButtonSetVisualCheck( m_commandWindows[ i ],
+				focusedObjectCount > 0 && objectsWithActiveUpgrade[ i ] == focusedObjectCount );
+		}
 
 		// check the count of objects that can do the command and enable/disable the control,
 		if( objectsThatCanDoCommand[ i ] > 0 )

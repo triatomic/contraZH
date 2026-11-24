@@ -78,7 +78,7 @@ WeaponSetUpgrade::~WeaponSetUpgrade()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-Bool WeaponSetUpgrade::wouldUpgrade(UpgradeMaskType keyMask) const
+Bool WeaponSetUpgrade::wouldUpgrade(const UpgradeMaskType& keyMask) const
 {
 	if (UpgradeMux::wouldUpgrade(keyMask)) {
 

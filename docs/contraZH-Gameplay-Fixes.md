@@ -3,6 +3,16 @@
 Always on, no `Options.ini` key. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Aircraft weapon upgrades can require parking
+
+`WeaponSetUpgrade` enforces `NeedsParkedAircraft = Yes` when the player orders an upgrade
+and when it completes. If the aircraft leaves its parking spot before an object upgrade
+finishes, the game cancels the upgrade and refunds its cost. This changes the simulation.
+
+Switches that use `RemovesUpgrades` now take effect on the first order in either
+direction. An `OBJECT_UPGRADE` button with `CHECK_LIKE` stays pressed while the unit
+owns that upgrade. Use `GrantUpgradeCreate` to grant the default choice when built.
+
 ## AI construction uses legal, reachable sites
 
 AI builders search nearby sites when a planned building overlaps an obstacle, sits on

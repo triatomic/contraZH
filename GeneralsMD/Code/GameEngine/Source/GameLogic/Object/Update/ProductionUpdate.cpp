@@ -1010,6 +1010,13 @@ UpdateSleepTime ProductionUpdate::update()
 		{
 			const UpgradeTemplate *upgrade = production->m_upgradeToResearch;
 
+			if( upgrade->getUpgradeType() == UPGRADE_TYPE_OBJECT &&
+					(us->hasUpgrade( upgrade ) || !us->affectedByUpgrade( upgrade )) )
+			{
+				cancelUpgrade( production );
+				return UPDATE_SLEEP_NONE;
+			}
+
 			// we finished an upgrade, lets add that money spent on it to the scorekeeper
 			player->getScoreKeeper()->addMoneySpent(upgrade->calcCostToBuild(player));
 

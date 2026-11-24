@@ -1218,6 +1218,13 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 	}
 
 	ProductionUpdateInterface *pu = obj->getProductionUpdateInterface();
+	if( command->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE &&
+			BitIsSet( command->getOptions(), CHECK_LIKE ) && command->getUpgradeTemplate() &&
+			obj->hasUpgrade( command->getUpgradeTemplate() ) )
+	{
+		return COMMAND_ACTIVE;
+	}
+
 	if( pu && pu->firstProduction() && BitIsSet( command->getOptions(), NOT_QUEUEABLE ) )
 	{
 		//This button is designated so that it is incapable of building this upgrade/object

@@ -65,7 +65,7 @@ class WeaponSetUpgrade : public UpgradeModule
 
 public:
 
-	virtual Bool wouldUpgrade(UpgradeMaskType keyMask) const;
+	virtual Bool wouldUpgrade(const UpgradeMaskType& keyMask) const override;
 
 	WeaponSetUpgrade( Thing *thing, const ModuleData* moduleData );
 	// virtual destructor prototype defined by MemoryPoolObject
