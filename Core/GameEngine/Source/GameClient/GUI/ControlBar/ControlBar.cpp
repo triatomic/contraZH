@@ -1299,9 +1299,9 @@ ControlBar::~ControlBar()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-void ControlBar::adoptCommandData( ControlBar *from )
+void ControlBar::adoptFrom( ControlBar *from )
 {
-	DEBUG_ASSERTCRASH( m_commandButtons == nullptr && m_commandSets == nullptr, ("ControlBar::adoptCommandData - this bar already has command data") );
+	DEBUG_ASSERTCRASH( m_commandButtons == nullptr && m_commandSets == nullptr, ("ControlBar::adoptFrom - this bar already has command data") );
 
 	m_commandButtons = from->m_commandButtons;
 	m_commandSets = from->m_commandSets;
@@ -1310,12 +1310,7 @@ void ControlBar::adoptCommandData( ControlBar *from )
 
 	// the flash counts live on the adopted buttons
 	m_flash = from->m_flash;
-}
 
-//-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
-void ControlBar::adoptClientState( ControlBar *from )
-{
 	// the logic side keeps the focus it was sent, so the new row must show and remember the same one
 	m_smartSelectionGroups = from->m_smartSelectionGroups;
 	m_smartSelectionActive = from->m_smartSelectionActive;
@@ -4154,11 +4149,6 @@ void ControlBar::initSpecialPowershortcutBar( Player *player)
 		}
 	}
 
-}
-
-void ControlBar::refreshSpecialPowerShortcut()
-{
-	populateSpecialPowerShortcut( ThePlayerList->getLocalPlayer() );
 }
 
 void ControlBar::populateSpecialPowerShortcut( Player *player)

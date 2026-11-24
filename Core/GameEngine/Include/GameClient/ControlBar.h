@@ -756,10 +756,8 @@ public:
 	virtual void reset() override;					///< from subsystem interface
 	virtual void update() override;				///< from subsystem interface
 
-	/// take over the command buttons and sets, which the match holds pointers into, so init does not load new ones
-	void adoptCommandData( ControlBar *from );
-	/// take over the client state a rebuilt bar must keep, such as the smart selection focus the logic side was sent
-	void adoptClientState( ControlBar *from );
+	/// take over the command data the match points into and the client state a rebuilt bar must keep, so init loads no new commands
+	void adoptFrom( ControlBar *from );
 
 	/// mark the UI as dirty so the context of everything is re-evaluated
 	void markUIDirty();
@@ -927,7 +925,7 @@ public:
 	void setArrowImage( const Image *arrowImage ){ m_genArrow = arrowImage;	}
 
 	void initSpecialPowershortcutBar( Player *player);
-	void refreshSpecialPowerShortcut();	///< fill the shortcut bar for the local player now instead of on the next dirty update
+	void populateSpecialPowerShortcut( Player *player);
 
 	void triggerRadarAttackGlow();
 
@@ -1017,7 +1015,6 @@ protected:
 
 	// the following methods are for the special power shortcut window
 
-	void populateSpecialPowerShortcut( Player *player);
 	void updateSpecialPowerShortcut();
 
 	// the following methods are for the smart selection row and the command group box

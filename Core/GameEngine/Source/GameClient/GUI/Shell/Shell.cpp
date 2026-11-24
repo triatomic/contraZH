@@ -298,7 +298,7 @@ void Shell::recreateWindowLayoutsLater()
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Recreating runs every screen's init again, which is safe only outside a match and off the score screen, whose init reads the finished match */
+/** A pending recreation runs only outside a match with the main menu as the only screen */
 //-------------------------------------------------------------------------------------------------
 Bool Shell::canRecreateWindowLayoutsNow()
 {
@@ -315,13 +315,7 @@ Bool Shell::canRecreateWindowLayoutsNow()
 		return FALSE;
 	}
 
-	// the same rule that keeps the options menu from rebuilding an online lobby
-	if( TheGameSpyInfo != nullptr )
-	{
-		return FALSE;
-	}
-
-	if( findScreenByFilename( "Menus/ScoreScreen.wnd" ) != nullptr )
+	if( m_screenCount != 1 || findScreenByFilename( "Menus/MainMenu.wnd" ) == nullptr )
 	{
 		return FALSE;
 	}
@@ -332,10 +326,6 @@ Bool Shell::canRecreateWindowLayoutsNow()
 		return FALSE;
 	}
 	if( m_saveLoadMenuLayout != nullptr && !m_saveLoadMenuLayout->isHidden() )
-	{
-		return FALSE;
-	}
-	if( m_popupReplayLayout != nullptr && !m_popupReplayLayout->isHidden() )
 	{
 		return FALSE;
 	}

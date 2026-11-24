@@ -9049,8 +9049,7 @@ void InGameUI::reloadInterfaceStyle()
 
 	ControlBar *oldControlBar = TheControlBar;
 	ControlBar *newControlBar = NEW ControlBar;
-	newControlBar->adoptCommandData( oldControlBar );
-	newControlBar->adoptClientState( oldControlBar );
+	newControlBar->adoptFrom( oldControlBar );
 	delete oldControlBar;
 	TheControlBar = newControlBar;
 	TheControlBar->init();
@@ -9100,7 +9099,7 @@ void InGameUI::reloadInterfaceStyle()
 	TheControlBar->setObservedPlayer( observedPlayer );
 	TheControlBar->initSpecialPowershortcutBar( localPlayer );
 	// filled while the bar is hidden, the shortcut bar shows with it instead of sliding in later
-	TheControlBar->refreshSpecialPowerShortcut();
+	TheControlBar->populateSpecialPowerShortcut( localPlayer );
 	TheControlBar->setControlBarSchemeByPlayer( localPlayer );
 	if( !localPlayer->isPlayerActive() && !localPlayer->isPlayerObserver() )
 	{
