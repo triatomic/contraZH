@@ -1203,7 +1203,7 @@ float Animatable3DObjClass::Compute_Current_Frame(float* newFrame0, float* newFr
 		float direction1 = ModeInterp.animDirection1;
 		float frame0 = ModeInterp.Frame0;
 		float frame1 = ModeInterp.Frame1;
-		float percentage = ModeInterp.Percentage;
+		//float percentage = ModeInterp.Percentage;
 		int sync_time = WW3D::Get_Sync_Time();
 		//
 		//	Compute the current frame based on elapsed time.

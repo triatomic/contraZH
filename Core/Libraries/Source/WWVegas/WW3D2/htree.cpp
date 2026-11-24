@@ -814,7 +814,7 @@ void HTreeClass::Blend_Update
 	endpivot = pivot + (NumPivots - 1);
 	lastAnimPivot = &Pivot[num_anim_pivots];
 
-	for (int piv_idx = 1; pivot < endpivot; pivot++, nodeMotion0++, nodeMotion1++) {
+	for (; pivot < endpivot; pivot++, nodeMotion0++, nodeMotion1++) {
 
 		// base pose
 		assert(pivot->Parent != NULL);
