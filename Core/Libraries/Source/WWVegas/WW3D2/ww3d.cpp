@@ -767,6 +767,22 @@ void WW3D::_Invalidate_Textures()
 	}
 }
 
+void WW3D::_Invalidate_Textures(bool (*is_stale)(const char *texture_name, void *user_data), void *user_data)
+{
+	if (!WW3DAssetManager::Get_Instance()) return;
+
+	TextureLoader::Flush_Pending_Load_Tasks();
+
+	HashTemplateIterator<StringClass,TextureClass*> ite(WW3DAssetManager::Get_Instance()->Texture_Hash());
+
+	for (ite.First();!ite.Is_Done();ite.Next()) {
+		TextureClass* tex=ite.Peek_Value();
+		if (is_stale(tex->Get_Texture_Name(), user_data)) {
+			tex->Invalidate();
+		}
+	}
+}
+
 void WW3D::Set_Texture_Filter(int texture_filter)
 {
 	TextureFilter = clamp((int)TextureFilterClass::TEXTURE_FILTER_NONE, texture_filter, (int)TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC);

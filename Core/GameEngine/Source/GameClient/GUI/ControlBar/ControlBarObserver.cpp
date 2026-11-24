@@ -330,6 +330,18 @@ void ControlBar::populateObserverList()
 	}
 }
 
+void ControlBar::showObserverPlayerInfo()
+{
+	if( ObserverPlayerInfoWindow == nullptr || ObserverPlayerListWindow == nullptr || m_observerLookAtPlayer == nullptr )
+	{
+		return;
+	}
+
+	ObserverPlayerInfoWindow->winHide(FALSE);
+	ObserverPlayerListWindow->winHide(TRUE);
+	populateObserverInfoWindow();
+}
+
 void ControlBar::populateObserverInfoWindow ()
 {
 	if(ObserverPlayerInfoWindow->winIsHidden())

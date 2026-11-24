@@ -172,6 +172,21 @@ void HideDisconnectWindow()
 
 }
 
+//------------------------------------------------------
+/** Drop a hidden Disconnect Screen so the next show or hide builds it from the current layout */
+//------------------------------------------------------
+void ResetDisconnectWindow()
+{
+	if( disconnectMenuLayout == nullptr || !disconnectMenuLayout->isHidden() )
+	{
+		return;
+	}
+
+	disconnectMenuLayout->destroyWindows();
+	deleteInstance( disconnectMenuLayout );
+	disconnectMenuLayout = nullptr;
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Input callback for the control bar parent */
 //-------------------------------------------------------------------------------------------------

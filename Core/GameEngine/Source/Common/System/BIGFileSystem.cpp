@@ -259,39 +259,39 @@ Bool BIGFileSystem::loadArchiveFilesFromDirectory(AsciiString dir, AsciiString f
 	FilenameList filenameList;
 	TheLocalFileSystem->getFileListInDirectory(dir, "", fileMask, filenameList, TRUE);
 
-	// The launcher disables an interface style by renaming its archives to .ctr, so those mount too
+	// The launcher disables an interface pack by renaming its archives to .ctr, so those mount too
 	FilenameList disabledList;
 	TheLocalFileSystem->getFileListInDirectory(dir, "", "*.ctr", disabledList, TRUE);
 	for (FilenameListIter disabledIt = disabledList.begin(); disabledIt != disabledList.end(); ++disabledIt) {
-		if (getArchiveInterfaceStyle(*disabledIt) != InterfaceStyle_Unset) {
+		if (getArchivePack(*disabledIt) != ArchivePack_None) {
 			filenameList.insert(*disabledIt);
 		}
 	}
 
 	if (m_interfaceStyle == InterfaceStyle_Unset) {
 		Bool hasProBig = FALSE;
-		Bool hasClassicBig = FALSE;
+		Bool hasContraBig = FALSE;
 		for (FilenameListIter styleIt = filenameList.begin(); styleIt != filenameList.end(); ++styleIt) {
 			if (!styleIt->endsWithNoCase(".big")) {
 				continue;
 			}
-			const Int style = getArchiveInterfaceStyle(*styleIt);
-			if (style == InterfaceStyle_Pro) {
+			const ArchivePack pack = getArchivePack(*styleIt);
+			if (pack == ArchivePack_Pro) {
 				hasProBig = TRUE;
 			}
-			else if (style == InterfaceStyle_Classic) {
-				hasClassicBig = TRUE;
+			else if (pack == ArchivePack_Contra) {
+				hasContraBig = TRUE;
 			}
 		}
 
-		if (hasProBig) {
+		if (hasContraBig && hasProBig) {
+			m_interfaceStyle = InterfaceStyle_Contra;
+		}
+		else if (hasProBig) {
 			m_interfaceStyle = InterfaceStyle_Pro;
 		}
-		else if (hasClassicBig) {
-			m_interfaceStyle = InterfaceStyle_Classic;
-		}
 		else {
-			m_interfaceStyle = InterfaceStyle_Contra;
+			m_interfaceStyle = InterfaceStyle_Classic;
 		}
 		DEBUG_LOG(("BIGFileSystem::loadArchiveFilesFromDirectory - archive extensions select interface style %d", m_interfaceStyle));
 	}

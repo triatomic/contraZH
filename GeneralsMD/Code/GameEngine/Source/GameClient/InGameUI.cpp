@@ -35,6 +35,7 @@
 #include "Common/IniNameRegistry.h"
 #include "Common/INIException.h"
 #include "Common/ActionManager.h"
+#include "Common/ArchiveFileSystem.h"
 #include "Common/ChatCommand.h"
 #include "Common/DrawModule.h"
 #include "Common/FramePacer.h"
@@ -47,6 +48,7 @@
 #include "Common/Player.h"
 #include "Common/OptionPreferences.h"
 #include "Common/PlayerList.h"
+#include "Common/PlayerTemplate.h"
 #include "Common/Radar.h"
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
@@ -81,6 +83,7 @@
 #include "GameClient/GameWindowGlobal.h"
 #include "GameClient/GameWindowID.h"
 #include "GameClient/GUICallbacks.h"
+#include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/VideoPlayer.h"
@@ -93,6 +96,7 @@
 #include "GameClient/LookAtXlat.h"
 #include "GameClient/SelectionXlat.h"
 #include "GameClient/Shadow.h"
+#include "GameClient/Shell.h"
 #include "GameClient/GlobalLanguage.h"
 
 #include "GameLogic/AIGuard.h"
@@ -2766,6 +2770,7 @@ InGameUI::InGameUI()
 
 	m_controlBarWindow = nullptr;
 	m_replayWindow = nullptr;
+	m_moneyDisplayStale = FALSE;
 	m_messagesOn = TRUE;
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	m_objectNameOverlayMode = OBJECT_NAME_OVERLAY_OFF;
@@ -3962,6 +3967,12 @@ void InGameUI::update()
 	// this seems like as good a place as any to do the power hide/show
 	static UnsignedInt lastMoney = ~0u;
 	static UnsignedInt lastIncome = ~0u;
+	if( m_moneyDisplayStale )
+	{
+		m_moneyDisplayStale = FALSE;
+		lastMoney = ~0u;
+		lastIncome = ~0u;
+	}
 	static NameKeyType moneyWindowKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:MoneyDisplay" );
 	static NameKeyType powerWindowKey = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:PowerWindow" );
 
@@ -7109,7 +7120,9 @@ void InGameUI::expireHint( HintType type, UnsignedInt hintIndex )
 void InGameUI::createControlBar()
 {
 
-	m_controlBarWindow = TheWindowManager->winCreateFromScript( "ControlBar.wnd" );
+	WindowLayoutInfo info;
+	m_controlBarWindow = TheWindowManager->winCreateFromScript( "ControlBar.wnd", &info );
+	m_controlBarRoots = info.windows;
 	HideControlBar();
 /*
 	// hide all windows created from this layout
@@ -7124,7 +7137,12 @@ void InGameUI::destroyControlBar()
 {
 	if (m_controlBarWindow != nullptr)
 	{
-		TheWindowManager->winDestroy(m_controlBarWindow);
+		// the first window alone would leave the layout's other top level windows behind
+		for (std::list<GameWindow *>::iterator it = m_controlBarRoots.begin(); it != m_controlBarRoots.end(); ++it)
+		{
+			TheWindowManager->winDestroy(*it);
+		}
+		m_controlBarRoots.clear();
 		m_controlBarWindow = nullptr;
 		m_idleWorkerWin = nullptr; // This window belongs to the Control Bar and is implicitly deleted as well.
 	}
@@ -8997,6 +9015,122 @@ void InGameUI::recreateControlBar()
 	delete TheControlBar;
 	TheControlBar = NEW ControlBar;
 	TheControlBar->init();
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Rebuild what the new interface style replaces, giving a running match its control bar state back */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::reloadInterfaceStyle()
+{
+	// Images and textures keep their names across styles, so their contents must reload
+	TheMappedImageCollection->load( 512 );
+	FilenameList styleTextures;
+	TheArchiveFileSystem->getInterfaceStyleFileList( "Art\\Textures", "*", styleTextures, TRUE );
+	TheDisplay->invalidateTextures( styleTextures );
+
+	const Bool inMatch = TheGameLogic->isInGame() && !TheGameLogic->isInShellGame();
+
+	// what the running game set up on the old bar, read before the bar goes
+	Player *lookAtPlayer = TheControlBar->getObserverLookAtPlayer();
+	Player *observedPlayer = TheControlBar->getObservedPlayer();
+	const ControlBarStages stage = TheControlBar->getControlBarStage();
+	const Bool portraitVeterancy = TheControlBar->isPortraitVeterancyEnabled();
+	GameWindow *window = TheWindowManager->winGetWindowFromId( nullptr, NAMEKEY( "ControlBar.wnd:ControlBarParent" ) );
+	const Bool barShown = window != nullptr && !window->winIsHidden();
+	window = TheWindowManager->winGetWindowFromId( nullptr, NAMEKEY( "ControlBar.wnd:PopupCommunicator" ) );
+	const Bool communicatorHidden = window != nullptr && window->winIsHidden();
+	const Bool replayHidden = m_replayWindow == nullptr || m_replayWindow->winIsHidden();
+
+	// the tooltip remembers the last button it was asked about
+	TheControlBar->deleteBuildTooltipLayout();
+
+	destroyControlBar();
+	createControlBar();
+
+	ControlBar *oldControlBar = TheControlBar;
+	ControlBar *newControlBar = NEW ControlBar;
+	newControlBar->adoptCommandData( oldControlBar );
+	newControlBar->adoptClientState( oldControlBar );
+	delete oldControlBar;
+	TheControlBar = newControlBar;
+	TheControlBar->init();
+	TheControlBar->setPortraitVeterancyEnabled( portraitVeterancy );
+
+	destroyReplayControl();
+	createReplayControl();
+	if( m_replayWindow )
+	{
+		m_replayWindow->winHide( replayHidden );
+	}
+
+	TheRadar->refreshRadarWindow();
+	m_idleWorkerWin = TheWindowManager->winGetWindowFromId( nullptr, NAMEKEY( "ControlBar.wnd:ButtonIdleWorker" ) );
+	m_currentIdleWorkerDisplay = -1;
+	m_moneyDisplayStale = TRUE;
+	if( m_cameoVideoBuffer )
+	{
+		window = TheWindowManager->winGetWindowFromId( nullptr, NAMEKEY( "ControlBar.wnd:RightHUD" ) );
+		if( window )
+		{
+			window->winGetInstanceData()->setVideoBuffer( m_cameoVideoBuffer );
+		}
+	}
+
+	// these layouts are built again from the new style the next time they show
+	destroyQuitMenu();
+	ResetDiplomacy();
+	ResetInGameChatWindow();
+	ResetDisconnectWindow();
+
+	refreshCustomUiResources();
+
+	if( !inMatch )
+	{
+		// The control bar goes first so its full screen roots stay below the rebuilt shell, as at launch
+		TheShell->recreateWindowLayouts();
+		return;
+	}
+
+	// The hidden shell keeps its stack, whose screens must not run their init during a match
+	TheShell->recreateWindowLayoutsLater();
+
+	// the same calls the match start, a player change and a defeat make
+	Player *localPlayer = ThePlayerList->getLocalPlayer();
+	TheControlBar->setObserverLookAtPlayer( lookAtPlayer );
+	TheControlBar->setObservedPlayer( observedPlayer );
+	TheControlBar->initSpecialPowershortcutBar( localPlayer );
+	// filled while the bar is hidden, the shortcut bar shows with it instead of sliding in later
+	TheControlBar->refreshSpecialPowerShortcut();
+	TheControlBar->setControlBarSchemeByPlayer( localPlayer );
+	if( !localPlayer->isPlayerActive() && !localPlayer->isPlayerObserver() )
+	{
+		TheControlBar->setControlBarSchemeByPlayerTemplate( ThePlayerTemplateStore->findPlayerTemplate( NAMEKEY( "FactionObserver" ) ) );
+	}
+	TheControlBar->hideCommunicator( communicatorHidden );
+	if( TheControlBar->isObserverControlBarOn() )
+	{
+		TheControlBar->showObserverPlayerInfo();
+	}
+
+	if( barShown )
+	{
+		ShowControlBar( TRUE );
+		if( stage == CONTROL_BAR_STAGE_LOW )
+		{
+			TheControlBar->switchControlBarStage( stage );
+		}
+	}
+	else
+	{
+		HideControlBar( TRUE );
+	}
+
+	// showing or hiding the bar moves the replay controls along
+	if( m_replayWindow )
+	{
+		m_replayWindow->winHide( replayHidden );
+	}
+	TheControlBar->markUIDirty();
 }
 
 void InGameUI::refreshCustomUiResources()

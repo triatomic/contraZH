@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "Common/FileSystem.h"
 #include "Common/SubsystemInterface.h"
 #include "GameClient/Color.h"
 #include "GameClient/GameFont.h"
@@ -194,7 +195,7 @@ public:
 #endif
 	virtual void preloadModelAssets( AsciiString model ) = 0;	///< preload model asset
 	virtual void preloadTextureAssets( AsciiString texture ) = 0;	///< preload texture asset
-	virtual void invalidateTextures() {}	///< reload every texture from the file system on its next use
+	virtual void invalidateTextures( const FilenameList &files ) {}	///< reload the textures named like the files, ignoring extensions, on their next use
 
 	virtual void takeScreenShot(ScreenshotFormat format, Int jpegQuality = DEFAULT_JPEG_QUALITY) = 0;			///< saves screenshot in specified format
 	virtual void toggleMovieCapture() = 0;							///< starts saving frames to an avi or frame sequence

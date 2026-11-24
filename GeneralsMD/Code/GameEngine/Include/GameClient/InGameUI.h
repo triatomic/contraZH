@@ -800,6 +800,7 @@ public:  // ********************************************************************
 	virtual Int getIdleWorkerCount();
 
 	virtual void recreateControlBar();
+	void reloadInterfaceStyle();	///< rebuild the interface after the archive file system switched interface style, in the shell or in a match
 	virtual void refreshCustomUiResources();
 	virtual void refreshNetworkLatencyResources();
 	virtual void refreshRenderFpsResources();
@@ -1351,7 +1352,9 @@ protected:
 																												///< to skip some client sounds/fx during shutdown
 
 	GameWindow *m_controlBarWindow;
+	std::list<GameWindow *> m_controlBarRoots;	///< every top level window of ControlBar.wnd, the first being m_controlBarWindow
 	GameWindow *m_replayWindow;
+	Bool m_moneyDisplayStale;	///< a rebuilt control bar shows no money until the display is written again
 
 	// World Animation Data
 	WorldAnimationList					m_worldAnimationList;		///< the list of world animations

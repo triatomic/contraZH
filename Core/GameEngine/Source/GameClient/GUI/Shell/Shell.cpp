@@ -78,6 +78,7 @@ void Shell::construct()
 	m_pendingPop = FALSE;
 	m_pendingPushName.set( "" );
 	m_isShellActive = TRUE;
+	m_recreateLayoutsPending = FALSE;
 	m_shellMapOn = FALSE;
 	m_background = nullptr;
 	m_clearBackground = FALSE;
@@ -199,6 +200,11 @@ void Shell::reset()
 //-------------------------------------------------------------------------------------------------
 void Shell::update()
 {
+	if( m_recreateLayoutsPending && canRecreateWindowLayoutsNow() )
+	{
+		recreateWindowLayouts();
+	}
+
 	static Int lastUpdate = timeGetTime();
 	static const Int shellUpdateDelay = 30;  // try to update 30 frames a second
 	Int now = timeGetTime();
@@ -283,6 +289,57 @@ void Shell::recreateWindowLayouts()
 		WindowLayout* layout = getScreenLayout(screenIndex);
 		layout->hide(screenInfo.isHidden);
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void Shell::recreateWindowLayoutsLater()
+{
+	m_recreateLayoutsPending = TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Recreating runs every screen's init again, which is safe only outside a match and off the score screen, whose init reads the finished match */
+//-------------------------------------------------------------------------------------------------
+Bool Shell::canRecreateWindowLayoutsNow()
+{
+	if( !m_isShellActive || m_pendingPush || m_pendingPop )
+	{
+		return FALSE;
+	}
+	if( TheGameLogic->isInGame() && !TheGameLogic->isInShellGame() )
+	{
+		return FALSE;
+	}
+	if( TheGameLogic->isLoadingMap() )
+	{
+		return FALSE;
+	}
+
+	// the same rule that keeps the options menu from rebuilding an online lobby
+	if( TheGameSpyInfo != nullptr )
+	{
+		return FALSE;
+	}
+
+	if( findScreenByFilename( "Menus/ScoreScreen.wnd" ) != nullptr )
+	{
+		return FALSE;
+	}
+
+	// recreation destroys these popups, so it waits until they are closed
+	if( m_optionsLayout != nullptr )
+	{
+		return FALSE;
+	}
+	if( m_saveLoadMenuLayout != nullptr && !m_saveLoadMenuLayout->isHidden() )
+	{
+		return FALSE;
+	}
+	if( m_popupReplayLayout != nullptr && !m_popupReplayLayout->isHidden() )
+	{
+		return FALSE;
+	}
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------

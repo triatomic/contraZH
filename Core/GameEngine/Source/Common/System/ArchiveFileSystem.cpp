@@ -316,7 +316,18 @@ void ArchiveFileSystem::getFileListInDirectory(const AsciiString& currentDirecto
 	}
 }
 
-Int ArchiveFileSystem::getArchiveInterfaceStyle(const AsciiString& name)
+void ArchiveFileSystem::getInterfaceStyleFileList(const AsciiString& directory, const AsciiString& searchName, FilenameList &filenameList, Bool searchSubdirectories) const
+{
+	for (MountedArchiveList::const_iterator it = m_mountedArchives.begin(); it != m_mountedArchives.end(); ++it)
+	{
+		if (it->pack != ArchivePack_None)
+		{
+			it->archiveFile->getFileListInDirectory(AsciiString::TheEmptyString, directory, searchName, filenameList, searchSubdirectories);
+		}
+	}
+}
+
+ArchiveFileSystem::ArchivePack ArchiveFileSystem::getArchivePack(const AsciiString& name)
 {
 	const char *baseName = name.reverseFind('\\');
 	const char *slash = name.reverseFind('/');
@@ -327,34 +338,58 @@ Int ArchiveFileSystem::getArchiveInterfaceStyle(const AsciiString& name)
 	AsciiString lowerName = (baseName != nullptr) ? baseName + 1 : name.str();
 	lowerName.toLower();
 
+	if (strstr(lowerName.str(), "controlbarcontra") != nullptr)
+	{
+		return ArchivePack_Contra;
+	}
 	if (strstr(lowerName.str(), "controlbarpro") != nullptr)
 	{
-		return InterfaceStyle_Pro;
+		return ArchivePack_Pro;
 	}
-	if (strstr(lowerName.str(), "controlbarstandard") != nullptr)
-	{
-		return InterfaceStyle_Classic;
-	}
-	return InterfaceStyle_Unset;
+	return ArchivePack_None;
 }
 
 Bool ArchiveFileSystem::isArchiveEnabled(const MountedArchive& archive) const
 {
-	return archive.style == InterfaceStyle_Unset || archive.style == m_interfaceStyle;
+	switch (archive.pack)
+	{
+		case ArchivePack_Pro:
+			return m_interfaceStyle == InterfaceStyle_Pro || m_interfaceStyle == InterfaceStyle_Contra;
+		case ArchivePack_Contra:
+			return m_interfaceStyle == InterfaceStyle_Contra;
+		default:
+			return TRUE;
+	}
 }
 
 Bool ArchiveFileSystem::hasInterfaceStyle(Int style) const
 {
-	if (style == InterfaceStyle_Contra)
+	if (style == InterfaceStyle_Classic)
 	{
 		return TRUE;
 	}
+
+	Bool hasPro = FALSE;
+	Bool hasContra = FALSE;
 	for (MountedArchiveList::const_iterator it = m_mountedArchives.begin(); it != m_mountedArchives.end(); ++it)
 	{
-		if (it->style == style)
+		if (it->pack == ArchivePack_Pro)
 		{
-			return TRUE;
+			hasPro = TRUE;
 		}
+		else if (it->pack == ArchivePack_Contra)
+		{
+			hasContra = TRUE;
+		}
+	}
+
+	if (style == InterfaceStyle_Pro)
+	{
+		return hasPro;
+	}
+	if (style == InterfaceStyle_Contra)
+	{
+		return hasPro && hasContra;
 	}
 	return FALSE;
 }
@@ -363,7 +398,7 @@ void ArchiveFileSystem::setInterfaceStyle(Int style)
 {
 	if (style < 0 || style >= InterfaceStyle_Count || !hasInterfaceStyle(style))
 	{
-		style = InterfaceStyle_Contra;
+		style = InterfaceStyle_Classic;
 	}
 	if (style == m_interfaceStyle)
 	{
@@ -387,7 +422,7 @@ void ArchiveFileSystem::mountArchiveFile(const AsciiString& name, ArchiveFile *a
 	MountedArchive archive;
 	archive.archiveFile = archiveFile;
 	archive.overwrite = overwrite;
-	archive.style = getArchiveInterfaceStyle(name);
+	archive.pack = getArchivePack(name);
 	m_mountedArchives.push_back(archive);
 
 	if (isArchiveEnabled(archive))
@@ -396,7 +431,7 @@ void ArchiveFileSystem::mountArchiveFile(const AsciiString& name, ArchiveFile *a
 	}
 	else
 	{
-		DEBUG_LOG(("ArchiveFileSystem::mountArchiveFile - %s belongs to interface style %d and stays out of the directory tree", name.str(), archive.style));
+		DEBUG_LOG(("ArchiveFileSystem::mountArchiveFile - %s belongs to interface pack %d and stays out of the directory tree", name.str(), archive.pack));
 	}
 }
 

@@ -87,13 +87,13 @@ typedef std::map<AsciiString, ArchivedFileInfo> ArchivedFileInfoMap; // Archived
 typedef std::map<AsciiString, ArchiveFile *> ArchiveFileMap; // Archive file name to archive data
 typedef std::multimap<AsciiString, ArchiveFile *> ArchivedFileLocationMap; // Archived file name to archive data
 
-// Interface styles ship as archives holding same-named files, so only one style's archives join the directory tree
+// Interface styles enable archive packs holding same-named files, so only the active style's packs join the directory tree
 enum InterfaceStyle CPP_11(: Int)
 {
 	InterfaceStyle_Unset = -1,	///< not decided yet
-	InterfaceStyle_Classic = 0,	///< archives named *ControlBarStandard*
+	InterfaceStyle_Classic = 0,	///< the mod's own control bar, no style archive
 	InterfaceStyle_Pro,					///< archives named *ControlBarPro*
-	InterfaceStyle_Contra,			///< the mod's own interface, no style archive
+	InterfaceStyle_Contra,			///< the mod's Pro bar, archives named *ControlBarPro* and *ControlBarContra*
 
 	InterfaceStyle_Count
 };
@@ -159,8 +159,9 @@ public:
 	ArchivedDirectoryInfo* friend_getArchivedDirectoryInfo(const Char* directory);
 
 	Int getInterfaceStyle() const { return m_interfaceStyle; }
-	Bool hasInterfaceStyle(Int style) const;	///< whether any mounted archive provides the style; always TRUE for Contra
-	void setInterfaceStyle(Int style);				///< enable the style's archives, falling back to Contra when it is unavailable
+	Bool hasInterfaceStyle(Int style) const;	///< whether the mounted archives provide every pack the style needs; always TRUE for Classic
+	void setInterfaceStyle(Int style);				///< enable the style's packs, falling back to Classic when it is unavailable
+	void getInterfaceStyleFileList(const AsciiString& directory, const AsciiString& searchName, FilenameList &filenameList, Bool searchSubdirectories) const;	///< like getFileListInDirectory, over every pack archive whether its style is active or not
 
 protected:
 	struct ArchivedDirectoryInfoResult
@@ -177,17 +178,24 @@ protected:
 
 	virtual void loadIntoDirectoryTree(ArchiveFile *archiveFile, Bool overwrite = FALSE);	///< load the archive file's header information and apply it to the global archive directory tree.
 
+	enum ArchivePack
+	{
+		ArchivePack_None,		///< an ordinary archive, always enabled
+		ArchivePack_Pro,		///< enabled by the Pro and Contra styles
+		ArchivePack_Contra	///< enabled by the Contra style
+	};
+
 	struct MountedArchive
 	{
 		ArchiveFile *archiveFile;
 		Bool overwrite;
-		Int style;	///< InterfaceStyle_Unset for archives that belong to no style
+		ArchivePack pack;
 	};
 	typedef std::vector<MountedArchive> MountedArchiveList;
 
-	static Int getArchiveInterfaceStyle(const AsciiString& name);	///< the style an archive belongs to, judged by its file name
+	static ArchivePack getArchivePack(const AsciiString& name);	///< the pack an archive belongs to, judged by its file name
 	Bool isArchiveEnabled(const MountedArchive& archive) const;
-	void mountArchiveFile(const AsciiString& name, ArchiveFile *archiveFile, Bool overwrite);	///< register the archive and load it into the tree if its style is enabled
+	void mountArchiveFile(const AsciiString& name, ArchiveFile *archiveFile, Bool overwrite);	///< register the archive and load it into the tree if its pack is enabled
 	void rebuildDirectoryTree();	///< reload the tree from the enabled archives in mount order
 
 	ArchiveFileMap m_archiveFileMap;

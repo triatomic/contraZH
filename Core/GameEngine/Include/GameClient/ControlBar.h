@@ -756,10 +756,16 @@ public:
 	virtual void reset() override;					///< from subsystem interface
 	virtual void update() override;				///< from subsystem interface
 
+	/// take over the command buttons and sets, which the match holds pointers into, so init does not load new ones
+	void adoptCommandData( ControlBar *from );
+	/// take over the client state a rebuilt bar must keep, such as the smart selection focus the logic side was sent
+	void adoptClientState( ControlBar *from );
+
 	/// mark the UI as dirty so the context of everything is re-evaluated
 	void markUIDirty();
 #if defined(RTS_ZEROHOUR)
 	void setPortraitVeterancyEnabled( Bool enabled );
+	Bool isPortraitVeterancyEnabled() const { return m_portraitDraw != nullptr; }
 #endif
 
 	/// a drawable has just become selected
@@ -877,6 +883,7 @@ public:
 	void initObserverControls();
 	void populateObserverInfoWindow ();
 	void populateObserverList();
+	void showObserverPlayerInfo();	///< show the looked at player's info in place of the player list, as picking the player does
 	Bool isObserverControlBarOn() { return m_isObserverCommandBar;}
 
 	void setObserverLookAtPlayer (Player *player); ///< Sets the looked at player. Used to present information about the player.
@@ -895,6 +902,7 @@ public:
 	// Functions for repositioning/resizing the control bar
 	void switchControlBarStage( ControlBarStages stage );
 	void toggleControlBarStage();
+	ControlBarStages getControlBarStage() const { return m_currentControlBarStage; }
 
 	const Image *getStarImage();
 
@@ -919,6 +927,7 @@ public:
 	void setArrowImage( const Image *arrowImage ){ m_genArrow = arrowImage;	}
 
 	void initSpecialPowershortcutBar( Player *player);
+	void refreshSpecialPowerShortcut();	///< fill the shortcut bar for the local player now instead of on the next dirty update
 
 	void triggerRadarAttackGlow();
 

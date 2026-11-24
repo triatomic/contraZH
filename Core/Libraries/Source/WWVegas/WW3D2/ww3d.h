@@ -246,6 +246,7 @@ public:
 	static bool					Is_Large_Texture_Extra_Reduction_Enabled();
 	static void					_Invalidate_Mesh_Cache();
 	static void					_Invalidate_Textures();
+	static void					_Invalidate_Textures(bool (*is_stale)(const char *texture_name, void *user_data), void *user_data);	///< only the textures is_stale picks
 
 	static void					Set_Thumbnail_Enabled(bool b) { ThumbnailEnabled=b; }
 	static bool					Get_Thumbnail_Enabled() { return ThumbnailEnabled; }

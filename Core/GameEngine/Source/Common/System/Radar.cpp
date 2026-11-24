@@ -321,6 +321,13 @@ void Radar::update()
 }
 
 //-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void Radar::refreshRadarWindow()
+{
+	m_radarWindow = TheWindowManager->winGetWindowFromId( nullptr, NAMEKEY( "ControlBar.wnd:LeftHUD" ) );
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Reset the radar for the new map data being given to it */
 //-------------------------------------------------------------------------------------------------
 void Radar::newMap( TerrainLogic *terrain )

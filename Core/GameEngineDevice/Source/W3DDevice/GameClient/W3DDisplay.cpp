@@ -3625,10 +3625,52 @@ void W3DDisplay::preloadTextureAssets( AsciiString texture )
 }
 
 //-------------------------------------------------------------------------------------------------
+/** A texture asked for as foo.tga may load from foo.dds, so names compare without folder and extension */
 //-------------------------------------------------------------------------------------------------
-void W3DDisplay::invalidateTextures()
+static AsciiString getTextureStem( const char *path )
 {
-	WW3D::_Invalidate_Textures();
+	const char *name = path;
+	for( const char *c = path; *c; ++c )
+	{
+		if( *c == '\\' || *c == '/' )
+		{
+			name = c + 1;
+		}
+	}
+	const char *dot = strrchr( name, '.' );
+	AsciiString stem;
+	if( dot != nullptr )
+	{
+		stem.set( name, (int)( dot - name ) );
+	}
+	else
+	{
+		stem.set( name );
+	}
+	return stem;
+}
+
+//-------------------------------------------------------------------------------------------------
+static bool isTextureNamedInList( const char *textureName, void *userData )
+{
+	const FilenameList *stems = (const FilenameList *)userData;
+	return stems->find( getTextureStem( textureName ) ) != stems->end();
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void W3DDisplay::invalidateTextures( const FilenameList &files )
+{
+	// a FilenameList ignores case, as texture names do
+	FilenameList stems;
+	for( FilenameList::const_iterator it = files.begin(); it != files.end(); ++it )
+	{
+		stems.insert( getTextureStem( it->str() ) );
+	}
+	if( !stems.empty() )
+	{
+		WW3D::_Invalidate_Textures( isTextureNamedInList, &stems );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------

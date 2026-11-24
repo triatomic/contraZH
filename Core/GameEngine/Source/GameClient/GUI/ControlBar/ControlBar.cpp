@@ -156,6 +156,9 @@ static void commandButtonTooltip(GameWindow *window,
 	TheControlBar->showBuildTooltipLayout(window);
 }
 
+// ControlBar::init clears this, since an interface style switch can add or remove the count sprites
+static Bool s_idleWorkerCountImagesLoaded = FALSE;
+
 //-------------------------------------------------------------------------------------------------
 /** Draws the idle worker button, then its count from sprites the size of the button. */
 //-------------------------------------------------------------------------------------------------
@@ -166,7 +169,6 @@ static void IdleWorkerButtonDraw( GameWindow *window, WinInstanceData *instData 
 	enum { DIGIT_COUNT = 10, MAX_SHOWN_COUNT = 99 };
 
 	static const Image *images[ STATE_COUNT ][ SLOT_COUNT ][ DIGIT_COUNT ];
-	static Bool imagesLoaded = FALSE;
 
 	// Fetch the stock draw each time, since init can run again on this window.
 	GameWinDrawFunc baseDraw = TheWindowManager->getPushButtonImageDrawFunc();
@@ -181,9 +183,9 @@ static void IdleWorkerButtonDraw( GameWindow *window, WinInstanceData *instData 
 		return;
 	}
 
-	if( !imagesLoaded && TheMappedImageCollection )
+	if( !s_idleWorkerCountImagesLoaded && TheMappedImageCollection )
 	{
-		imagesLoaded = TRUE;
+		s_idleWorkerCountImagesLoaded = TRUE;
 		const char *stateLetters = "EHP";
 		const char *slotLetters = "STO";
 		for( Int state = 0; state < STATE_COUNT; ++state )
@@ -1093,6 +1095,7 @@ ControlBar::ControlBar()
 
 	m_currContext = CB_CONTEXT_NONE;
 	m_defaultControlBarPosition.x = m_defaultControlBarPosition.y = 0;
+	m_currentControlBarStage = CONTROL_BAR_STAGE_DEFAULT;
 	m_genStarFlash = FALSE;
 	m_genStarFlashTimeAccumulator = 0.0f;
 	m_genStarOff = nullptr;
@@ -1293,6 +1296,43 @@ ControlBar::~ControlBar()
 	}
 
 }
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void ControlBar::adoptCommandData( ControlBar *from )
+{
+	DEBUG_ASSERTCRASH( m_commandButtons == nullptr && m_commandSets == nullptr, ("ControlBar::adoptCommandData - this bar already has command data") );
+
+	m_commandButtons = from->m_commandButtons;
+	m_commandSets = from->m_commandSets;
+	from->m_commandButtons = nullptr;
+	from->m_commandSets = nullptr;
+
+	// the flash counts live on the adopted buttons
+	m_flash = from->m_flash;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void ControlBar::adoptClientState( ControlBar *from )
+{
+	// the logic side keeps the focus it was sent, so the new row must show and remember the same one
+	m_smartSelectionGroups = from->m_smartSelectionGroups;
+	m_smartSelectionActive = from->m_smartSelectionActive;
+	m_sentFocusGroup = from->m_sentFocusGroup;
+	m_smartSelectionLastClickSlot = from->m_smartSelectionLastClickSlot;
+	m_smartSelectionLastClickTime = from->m_smartSelectionLastClickTime;
+
+	// the old bar never destroys its markers, so the new one takes them over and replaces them
+	m_rallyPointDrawableIDs.swap( from->m_rallyPointDrawableIDs );
+
+	// queue orders still on their way to the logic side
+	m_multiSelectQueueCache = from->m_multiSelectQueueCache;
+
+	m_genStarFlash = from->m_genStarFlash;
+	m_genStarFlashTimeAccumulator = from->m_genStarFlashTimeAccumulator;
+	m_lastFlashedAtPointValue = from->m_lastFlashedAtPointValue;
+}
 void ControlBarPopupDescriptionUpdateFunc( WindowLayout *layout, void *param );
 
 //-------------------------------------------------------------------------------------------------
@@ -1302,15 +1342,21 @@ void ControlBar::init()
 {
 	INI ini;
 	m_sideSelectAnimateDown = FALSE;
-	// load the command buttons
-	ini.loadFileDirectory( "Data\\INI\\Default\\CommandButton", INI_LOAD_OVERWRITE, nullptr );
-	ini.loadFileDirectory( "Data\\INI\\CommandButton", INI_LOAD_OVERWRITE, nullptr );
+	// a bar rebuilt in place has adopted the command data and client state of the bar it replaces
+	const Bool adopted = m_commandButtons != nullptr || m_commandSets != nullptr;
+	if( !adopted )
+	{
+		// load the command buttons
+		ini.loadFileDirectory( "Data\\INI\\Default\\CommandButton", INI_LOAD_OVERWRITE, nullptr );
+		ini.loadFileDirectory( "Data\\INI\\CommandButton", INI_LOAD_OVERWRITE, nullptr );
 
-	// load the command sets
-	ini.loadFileDirectory( "Data\\INI\\CommandSet", INI_LOAD_OVERWRITE, nullptr );
+		// load the command sets
+		ini.loadFileDirectory( "Data\\INI\\CommandSet", INI_LOAD_OVERWRITE, nullptr );
 
-	// post process step after loading the command buttons and command sets
-	postProcessCommands();
+		// post process step after loading the command buttons and command sets
+		postProcessCommands();
+	}
+	s_idleWorkerCountImagesLoaded = FALSE;
 
 	// Init the scheme manager, this will call its own INI init function.
 	m_controlBarSchemeManager = NEW ControlBarSchemeManager;
@@ -1393,6 +1439,10 @@ void ControlBar::init()
 		if( m_commandWindows[ 0 ] )
 		{
 			initSmartSelectionBar( commandSize );
+		}
+		if( m_smartSelectionParent && !m_smartSelectionGroups.empty() )
+		{
+			refreshSmartSelectionButtons();
 		}
 
 
@@ -1536,8 +1586,11 @@ void ControlBar::init()
 
 		m_genStarOn = TheMappedImageCollection ? (Image *)TheMappedImageCollection->findImageByName("BarButtonGenStarON") : nullptr;
 		m_genStarOff = TheMappedImageCollection ? (Image *)TheMappedImageCollection->findImageByName("BarButtonGenStarOFF") : nullptr;
-		m_genStarFlash = TRUE;
-		m_lastFlashedAtPointValue = -1;
+		if( !adopted )
+		{
+			m_genStarFlash = TRUE;
+			m_lastFlashedAtPointValue = -1;
+		}
 
 		m_rankVeteranIcon = TheMappedImageCollection ? TheMappedImageCollection->findImageByName( "SSChevron1L" ) : nullptr;
 		m_rankEliteIcon		= TheMappedImageCollection ? TheMappedImageCollection->findImageByName( "SSChevron2L" ) : nullptr;
@@ -4101,6 +4154,11 @@ void ControlBar::initSpecialPowershortcutBar( Player *player)
 		}
 	}
 
+}
+
+void ControlBar::refreshSpecialPowerShortcut()
+{
+	populateSpecialPowerShortcut( ThePlayerList->getLocalPlayer() );
 }
 
 void ControlBar::populateSpecialPowerShortcut( Player *player)

@@ -354,6 +354,7 @@ extern void ToggleInGameChat( Bool immediate = TRUE );
 extern void HideInGameChat( Bool immediate = TRUE );
 extern void ShowInGameChat( Bool immediate = TRUE );
 void ResetInGameChat();
+void ResetInGameChatWindow();
 void SetInGameChatType( InGameChatType chatType );
 Bool IsInGameChatActive();
 
@@ -379,6 +380,7 @@ WindowMsgHandledType QueueBarSystem( GameWindow *window, UnsignedInt msg, Window
 // Disconnect Menu --------------------------------------------------------------------------------
 extern void ShowDisconnectWindow();
 extern void HideDisconnectWindow();
+extern void ResetDisconnectWindow();
 extern WindowMsgHandledType DisconnectControlSystem( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
 extern WindowMsgHandledType DisconnectControlInput( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
 

@@ -84,7 +84,8 @@ void ShowInGameChat( Bool immediate )
 
 		static NameKeyType textEntryChatID = TheNameKeyGenerator->nameToKey( "InGameChat.wnd:TextEntryChat" );
 		chatTextEntry = TheWindowManager->winGetWindowFromId( nullptr, textEntryChatID );
-		GadgetTextEntrySetText( chatTextEntry, UnicodeString::TheEmptyString );
+		GadgetTextEntrySetText( chatTextEntry, s_savedChat );
+		s_savedChat.clear();
 
 		static NameKeyType chatTypeStaticTextID = TheNameKeyGenerator->nameToKey( "InGameChat.wnd:StaticTextChatType" );
 		chatTypeStaticText = TheWindowManager->winGetWindowFromId( nullptr, chatTypeStaticTextID );
@@ -103,6 +104,22 @@ void ResetInGameChat()
 	chatTextEntry = nullptr;
 	chatTypeStaticText = nullptr;
 	s_savedChat.clear();
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Drop a hidden chat window so the next show builds it from the current layout, keeping unsent text */
+// ------------------------------------------------------------------------------------------------
+void ResetInGameChatWindow()
+{
+	if (chatWindow == nullptr || !chatWindow->winIsHidden())
+	{
+		return;
+	}
+
+	TheWindowManager->winDestroy( chatWindow );
+	chatWindow = nullptr;
+	chatTextEntry = nullptr;
+	chatTypeStaticText = nullptr;
 }
 
 // ------------------------------------------------------------------------------------------------

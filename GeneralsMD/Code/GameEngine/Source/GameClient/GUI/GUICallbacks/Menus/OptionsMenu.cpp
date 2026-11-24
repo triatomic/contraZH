@@ -1652,6 +1652,7 @@ static void saveOptions()
 
 	//-------------------------------------------------------------------------------------------------
 	// Interface style
+	Bool styleChanged = FALSE;
 	Bool rebuildInterface = FALSE;
 	if (comboBoxInterfaceStyle && comboBoxInterfaceStyle->winGetEnabled())
 	{
@@ -1663,10 +1664,7 @@ static void saveOptions()
 		}
 		if (TheArchiveFileSystem->getInterfaceStyle() != oldStyle)
 		{
-			// Images and textures keep their names across styles, so their contents must reload
-			TheMappedImageCollection->load( 512 );
-			TheDisplay->invalidateTextures();
-			rebuildInterface = TRUE;
+			styleChanged = TRUE;
 		}
 		(*pref)["InterfaceStyle"] = InterfaceStyleNames[ TheArchiveFileSystem->getInterfaceStyle() ];
 	}
@@ -1733,7 +1731,12 @@ static void saveOptions()
 
 	// MUST NEVER ADD ANOTHER OPTION HERE AT THE END !
 
-	if (rebuildInterface)
+	if (styleChanged)
+	{
+		// The style reload also rebuilds everything a resolution change needs rebuilt
+		TheInGameUI->reloadInterfaceStyle();
+	}
+	else if (rebuildInterface)
 	{
 		// The control bar goes first so its full screen roots stay below the rebuilt shell, as at launch
 		TheInGameUI->recreateControlBar();
@@ -2832,7 +2835,8 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 		if (comboBoxResolution)
 			comboBoxResolution->winEnable(FALSE);
 
-		enableWindow( comboBoxInterfaceStyle, FALSE );
+		// A match rebuilds its interface in place, but an online lobby must not rebuild the shell
+		enableWindow( comboBoxInterfaceStyle, TheGameLogic->isInGame() && TheGameLogic->getGameMode() != GAME_SHELL );
 		enableWindow( checkBorderlessWindow, FALSE );
 		enableWindow( checkWindowed, FALSE );
 
@@ -3071,6 +3075,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			}
 			else if (controlID == buttonAccept )
 			{
+				const Bool quitMenuWasVisible = TheInGameUI->isQuitMenuVisible();
 				saveOptions();
 
 				if (pref)
@@ -3097,6 +3102,12 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 					{
 						DoResolutionDialog();
 					}
+				}
+
+				// An interface style reload in a match closes the quit menu, which opens again in the new style
+				if (quitMenuWasVisible && !TheInGameUI->isQuitMenuVisible())
+				{
+					ToggleQuitMenu();
 				}
 
 			}

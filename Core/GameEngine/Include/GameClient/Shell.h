@@ -123,6 +123,7 @@ public:
 	//===============================================================================================
 
 	void recreateWindowLayouts();
+	void recreateWindowLayoutsLater();	///< recreate the layouts once the shell is back and no match runs
 
 	void showShellMap(Bool useShellMap );										///< access function to turn on and off the shell map
 
@@ -162,6 +163,7 @@ protected:
 	void construct();
 	void deconstruct();
 	void destroyScreenStack();													///< tear down all screens without initializing uncovered layouts
+	Bool canRecreateWindowLayoutsNow();									///< whether a pending recreation can run without disturbing a match or an open screen
 
 	void linkScreen( WindowLayout *screen );								///< link screen to list
 	void unlinkScreen( WindowLayout *screen );							///< remove screen from list
@@ -180,6 +182,7 @@ protected:
 	Bool m_pendingPop;																			///< TRUE when a pop is pending
 	AsciiString m_pendingPushName;													///< layout name to be pushed
 	Bool m_isShellActive;																		///< TRUE when the shell is active
+	Bool m_recreateLayoutsPending;													///< TRUE while a layout recreation waits for the shell to return
 	Bool m_shellMapOn;																			///< TRUE when the shell map is on
 	AnimateWindowManager *m_animateWindowManager;						///< The animate Window Manager
 	ShellMenuSchemeManager *m_schemeManager;								///< The Shell Scheme Manager
