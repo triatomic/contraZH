@@ -216,8 +216,9 @@ Shaders panels. The tab logic is adapted from the tabbed menu by simonx645.
   fullscreen. It writes the four `CursorCaptureEnabledIn*` keys. A hand-edited combination that no entry
   matches shows no selection and stays as it is.
 * **Audio > Money volume** sets `MoneyTransactionVolume`, 0-100.
-* **Interface > System clock size** and **Game timer size** set `SystemTimeFontSize` and
-  `GameTimeFontSize`, 0-99. 0 hides the clock or the timer.
+* **Interface > System clock size** and **Game timer size** are sliders that set `SystemTimeFontSize`
+  and `GameTimeFontSize`, 0-30. 0 hides the clock or the timer. A larger value set in `Options.ini`
+  is kept until the slider is moved.
 
 ## Hotkeys screen
 

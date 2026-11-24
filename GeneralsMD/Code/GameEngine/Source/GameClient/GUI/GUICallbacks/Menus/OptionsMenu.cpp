@@ -220,8 +220,8 @@ static GameWindow *   comboBoxAnisotropy          = nullptr;
 static GameWindow *   comboBoxRenderFPSLimit      = nullptr;
 static GameWindow *   comboBoxCursorCapture       = nullptr;
 static GameWindow *   sliderMoneyVolume           = nullptr;
-static GameWindow *   textEntrySystemTimeFontSize = nullptr;
-static GameWindow *   textEntryGameTimeFontSize   = nullptr;
+static GameWindow *   sliderSystemTimeFontSize    = nullptr;
+static GameWindow *   sliderGameTimeFontSize      = nullptr;
 static GameWindow *   checkNumericalHealth        = nullptr;
 static GameWindow *   checkSmartPips              = nullptr;
 static GameWindow *   checkSelectionCircle        = nullptr;
@@ -300,7 +300,6 @@ static const CursorCaptureMode CursorCapturePresets[] =
 	CursorCaptureMode_EnabledInWindowedGame | CursorCaptureMode_EnabledInWindowedMenu | CursorCaptureMode_EnabledInFullscreenGame | CursorCaptureMode_EnabledInFullscreenMenu,
 	CursorCaptureMode_Default,
 };
-static const Int MaxTimeFontSize = 99;
 static const Int DefaultTimeFontSize = 8;
 static_assert( ARRAY_SIZE(HealthBarModeNames) == HealthBarDisplayMode_Count, "HealthBarModeNames out of date" );
 static const char *const AlliedDecalModeNames[] = { "Hidden", "House", "Army" };
@@ -461,6 +460,14 @@ static void setEntryInt( GameWindow *entry, Int value )
 		UnicodeString shown;
 		shown.format( L"%d", value );
 		GadgetTextEntrySetText( entry, shown );
+	}
+}
+
+static void setSliderPos( GameWindow *slider, Int pos )
+{
+	if (slider)
+	{
+		GadgetSliderSetPosition( slider, pos );
 	}
 }
 
@@ -720,8 +727,8 @@ static void populateGameOptions()
 	{
 		GadgetSliderSetPosition( sliderMoneyVolume, MIN( REAL_TO_INT( pref->getMoneyTransactionVolume() ), 100 ) );
 	}
-	setEntryInt( textEntrySystemTimeFontSize, pref->getSystemTimeFontSize() );
-	setEntryInt( textEntryGameTimeFontSize, pref->getGameTimeFontSize() );
+	setSliderPos( sliderSystemTimeFontSize, pref->getSystemTimeFontSize() );
+	setSliderPos( sliderGameTimeFontSize, pref->getGameTimeFontSize() );
 
 	updateGameOptionsEnables();
 }
@@ -783,8 +790,8 @@ static void setGameOptionsDefaults()
 	{
 		GadgetSliderSetPosition( sliderMoneyVolume, REAL_TO_INT( TheAudio->getAudioSettings()->m_defaultMoneyTransactionVolume * 100.0f ) );
 	}
-	setEntryInt( textEntrySystemTimeFontSize, DefaultTimeFontSize );
-	setEntryInt( textEntryGameTimeFontSize, DefaultTimeFontSize );
+	setSliderPos( sliderSystemTimeFontSize, DefaultTimeFontSize );
+	setSliderPos( sliderGameTimeFontSize, DefaultTimeFontSize );
 
 	updateGameOptionsEnables();
 }
@@ -1563,7 +1570,7 @@ static void saveOptions()
 
 	//-------------------------------------------------------------------------------------------------
 	// Set System Time Font Size
-	val = getEntryInt( textEntrySystemTimeFontSize, 0, MaxTimeFontSize, pref->getSystemTimeFontSize() );
+	val = sliderSystemTimeFontSize ? GadgetSliderGetPosition( sliderSystemTimeFontSize ) : pref->getSystemTimeFontSize();
 	if (val >= 0)
 	{
 		AsciiString prefString;
@@ -1575,7 +1582,7 @@ static void saveOptions()
 
 	//-------------------------------------------------------------------------------------------------
 	// Set Game Time Font Size
-	val = getEntryInt( textEntryGameTimeFontSize, 0, MaxTimeFontSize, pref->getGameTimeFontSize() );
+	val = sliderGameTimeFontSize ? GadgetSliderGetPosition( sliderGameTimeFontSize ) : pref->getGameTimeFontSize();
 	if (val >= 0)
 	{
 		AsciiString prefString;
@@ -2092,8 +2099,8 @@ static void initGameOptionsWindows()
 	checkSmoothUnitMotion = findOptionsWindow( "OptionsMenu.wnd:CheckSmoothUnitMotion" );
 	comboBoxCursorCapture = findOptionsWindow( "OptionsMenu.wnd:ComboBoxCursorCapture" );
 	sliderMoneyVolume = findOptionsWindow( "OptionsMenu.wnd:SliderMoneyVolume" );
-	textEntrySystemTimeFontSize = findOptionsWindow( "OptionsMenu.wnd:TextEntrySystemTimeFontSize" );
-	textEntryGameTimeFontSize = findOptionsWindow( "OptionsMenu.wnd:TextEntryGameTimeFontSize" );
+	sliderSystemTimeFontSize = findOptionsWindow( "OptionsMenu.wnd:SliderSystemTimeFontSize" );
+	sliderGameTimeFontSize = findOptionsWindow( "OptionsMenu.wnd:SliderGameTimeFontSize" );
 
 	if (ButtonGameOptions)
 	{
@@ -2183,8 +2190,8 @@ static void initGameOptionsWindows()
 	setTooltip( comboBoxAnisotropy, "TOOLTIP:Anisotropy" );
 	setTooltip( comboBoxCursorCapture, "TOOLTIP:CursorCapture" );
 	setTooltip( sliderMoneyVolume, "TOOLTIP:MoneyVolume" );
-	setTooltip( textEntrySystemTimeFontSize, "TOOLTIP:SystemTimeFontSize" );
-	setTooltip( textEntryGameTimeFontSize, "TOOLTIP:GameTimeFontSize" );
+	setTooltip( sliderSystemTimeFontSize, "TOOLTIP:SystemTimeFontSize" );
+	setTooltip( sliderGameTimeFontSize, "TOOLTIP:GameTimeFontSize" );
 	if (comboBoxGridHotkeyLayout)
 	{
 		comboBoxGridHotkeyLayout->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( "TOOLTIP:GridHotkeyRows",
