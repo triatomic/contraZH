@@ -146,6 +146,7 @@ decals, instead of a flat quad that cuts through hills.
 Notes:
 * Opt-in per effect; retail effects are unchanged.
 * Requires `IsGroundAligned = Yes` on the same effect; billboarded and multi-layer volume particles do not conform.
+* `IsGroundAligned = Conforming` (TheSuperHackers' form) turns terrain conforming on without `ConformToTerrain`.
 * Flat ground becomes one quad; only uneven ground is meshed cell by cell.
 * Only the part on screen is meshed. Past 160 cells per side the mesh stops at coarser cells.
 * Fluid, flame, electric and cryo shaders shade the terrain mesh. Flame heat haze and disruption
