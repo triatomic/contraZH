@@ -40,6 +40,10 @@ class STLSpecialAlloc;
 // PLEASE DO NOT ABUSE WINDOWS OR IT WILL BE REMOVED ENTIRELY. :-)
 //--------------------------------------------------------------------------------- System Includes
 
+// Generals Online code needs winsock2, which must come before the winsock 1 include in udp.h
+#if defined(GENERALS_ONLINE)
+#include <winsock2.h>
+#endif
 #include <windows.h>
 
 #include <assert.h>
