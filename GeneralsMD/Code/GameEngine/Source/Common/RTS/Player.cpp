@@ -972,6 +972,8 @@ void Player::initFromDict(const Dict* d)
 			// Now add teams.
 
 			AsciiString originalPlayerName = TheSidesList->getSkirmishSideInfo(skirmishNdx)->getDict()->getAsciiString(TheKey_playerName);
+			// keyToName scans the whole name table, so the hook name is fetched once
+			const AsciiString genericScriptHookName = TheNameKeyGenerator->keyToName(TheKey_teamGenericScriptHook);
 			for (i=0; i<TheSidesList->getNumSkirmishTeams(); i++) {
 				if (TheSidesList->getSkirmishTeamInfo(i)->getDict()->getAsciiString(TheKey_teamOwner) == originalPlayerName)
 				{
@@ -1012,7 +1014,7 @@ void Player::initFromDict(const Dict* d)
 					// Now do the TheKey_teamGenericScriptHookN (where N can be from 0 to 15.)
 					for (j = 0; j < MAX_GENERIC_SCRIPTS; ++j) {
 						AsciiString keyName;
-						keyName.format("%s%d", TheNameKeyGenerator->keyToName(TheKey_teamGenericScriptHook).str(), j);
+						keyName.format("%s%d", genericScriptHookName.str(), j);
 						tmpStr = teamDict.getAsciiString(NAMEKEY(keyName), &exists);
 						if (exists && !tmpStr.isEmpty())
 						{

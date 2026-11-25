@@ -755,9 +755,11 @@ TeamTemplateInfo::TeamTemplateInfo(Dict *d) :
 
 
 	// Which scripts to attempt during run?
+	// keyToName scans the whole name table, so the hook name is fetched once
+	const AsciiString genericScriptHookName = TheNameKeyGenerator->keyToName(TheKey_teamGenericScriptHook);
 	for (int i = 0; i < MAX_GENERIC_SCRIPTS; ++i) {
 		AsciiString keyName;
-		keyName.format("%s%d", TheNameKeyGenerator->keyToName(TheKey_teamGenericScriptHook).str(), i);
+		keyName.format("%s%d", genericScriptHookName.str(), i);
 		m_teamGenericScripts[i] = d->getAsciiString(NAMEKEY(keyName), &exists);
 		if (!exists) {
 			m_teamGenericScripts[i].clear();
