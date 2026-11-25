@@ -20,9 +20,12 @@ origin = triatomic/contraZH (my repo)
 Layout
 
 GeneralsMD/ = Zero Hour (the Contra target, nearly all work). Generals/ = vanilla, rarely
-touched and does not build in this fork. Core/ = shared sources compiled INTO each game via
-INTERFACE targets (no separate lib): a Core file is shared with vanilla, so guard
-ZH-only code in Core with RTS_ZEROHOUR. Same-named files exist in all three trees and game
+touched and does not build in this fork. Core/ = shared sources, mostly compiled INTO each
+game via corei_* INTERFACE targets: a Core file is shared with vanilla, so guard
+ZH-only code in Core with RTS_ZEROHOUR. The core_* STATIC libraries (core_libraries with
+Lib/ and Trig.cpp, core_wwlib, core_wwmath, core_debug, core_minidumper and others) compile
+once for both games, so their .cpp files see neither RTS_ZEROHOUR nor GENERALS_ONLINE.
+Same-named files exist in all three trees and game
 headers shadow Core ones; the game's Code/GameEngine/CMakeLists.txt decides which copy
 compiles. User-facing changes go in the matching docs/contraZH-*.md page, listed on docs/contraZH-Changes.md (published to triatomic.github.io/contraZH).
 
