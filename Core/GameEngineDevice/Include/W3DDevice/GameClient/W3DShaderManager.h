@@ -252,6 +252,9 @@ protected:
 	static ChipsetType m_currentChipset;	///<last video card chipset that was detected.
 	static GraphicsVenderID m_currentVendor;	///<last video card vendor
 	static __int64 m_driverVersion;			///<driver version of last chipset.
+	static Bool m_chipsetKnown;			///<whether m_chipset holds the device's chipset.
+	static ChipsetType m_chipset;		///<chipset the device reported.
+	static ChipsetType queryChipset();	///<asks the device which chipset it has.
 	static ShaderTypes m_currentShader;	///<last shader that was set.
 	static Int m_currentShaderPass;		///<pass of last shader that was set.
 

@@ -131,6 +131,8 @@ Int W3DShaderManager::m_currentShaderPass;
 ChipsetType W3DShaderManager::m_currentChipset;
 GraphicsVenderID W3DShaderManager::m_currentVendor;
 __int64 W3DShaderManager::m_driverVersion;
+Bool W3DShaderManager::m_chipsetKnown = FALSE;
+ChipsetType W3DShaderManager::m_chipset = DC_UNKNOWN;
 
 Bool W3DShaderManager::m_renderingToTexture = false;
 IDirect3DSurface8 *W3DShaderManager::m_oldRenderSurface=nullptr;	///<previous render target
@@ -6716,6 +6718,17 @@ ChipsetType W3DShaderManager::getChipset()
 	if (TheGlobalData && TheGlobalData->m_chipSetType != DC_UNKNOWN)
 		return (ChipsetType)TheGlobalData->m_chipSetType;
 
+	// The adapter never changes, so it is asked once a device exists.
+	if (!m_chipsetKnown && DX8Wrapper::_Get_D3D8() && DX8Wrapper::_Get_D3D_Device8())
+	{
+		m_chipset = queryChipset();
+		m_chipsetKnown = TRUE;
+	}
+	return m_chipsetKnown ? m_chipset : DC_UNKNOWN;
+}
+
+ChipsetType W3DShaderManager::queryChipset()
+{
 	ChipsetType chip=DC_UNKNOWN;
 	IDirect3D8* d3d8Interface=DX8Wrapper::_Get_D3D8();
 
