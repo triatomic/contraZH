@@ -215,6 +215,9 @@ Shaders panels. The tab logic is adapted from the tabbed menu by simonx645.
   matches, Always also captures it in menus, and Auto captures it in game when windowed and always when
   fullscreen. It writes the four `CursorCaptureEnabledIn*` keys. A hand-edited combination that no entry
   matches shows no selection and stays as it is.
+* **Controls > Edge scroll when windowed** scrolls the camera when the cursor touches the screen edge
+  in windowed and borderless mode. It writes `ScreenEdgeScrollEnabledInWindowedApp` and is on by
+  default. It needs the cursor captured in game, so it does nothing with **Cursor capture** on None.
 * **Audio > Money volume** sets `MoneyTransactionVolume`, 0-100.
 * **Interface > System clock size** and **Game timer size** are sliders that set `SystemTimeFontSize`
   and `GameTimeFontSize`, 0-30. 0 hides the clock or the timer. A larger value set in `Options.ini`

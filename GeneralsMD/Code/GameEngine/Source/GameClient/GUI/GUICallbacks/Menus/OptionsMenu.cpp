@@ -219,6 +219,7 @@ static GameWindow *   comboBoxTextureFilter       = nullptr;
 static GameWindow *   comboBoxAnisotropy          = nullptr;
 static GameWindow *   comboBoxRenderFPSLimit      = nullptr;
 static GameWindow *   comboBoxCursorCapture       = nullptr;
+static GameWindow *   checkScreenEdgeScrollWindowed = nullptr;
 static GameWindow *   sliderMoneyVolume           = nullptr;
 static GameWindow *   sliderSystemTimeFontSize    = nullptr;
 static GameWindow *   sliderGameTimeFontSize      = nullptr;
@@ -723,6 +724,7 @@ static void populateGameOptions()
 	setEntryInt( textEntryBloomSize, bloomPercent( pref->getBloomSize() ) );
 
 	setComboPos( comboBoxCursorCapture, cursorCaptureIndex( pref->getCursorCaptureMode() ) );
+	setCheck( checkScreenEdgeScrollWindowed, (pref->getScreenEdgeScrollMode() & ScreenEdgeScrollMode_EnabledInWindowedApp) != 0 );
 	if (sliderMoneyVolume)
 	{
 		GadgetSliderSetPosition( sliderMoneyVolume, MIN( REAL_TO_INT( pref->getMoneyTransactionVolume() ), 100 ) );
@@ -786,6 +788,7 @@ static void setGameOptionsDefaults()
 	setEntryInt( textEntryBloomSize, 100 );
 
 	setComboPos( comboBoxCursorCapture, cursorCaptureIndex( CursorCaptureMode_Default ) );
+	setCheck( checkScreenEdgeScrollWindowed, (ScreenEdgeScrollMode_Default & ScreenEdgeScrollMode_EnabledInWindowedApp) != 0 );
 	if (sliderMoneyVolume)
 	{
 		GadgetSliderSetPosition( sliderMoneyVolume, REAL_TO_INT( TheAudio->getAudioSettings()->m_defaultMoneyTransactionVolume * 100.0f ) );
@@ -1231,6 +1234,14 @@ static void saveOptions()
 	// TheSuperHackers @todo Add combo box ?
 	{
 		ScreenEdgeScrollMode mode = pref->getScreenEdgeScrollMode();
+		if (getCheck( checkScreenEdgeScrollWindowed, (mode & ScreenEdgeScrollMode_EnabledInWindowedApp) != 0 ))
+		{
+			mode |= ScreenEdgeScrollMode_EnabledInWindowedApp;
+		}
+		else
+		{
+			mode &= ~ScreenEdgeScrollMode_EnabledInWindowedApp;
+		}
 		(*pref)["ScreenEdgeScrollEnabledInWindowedApp"] = (mode & ScreenEdgeScrollMode_EnabledInWindowedApp) ? "yes" : "no";
 		(*pref)["ScreenEdgeScrollEnabledInFullscreenApp"] = (mode & ScreenEdgeScrollMode_EnabledInFullscreenApp) ? "yes" : "no";
 		TheLookAtTranslator->setScreenEdgeScrollMode(mode);
@@ -2099,6 +2110,7 @@ static void initGameOptionsWindows()
 	checkLowLatency = findOptionsWindow( "OptionsMenu.wnd:CheckLowLatency" );
 	checkSmoothUnitMotion = findOptionsWindow( "OptionsMenu.wnd:CheckSmoothUnitMotion" );
 	comboBoxCursorCapture = findOptionsWindow( "OptionsMenu.wnd:ComboBoxCursorCapture" );
+	checkScreenEdgeScrollWindowed = findOptionsWindow( "OptionsMenu.wnd:CheckScreenEdgeScrollWindowed" );
 	sliderMoneyVolume = findOptionsWindow( "OptionsMenu.wnd:SliderMoneyVolume" );
 	sliderSystemTimeFontSize = findOptionsWindow( "OptionsMenu.wnd:SliderSystemTimeFontSize" );
 	sliderGameTimeFontSize = findOptionsWindow( "OptionsMenu.wnd:SliderGameTimeFontSize" );
