@@ -684,7 +684,9 @@ enum DebrisDisposition CPP_11(: Int)
 	RANDOM_FORCE						= 0x00000020,
 	FLOATING								= 0x00000040,
 	INHERIT_VELOCITY				= 0x00000080,
-	WHIRLING								= 0x00000100
+	WHIRLING								= 0x00000100,
+
+	DEBRIS_DISPOSITION_END // keep after the last named flag
 };
 
 static const char* const DebrisDispositionNames[] =
@@ -700,6 +702,7 @@ static const char* const DebrisDispositionNames[] =
 	"WHIRLING",
 	nullptr
 };
+static_assert(equalsEnumBitFlagsCount(ARRAY_SIZE(DebrisDispositionNames) - 1, DEBRIS_DISPOSITION_END), "Incorrect array size");
 
 std::vector<AsciiString>	debrisModelNamesGlobalHack;
 
@@ -1258,7 +1261,8 @@ protected:
 			if (m_nameAreObjects)
 				tmpl = TheThingFactory->findTemplate(m_names[pick]);
 			else
-			{	//this is using the generic debris type so it's probably safe to
+			{
+				//this is using the generic debris type so it's probably safe to
 				//remove if requested by the GameLOD manager.
 				if (TheGameLODManager->isDebrisSkipped())
 					continue;

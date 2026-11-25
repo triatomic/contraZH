@@ -30,6 +30,7 @@
 #include "Common/LocalFileSystem.h"
 #include "WWLib/TARGA.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/shader.h"
 #include "WW3D2/vertmaterial.h"
 #include "WW3D2/camera.h"
@@ -252,9 +253,9 @@ void W3DColorLut::render(CameraClass &camera)
 	DX8Wrapper::Set_Material(material);
 	REF_PTR_RELEASE(material);
 	Matrix4x4 identity(true);
-	DX8Wrapper::Set_World_Identity();
-	DX8Wrapper::Set_View_Identity();
-	DX8Wrapper::Set_Transform(D3DTS_PROJECTION, identity);
+	Renderer::Set_World_Identity();
+	Renderer::Set_View_Identity();
+	Renderer::Set_Transform(RenderTransform_Projection, identity);
 
 	ShaderClass replace = ShaderClass::_PresetOpaque2DShader;
 	replace.Set_Cull_Mode(ShaderClass::CULL_MODE_DISABLE);

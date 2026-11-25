@@ -29,11 +29,13 @@
 #include "ww3d.h"
 #include "rinfo.h"
 #include "dx8wrapper.h"
+#include "Renderer.h"
 #include "sortingrenderer.h"
 #include "WWMath/vp.h"
 #include "WWMath/Vector3i.h"
 #include "WWLib/RANDOM.h"
 #include "WWMath/v3_rnd.h"
+#include <Utility/cmath_adapter.h>
 
 
 /* We have chunking logic which handles N segments at a time. To simplify the subdivision logic,
@@ -317,11 +319,11 @@ void StreakRendererClass::RenderStreak
 )
 {
 	Matrix4x4 view;
-	DX8Wrapper::Get_Transform(D3DTS_VIEW,view);
+	Renderer::Get_Transform(RenderTransform_View,view);
 
 	Matrix4x4 identity(true);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,identity);
-	DX8Wrapper::Set_Transform(D3DTS_VIEW,identity);
+	Renderer::Set_Transform(RenderTransform_World,identity);
+	Renderer::Set_Transform(RenderTransform_View,identity);
 
 	/*
 	** Handle texture UV offset animation (done once for entire line).
@@ -339,7 +341,7 @@ void StreakRendererClass::RenderStreak
 	// LastUsedSyncTime = WW3D::Get_Sync_Time();
 
 	// Used later
-	TextureMapMode map_mode = Get_Texture_Mapping_Mode();
+	//TextureMapMode map_mode = Get_Texture_Mapping_Mode();
 
 	/*
 	** Process line geometry:
@@ -546,7 +548,8 @@ void StreakRendererClass::RenderStreak
 
 
 		for (segmentIndex = 1; segmentIndex < point_cnt; segmentIndex++)
-		{	// #segments = #points - 1 (+ 2 dummy segments)
+		{
+			// #segments = #points - 1 (+ 2 dummy segments)
 
 			radius = widths[segmentIndex]; /// NEW ///// // TODO: Does not work correctly when subdivision are not 0
 
@@ -764,7 +767,7 @@ void StreakRendererClass::RenderStreak
 
 			// Relevant midpoint:
 			Vector3 &midpoint = points[intersectionIndex - 1];
-			float mid_tex_v = tex_v[intersectionIndex - 1];
+//			float mid_tex_v = tex_v[intersectionIndex - 1];
 
 			// Initialize misc. fields
 			intersection[intersectionIndex][TOP_EDGE].PointCount = 1;
@@ -1351,38 +1354,21 @@ void StreakRendererClass::RenderStreak
 		{
 			DynamicVBAccessClass::WriteLockClass Lock(&Verts);
 			unsigned int i;
-			unsigned char *vb=(unsigned char*)Lock.Get_Formatted_Vertex_Array();
-			const FVFInfoClass& fvfinfo=Verts.FVF_Info();
-			int segIdx = 0;
-			unsigned int argb = 0x00000000;
-
-			unsigned int oddEven = 0;
-
-			//oddEven = ( personalities[0] & 1 );
-
-			const unsigned verticesOffset = fvfinfo.Get_Location_Offset();
-			const unsigned diffuseOffset = fvfinfo.Get_Diffuse_Offset();
-			const unsigned textureOffset = fvfinfo.Get_Tex_Offset(0);
-			const unsigned beamOffset = fvfinfo.Get_Tex_Offset(1);
-			const unsigned vbSize = fvfinfo.Get_FVF_Size();
+			VertexFormatXYZNDUV2* vb=Lock.Get_Formatted_Vertex_Array();
 
 			for (i=0; i<vnum; i++)
 			{
 				DEBUG_ASSERTCRASH(vertexArray[i].x != (float)0xdeadbeef && vertexArray[i].y != (float)0xdeadbeef && vertexArray[i].z != (float)0xdeadbeef && vertexArray[i].u1 != (float)0xdeadbeeef && vertexArray[i].v1 != (float)0xdeadbeef, ("Uninitialized vertexArray[%d]", i));
-				DEBUG_ASSERTCRASH((! _isnan(vertexArray[i].x) && _finite(vertexArray[i].x) && ! _isnan(vertexArray[i].y) && _finite(vertexArray[i].y) && ! _isnan(vertexArray[i].z) && _finite(vertexArray[i].z)) , ("Bad vertexArray[%d]", i));
-				Vector3 *vertex = reinterpret_cast<Vector3 *>(vb + verticesOffset);
-				vertex->X = vertexArray[i].x;
-				vertex->Y = vertexArray[i].y;
-				vertex->Z = vertexArray[i].z;
-				*reinterpret_cast<unsigned int *>(vb + diffuseOffset) = DX8Wrapper::Convert_Color_Clamp(colors[MIN((i/2), point_cnt)]); // TODO: Does not work correctly when subdivision are not 0
-				Vector2 *texture = reinterpret_cast<Vector2 *>(vb + textureOffset);
-				texture->U = vertexArray[i].u1;
-				texture->V = vertexArray[i].v1;
+				DEBUG_ASSERTCRASH((! std::isnan(vertexArray[i].x) && std::isfinite(vertexArray[i].x) && ! std::isnan(vertexArray[i].y) && std::isfinite(vertexArray[i].y) && ! std::isnan(vertexArray[i].z) && std::isfinite(vertexArray[i].z)) , ("Bad vertexArray[%d]", i));
+				vb[i].x = vertexArray[i].x;
+				vb[i].y = vertexArray[i].y;
+				vb[i].z = vertexArray[i].z;
+				vb[i].diffuse = DX8Wrapper::Convert_Color_Clamp(colors[MIN((i/2), point_cnt)]); // TODO: Does not work correctly when subdivision are not 0
+				vb[i].u1 = vertexArray[i].u1;
+				vb[i].v1 = vertexArray[i].v1;
 				// Across the streak from 0 to 1, and along it in world units
-				Vector2 *beam = reinterpret_cast<Vector2 *>(vb + beamOffset);
-				beam->U = vertexArray[i].u1;
-				beam->V = vertexArray[i].x * beam_dir.X + vertexArray[i].y * beam_dir.Y + vertexArray[i].z * beam_dir.Z - beam_base;
-				vb += vbSize;
+				vb[i].u2 = vertexArray[i].u1;
+				vb[i].v2 = vertexArray[i].x * beam_dir.X + vertexArray[i].y * beam_dir.Y + vertexArray[i].z * beam_dir.Z - beam_base;
 			}
 		}
 
@@ -1429,7 +1415,7 @@ void StreakRendererClass::RenderStreak
 
 	}
 
-	DX8Wrapper::Set_Transform(D3DTS_VIEW,view);
+	Renderer::Set_Transform(RenderTransform_View,view);
 
 }
 

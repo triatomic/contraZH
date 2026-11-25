@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 7                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -67,11 +65,6 @@ public:
 	virtual void		Get_Tangents(int i,Vector3 * set_in,Vector3 * set_out);
 
 	virtual void		Update_Tangents() { TangentsDirty = false; }
-
-	// save-load support
-	virtual const PersistFactoryClass &	Get_Factory() const override;
-	virtual bool								Save(ChunkSaveClass &csave) override;
-	virtual bool								Load(ChunkLoadClass &cload) override;
 
 protected:
 
@@ -110,11 +103,6 @@ public:
 
 	virtual void		Set_Tangents(int i,float in_tan,float out_tan);
 	virtual void		Get_Tangents(int i,float * set_in,float * set_out);
-
-	// save-load support
-	virtual const PersistFactoryClass &	Get_Factory() const override;
-	virtual bool								Save(ChunkSaveClass &csave) override;
-	virtual bool								Load(ChunkLoadClass &cload) override;
 
 protected:
 

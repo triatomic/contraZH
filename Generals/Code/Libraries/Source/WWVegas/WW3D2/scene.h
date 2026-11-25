@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 10                                                          $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -44,8 +42,6 @@
 class	RenderObjClass;
 class	RenderInfoClass;
 class CameraClass;
-class ChunkLoadClass;
-class ChunkSaveClass;
 
 /*
 ** SceneIterator
@@ -168,13 +164,6 @@ public:
 	///////////////////////////////////////////////////////////////////////////////////
 	virtual float				Compute_Point_Visibility(	RenderInfoClass & rinfo,
 																		const Vector3 & point)	{ return 1.0f; }
-
-
-	///////////////////////////////////////////////////////////////////////////////////
-	//	Save-Load, records the fog, depth cue, etc settings into a chunk
-	///////////////////////////////////////////////////////////////////////////////////
-	virtual void				Save(ChunkSaveClass & csave);
-	virtual void				Load(ChunkLoadClass & cload);
 
 protected:
 	virtual void	Render(RenderInfoClass & rinfo);	//Made virtual so we can override -MW

@@ -1,4 +1,3 @@
-if (TARGET maxsdk)
-    add_subdirectory(pluglib)
+if (TARGET deps_maxsdk)
     add_subdirectory(max2w3d)
 endif()

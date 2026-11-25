@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 4                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -76,9 +74,6 @@ class FilteredSoundClass : public SoundPseudo3DClass
 		//	Volume control
 		//////////////////////////////////////////////////////////////////////
 		virtual void				Update_Volume () override;
-
-		// From PersistClass
-		virtual const PersistFactoryClass &	Get_Factory () const override;
 
 	protected:
 

@@ -34,8 +34,6 @@
  *                                                                                             *
  * 06/26/02 KM Matrix name change to avoid MAX conflicts                                       *
  * 06/27/02 KM Changes to max texture stage caps																*
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "sortingrenderer.h"
@@ -43,6 +41,7 @@
 #include "dx8indexbuffer.h"
 #include "dx8wrapper.h"
 #include "dx8renderer.h"
+#include "Renderer.h"
 #include "vertmaterial.h"
 #include "texture.h"
 #include "dx8compat.h"
@@ -52,6 +51,7 @@
 #include "pointgr.h"
 #endif
 #include <WWDebug/wwprofile.h>
+#include <Utility/cmath_adapter.h>
 #include <algorithm>
 #include <vector>
 #include <stdlib.h>
@@ -524,7 +524,7 @@ void SortingRendererClass::Insert_Triangles(
 		return;
 	}
 
-#ifdef WWDEBUG
+#ifdef DEBUG_CRASHING
 	SortingVertexBufferClass* vertex_buffer=static_cast<SortingVertexBufferClass*>(state->sorting_state.vertex_buffers[0]);
 	WWASSERT(vertex_buffer);
 	WWASSERT(state->vertex_count<=vertex_buffer->Get_Vertex_Count());
@@ -545,7 +545,7 @@ void SortingRendererClass::Insert_Triangles(
 		WWASSERT(idx2<state->vertex_count);
 		WWASSERT(idx3<state->vertex_count);
 	}
-#endif // WWDEBUG
+#endif // DEBUG_CRASHING
 
 	Insert_To_Sorting_Pool(state);
 }
@@ -786,7 +786,7 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 					triangle.idx = node_id;
 					const float z = state->billboards[i / 2].Position.Z;
 					triangle.z = (z + z + z) / 3.0f;
-					DEBUG_ASSERTCRASH((!_isnan(triangle.z) && _finite(triangle.z)), ("Billboard has invalid center"));
+					DEBUG_ASSERTCRASH((!std::isnan(triangle.z) && std::isfinite(triangle.z)), ("Billboard has invalid center"));
 				}
 				state->min_vertex_index = vertex_array_offset;
 				polygon_array_offset += state->polygon_count;
@@ -801,16 +801,11 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 			memcpy(dest_verts, src_verts, sizeof(VertexFormatXYZNDUV2)*state->vertex_count);
 			dest_verts += state->vertex_count;
 
-			// Only the third column of world*view is needed, to get each triangle's
-			// view depth. Both operands are D3DMATRIX, so this stays row-major.
-			const D3DMATRIX& world=state->sorting_state.world;
-			const D3DMATRIX& view=state->sorting_state.view;
-			const D3DMATRIX product=world*view;
-			const float (&mtx)[4][4]=product.m;
+			const Matrix4x4 mtx=To_Matrix4x4(state->sorting_state.view)*To_Matrix4x4(state->sorting_state.world);
 
 			const unsigned short* indices=Source_Indices(state);
 
-			if (mtx[0][2] == 0.0f && mtx[1][2] == 0.0f && mtx[3][2] == 0.0f && mtx[2][2] == 1.0f) {
+			if (mtx[2][0] == 0.0f && mtx[2][1] == 0.0f && mtx[2][3] == 0.0f && mtx[2][2] == 1.0f) {
 				// The common case for particle systems.
 				for (int i=0;i<state->polygon_count;++i) {
 					unsigned short idx1=indices[i*3]-state->min_vertex_index;
@@ -830,7 +825,7 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 					tis_ptr->tri.k = idx3 + vertex_array_offset;
 					tis_ptr->idx = node_id;
 					tis_ptr->z = (v1->z + v2->z + v3->z)/3.0f;
-					DEBUG_ASSERTCRASH((! _isnan(tis_ptr->z) && _finite(tis_ptr->z)), ("Triangle has invalid center"));
+					DEBUG_ASSERTCRASH((! std::isnan(tis_ptr->z) && std::isfinite(tis_ptr->z)), ("Triangle has invalid center"));
 				}
 			} else {
 				for (int i=0;i<state->polygon_count;++i) {
@@ -850,10 +845,10 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 					tis_ptr->tri.j = idx2 + vertex_array_offset;
 					tis_ptr->tri.k = idx3 + vertex_array_offset;
 					tis_ptr->idx = node_id;
-					tis_ptr->z = (mtx[0][2]*(v1->x + v2->x + v3->x) +
-												mtx[1][2]*(v1->y + v2->y + v3->y) +
-												mtx[2][2]*(v1->z + v2->z + v3->z))/3.0f + mtx[3][2];
-					DEBUG_ASSERTCRASH((! _isnan(tis_ptr->z) && _finite(tis_ptr->z)), ("Triangle has invalid center"));
+					tis_ptr->z = (mtx[2][0]*(v1->x + v2->x + v3->x) +
+												mtx[2][1]*(v1->y + v2->y + v3->y) +
+												mtx[2][2]*(v1->z + v2->z + v3->z))/3.0f + mtx[2][3];
+					DEBUG_ASSERTCRASH((! std::isnan(tis_ptr->z) && std::isfinite(tis_ptr->z)), ("Triangle has invalid center"));
 				}
 			}
 
@@ -1016,8 +1011,8 @@ void SortingRendererClass::Flush_Disruption()
 
 	Matrix4x4 old_view;
 	Matrix4x4 old_world;
-	DX8Wrapper::Get_Transform(D3DTS_VIEW,old_view);
-	DX8Wrapper::Get_Transform(D3DTS_WORLD,old_world);
+	Renderer::Get_Transform(RenderTransform_View,old_view);
+	Renderer::Get_Transform(RenderTransform_World,old_world);
 
 	for (size_t i=0;i<disrupt_list.size();++i) {
 		SortingNodeStruct* state=disrupt_list[i];
@@ -1065,8 +1060,8 @@ void SortingRendererClass::Flush_Disruption()
 
 	DX8Wrapper::Set_Index_Buffer(nullptr,0);
 	DX8Wrapper::Set_Vertex_Buffer(nullptr);
-	DX8Wrapper::Set_Transform(D3DTS_VIEW,old_view);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,old_world);
+	Renderer::Set_Transform(RenderTransform_View,old_view);
+	Renderer::Set_Transform(RenderTransform_World,old_world);
 }
 
 // ----------------------------------------------------------------------------
@@ -1076,8 +1071,8 @@ void SortingRendererClass::Flush()
 	WWPROFILE("SortingRenderer::Flush");
 	Matrix4x4 old_view;
 	Matrix4x4 old_world;
-	DX8Wrapper::Get_Transform(D3DTS_VIEW,old_view);
-	DX8Wrapper::Get_Transform(D3DTS_WORLD,old_world);
+	Renderer::Get_Transform(RenderTransform_View,old_view);
+	Renderer::Get_Transform(RenderTransform_World,old_world);
 
 	// Only a pass that takes a scene copy draws these, and it has had its turn.
 	Recycle_Nodes(disrupt_list);
@@ -1103,8 +1098,8 @@ void SortingRendererClass::Flush()
 	DynamicVBAccessClass::_Reset(false);
 
 
-	DX8Wrapper::Set_Transform(D3DTS_VIEW,old_view);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,old_world);
+	Renderer::Set_Transform(RenderTransform_View,old_view);
+	Renderer::Set_Transform(RenderTransform_World,old_world);
 
 }
 

@@ -168,7 +168,6 @@ static const BlockParse theTypeTable[] =
 	{ "Weapon",                         INI::parseWeaponTemplateDefinition },
 	{ "WeaponExtend",                   INI::parseWeaponExtendTemplateDefinition },
 	{ "Weather",                        INI::parseWeatherDefinition },
-	{ "WebpageURL",                     INI::parseWebpageURLDefinition },
 	{ "WindowTransition",               INI::parseWindowTransitions },
 };
 
@@ -245,7 +244,7 @@ INI::INI()
 }
 
 //-------------------------------------------------------------------------------------------------
-UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadType, Xfer *pXfer, Bool subdirs, Bool optional/* = FALSE*/)
+UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadType, Xfer *pXfer, LoadFlags loadFlags )
 {
 	UnsignedInt filesRead = 0;
 
@@ -266,14 +265,15 @@ UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadTyp
 
 	if (TheFileSystem->doesFileExist(iniFile.str()))
 	{
-		filesRead += load(iniFile, loadType, pXfer, optional);
+		filesRead += load(iniFile, loadType, pXfer, (loadFlags & LoadFlags_ExpectFileFound) == 0);
 	}
 
 	// Load any additional ini files from a "filename" directory and its subdirectories.
-	filesRead += loadDirectory(iniDir, loadType, pXfer, subdirs, optional);
+	filesRead += loadDirectory(iniDir, loadType, pXfer, loadFlags & ~LoadFlags_ExpectFileFound);
 
 	// Expect to open and load at least one file.
-	if (filesRead == 0 && !optional)
+	const Bool expectFileFound = (loadFlags & LoadFlags_ExpectFileFound) != 0;
+	if (expectFileFound && filesRead == 0)
 	{
 		throw INI_CANT_OPEN_FILE;
 	}
@@ -286,7 +286,7 @@ UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadTyp
 	* If we are to load subdirectories, we will load them *after* we load all the
 	* files in the current directory */
 //-------------------------------------------------------------------------------------------------
-UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer *pXfer, Bool subdirs, Bool optional/* = FALSE*/)
+UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer *pXfer, LoadFlags loadFlags )
 {
 	UnsignedInt filesRead = 0;
 
@@ -294,6 +294,7 @@ UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer 
 	if (dirName.isEmpty())
 			throw INI_INVALID_DIRECTORY;
 
+	const Bool subdirs = (loadFlags & LoadFlags_SearchSubDirs) != 0;
 	FilenameList filenameList;
 	dirName.concat('\\');
 	TheFileSystem->getFileListInDirectory(dirName, "*.ini", filenameList, subdirs);
@@ -305,7 +306,7 @@ UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer 
 		AsciiString tempname;
 		tempname = (*it).str() + dirName.getLength();
 
-		if ((tempname.find('\\') == nullptr) && (tempname.find('/') == nullptr)) {
+		if (getFirstPathSeparator(tempname.str()) == nullptr) {
 			// this file doesn't reside in a subdirectory, load it first.
 			filesRead += load( *it, loadType, pXfer );
 		}
@@ -318,10 +319,17 @@ UnsignedInt INI::loadDirectory( AsciiString dirName, INILoadType loadType, Xfer 
 		AsciiString tempname;
 		tempname = (*it).str() + dirName.getLength();
 
-		if ((tempname.find('\\') != nullptr) || (tempname.find('/') != nullptr)) {
+		if (getFirstPathSeparator(tempname.str()) != nullptr) {
 			filesRead += load( *it, loadType, pXfer );
 		}
 		++it;
+	}
+
+	// Expect to open and load at least one file.
+	const Bool expectFileFound = (loadFlags & LoadFlags_ExpectFileFound) != 0;
+	if (expectFileFound && filesRead == 0)
+	{
+		throw INI_CANT_OPEN_FILE;
 	}
 
 	return filesRead;
@@ -961,7 +969,7 @@ void INI::parseBool( INI* ini, void * /*instance*/, void *store, const void* /*u
 void INI::parseBitInInt32( INI *ini, void *instance, void *store, const void* userData )
 {
 	UnsignedInt* s = (UnsignedInt*)store;
-	UnsignedInt mask = (UnsignedInt)userData;
+	UnsignedInt mask = (UnsignedInt)(uintptr_t)userData;
 
 	if (INI::scanBool(ini->getNextToken()))
 		*s |= mask;
@@ -1167,7 +1175,8 @@ AsciiString INI::getNextAsciiString()
 				result.set(buff);
 			} else {
 				Int len = strlen(buff);
-				if (len && buff[len-1] == '"') { // strip off trailing quote jba. [2/12/2003]
+				if (len && buff[len-1] == '"') {
+					// strip off trailing quote jba. [2/12/2003]
 					buff[len-1] = 0;
 				}
 				result.set(buff);

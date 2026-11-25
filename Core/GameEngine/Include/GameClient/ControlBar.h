@@ -109,6 +109,8 @@ enum CommandOption CPP_11(: Int)
 #if RTS_ZEROHOUR
 	REQUIRES_POWER						= 0x08000000, // this button requires sufficient player power
 #endif
+
+	COMMAND_OPTION_END // keep after the last named flag
 };
 
 #ifdef DEFINE_COMMAND_OPTION_NAMES
@@ -151,6 +153,7 @@ static const char *const TheCommandOptionNames[] =
 
 	nullptr
 };
+static_assert(equalsEnumBitFlagsCount(ARRAY_SIZE(TheCommandOptionNames) - 1, COMMAND_OPTION_END), "Incorrect array size");
 #endif  // end DEFINE_COMMAND_OPTION_NAMES
 
 //-------------------------------------------------------------------------------------------------

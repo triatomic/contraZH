@@ -151,9 +151,14 @@ Bool PolygonTrigger::ParsePolygonTriggersDataChunk(DataChunkInput &file, DataChu
 	while (count>0) {
 		count--;
 		triggerName = file.readAsciiString();
+		// TheSuperHackers @info Retail Generals does not know the layer name that Zero Hour stores in version 4 triggers,
+		// so it reads the following values from the wrong bytes. With an empty layer name, the first trigger is never a
+		// water area, and reading its points runs past the end of the file, so no further triggers are read.
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
 		if (info->version >= K_TRIGGERS_VERSION_4) {
 			layerName = file.readAsciiString();
 		}
+#endif
 		triggerID = file.readInt();
 		isWater = false;
 		if (info->version >= K_TRIGGERS_VERSION_2) {
@@ -286,14 +291,15 @@ void PolygonTrigger::updateBounds()	const
 	m_bounds.hi.x = m_bounds.hi.y = -BIG_INT;
 	Int i;
 	for (i=0; i<m_numPoints; i++) {
-		if (m_points[i].x < m_bounds.lo.x) m_bounds.lo.x = m_points[i].x;
-		if (m_points[i].y < m_bounds.lo.y) m_bounds.lo.y = m_points[i].y;
-		if (m_points[i].x > m_bounds.hi.x) m_bounds.hi.x = m_points[i].x;
-		if (m_points[i].y > m_bounds.hi.y) m_bounds.hi.y = m_points[i].y;
+		m_bounds.uniteWith(m_points[i].asICoord2D());
 	}
-	m_boundsNeedsUpdate = 0;
-	Real halfWidth = (m_bounds.hi.x - m_bounds.lo.x) / 2.0f;
+	m_boundsNeedsUpdate = false;
+	Real halfWidth = m_bounds.width() / 2.0f;
+#if RETAIL_COMPATIBLE_CRC
 	Real halfHeight = (m_bounds.hi.y + m_bounds.lo.y) / 2.0f;
+#else
+	Real halfHeight = m_bounds.height() / 2.0f;
+#endif
 
 	m_radius = WWMath::Sqrt(halfHeight*halfHeight + halfWidth*halfWidth);
 }
@@ -373,11 +379,13 @@ void PolygonTrigger::setPoint(const ICoord3D &point, Int ndx)
 {
 	DEBUG_ASSERTCRASH(ndx>=0 && ndx <= m_numPoints, ("Invalid ndx."));
 	if (ndx<0) return;
-	if (ndx == m_numPoints) {	// we are setting first available unused point
+	if (ndx == m_numPoints) {
+		// we are setting first available unused point
 		addPoint(point);
 		return;
 	}
-	if (ndx>m_numPoints) { // Can't skip points.
+	if (ndx>m_numPoints) {
+		// Can't skip points.
 		return;
 	}
 	m_points[ndx] = point;
@@ -393,7 +401,8 @@ void PolygonTrigger::insertPoint(const ICoord3D &point, Int ndx)
 {
 	DEBUG_ASSERTCRASH(ndx>=0 && ndx <= m_numPoints, ("Invalid ndx."));
 	if (ndx<0) return;
-	if (ndx == m_numPoints) {	// we are setting first available unused point
+	if (ndx == m_numPoints) {
+		// we are setting first available unused point
 		addPoint(point);
 		return;
 	}

@@ -1242,7 +1242,7 @@ Bool outOfWeaponRangePosition( State *thisState, void* userData )
  */
 static Bool cannotPossiblyAttackObject( State *thisState, void* userData )
 {
-	AbleToAttackType attackType = (AbleToAttackType)(UnsignedInt)userData;
+	AbleToAttackType attackType = (AbleToAttackType)(uintptr_t)userData;
 	Object *obj = thisState->getMachineOwner();
 	Object *victim = thisState->getMachineGoalObject();
 
@@ -3842,7 +3842,7 @@ void AIFollowWaypointPathState::computeGoal(Bool useGroupOffsets)
 	}
 	Region3D extent;
 	TheTerrainLogic->getMaximumPathfindExtent(&extent);
-	if (!extent.isInRegionNoZ(m_goalPosition)) {
+	if (!extent.containsWithin(m_goalPosition.asCoord2D())) {
 		setAdjustsDestination(false); // moving off the map.
 		ai->getCurLocomotor()->setAllowInvalidPosition(true); // allow it to move off the map.
 		m_appendGoalPosition = true; // Moving off the map.
@@ -4829,9 +4829,28 @@ StateReturnType AIAttackAimAtTargetState::onEnter()
 	//to move to the best fire point, check if it's in firing range, and if not
 	//move it back so another unit with longer range can!
 	Object *containedBy = source->getContainedBy();
+	ContainModuleInterface *contain = containedBy ? containedBy->getContain() : nullptr;
+
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
 	if( containedBy && weapon )
+#else
+	if( containedBy && weapon && contain && contain->isEnclosingContainerFor( source ) )
+#endif
 	{
-		ContainModuleInterface *contain = containedBy->getContain();
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+		// TheSuperHackers @bugfix Caball009 22/09/2026 Return early to prevent a crash.
+		// This is needed when a Tunnel Network with units is transferred to another player and then sold or destroyed.
+		// The units are not properly transferred and are left in an invalid state.
+		if (!contain)
+		{
+			// remove all such units from the tunnel tracker and destroy them
+			TheGameLogic->friend_destroyInTunnelContain(source);
+
+			return STATE_FAILURE;
+		}
+#endif
+
+		// non enclosing garrison containers do not use firepoints. Lorenzen, 6/11/03
 		if (victim)
 		{
 			inFiringRange = contain->attemptBestFirePointPosition( source, weapon, victim );
@@ -4943,7 +4962,6 @@ StateReturnType AIAttackAimAtTargetState::update()
 
 		if (aimDelta < REL_THRESH) aimDelta = REL_THRESH;
 
-		//DEBUG_LOG(("AIM: desired %f, actual %f, delta %f, aimDelta %f, goalpos %f %f",rad2deg(obj->getOrientation() + relAngle),rad2deg(obj->getOrientation()),rad2deg(relAngle),rad2deg(aimDelta),victim->getPosition()->x,victim->getPosition()->y));
 		if (m_canTurnInPlace)
 		{
 			if (WWMath::Fabs(relAngle) > aimDelta)
@@ -5789,7 +5807,7 @@ Object *AIAttackSquadState::chooseVictim()
 		case DIFFICULTY_EASY:
 		{
 			// pick a random unit
-			VecObjectPtr objects = victimSquad->getLiveObjects();
+			const VecObjectPtr& objects = victimSquad->getLiveObjects();
 			Int numUnits = objects.size();
 			if (numUnits == 0)
 			{
@@ -5817,7 +5835,7 @@ Object *AIAttackSquadState::chooseVictim()
 		case DIFFICULTY_HARD:
 		{
 			// everyone picks the same unit
-			VecObjectPtr objects = victimSquad->getLiveObjects();
+			const VecObjectPtr& objects = victimSquad->getLiveObjects();
 			if (!objects.empty())
 			{
 				return objects[0];

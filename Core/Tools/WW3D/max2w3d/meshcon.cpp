@@ -31,35 +31,16 @@
  *                                                                                             *
  *                    $Revision:: 34                                                          $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   MeshConnectionsClass::MeshConnectionsClass -- Constructor                                 *
- *   MeshConnectionsClass::~MeshConnectionsClass -- Destructor                                 *
- *   MeshConnectionsClass::Get_Aggregate_Data -- name and bone for the given aggregate         *
- *   MeshConnectionsClass::Get_Proxy_Data -- name and transform for the specified proxy object *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
 #include "meshcon.h"
 #include "util.h"
-#include "SnapPoints.h"
 #include "w3dappdata.h"
 #include "geometryexporttask.h"
 #include "geometryexportcontext.h"
 
 
-/***********************************************************************************************
- * MeshConnectionsClass::MeshConnectionsClass -- Constructor                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/19/2000 gth : New version which uses the GeometryExportTasks                           *
- *=============================================================================================*/
 MeshConnectionsClass::MeshConnectionsClass
 (
 	DynamicVectorClass<GeometryExportTaskClass *> sub_object_list,
@@ -98,35 +79,11 @@ MeshConnectionsClass::MeshConnectionsClass
 }
 
 
-/***********************************************************************************************
- * MeshConnectionsClass::~MeshConnectionsClass -- Destructor                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   07/24/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 MeshConnectionsClass::~MeshConnectionsClass()
 {
 }
 
 
-/***********************************************************************************************
- * MeshConnectionsClass::Get_Sub_Object_Data -- Returns the name and bone index for a given obj*
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   9/14/1999  AJA : Created.                                                                 *
- *=============================================================================================*/
 bool MeshConnectionsClass::Get_Sub_Object_Data (int mesh_idx, char **out_name, int *out_boneindex,
 														INode **out_inode)
 {
@@ -143,18 +100,6 @@ bool MeshConnectionsClass::Get_Sub_Object_Data (int mesh_idx, char **out_name, i
 }
 
 
-/***********************************************************************************************
- * MeshConnectionsClass::Get_Aggregate_Data -- name and bone for the given aggregate           *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/25/2000 gth : Created.                                                                 *
- *=============================================================================================*/
 bool MeshConnectionsClass::Get_Aggregate_Data(int mesh_idx, char **out_name, int *out_boneindex,
 														INode **out_inode)
 {
@@ -171,18 +116,6 @@ bool MeshConnectionsClass::Get_Aggregate_Data(int mesh_idx, char **out_name, int
 }
 
 
-/***********************************************************************************************
- * MeshConnectionsClass::Get_Proxy_Data -- name and transform for the specified proxy object   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/26/2000 gth : Created.                                                                 *
- *=============================================================================================*/
 bool MeshConnectionsClass::Get_Proxy_Data(int index, char **out_name, int *out_boneindex,
 														INode **out_inode)
 {

@@ -717,11 +717,10 @@ CMainFrame::OnCreateClient
 			ASSERT (pCGraphicView);
 			if (pCGraphicView) {
 
-				TCHAR szFileName[MAX_PATH];
-				::GetModuleFileName (nullptr, szFileName, sizeof (szFileName));
-				LPTSTR pszPath = ::strrchr (szFileName, '\\');
-				if (pszPath) {
-					pszPath[0] = 0;
+				{
+					TCHAR szFileName[MAX_PATH];
+					::GetModuleFileName (nullptr, szFileName, sizeof (szFileName));
+					*getFileName (szFileName) = 0;
 					::SetCurrentDirectory (szFileName);
 				}
 
@@ -794,7 +793,7 @@ CMainFrame::OnCreateClient
 					gamma=gamma/10.0f;
 					if (gamma<1.0) gamma=1.0;
 					if (gamma>3.0) gamma=3.0;
-					DX8Wrapper::Set_Gamma(gamma,0.0f,1.0f);
+					WW3D::Set_Gamma(gamma,0.0f,1.0f);
 				}
 			}
 		}
@@ -881,7 +880,7 @@ CMainFrame::WindowProc
 				::GetModuleFileName (nullptr, filename, sizeof (filename));
 
 				// Strip the filename from the path
-				LPTSTR ppath = ::strrchr (filename, '\\');
+				LPTSTR ppath = getLastPathSeparator (filename);
 				if (ppath != nullptr) {
 					ppath[0] = 0;
 				}
@@ -980,7 +979,6 @@ CMainFrame::ShowObjectProperties ()
 {
 	// Get a pointer to the 'graphic' pane's window
     CDataTreeView *pCDataTreeView = (CDataTreeView *)m_wndSplitter.GetPane (0, 0);
-    BOOL bReturn = (pCDataTreeView != nullptr);
 
     // Were we successful in getting the view's pointer?
     ASSERT (pCDataTreeView);
@@ -1051,7 +1049,6 @@ CMainFrame::OnUpdateObjectProperties (CCmdUI* pCmdUI)
 {
 	// Get a pointer to the 'graphic' pane's window
     CDataTreeView *pCDataTreeView = (CDataTreeView *)m_wndSplitter.GetPane (0, 0);
-    BOOL bReturn = (pCDataTreeView != nullptr);
 
     // Were we successful in view's getting the pointer?
     ASSERT (pCDataTreeView);
@@ -4060,7 +4057,7 @@ CMainFrame::Update_Emitters_List ()
 {
 	::EnableMenuItem (::GetSubMenu (::GetMenu (m_hWnd), 3), 3, MF_BYPOSITION | MF_ENABLED);
 	HMENU hsub_menu = Get_Emitters_List_Menu ();
-	int index = 0;
+	//int index = 0;
 	while (::RemoveMenu (hsub_menu, 0, MF_BYPOSITION)) {
 		//index ++;
 	}
@@ -4137,7 +4134,7 @@ CMainFrame::OnUpdateAdvancedAnim(CCmdUI* pCmdUI)
 {
 	// Enable the menu item if the selected hierarchy has at least one
 	// animation we can apply.
-	RenderObjClass *prender_obj = ::GetCurrentDocument()->GetDisplayedObject();
+	//RenderObjClass *prender_obj = ::GetCurrentDocument()->GetDisplayedObject();
 }
 
 
@@ -5243,9 +5240,9 @@ void CMainFrame::OnEnableGammaCorrection()
 		gamma=gamma/10.0f;
 		if (gamma<1.0) gamma=1.0;
 		if (gamma>3.0) gamma=3.0;
-		DX8Wrapper::Set_Gamma(gamma,0.0f,1.0f);
+		WW3D::Set_Gamma(gamma,0.0f,1.0f);
 	} else {
-		DX8Wrapper::Set_Gamma(1.0,0.0f,1.0f);
+		WW3D::Set_Gamma(1.0,0.0f,1.0f);
 	}
 }
 

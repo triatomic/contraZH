@@ -1898,7 +1898,8 @@ void CWorldBuilderDoc::Serialize(CArchive& ar)
 			pStrm->absoluteSeek(0);
 			try {
 				DataChunkInput file( pStrm );
-				if (file.isValidFileType()) {	// Backwards compatible files aren't valid data chunk files.
+				if (file.isValidFileType()) {
+					// Backwards compatible files aren't valid data chunk files.
 					// Read the waypoints.
 					file.registerParser( "WaypointsList", AsciiString::TheEmptyString, ParseWaypointDataChunk );
 					if (!file.parse(this)) {
@@ -3392,7 +3393,8 @@ void CWorldBuilderDoc::OptimizeTiles()
 
 		WorldHeightMapEdit *htMapEditCopy = GetHeightMap()->duplicate();
 		if (htMapEditCopy == nullptr) return;
-		if (htMapEditCopy->optimizeTiles()) {  // does all the work.
+		if (htMapEditCopy->optimizeTiles()) {
+			// does all the work.
 			IRegion2D partialRange = {0,0,0,0};
 			updateHeightMap(htMapEditCopy, false, partialRange);
 			WBDocUndoable *pUndo = new WBDocUndoable(this, htMapEditCopy);
@@ -3601,7 +3603,8 @@ void CWorldBuilderDoc::OnFileResize()
 	if (htMapEditCopy == nullptr) return;
 	Coord3D objOffset;
 	if (htMapEditCopy->resize(hi.xExtent, hi.yExtent, hi.initialHeight, hi.borderWidth,
-		hi.anchorTop, hi.anchorBottom, hi.anchorLeft, hi.anchorRight, &objOffset)) {  // does all the work.
+		hi.anchorTop, hi.anchorBottom, hi.anchorLeft, hi.anchorRight, &objOffset)) {
+			// does all the work.
 		WBDocUndoable *pUndo = new WBDocUndoable(this, htMapEditCopy, &objOffset);
 		this->AddAndDoUndoable(pUndo);
 		REF_PTR_RELEASE(pUndo); // belongs to this now.
@@ -3629,7 +3632,8 @@ void CWorldBuilderDoc::OnTsRemap()
 	if (m_heightMap) {
 		WorldHeightMapEdit *htMapEditCopy = GetHeightMap()->duplicate();
 		if (htMapEditCopy == nullptr) return;
-		if (htMapEditCopy->remapTextures()) {  // does all the work.
+		if (htMapEditCopy->remapTextures()) {
+			// does all the work.
 			IRegion2D partialRange = {0,0,0,0};
 			updateHeightMap(htMapEditCopy, false, partialRange);
 			WBDocUndoable *pUndo = new WBDocUndoable(this, htMapEditCopy);
@@ -3769,6 +3773,11 @@ BOOL CWorldBuilderDoc::OnNewDocument()
 	hi.xExtent = AfxGetApp()->GetProfileInt("GameOptions", "Default Map X-size", 100);
 	hi.yExtent = AfxGetApp()->GetProfileInt("GameOptions", "Default Map Y-size", 100);
 	hi.borderWidth = AfxGetApp()->GetProfileInt("GameOptions", "Default Map Border", 30);
+	if (!WorldHeightMapEdit::isValidPlayableMapSize(hi.xExtent, hi.yExtent, hi.borderWidth)) {
+		hi.xExtent = 100;
+		hi.yExtent = 100;
+		hi.borderWidth = 30;
+	}
 	hi.forResize = false;
 	if (regular_reset) {
 		CString label;
@@ -4122,7 +4131,7 @@ BOOL CWorldBuilderDoc::OnOpenDocument(LPCTSTR lpszPathName)
 	TheGameText->reset();
 	TheWriteableMapData->reset();
 	AsciiString s = lpszPathName;
-	const char* lastSep = s.reverseFind('\\');
+	const char* lastSep = getLastPathSeparator(s.str());
 	if (lastSep != nullptr)
 	{
 		s.truncateTo(lastSep - s.str() + 1);
@@ -4181,7 +4190,7 @@ BOOL CWorldBuilderDoc::OnOpenDocument(LPCTSTR lpszPathName)
 
 	WbApp()->setCurrentDirectory(AsciiString(buf));
 	::GetModuleFileName(nullptr, buf, sizeof(buf));
-	if (char *pEnd = strrchr(buf, '\\')) {
+	if (char *pEnd = getLastPathSeparator(buf)) {
 		*pEnd = 0;
 	}
 	::SetCurrentDirectory(buf);
@@ -4892,6 +4901,7 @@ static void writeRawDict( FILE *theLogFile, const char* nm, const Dict* d )
 		Dict::DataType t = d->getNthType(i);
 
 		const char* typenames[] = { "Bool", "int", "float", "ascii", "unicode" };
+		static_assert(ARRAY_SIZE(typenames) == Dict::DICT_TYPE_COUNT, "Incorrect array size");
 		fprintf(theLogFile, "Entry %d is %s: %s = ",i,typenames[t], kname.str());
 
 		switch(t)
@@ -4936,7 +4946,8 @@ static void fprintUnit(FILE *theLogFile, Dict *teamDict, NameKeyType keyMinUnit,
 void CWorldBuilderDoc::OnDumpDocToText()
 {
 	MapObject *pMapObj = nullptr;
-	const char* vetStrings[] = {"Green", "Regular", "Veteran", "Elite"};
+	const char* vetStrings[] = {"Green", "Regular", "Veteran", "Elite", "Level Four", "Level Five"};
+	static_assert(ARRAY_SIZE(vetStrings) == LEVEL_COUNT, "Incorrect array size");
 	const char* aggroStrings[] = {"Passive", "Normal", "Guard", "Hunt", "Aggressive", "Sleep"};
 	AsciiString noOwner = "No Owner";
 	static FILE *theLogFile = nullptr;
@@ -4944,7 +4955,7 @@ void CWorldBuilderDoc::OnDumpDocToText()
 	try {
 		char curbuf[_MAX_PATH];
 		GetModuleFileName(nullptr, curbuf, sizeof(curbuf));
-		if (char *pEnd = strrchr(curbuf, '\\'))
+		if (char *pEnd = getLastPathSeparator(curbuf))
 		{
 			*(pEnd + 1) = 0;
 		}
@@ -5413,7 +5424,8 @@ void CWorldBuilderDoc::OnRemoveclifftexmapping()
 
 			WorldHeightMapEdit *htMapEditCopy = GetHeightMap()->duplicate();
 			if (htMapEditCopy == nullptr) return;
-			if (htMapEditCopy->removeCliffMapping()) {  // does all the work.
+			if (htMapEditCopy->removeCliffMapping()) {
+				// does all the work.
 				IRegion2D partialRange = {0,0,0,0};
 				updateHeightMap(htMapEditCopy, false, partialRange);
 				WBDocUndoable *pUndo = new WBDocUndoable(this, htMapEditCopy);

@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 8                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -47,8 +45,6 @@
 
 // Forward declarations
 class RenderObjClass;
-class ChunkSaveClass;
-class ChunkLoadClass;
 
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -139,14 +135,6 @@ class SoundSceneClass
 		virtual void			Add_Logical_Listener (LogicalListenerClass *listener_obj);
 		virtual void			Remove_Logical_Listener (LogicalListenerClass *listener_obj);
 
-		//////////////////////////////////////////////////////////////////////
-		//	Save/Load
-		//////////////////////////////////////////////////////////////////////
-		bool						Save_Static (ChunkSaveClass &csave);
-		bool						Load_Static (ChunkLoadClass &cload);
-		bool						Save_Dynamic (ChunkSaveClass &csave);
-		bool						Load_Dynamic (ChunkLoadClass &cload);
-
 		bool						Is_Batch_Mode () const			{ return m_IsBatchMode; }
 		void						Set_Batch_Mode (bool batch_mode)	{ m_IsBatchMode = batch_mode; }
 
@@ -164,10 +152,6 @@ class SoundSceneClass
 		virtual void			Initialize ();
 
 		virtual bool			Is_Logical_Sound_In_Scene (LogicalSoundClass *sound_obj, bool single_shot = false);
-
-		// Save/load methods
-		virtual void			Save_Static_Sounds (ChunkSaveClass &csave);
-		virtual void			Load_Static_Sounds (ChunkLoadClass &cload);
 
 		//////////////////////////////////////////////////////////////////////
 		//	Collection methods

@@ -96,20 +96,19 @@ FireWeaponPower::~FireWeaponPower()
 // ------------------------------------------------------------------------------------------------
 void FireWeaponPower::doSpecialPower( UnsignedInt commandOptions )
 {
-	Object *self = getObject();
-	const FireWeaponPowerModuleData *data = getFireWeaponPowerModuleData();
-
-	if( self->isDisabled() )
+	if (!canDoSpecialPower())
 		return;
 
 	// call the base class action cause we are *EXTENDING* functionality
 	SpecialPowerModule::doSpecialPower( commandOptions );
 
+	Object *self = getObject();
 	self->reloadAllAmmo( TRUE );
 
 	AIUpdateInterface *ai = self->getAI();
 	if( ai )
 	{
+		const FireWeaponPowerModuleData *data = getFireWeaponPowerModuleData();
 		// This attack is CMD_FROM_AI, so the OCL statuses keep a queued step current until it ends.
 		TheCommandSequence->oclPending( self );
 
@@ -129,20 +128,19 @@ void FireWeaponPower::doSpecialPower( UnsignedInt commandOptions )
 // ------------------------------------------------------------------------------------------------
 void FireWeaponPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	Object *self = getObject();
-	const FireWeaponPowerModuleData *data = getFireWeaponPowerModuleData();
-
-	if( self->isDisabled() )
+	if (!canDoSpecialPower())
 		return;
 
 	// call the base class action cause we are *EXTENDING* functionality
 	SpecialPowerModule::doSpecialPowerAtLocation( loc, angle, commandOptions );
 
+	Object *self = getObject();
 	self->reloadAllAmmo( TRUE );
 
 	AIUpdateInterface *ai = self->getAI();
 	if( ai )
 	{
+		const FireWeaponPowerModuleData *data = getFireWeaponPowerModuleData();
 		TheCommandSequence->oclPending( self );
 
 		ai->aiAttackPosition( loc, data->m_maxShotsToFire, CMD_FROM_AI );
@@ -161,20 +159,19 @@ void FireWeaponPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 // ------------------------------------------------------------------------------------------------
 void FireWeaponPower::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions )
 {
-	Object *self = getObject();
-	const FireWeaponPowerModuleData *data = getFireWeaponPowerModuleData();
-
-	if( self->isDisabled() )
+	if (!canDoSpecialPower())
 		return;
 
 	// call the base class action cause we are *EXTENDING* functionality
 	SpecialPowerModule::doSpecialPowerAtObject( obj, commandOptions );
 
+	Object *self = getObject();
 	self->reloadAllAmmo( TRUE );
 
 	AIUpdateInterface *ai = self->getAI();
 	if( ai )
 	{
+		const FireWeaponPowerModuleData *data = getFireWeaponPowerModuleData();
 		TheCommandSequence->oclPending( self );
 
 		ai->aiAttackObject( obj, data->m_maxShotsToFire, CMD_FROM_AI );

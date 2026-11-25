@@ -35,6 +35,7 @@
 #include "WW3D2/surfaceclass.h"
 #include "WWLib/ffactory.h"
 
+#include <Utility/cmath_adapter.h>
 #include <cfloat>
 #include <cstdio>
 #include <string>
@@ -132,7 +133,7 @@ void Add_Int(std::string &out, const char *key, long long value)
 void Add_Float(std::string &out, const char *key, float value)
 {
 	char buffer[32];
-	::sprintf_s(buffer, "%.9g,", ::_finite(value) ? (double)value : 0.0);
+	::sprintf_s(buffer, "%.9g,", std::isfinite(value) ? (double)value : 0.0);
 	Add_Key(out, key);
 	out += buffer;
 }

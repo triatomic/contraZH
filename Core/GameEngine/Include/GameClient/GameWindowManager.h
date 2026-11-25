@@ -84,6 +84,8 @@ public:
 	virtual void reset() override;		///< reset the system
 	virtual void update() override;  ///< update method, called once per frame
 
+	virtual Bool isDummy() const { return false; }
+
 	virtual GameWindow *allocateNewWindow() = 0;  ///< new game window
 
 	void linkWindow( GameWindow *window );  ///< link into master list
@@ -278,8 +280,7 @@ public:
 	virtual GameWindow *winGetCapture();  ///< current mouse capture settings
 
 	virtual Int winSetModal( GameWindow *window );  ///< put at top of modal stack
-	virtual Int winUnsetModal( GameWindow *window );  /**< take window off modal stack, if window is
-																										not at top of stack and error will occur */
+	virtual Int winUnsetModal( GameWindow *window );  ///< take window off the modal stack from anywhere in the stack
 
 	//---------------------------------------------------------------------------
 	/////////////////////////////////////////////////////////////////////////////
@@ -335,7 +336,6 @@ public:
 protected:
 
 	void processDestroyList();  ///< process windows waiting to be killed
-	void removeWindowFromModalStack( GameWindow *window );
 
 	Int drawWindow( GameWindow *window );  ///< draw this window
 
@@ -385,6 +385,8 @@ extern WindowMsgHandledType PassMessagesToParentSystem( GameWindow *window,
 class GameWindowManagerDummy : public GameWindowManager
 {
 public:
+	virtual Bool isDummy() const override { return true; }
+
 	virtual GameWindow *winGetWindowFromId(GameWindow *window, Int id) override;
 	virtual GameWindow *winCreateFromScript(AsciiString filenameString, WindowLayoutInfo *info) override;
 

@@ -24,7 +24,7 @@ Everything here is additional to upstream; the rest of these docs still applies.
 * A network mismatch writes `MismatchInfo.txt` to the user data folder (the previous one is kept as `MismatchInfoPrev.txt`): the frame, every player's CRC, separate CRCs for objects, the partition manager, the player list and the AI, and one CRC per object. A diff of two players' files names the objects that differ.
 * When more than 128 one-shot sound effects are waiting to play, the oldest are dropped down to 64. Loops, stops, pauses, music and speech are never dropped and do not count toward the limit.
 * On laptops with two GPUs, the game, WorldBuilder and GUIEdit ask the NVIDIA or AMD driver to run them on the dedicated GPU.
-* Synced with TheSuperHackers/GeneralsGameCode as of August 2026 and with GeneralsGameCode_Modding
+* Synced with TheSuperHackers/GeneralsGameCode as of November 2026 and with GeneralsGameCode_Modding
 as of October 2026. The only casualty was the texture filter option, replaced by TheSuperHackers'
 version - see [Rendering](contraZH-Options.md#rendering) for the renamed `AnisotropyLevel` key.
 * Upstream's WorldBuilder MCP server is not included; contraZH has its own, see

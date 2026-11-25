@@ -343,14 +343,19 @@ AsciiString MapCache::getMapExtension() const
 	return "map";
 }
 
+AsciiString MapCache::getCachePath( const AsciiString &mapDir )
+{
+	AsciiString path = mapDir;
+	FileSystem::ensureTrailingPathSeparatorInPath(path);
+	path.concat(m_mapCacheName);
+	return path;
+}
+
 void MapCache::writeCacheINI( const AsciiString &mapDir )
 {
-	AsciiString filepath = mapDir;
-	filepath.concat('\\');
+	AsciiString filepath = getCachePath(mapDir);
 
 	TheFileSystem->createDirectory(mapDir);
-
-	filepath.concat(m_mapCacheName);
 
 	// write to a temp file and swap it in so a failed write never leaves a truncated MapCache.ini
 	AsciiString tempFilepath = filepath;
@@ -532,8 +537,7 @@ Bool MapCache::clearUnseenMaps( const AsciiString &mapDir )
 Bool MapCache::loadMapsFromMapCacheINI( const AsciiString &mapDir )
 {
 	INI ini;
-	AsciiString fname;
-	fname.format("%s\\%s", mapDir.str(), m_mapCacheName);
+	AsciiString fname = getCachePath(mapDir);
 
 	if (TheFileSystem->doesFileExist(fname.str()))
 	{
@@ -558,7 +562,7 @@ Bool MapCache::loadMapsFromDisk( const AsciiString &mapDir, Bool isOfficial, Boo
 	FilenameList filepathList;
 	FilenameListIter filepathIt;
 	AsciiString toplevelPattern;
-	toplevelPattern.format("%s\\", mapDir.str());
+	toplevelPattern.format("%s%c", mapDir.str(), getNativePathSeparator());
 	Bool mapListChanged = FALSE;
 	AsciiString filenamepattern;
 	filenamepattern.format("*.%s", getMapExtension().str());
@@ -573,14 +577,13 @@ Bool MapCache::loadMapsFromDisk( const AsciiString &mapDir, Bool isOfficial, Boo
 		AsciiString filepathLower = *filepathIt;
 		filepathLower.toLower();
 
-		const char *szFilenameLower = filepathLower.reverseFind('\\');
+		const char *szFilenameLower = getLastPathSeparator(filepathLower.str());
 		if (!szFilenameLower)
 		{
-			DEBUG_CRASH(("Couldn't find \\ in map name!"));
+			DEBUG_CRASH(("Couldn't find / or \\ in map name!"));
 			continue;
 		}
 
-		AsciiString endingStr;
 		AsciiString filenameLower = szFilenameLower+1;
 		filenameLower.truncateBy(strlen(mapExtension));
 
@@ -590,9 +593,11 @@ Bool MapCache::loadMapsFromDisk( const AsciiString &mapDir, Bool isOfficial, Boo
 			continue;
 		}
 
-		endingStr.format("%s\\%s%s", filenameLower.str(), filenameLower.str(), mapExtension);
+		// The map must sit in a folder of the same name
+		const AsciiString fullMapFolderLower(filepathLower.str(), szFilenameLower - filepathLower.str());
+		const char* lastMapFolderLower = getFileName(fullMapFolderLower.str());
 
-		if (!filepathLower.endsWithNoCase(endingStr.str()))
+		if (strcmp(lastMapFolderLower, filenameLower.str()) != 0)
 		{
 			DEBUG_CRASH(("Found map '%s' in wrong spot (%s)", filenameLower.str(), filepathLower.str()));
 			continue;
@@ -635,7 +640,7 @@ Bool MapCache::addMap(
 			{
 				// unofficial maps or maps without names
 				AsciiString tempdisplayname;
-				tempdisplayname = fname.reverseFind('\\') + 1;
+				tempdisplayname = getFileName(fname.str());
 				(*this)[lowerFname].m_displayName.translate(tempdisplayname);
 				if (md.m_numPlayers >= 2)
 				{
@@ -665,9 +670,6 @@ Bool MapCache::addMap(
 		DEBUG_LOG(("size: %d / %d", fileInfo.sizeLow, md.m_filesize));
 		DEBUG_LOG(("time1: %d / %d", fileInfo.timestampHigh, md.m_timestamp.m_highTimeStamp));
 		DEBUG_LOG(("time2: %d / %d", fileInfo.timestampLow, md.m_timestamp.m_lowTimeStamp));
-//		DEBUG_LOG(("size: %d / %d", filesize, md.m_filesize));
-//		DEBUG_LOG(("time1: %d / %d", timestamp.m_highTimeStamp, md.m_timestamp.m_highTimeStamp));
-//		DEBUG_LOG(("time2: %d / %d", timestamp.m_lowTimeStamp, md.m_timestamp.m_lowTimeStamp));
 	}
 
 	DEBUG_LOG(("MapCache::addMap(): caching '%s' because '%s' was not found", fname.str(), lowerFname.str()));
@@ -715,7 +717,7 @@ Bool MapCache::addMap(
 	{
 		DEBUG_LOG(("Missing TheKey_mapName!"));
 		AsciiString tempdisplayname;
-		tempdisplayname = fname.reverseFind('\\') + 1;
+		tempdisplayname = getFileName(fname.str());
 		md.m_displayName.translate(tempdisplayname);
 		if (md.m_numPlayers >= 2)
 		{
@@ -1283,7 +1285,7 @@ Image *getMapPreviewImage( AsciiString mapName )
 	for(Int i = 0; i < portableName.getLength(); ++i)
 	{
 		char c = portableName.getCharAt(i);
-		if (c == '\\' || c == ':')
+		if (isPathSeparator(c) || c == ':')
 			tempName.concat('_');
 		else
 			tempName.concat(c);
@@ -1370,7 +1372,8 @@ Image *getMapPreviewImage( AsciiString mapName )
 		ChunkInputStream *pStrm = &theInputStream;
 		pStrm->absoluteSeek(0);
 		DataChunkInput file( pStrm );
-		if (file.isValidFileType()) {	// Backwards compatible files aren't valid data chunk files.
+		if (file.isValidFileType()) {
+			// Backwards compatible files aren't valid data chunk files.
 			// Read the waypoints.
 			file.registerParser( "MapPreview", AsciiString::TheEmptyString, parseMapPreviewChunk );
 			if (!file.parse(nullptr)) {

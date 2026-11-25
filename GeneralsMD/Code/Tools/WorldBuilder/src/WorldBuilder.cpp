@@ -63,7 +63,7 @@
 #include "Common/LocalFileSystem.h"
 #include "Common/Debug.h"
 #include "Common/StackDump.h"
-#include "Common/MiniDumper.h"
+#include "MiniDumper/MiniDumper.h"
 #include "Common/GameMemory.h"
 #include "Common/Science.h"
 #include "Common/ThingFactory.h"
@@ -129,7 +129,7 @@ static SubsystemInterfaceList TheSubsystemListRecord;
 // does in case a worker allocates via the pool / AsciiString. Uncontended cost
 // is ~14ns per lock pair (measured) -- cheap insurance. Assigned at the very
 // top of InitInstance, before any pooled allocation.
-static CriticalSection critSecUnicode, critSecDma, critSecMemoryPool, critSecDebugLog;
+static CriticalSection critSecUnicode, critSecDma, critSecMemoryPool;
 
 template<class SUBSYSTEM>
 void initSubsystem(SUBSYSTEM*& sysref, SUBSYSTEM* sys, const char* path1 = nullptr, const char* path2 = nullptr)
@@ -380,7 +380,6 @@ BOOL CWorldBuilderApp::InitInstance()
 	TheUnicodeStringCriticalSection = &critSecUnicode;
 	TheDmaCriticalSection = &critSecDma;
 	TheMemoryPoolCriticalSection = &critSecMemoryPool;
-	TheDebugLogCriticalSection = &critSecDebugLog;
 
 	ApplicationHWnd = GetDesktopWindow();
 
@@ -397,7 +396,7 @@ BOOL CWorldBuilderApp::InitInstance()
 	AsciiString dumpRoot = TheGlobalData->getPath_UserData();
 	dumpRoot.concat("WorldBuilder\\");
 	CreateDirectory(dumpRoot.str(), nullptr);
-	MiniDumper::initMiniDumper(dumpRoot);
+	MiniDumper::initMiniDumper(dumpRoot.str(), 'Z');
 #endif
 
 #ifdef DEBUG_LOGGING
@@ -515,7 +514,7 @@ BOOL CWorldBuilderApp::InitInstance()
 	ini.loadFileDirectory( "Data\\Scripts\\Scripts", INI_LOAD_OVERWRITE, nullptr );
 
 	initSubsystem(TheAudio, (AudioManager*)new MilesAudioManager());
-	initSubsystem(TheVideoPlayer, (VideoPlayerInterface*)(new VideoPlayer()));
+	initSubsystem(TheVideoPlayer, (VideoPlayerInterface*)(new NullVideoPlayer()));
 	initSubsystem(TheModuleFactory, (ModuleFactory*)(new W3DModuleFactory()));
 	initSubsystem(TheSidesList, new SidesList());
 	initSubsystem(TheCaveSystem, new CaveSystem());
@@ -848,7 +847,8 @@ void CWorldBuilderApp::updateCurTool(Bool forceHand)
 {
 	Tool *curTool = m_curTool;
 	DEBUG_ASSERTCRASH((m_lockCurTool>=0),("oops"));
-	if (!m_lockCurTool) {	 // don't change tools that are doing something.
+	if (!m_lockCurTool) {
+		// don't change tools that are doing something.
 		if (forceHand || (0x8000 & ::GetAsyncKeyState(VK_SPACE))) {
 			// Space bar gives scroll hand.
 			m_curTool = &m_handScrollTool;

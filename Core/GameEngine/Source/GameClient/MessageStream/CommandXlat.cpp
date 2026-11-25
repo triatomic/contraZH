@@ -368,8 +368,6 @@ bool changeLogicTimeScale(FpsValueChange change)
 }
 
 
-static Bool isSystemMessage( const GameMessage *msg );
-
 enum{ DROPPED_MAX_PARTICLE_COUNT = 1000};
 
 static Bool canSelectionSalvage( const Object *targetObj)
@@ -813,7 +811,9 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 					//Low priority sounds -- only do this if uninitialized.
 					if( info && info->m_air )
 						soundToPlayPtr = templ->getVoiceAttackAir();
-					else
+
+					// TheSuperHackers @tweak Stubbjax 31/10/2026 Fall back to VoiceAttack if VoiceAttackAir is invalid.
+					if (!soundToPlayPtr || !TheAudio->isValidAudioEvent(soundToPlayPtr))
 						soundToPlayPtr = templ->getVoiceAttack();
 
 					objectWithSound = obj;
@@ -887,8 +887,11 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 					//Low priority sounds -- only do this if uninitialized.
 					if( info && info->m_air )
 						soundToPlayPtr = templ->getVoiceAttackAir();
-					else
+
+					// TheSuperHackers @tweak Stubbjax 31/10/2026 Fall back to VoiceAttack if VoiceAttackAir is invalid.
+					if (!soundToPlayPtr || !TheAudio->isValidAudioEvent(soundToPlayPtr))
 						soundToPlayPtr = templ->getVoiceAttack();
+
 					objectWithSound = obj;
 				}
 
@@ -1310,7 +1313,7 @@ GameMessage::Type CommandTranslator::issueAttackCommand( Drawable *target,
 	if( m_teamExists )
 	{
 
-		//DEBUG_LOG(("issuing team-attack cmd against %s",enemy->getTemplate()->getName().str()));
+		//DEBUG_LOG(("issuing team-attack cmd against %s",targetObj->getTemplate()->getName().str()));
 
 		// insert team attack command message into stream
 		switch( command )
@@ -2723,8 +2726,8 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 		return msgType;
 	}
 
-	const Bool canPerformActions = TheInGameUI->areSelectedObjectsControllable()
-		|| ( command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT );
+	const Bool canPerformActions = TheInGameUI->areSelectedObjectsControllable() ||
+		( command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT );
 
 	if( !canPerformActions )
 	{
@@ -2758,14 +2761,14 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 	CanAttackResult result = ATTACKRESULT_NOT_POSSIBLE;
 
 	if(command &&
-		(command->isContextCommand()
-			|| command->getCommandType() == GUI_COMMAND_SPECIAL_POWER
-			|| command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT))
+		(command->isContextCommand() ||
+			command->getCommandType() == GUI_COMMAND_SPECIAL_POWER ||
+			command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT))
 	{
 		return handleGuiCommand( command, draw, obj, pos, type );
 	}
-	else if( command && (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT
-					 || command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT) )
+	else if( command && (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT ||
+					 command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT) )
 	{
 		return handleSpecialPowerConstructCommand( command, draw, pos, type );
 	}
@@ -2884,11 +2887,24 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 {
 	GameMessage::Type t = msg->getType();
 	GameMessageDisposition disp = KEEP_MESSAGE;
+
 	// We want to always be able to get to the options menu even during no input times and a clear game data message should always go through
-	if (t != GameMessage::MSG_META_OPTIONS && t != GameMessage::MSG_CLEAR_GAME_DATA &&
-			!TheInGameUI->getInputEnabled() && !isSystemMessage(msg) && !GameMessage::isDebugCheatHotkey(t))
+	switch (t)
 	{
-		return DESTROY_MESSAGE;
+	case GameMessage::MSG_FRAME_TICK:
+	case GameMessage::MSG_CLEAR_GAME_DATA:
+	case GameMessage::MSG_LOGIC_CRC_PLAYBACK:
+	case GameMessage::MSG_META_OPTIONS:
+	case GameMessage::MSG_META_DEMO_INSTANT_QUIT:
+	case GameMessage::MSG_DESTROY_SELECTED_GROUP:
+	case GameMessage::MSG_SET_REPLAY_CAMERA:
+	case GameMessage::MSG_LOGIC_CRC:
+		break;
+	default:
+		if (!TheInGameUI->getInputEnabled() && !GameMessage::isDebugCheatHotkey(t))
+			return DESTROY_MESSAGE;
+
+		break;
 	}
 
 #if defined(RTS_DEBUG)
@@ -3104,8 +3120,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 							hack = TRUE;
 							const Object *tempObject = temp->getObject();
 							// must take case of this case here or else the loop will break without getting newDrawable
-							if( tempObject && temp->getNextDrawable() == selectedDrawable && !temp->isSelected()
-								&& tempObject->isMobile() && tempObject->isLocallyControlled() && !tempObject->isContained() && !tempObject->isKindOf( KINDOF_NO_SELECT ) )
+							if( tempObject && temp->getNextDrawable() == selectedDrawable && !temp->isSelected() &&
+								tempObject->isMobile() && tempObject->isLocallyControlled() && !tempObject->isContained() && !tempObject->isKindOf( KINDOF_NO_SELECT ) )
 							{
 								newDrawable = temp;
 								break;
@@ -3331,8 +3347,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 							hack = TRUE;
 							const Object *tempObject = temp->getObject();
 							// must take case of this case here or else the loop will break without getting newDrawable
-							if( tempObject && temp->getNextDrawable() == selectedDrawable && !temp->isSelected()
-								&& tempObject->isMobile() && tempObject->isLocallyControlled() && !tempObject->isContained() )
+							if( tempObject && temp->getNextDrawable() == selectedDrawable && !temp->isSelected() &&
+								tempObject->isMobile() && tempObject->isLocallyControlled() && !tempObject->isContained() )
 							{
 								newDrawable = temp;
 								break;
@@ -3342,8 +3358,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 						else
 						{
 							const Object *tempObject = temp->getObject();
-							if( tempObject && !temp->isSelected() && tempObject->isMobile()
-								  && tempObject->isLocallyControlled() && !tempObject->isContained() && tempObject->isKindOf( KINDOF_DOZER ) )
+							if( tempObject && !temp->isSelected() && tempObject->isMobile() &&
+								  tempObject->isLocallyControlled() && !tempObject->isContained() && tempObject->isKindOf( KINDOF_DOZER ) )
 							{
 								newDrawable = temp;
 								break;
@@ -3537,13 +3553,13 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 				disqualifyingKindofs.set(KINDOF_DOZER);
 				disqualifyingKindofs.set(KINDOF_HARVESTER);
 				disqualifyingKindofs.set(KINDOF_IGNORES_SELECT_ALL);
-				if( object
-					&& object->isMobile()
-					&& object->isLocallyControlled()
-					&& !object->isContained()
-					&& !object->isAnyKindOf( disqualifyingKindofs )
-					&& !object->isEffectivelyDead()
-					&& object->isMassSelectable()
+				if( object &&
+					object->isMobile() &&
+					object->isLocallyControlled() &&
+					!object->isContained() &&
+					!object->isAnyKindOf( disqualifyingKindofs ) &&
+					!object->isEffectivelyDead() &&
+					object->isMassSelectable()
 					)
 				{
 					// enforce optional unit cap
@@ -4883,8 +4899,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		case GameMessage::MSG_MOUSEOVER_DRAWABLE_HINT:
 		{
 			const CommandButton *command = TheInGameUI->getGUICommand();
-			if( TheInGameUI->getSelectCount() > 0
-					|| (command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT) ) // If something is selected
+			if( TheInGameUI->getSelectCount() > 0 ||
+					(command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT) ) // If something is selected
 			{
 				/// @todo This as well as the one in GameMessage::MSG_DRAWABLE_PICKED below should possibly have a generalized CanAttack instead of simply checking isEnemyOf
 				Drawable *draw = TheGameClient->findDrawableByID( msg->getArgument( 0 )->drawableID );
@@ -4995,8 +5011,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		case GameMessage::MSG_MOUSE_RIGHT_CLICK:
 		{
 			// right click is only actioned here if we're in alternate mouse mode
-			if (TheGlobalData->m_useAlternateMouse
-				&& TheMouse->isClick(
+			if (TheGlobalData->m_useAlternateMouse &&
+				TheMouse->isClick(
 					m_rightMouseDownTimeMs, m_rightMouseUpTimeMs,
 					m_rightMouseDownAnchor, m_rightMouseUpAnchor))
 			{
@@ -5015,8 +5031,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 				const CommandButton *command = TheInGameUI->getGUICommand();
 				Bool isPoint = (msg->getArgument(0)->pixelRegion.height() == 0 && msg->getArgument(0)->pixelRegion.width() == 0);
-				Bool controllable = TheInGameUI->areSelectedObjectsControllable()
-														|| (command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT);
+				Bool controllable = TheInGameUI->areSelectedObjectsControllable() ||
+														(command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT);
 				if (isPoint && controllable)
 				{
 					UnsignedInt pickType = getPickTypesForContext( TheInGameUI->isInForceAttackMode() );
@@ -5085,20 +5101,20 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 			const CommandButton *command = TheInGameUI->getGUICommand();
 			// maintain this as the list of GUI button initiated commands that fire with left click in alt mouse mode
-  			Bool isFiringGUICommand = (command	&& (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER
-  												|| command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT
- 												|| command->getCommandType() == GUI_COMMAND_FIRE_WEAPON
-												|| command->getCommandType() == GUI_COMMAND_COMBATDROP
-												|| command->getCommandType() == GUICOMMANDMODE_HIJACK_VEHICLE
-												|| command->getCommandType() == GUICOMMANDMODE_CONVERT_TO_CARBOMB));
+  			Bool isFiringGUICommand = (command	&& (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER ||
+  												command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT ||
+ 												command->getCommandType() == GUI_COMMAND_FIRE_WEAPON ||
+												command->getCommandType() == GUI_COMMAND_COMBATDROP ||
+												command->getCommandType() == GUICOMMANDMODE_HIJACK_VEHICLE ||
+												command->getCommandType() == GUICOMMANDMODE_CONVERT_TO_CARBOMB));
 
 			// in alternate mouse mode, this left click is only actioned here if we're firing a gui command
 			if ((TheGlobalData->m_useAlternateMouse) && (! isFiringGUICommand))
 				break;
 
 			Bool isPoint = (msg->getArgument(0)->pixelRegion.height() == 0 && msg->getArgument(0)->pixelRegion.width() == 0);
-			Bool controllable = TheInGameUI->areSelectedObjectsControllable()
-													|| (command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT);
+			Bool controllable = TheInGameUI->areSelectedObjectsControllable() ||
+													(command && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT);
 			if (isPoint && controllable)
 			{
 				UnsignedInt pickType = getPickTypesForContext( TheInGameUI->isInForceAttackMode() );
@@ -5330,7 +5346,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		case GameMessage::MSG_META_DEMO_TOGGLE_MOTION_BLUR_ZOOM:
 		{	Int mode;
 			if ((mode=TheTacticalView->getViewFilterType()) == FT_VIEW_MOTION_BLUR_FILTER)
-			{	//mode already set, turn it off
+			{
+				//mode already set, turn it off
 				TheTacticalView->setViewFilterMode(FM_NULL_MODE);
 				TheTacticalView->setViewFilter(FT_NULL_FILTER);
 			}
@@ -5360,10 +5377,12 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		//------------------------------------------------------------------------------- DEMO MESSAGES
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_DEMO_TOGGLE_BW_VIEW:
-		{   //We're not testing BW mode anymore, so use this message for toggling wireframe mode.
+		{
+			//We're not testing BW mode anymore, so use this message for toggling wireframe mode.
 			static Int mode=0;
 			if (mode == 0)
-			{	//First turn on wireframe
+			{
+				//First turn on wireframe
 				TheTacticalView->set3DWireFrameMode(TRUE);
 				mode++;
 				disp = DESTROY_MESSAGE;
@@ -5372,7 +5391,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			if (mode == 1)
 			{
 				if ((TheTacticalView->getViewFilterType()) == FT_VIEW_CROSSFADE)
-				{	//mode already set, turn it off
+				{
+					//mode already set, turn it off
 					TheTacticalView->setViewFilterMode(FM_NULL_MODE);
 					TheTacticalView->setViewFilter(FT_NULL_FILTER);
 					TheTacticalView->setFadeParameters(0,-1);
@@ -5404,7 +5424,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		case GameMessage::MSG_META_DEMO_TOGGLE_RED_VIEW:
 		{
 			if ((TheTacticalView->getViewFilterType()) == FT_VIEW_BW_FILTER)
-			{	//mode already set, turn it off
+			{
+				//mode already set, turn it off
 				TheTacticalView->setViewFilterMode(FM_NULL_MODE);
 				TheTacticalView->setViewFilter(FT_NULL_FILTER);
 				TheTacticalView->setFadeParameters(30,-1);
@@ -5425,7 +5446,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		case GameMessage::MSG_META_DEMO_TOGGLE_GREEN_VIEW:
 		{
 			if ((TheTacticalView->getViewFilterType()) == FT_VIEW_BW_FILTER)
-			{	//mode already set, turn it off
+			{
+				//mode already set, turn it off
 				TheTacticalView->setViewFilterMode(FM_NULL_MODE);
 				TheTacticalView->setViewFilter(FT_NULL_FILTER);
 				TheTacticalView->setFadeParameters(30,-1);
@@ -6564,23 +6586,4 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 	return disp;
 
-}
-
-static Bool isSystemMessage( const GameMessage *msg )
-{
-	if (!msg) {
-		return false;
-	}
-	GameMessage::Type msgType = msg->getType();
-
-	switch (msgType)
-	{
-		case GameMessage::MSG_DESTROY_SELECTED_GROUP:
-		case GameMessage::MSG_LOGIC_CRC:
-		case GameMessage::MSG_SET_REPLAY_CAMERA:
-		case GameMessage::MSG_FRAME_TICK:
-		case GameMessage::MSG_META_DEMO_INSTANT_QUIT:
-			return TRUE;
-	}
-	return FALSE;
 }

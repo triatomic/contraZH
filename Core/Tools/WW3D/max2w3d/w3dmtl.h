@@ -30,15 +30,13 @@
  *                                                                                             *
  *                    $Revision:: 15                                                          $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
 
-#include "always.h"
-#include "w3d_file.h"
-#include "Vector.h"
+#include "WWLib/always.h"
+#include "WW3D2/w3d_file.h"
+#include "WWLib/Vector.h"
 
 class GameMtl;
 class Mtl;
@@ -193,7 +191,6 @@ public:
 	W3dShaderStruct *				Get_Shader(int mat_index,int pass);
 	W3dMapClass *					Get_Texture(int mat_index,int pass,int stage);
 	int								Get_Map_Channel(int mat_index,int pass,int stage);
-	bool								Stage_Needs_Texture_Coordinates(int pass,int stage);
 	bool								Pass_Uses_Vertex_Alpha(int pass);
 	bool								Pass_Uses_Alpha(int pass);
 

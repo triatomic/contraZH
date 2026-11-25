@@ -30,8 +30,6 @@
  *                                                                                             *
  *                  Last update : 11/1/1999                                                    *
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "AlphaModifier.h"
@@ -341,17 +339,6 @@ AlphaModifierClass::AlphaModifierClass()
 	assert(pblock);
 	Message = 0;
 }
-
-
-/*===========================================================================*\
- |	Invalidate our UI (or the recently changed parameter)
-\*===========================================================================*/
-
-void AlphaModifierClass::InvalidateUI()
-{
-	alpha_param_blk.InvalidateUI(pblock->LastNotifyParamID());
-}
-
 
 
 /*===========================================================================*\

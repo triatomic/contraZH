@@ -33,8 +33,6 @@
  *                    $Revision:: 1                                                          $*
  *                                                                                             *
  * 08/05/02 KM Texture filter class abstraction																			*
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -92,7 +90,7 @@ public:
 		TEXTURE_FILTER_COUNT
 	};
 
-	static const char* const TextureFilterModeString[TEXTURE_FILTER_COUNT];
+	static const char* const TextureFilterModeString[];
 
 	static TextureFilterMode getTextureFilterMode(const char* str);
 

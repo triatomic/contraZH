@@ -1557,7 +1557,7 @@ Bool outOfWeaponRangePosition( State *thisState, void* userData )
  */
 static Bool cannotPossiblyAttackObject( State *thisState, void* userData )
 {
-	AbleToAttackType attackType = (AbleToAttackType)(UnsignedInt)userData;
+	AbleToAttackType attackType = (AbleToAttackType)(uintptr_t)userData;
 	Object *obj = thisState->getMachineOwner();
 	Object *victim = thisState->getMachineGoalObject();
 
@@ -4595,9 +4595,9 @@ void AIFollowWaypointPathState::computeGoal(Bool useGroupOffsets)
 	Region3D extent;
 	TheTerrainLogic->getMaximumPathfindExtent(&extent);
 
-	if (extent.isInRegionNoZ(dest)) {
+	if (extent.containsWithin(dest.asCoord2D())) {
 		// The waypoint is on the map.  Check & see if the adjusted position is off map [8/28/2003]
-		if (!extent.isInRegionNoZ(m_goalPosition)) {
+		if (!extent.containsWithin(m_goalPosition.asCoord2D())) {
 			// clamp to in region. [8/28/2003]
 			if (m_goalPosition.x < extent.lo.x+PATHFIND_CELL_SIZE_F) {
 				m_goalPosition.x = extent.lo.x+PATHFIND_CELL_SIZE_F;
@@ -4614,13 +4614,13 @@ void AIFollowWaypointPathState::computeGoal(Bool useGroupOffsets)
 		}
 	}
 
-	if (hasNextWaypoint() && m_goalLayer == LAYER_GROUND && extent.isInRegionNoZ(dest) &&
-		extent.isInRegionNoZ(m_goalPosition))
+	if (hasNextWaypoint() && m_goalLayer == LAYER_GROUND && extent.containsWithin(dest.asCoord2D()) &&
+		extent.containsWithin(m_goalPosition.asCoord2D()))
 	{
 		TheAI->pathfinder()->adjustThreatenedWaypoint(obj, m_goalPosition);
 	}
 
-	if (!extent.isInRegionNoZ(m_goalPosition)) {
+	if (!extent.containsWithin(m_goalPosition.asCoord2D())) {
 		setAdjustsDestination(false); // moving off the map.
 		ai->getCurLocomotor()->setAllowInvalidPosition(true); // allow it to move off the map.
 		m_appendGoalPosition = true; // Moving off the map.
@@ -5629,8 +5629,26 @@ StateReturnType AIAttackAimAtTargetState::onEnter()
 	Object *containedBy = source->getContainedBy();
 	ContainModuleInterface *contain = containedBy ? containedBy->getContain() : nullptr;
 
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+	if( containedBy && weapon )
+#else
 	if( containedBy && weapon && contain && contain->isEnclosingContainerFor( source ) )
-	{                                          // non enclosing garrison containers do not use firepoints. Lorenzen, 6/11/03
+#endif
+	{
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+		// TheSuperHackers @bugfix Caball009 22/09/2026 Return early to prevent a crash.
+		// This is needed when a Tunnel Network with units is transferred to another player and then sold or destroyed.
+		// The units are not properly transferred and are left in an invalid state.
+		if (!contain)
+		{
+			// remove all such units from the tunnel tracker and destroy them
+			TheGameLogic->friend_destroyInTunnelContain(source);
+
+			return STATE_FAILURE;
+		}
+#endif
+
+		// non enclosing garrison containers do not use firepoints. Lorenzen, 6/11/03
 		if (victim)
 		{
 			inFiringRange = contain->attemptBestFirePointPosition( source, weapon, victim );
@@ -7093,7 +7111,7 @@ Object *AIAttackSquadState::chooseVictim()
 		case DIFFICULTY_EASY:
 		{
 			// pick a random unit
-			VecObjectPtr objects = victimSquad->getLiveObjects();
+			const VecObjectPtr& objects = victimSquad->getLiveObjects();
 			Int numUnits = objects.size();
 			if (numUnits == 0)
 			{
@@ -7121,7 +7139,7 @@ Object *AIAttackSquadState::chooseVictim()
 		case DIFFICULTY_HARD:
 		{
 			// everyone picks the same unit
-			VecObjectPtr objects = victimSquad->getLiveObjects();
+			const VecObjectPtr& objects = victimSquad->getLiveObjects();
 			if (!objects.empty())
 			{
 				return objects[0];

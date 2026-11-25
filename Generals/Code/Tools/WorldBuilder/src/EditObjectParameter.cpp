@@ -101,7 +101,7 @@ BOOL EditObjectParameter::OnInitDialog()
 void EditObjectParameter::addObject( const ThingTemplate *thingTemplate  )
 {
 	HTREEITEM parent = TVI_ROOT;
-	const char *leafName;
+	const char *leafName = nullptr;
 	//
 	// if we have an thing template in mapObject, we've read it from the new INI database,
 	// we will sort those items into the tree based on properties of the template that
@@ -118,7 +118,7 @@ void EditObjectParameter::addObject( const ThingTemplate *thingTemplate  )
 			parent = findOrAdd( parent, "TEST" );
 
 		// first sort by Side, either create or find the tree item with matching side name
-		AsciiString side = thingTemplate->getDefaultOwningSide();
+		const AsciiString &side = thingTemplate->getDefaultOwningSide();
 		DEBUG_ASSERTCRASH(!side.isEmpty(), ("null default side in template") );
 		parent = findOrAdd( parent, side.str());
 

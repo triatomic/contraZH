@@ -35,8 +35,6 @@
  * 06/26/02 KM Matrix name change to avoid MAX conflicts                                       *
  * 06/27/02 KM Render to shadow buffer texture support														*
  * 08/05/02 KM Texture class redesign
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -162,6 +160,9 @@ WWINLINE void DX8_ErrorCode_Impl(unsigned res, const char* file, int line)
 
 // Reports where the failure happened, which a bare error code does not
 #define DX8_ErrorCode(res) DX8_ErrorCode_Impl((res), __FILE__, __LINE__)
+
+// Converts a FLOAT to a DWORD for use in SetRenderState() calls
+inline DWORD F2DW(FLOAT f) { return *((DWORD*)&f); }
 
 #ifdef WWDEBUG
 #define DX8CALL_HRES(x,res) DX8_Assert(); res = DX8Wrapper::_Get_D3D_Device8()->x; DX8_ErrorCode(res); DX8Wrapper::Increment_DX8_CallCount();
@@ -867,6 +868,7 @@ protected:
 
 	friend void DX8_Assert();
 	friend class WW3D;
+	friend class Renderer;
 	friend class DX8IndexBufferClass;
 	friend class DX8VertexBufferClass;
 };
@@ -1117,7 +1119,7 @@ WWINLINE void DX8Wrapper::Set_DX8_Render_State(D3DRENDERSTATETYPE state, unsigne
 	// Can't monitor state changes because setShader call to GERD may change the states!
 	if (RenderStates[state]==value) return;
 
-#ifdef MESH_RENDER_SNAPSHOT_ENABLED
+#ifdef DEBUG_LOGGING
 	if (WW3D::Is_Snapshot_Activated()) {
 		StringClass value_name(0,true);
 		Get_DX8_Render_State_Value_Name(value_name,state,value);
@@ -1187,7 +1189,8 @@ WWINLINE void DX8Wrapper::Set_DX8_Texture_Stage_State(unsigned stage, D3DTEXTURE
 
 	// Can't monitor state changes because setShader call to GERD may change the states!
 	if (TextureStageStates[stage][(unsigned int)state]==value) return;
-#ifdef MESH_RENDER_SNAPSHOT_ENABLED
+
+#ifdef DEBUG_LOGGING
 	if (WW3D::Is_Snapshot_Activated()) {
 		StringClass value_name(0,true);
 		Get_DX8_Texture_Stage_State_Value_Name(value_name,state,value);
@@ -1531,14 +1534,14 @@ WWINLINE void DX8Wrapper::Clamp_Color(Vector4& color)
 
 WWINLINE unsigned int DX8Wrapper::Convert_Color(const Vector4& color)
 {
-	return Convert_Color(reinterpret_cast<const Vector3&>(color),color[3]);
+	return Convert_Color(Vector3(color.X,color.Y,color.Z),color.W);
 }
 
 WWINLINE unsigned int DX8Wrapper::Convert_Color_Clamp(const Vector4& color)
 {
 	Vector4 clamped_color=color;
 	DX8Wrapper::Clamp_Color(clamped_color);
-	return Convert_Color(reinterpret_cast<const Vector3&>(clamped_color),clamped_color[3]);
+	return Convert_Color(clamped_color);
 }
 
 #endif
@@ -1592,10 +1595,8 @@ WWINLINE void DX8Wrapper::Set_Shader(const ShaderClass& shader)
 	}
 	render_state.shader=shader;
 	render_state_changed|=SHADER_CHANGED;
-#ifdef MESH_RENDER_SNAPSHOT_ENABLED
-	StringClass str;
-#endif
-	SNAPSHOT_SAY(("DX8Wrapper::Set_Shader(%s)",shader.Get_Description(str).str()));
+
+	SNAPSHOT_SAY(("DX8Wrapper::Set_Shader(%s)",shader.Get_Description().str()));
 }
 
 WWINLINE void DX8Wrapper::Set_Projection_Transform_With_Z_Bias(const Matrix4x4& matrix, float znear, float zfar)

@@ -185,11 +185,9 @@ namespace
 		int i;
 
 		strcpy(dirBuf, ".\\data\\Editor\\Molds");
-		int len = strlen(dirBuf);
-		if (len > 0 && dirBuf[len - 1] != '\\')
+		if (!ensureTrailingSeparatorInPath(dirBuf, ARRAY_SIZE(dirBuf)).ok)
 		{
-			dirBuf[len++] = '\\';
-			dirBuf[len] = 0;
+			return;
 		}
 
 		FilenameList filenameList;
@@ -199,7 +197,7 @@ namespace
 		for (; it != filenameList.end(); ++it)
 		{
 			AsciiString filename = *it;
-			len = filename.getLength();
+			int len = filename.getLength();
 			if (len < 5)
 			{
 				continue;

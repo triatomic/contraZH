@@ -21,6 +21,7 @@
 #include "WorldBuilderMcpBridge.h"
 
 #include <float.h>
+#include <Utility/cmath_adapter.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <wchar.h>
@@ -1107,11 +1108,11 @@ Bool ParseReal(const std::string &text, Real *value)
 	}
 	char *end = nullptr;
 	double parsed = strtod(text.c_str(), &end);
-	if (end == text.c_str() || *end != '\0' || !_finite(parsed)) {
+	if (end == text.c_str() || *end != '\0' || !std::isfinite(parsed)) {
 		return false;
 	}
 	*value = static_cast<Real>(parsed);
-	return _finite(*value) != 0;
+	return std::isfinite(*value);
 }
 
 Bool GetOptionalInt(

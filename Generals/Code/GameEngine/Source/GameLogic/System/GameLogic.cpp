@@ -42,7 +42,6 @@
 #include "Common/LatchRestore.h"
 #include "Common/MapObject.h"
 #include "Common/MultiplayerSettings.h"
-#include "Common/OSDisplay.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -54,7 +53,9 @@
 #include "Common/ThingFactory.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
-#include "GameClient/Water.h"
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+#include "Common/TunnelTracker.h"
+#endif
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
 #include "Common/XferCRC.h"
@@ -73,6 +74,7 @@
 #include "GameClient/View.h"
 #include "GameClient/CampaignManager.h"
 #include "GameClient/GameWindowTransitions.h"
+#include "GameClient/Water.h"
 
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
@@ -204,28 +206,10 @@ void setFPMode()
 	_controlfp(newVal, _MCW_PC | _MCW_RC);
 }
 
-//-------------------------------------------------------------------------------------------------
-const char* toString(GameMode mode)
+// ------------------------------------------------------------------------------------------------
+UnsignedShort GameLogic::getSuperweaponRestriction() const
 {
-	switch (mode)
-	{
-		case GAME_SINGLE_PLAYER:
-			return "GAME_SINGLE_PLAYER";
-		case GAME_LAN:
-			return "GAME_LAN";
-		case GAME_SKIRMISH:
-			return "GAME_SKIRMISH";
-		case GAME_REPLAY:
-			return "GAME_REPLAY";
-		case GAME_SHELL:
-			return "GAME_SHELL";
-		case GAME_INTERNET:
-			return "GAME_INTERNET";
-		case GAME_NONE:
-			return "GAME_NONE";
-		default:
-			return "GAME_UNKNOWN";
-	}
+  return TheGameInfo ? TheGameInfo->getSuperweaponRestriction() : 0;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -286,12 +270,16 @@ GameLogic::GameLogic()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-Bool GameLogic::isInSinglePlayerGame()
+Bool GameLogic::isInSinglePlayerGame() const
 {
-	return (m_gameMode == GAME_SINGLE_PLAYER ||
-		(TheRecorder && TheRecorder->isPlaybackMode() && TheRecorder->getGameMode() == GAME_SINGLE_PLAYER));
-}
+	if (rts::isSinglePlayerGame(m_gameMode))
+		return true;
 
+	if (TheRecorder && TheRecorder->isPlaybackMode() && rts::isSinglePlayerGame(TheRecorder->getGameMode()))
+		return true;
+
+	return false;
+}
 
 //-------------------------------------------------------------------------------------------------
 /** Destroy all objects immediately */
@@ -501,7 +489,6 @@ static Object * placeObjectAtPosition(Int slotNum, AsciiString objectTemplateNam
 		obj->setOrientation(obj->getTemplate()->getPlacementViewAngle());
 		obj->setPosition( &pos );
 
-		//DEBUG_LOG(("Placed a starting building for %s at waypoint %s", playerName.str(), waypointName.str()));
 		CRCDEBUG_LOG(("Placed an object for %ls at pos (%g,%g,%g)", pPlayer->getPlayerDisplayName().str(),
 			pos.x, pos.y, pos.z));
 		DUMPCOORD3D(&pos);
@@ -980,7 +967,7 @@ void GameLogic::updateDisplayBusyState()
 	const Bool busySystem = isInInteractiveGame() && !isGamePaused();
 	const Bool busyDisplay = busySystem && !TheGlobalData->m_headless;
 
-	OSDisplaySetBusyState(busyDisplay, busySystem);
+	TheGameEngine->setBusyState(busyDisplay, busySystem);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2185,12 +2172,13 @@ void GameLogic::loadMapINI( AsciiString mapName )
 		return;
 	}
 
-	// back up over the ".map" extension and to the first directory separator
-	char *extension = filename + length - 4;
-	while ((extension > filename) && (*extension != '\\') && (*extension != '/')) {
-		--extension;
+	// cut the map file name off to get the map directory
+	char *separator = getLastPathSeparator(filename);
+	if (separator) {
+		*separator = 0;
+	} else {
+		filename[0] = 0;
 	}
-	*extension = 0;
 
 
 	char fullFledgeFilename[_MAX_PATH];
@@ -2855,6 +2843,40 @@ void GameLogic::friend_awakenUpdateModule(Object* obj, UpdateModulePtr u, Unsign
 	}
 }
 
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+// ------------------------------------------------------------------------------------------------
+// Find the tunnel tracker that contains the object and destroy all objects in the contain list
+// ------------------------------------------------------------------------------------------------
+void GameLogic::friend_destroyInTunnelContain(const Object* strandedObject)
+{
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		TunnelTracker* tracker = ThePlayerList->getNthPlayer(i)->getTunnelSystem();
+		if (!tracker)
+			continue;
+
+		const ContainedItemsList& list = *tracker->getContainedItemsList();
+
+		const ContainedItemsList::const_iterator it = std::find(list.begin(), list.end(), strandedObject);
+		if (it == list.end())
+			continue;
+
+		while (!list.empty())
+		{
+			Object* obj = list.front();
+
+			tracker->removeFromContain(obj);
+
+			obj->onRemovedFrom(nullptr);
+
+			destroyObject(obj);
+		}
+
+		break;
+	}
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 #ifdef DO_UNIT_TIMINGS
 	enum {TIME_FRAMES=100};
@@ -3035,8 +3057,8 @@ static void unitTimings()
 		if (g_UT_curThing->getName()==SINGLE_UNIT) {
 			return;
 		}
-		while (g_UT_curThing->friend_getNextTemplate()
-			&& g_UT_curThing->friend_getNextTemplate()->getName()!=SINGLE_UNIT)
+		while (g_UT_curThing->friend_getNextTemplate() &&
+			g_UT_curThing->friend_getNextTemplate()->getName()!=SINGLE_UNIT)
 			g_UT_curThing = g_UT_curThing->friend_getNextTemplate();
 
 	}
@@ -3243,6 +3265,12 @@ void GameLogic::update()
 	Bool isMPGameOrReplay = (TheRecorder && TheRecorder->isMultiplayer() && getGameMode() != GAME_SHELL && getGameMode() != GAME_NONE);
 	Bool isSoloGameOrReplay = (TheRecorder && !TheRecorder->isMultiplayer() && getGameMode() != GAME_SHELL && getGameMode() != GAME_NONE);
 	Bool generateForMP = (isMPGameOrReplay && (m_frame % TheGameInfo->getCRCInterval()) == 0);
+#if RETAIL_COMPATIBLE_CRC
+	// TheSuperHackers @info The local player of a network game only goes in game on logic frame 1.
+	// Retail clients therefore never sent the CRC of logic frame 0, and their replays do not contain it.
+	if (generateForMP && m_frame == 0 && rts::isMultiplayerGame(TheRecorder->getGameMode()))
+		generateForMP = FALSE;
+#endif
 #ifdef DEBUG_CRC
 	Bool generateForSolo = isSoloGameOrReplay && ((m_frame && (m_frame%100 == 0)) ||
 		(getFrame() >= TheCRCFirstFrameToLog && getFrame() < TheCRCLastFrameToLog && ((m_frame % REPLAY_CRC_INTERVAL) == 0)));
@@ -3253,11 +3281,14 @@ void GameLogic::update()
 	if (generateForSolo || generateForMP)
 	{
 		m_CRC = getCRC( CRC_RECALC );
-		bool isPlayback = (TheRecorder && TheRecorder->isPlaybackMode());
 
-		GameMessage *msg = newInstance(GameMessage)(GameMessage::MSG_LOGIC_CRC);
+		// TheSuperHackers @tweak Caball009 30/09/2026 Playback CRC is now separate from regular CRC,
+		// removing the need for the second parameter used to distinguish them. Older clients can still
+		// parse newer replays because GameMessage::getArgument returns false for the missing playback argument.
+		const bool isPlayback = TheRecorder && TheRecorder->isPlaybackMode();
+		const GameMessage::Type msgType = isPlayback ? GameMessage::MSG_LOGIC_CRC_PLAYBACK : GameMessage::MSG_LOGIC_CRC;
+		GameMessage *msg = newInstance(GameMessage)(msgType);
 		msg->appendIntegerArgument(m_CRC);
-		msg->appendBooleanArgument(isPlayback);
 
 		// TheSuperHackers @info helmutbuhler 13/04/2025
 		// During replay simulation, we bypass TheMessageStream and instead put the CRC message
@@ -3352,7 +3383,7 @@ void GameLogic::update()
 			{
 				USE_PERF_TIMER(GameLogic_update_sleepy)
 
-				//DEBUG_LOG(("calling update %08lx (%d %d)...",update,update->friend_getNextCallFrame(),update->friend_getNextCallPhase()));
+				//DEBUG_LOG(("calling update %08lx (%d %d)...",u,u->friend_getNextCallFrame(),u->friend_getNextCallPhase()));
 				m_curUpdateModule = u;
 
 				sleepLen = u->update();
@@ -3465,7 +3496,7 @@ void GameLogic::addObjectToLookupTable( Object *obj )
 	if( obj == nullptr )
 		return;
 
-	// add to lookup
+	// add to lookup table
 	m_objHash[ obj->getID() ] = obj;
 
 }

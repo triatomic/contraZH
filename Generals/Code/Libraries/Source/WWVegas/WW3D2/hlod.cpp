@@ -30,98 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 10                                                          $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   HLodLoaderClass::Load_W3D -- Loads an HlodDef from a W3D file                             *
- *   HLodPrototypeClass::Create -- Creates an HLod from an HLodDef                             *
- *   HLodDefClass::HLodDefClass -- Constructor                                                 *
- *   HLodDefClass::HLodDefClass -- Copy Constructor                                            *
- *   HLodDefClass::~HLodDefClass -- Destructor                                                 *
- *   HLodDefClass::Free -- releases all resources being used                                   *
- *   HLodDefClass::Initialize -- init this def from an HLod                                    *
- *   HLodDefClass::Save -- save this HLodDef                                                   *
- *   HLodDefClass::Save_Header -- writes the HLodDef header                                    *
- *   HLodDefClass::Save_Lod_Array -- Saves the lod array                                       *
- *   HLodDefClass::Save_Aggregate_Array -- Save the array of aggregate models                  *
- *   HLodDefClass::Load_W3D -- Loads this HLodDef from a W3d File                              *
- *   HLodDefClass::read_header -- loads the HLodDef header from a W3d file                     *
- *   HLodDefClass::read_proxy_array -- load the proxy names                                    *
- *   HLodDefClass::SubObjectArrayClass::SubObjectArrayClass -- LodArray constructor            *
- *   HLodDefClass::SubObjectArrayClass::~SubObjectArrayClass -- LodArray destructor            *
- *   HLodDefClass::SubObjectArrayClass::Save_W3D -- saves a w3d file for this HLodDef          *
- *   HLodDefClass::SubObjectArrayClass::Load_W3D -- LodArray load function                     *
- *   HLodDefClass::SubObjectArrayClass::Reset -- release the contents of this array            *
- *   HLodClass::HLodClass -- Constructor                                                       *
- *   HLodClass::HLodClass -- copy constructor                                                  *
- *   HLodClass::HLodClass -- Constructor                                                       *
- *   HLodClass::HLodClass -- Constructs an HLod from an HLodDef                                *
- *   HLodClass::HLodClass -- Constructs an HLod from an HModelDef                              *
- *   HLodClass::operator -- assignment operator                                                *
- *   HLodClass::~HLodClass -- Destructor                                                       *
- *   HLodClass::Free -- releases all resources                                                 *
- *   HLodClass::Clone -- virtual copy constructor                                              *
- *   HLodClass::Set_Max_Screen_Size -- Set max-screen-size for an LOD                          *
- *   HLodClass::Get_Max_Screen_Size -- get max-screen-size for an LOD                          *
- *   HLodClass::Get_Lod_Count -- returns number of levels of detail                            *
- *   HLodClass::Get_Lod_Model_Count -- number of sub-objs in a given level of detail           *
- *   HLodClass::Peek_Lod_Model -- returns pointer to a model in one of the LODs                *
- *   HLodClass::Get_Lod_Model -- returns a pointer to a model in one of the LODs               *
- *   HLodClass::Get_Lod_Model_Bone -- returns the bone index of a model                        *
- *   HLodClass::Get_Additional_Model_Count -- number of additional sub-objs                    *
- *   HLodClass::Peek_Additional_Model -- returns pointer to an additional model                *
- *   HLodClass::Get_Additional_Model -- returns pointer to an additional model                 *
- *   HLodClass::Get_Additional_Model_Bone -- returns the bone index of an additional model     *
- *   HLodClass::Is_NULL_Lod_Included -- does this HLod have nullptr as its lowest LOD             *
- *   HLodClass::Include_NULL_Lod -- Add nullptr as the lowest LOD                                 *
- *   HLodClass::Get_Num_Polys -- returns polycount of the current LOD                          *
- *   HLodClass::Render -- render this HLod                                                     *
- *   HLodClass::Special_Render -- Special_Render for HLod                                      *
- *   HLodClass::Set_Transform -- Sets the transform                                            *
- *   HLodClass::Set_Position -- Sets the position                                              *
- *   HLodClass::Notify_Added -- callback notifies subobjs that they were added                 *
- *   HLodClass::Notify_Removed -- notifies subobjs that they were removed                      *
- *   HLodClass::Get_Num_Sub_Objects -- returns total number of sub-objects                     *
- *   HLodClass::Get_Sub_Object -- returns a pointer to specified sub-object                    *
- *   HLodClass::Add_Sub_Object -- add a sub-object to this HLod                                *
- *   HLodClass::Remove_Sub_Object -- remove a sub-object from this HLod                        *
- *   HLodClass::Get_Num_Sub_Objects_On_Bone -- returns the number of objects on the given bone *
- *   HLodClass::Get_Sub_Object_On_Bone -- returns obj on the given bone                        *
- *   HLodClass::Get_Sub_Object_Bone_Index -- returns bone index of given object                *
- *   HLodClass::Add_Sub_Object_To_Bone -- adds a sub-object to a bone                          *
- *   HLodClass::Set_Animation -- set animation state to the base-pose                          *
- *   HLodClass::Set_Animation -- set animation state to an animation frame                     *
- *   HLodClass::Set_Animation -- set animation state to a blend of two animations              *
- *   HLodClass::Set_Animation -- set animation state to a combination of anims                 *
- *   HLodClass::Cast_Ray -- cast a ray against this HLod                                       *
- *   HLodClass::Cast_AABox -- Cast a swept AABox against this HLod                             *
- *   HLodClass::Cast_OBBox -- Cast a swept OBBox against this HLod                             *
- *   HLodClass::Intersect_AABox -- Intersect an AABox with this HLod                           *
- *   HLodClass::Intersect_OBBox -- Intersect an OBBox with this HLod                           *
- *   HLodClass::Prepare_LOD -- Prepare for LOD processing                                      *
- *   HLodClass::Recalculate_Static_LOD_Factors -- compute lod factors                          *
- *   HLodClass::Increment_LOD -- move to next lod                                              *
- *   HLodClass::Decrement_LOD -- move to previous lod                                          *
- *   HLodClass::Get_Cost -- returns the cost of this LOD                                       *
- *   HLodClass::Get_Value -- returns the value of this LOD                                     *
- *   HLodClass::Get_Post_Increment_Value -- returns the post increment value                   *
- *   HLodClass::Set_LOD_Level -- set the current lod level                                     *
- *   HLodClass::Get_LOD_Level -- returns the current LOD level                                 *
- *   HLodClass::Get_LOD_Count -- returns the number of levels of detail                        *
- *   HLodClass::Calculate_Cost_Value_Arrays -- computes the cost-value arrays                  *
- *   HLodClass::Get_Current_LOD -- returns a render object which represents the current LOD    *
- *   HLodClass::Set_Texture_Reduction_Factor -- resizeable texture support                     *
- *   HLodClass::Scale -- scale this HLod model                                                 *
- *   HLodClass::Get_Num_Snap_Points -- returns the number of snap points in this model         *
- *   HLodClass::Get_Snap_Point -- returns specified snap-point                                 *
- *   HLodClass::Update_Sub_Object_Transforms -- updates transforms of all sub-objects          *
- *   HLodClass::Update_Obj_Space_Bounding_Volumes -- update object-space bounding volumes      *
- *   HLodClass::Add_Lod_Model -- adds a model to one of the lods                               *
- *   HLodClass::Create_Decal -- create a decal on this HLod                                    *
- *   HLodClass::Delete_Decal -- remove a decal from this HLod                                  *
- *   HLodClass::Set_HTree -- replace the hierarchy tree                                        *
- *   HLodClass::Get_Proxy_Count -- Returns the number of proxy objects                         *
- *   HLodClass::Get_Proxy -- returns the information for the i'th proxy                        *
- * HLodClass::Set_Hidden -- Propogates the hidden bit to particle emitters.                    *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -197,18 +105,6 @@ public:
 ** The HLod Loader Implementation
 */
 
-/***********************************************************************************************
- * HLodLoaderClass::Load_W3D -- Loads an HlodDef from a W3D file                               *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 PrototypeClass *HLodLoaderClass::Load_W3D( ChunkLoadClass &cload )
 {
 	HLodDefClass * def = W3DNEW HLodDefClass;
@@ -235,18 +131,6 @@ PrototypeClass *HLodLoaderClass::Load_W3D( ChunkLoadClass &cload )
 ** HLod Prototype Implementation
 */
 
-/***********************************************************************************************
- * HLodPrototypeClass::Create -- Creates an HLod from an HLodDef                               *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 RenderObjClass * HLodPrototypeClass::Create()
 {
 	HLodClass * hlod = NEW_REF( HLodClass , ( *Definition ) );
@@ -258,17 +142,6 @@ RenderObjClass * HLodPrototypeClass::Create()
 ** HLodDef Implementation
 */
 
-/***********************************************************************************************
- * HLodDefClass::HLodDefClass -- Constructor                                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *=============================================================================================*/
 HLodDefClass::HLodDefClass() :
 	Name(nullptr),
 	HierarchyTreeName(nullptr),
@@ -279,18 +152,6 @@ HLodDefClass::HLodDefClass() :
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::HLodDefClass -- Copy Constructor                                              *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 HLodDefClass::HLodDefClass(HLodClass &src_lod) :
 	Name(nullptr),
 	HierarchyTreeName(nullptr),
@@ -302,36 +163,12 @@ HLodDefClass::HLodDefClass(HLodClass &src_lod) :
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::~HLodDefClass -- Destructor                                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 HLodDefClass::~HLodDefClass()
 {
 	Free ();
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::Free -- releases all resources being used                                     *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodDefClass::Free()
 {
 	::free(Name);
@@ -344,22 +181,11 @@ void HLodDefClass::Free()
 	Lod = nullptr;
 	LodCount = 0;
 
+	Aggregates.Reset();
 	REF_PTR_RELEASE(ProxyArray);
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::Initialize -- init this def from an HLod                                      *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodDefClass::Initialize(HLodClass &src_lod)
 {
 	// Start with a fresh set of data
@@ -408,21 +234,12 @@ void HLodDefClass::Initialize(HLodClass &src_lod)
 			Lod[index].BoneIndex = bone_indicies;
 		}
 	}
+
+	Aggregates.Copy_Additional_Models(src_lod);
+	REF_PTR_SET (ProxyArray, src_lod.ProxyArray);
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::Save -- save this HLodDef                                                     *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 WW3DErrorType HLodDefClass::Save(ChunkSaveClass & csave)
 {
 	// Assume error
@@ -433,7 +250,9 @@ WW3DErrorType HLodDefClass::Save(ChunkSaveClass & csave)
 
 		// Attempt to save the different sections of the aggregate definition
 		if ((Save_Header (csave) == WW3D_ERROR_OK) &&
-			 (Save_Lod_Array (csave) == WW3D_ERROR_OK)) {
+			 (Save_Lod_Array (csave) == WW3D_ERROR_OK) &&
+			 (Save_Aggregate_Array (csave) == WW3D_ERROR_OK) &&
+			 (Save_Proxy_Array (csave) == WW3D_ERROR_OK)) {
 
 			// Success!
 			ret_val = WW3D_ERROR_OK;
@@ -448,18 +267,6 @@ WW3DErrorType HLodDefClass::Save(ChunkSaveClass & csave)
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::Save_Header -- writes the HLodDef header                                      *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 WW3DErrorType HLodDefClass::Save_Header(ChunkSaveClass &csave)
 {
 	// Assume error
@@ -497,18 +304,6 @@ WW3DErrorType HLodDefClass::Save_Header(ChunkSaveClass &csave)
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::Save_Lod_Array -- Saves the lod array                                         *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 WW3DErrorType HLodDefClass::Save_Lod_Array(ChunkSaveClass &csave)
 {
 	// Loop through all the LODs and save their model array to the chunk
@@ -516,7 +311,11 @@ WW3DErrorType HLodDefClass::Save_Lod_Array(ChunkSaveClass &csave)
 	for (int lod_index = 0;
 		  (lod_index < LodCount) && success;
 		  lod_index ++) {
-		success = Lod[lod_index].Save_W3D (csave);
+		success &= (csave.Begin_Chunk (W3D_CHUNK_HLOD_LOD_ARRAY) == TRUE);
+		if (success) {
+			success &= Lod[lod_index].Save_W3D (csave);
+			success &= csave.End_Chunk ();
+		}
 	}
 
 	// Return the WW3DErrorType return code
@@ -524,44 +323,62 @@ WW3DErrorType HLodDefClass::Save_Lod_Array(ChunkSaveClass &csave)
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::Save_Aggregate_Array -- Save the array of aggregate models                    *
- *                                                                                             *
- * aggregate models are ones that are attached as "additional" models.                         *
- *                                                                                             *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/25/2000 gth : Created.                                                                 *
- *=============================================================================================*/
+// Aggregate models are ones that are attached as "additional" models.
 WW3DErrorType HLodDefClass::Save_Aggregate_Array(ChunkSaveClass & csave)
 {
+	bool success = true;
 	if (Aggregates.ModelCount > 0) {
-		csave.Begin_Chunk(W3D_CHUNK_HLOD_AGGREGATE_ARRAY);
-		Aggregates.Save_W3D(csave);
-		csave.End_Chunk();
+		success &= csave.Begin_Chunk(W3D_CHUNK_HLOD_AGGREGATE_ARRAY);
+		if (success) {
+			success &= Aggregates.Save_W3D(csave);
+			success &= csave.End_Chunk();
+		}
 	}
-	return WW3D_ERROR_OK;
+	return success ? WW3D_ERROR_OK : WW3D_ERROR_SAVE_FAILED;
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::Load_W3D -- Loads this HLodDef from a W3d File                                *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
+// The screen size in the array header is 0.
+// TheSuperHackers @fix Added to keep the proxy and aggregate arrays of HLod definitions.
+WW3DErrorType HLodDefClass::Save_Proxy_Array(ChunkSaveClass & csave)
+{
+	bool success = true;
+
+	if ((ProxyArray != nullptr) && (ProxyArray->Length() > 0)) {
+		success &= csave.Begin_Chunk(W3D_CHUNK_HLOD_PROXY_ARRAY);
+
+		if (success) {
+			success &= csave.Begin_Chunk(W3D_CHUNK_HLOD_SUB_OBJECT_ARRAY_HEADER);
+
+			if (success) {
+				W3dHLodArrayHeaderStruct header = { 0 };
+				header.ModelCount = ProxyArray->Length();
+				header.MaxScreenSize = 0.0f;
+				success &= (csave.Write(&header,sizeof(header)) == sizeof(header));
+				success &= csave.End_Chunk();
+			}
+
+			for (int imodel=0; success && imodel<ProxyArray->Length(); ++imodel) {
+				ProxyRecordClass & proxy = (*ProxyArray)[imodel];
+				W3dHLodSubObjectStruct subobjdef = { 0 };
+				subobjdef.BoneIndex = proxy.Get_Bone_Index();
+				::lstrcpyn(subobjdef.Name, proxy.Get_Name(), sizeof(subobjdef.Name));
+				subobjdef.Name[sizeof(subobjdef.Name) - 1] = 0;
+
+				success &= csave.Begin_Chunk(W3D_CHUNK_HLOD_SUB_OBJECT);
+				if (success) {
+					success &= (csave.Write(&subobjdef,sizeof(subobjdef)) == sizeof(subobjdef));
+					success &= csave.End_Chunk();
+				}
+			}
+			success &= csave.End_Chunk();
+		}
+	}
+
+	return success ? WW3D_ERROR_OK : WW3D_ERROR_SAVE_FAILED;
+}
+
+
 WW3DErrorType HLodDefClass::Load_W3D(ChunkLoadClass & cload)
 {
 	/*
@@ -614,18 +431,6 @@ WW3DErrorType HLodDefClass::Load_W3D(ChunkLoadClass & cload)
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::read_header -- loads the HLodDef header from a W3d file                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 bool HLodDefClass::read_header(ChunkLoadClass & cload)
 {
 	/*
@@ -653,22 +458,9 @@ bool HLodDefClass::read_header(ChunkLoadClass & cload)
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::read_proxy_array -- load the proxy names                                      *
- *                                                                                             *
- *    This function is coded separately from SubObjectArrayClass::Load because we are going    *
- *    to store the proxies in a shared data structure.  Because all of the proxy data is       *
- *    constant, each instanced HLOD can just add-ref a pointer to its proxy array.             *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/27/2000 gth : Created.                                                                 *
- *=============================================================================================*/
+// This function is coded separately from SubObjectArrayClass::Load because we are going to store
+// the proxies in a shared data structure. Because all of the proxy data is constant, each instanced
+// HLOD can just add-ref a pointer to its proxy array.
 bool HLodDefClass::read_proxy_array(ChunkLoadClass & cload)
 {
 	REF_PTR_RELEASE(ProxyArray);
@@ -703,17 +495,6 @@ bool HLodDefClass::read_proxy_array(ChunkLoadClass & cload)
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::SubObjectArrayClass::SubObjectArrayClass -- LodArray constructor              *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *=============================================================================================*/
 HLodDefClass::SubObjectArrayClass::SubObjectArrayClass() :
 	MaxScreenSize(NO_MAX_SCREEN_SIZE),
 	ModelCount(0),
@@ -723,36 +504,12 @@ HLodDefClass::SubObjectArrayClass::SubObjectArrayClass() :
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::SubObjectArrayClass::~SubObjectArrayClass -- LodArray destructor              *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 HLodDefClass::SubObjectArrayClass::~SubObjectArrayClass()
 {
 	Reset();
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::SubObjectArrayClass::Reset -- release the contents of this array              *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/25/2000 gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodDefClass::SubObjectArrayClass::Reset()
 {
 	MaxScreenSize = NO_MAX_SCREEN_SIZE;
@@ -772,18 +529,24 @@ void HLodDefClass::SubObjectArrayClass::Reset()
 }
 
 
-/***********************************************************************************************
- * HLodDefClass::SubObjectArrayClass::Load_W3D -- LodArray load function                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
+// TheSuperHackers @fix Added to keep the proxy and aggregate arrays of HLod definitions.
+void HLodDefClass::SubObjectArrayClass::Copy_Additional_Models(const HLodClass & hlod)
+{
+	Reset();
+
+	ModelCount = hlod.Get_Additional_Model_Count ();
+	if (ModelCount > 0) {
+		MaxScreenSize = 0.0f;
+		ModelName = W3DNEWARRAY char *[ModelCount];
+		BoneIndex = W3DNEWARRAY int[ModelCount];
+		for (int model_index = 0; model_index < ModelCount; model_index ++) {
+			ModelName[model_index] = ::strdup (hlod.Peek_Additional_Model (model_index)->Get_Name ());
+			BoneIndex[model_index] = hlod.Get_Additional_Model_Bone (model_index);
+		}
+	}
+}
+
+
 bool HLodDefClass::SubObjectArrayClass::Load_W3D(ChunkLoadClass & cload)
 {
 	/*
@@ -823,69 +586,52 @@ bool HLodDefClass::SubObjectArrayClass::Load_W3D(ChunkLoadClass & cload)
 	return true;
 }
 
-/***********************************************************************************************
- * HLodDefClass::SubObjectArrayClass::Save_W3D -- saves a w3d file for this HLodDef            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
+// TheSuperHackers @fix Writes only the array contents, as Load_W3D reads them. The caller wraps
+// them in W3D_CHUNK_HLOD_LOD_ARRAY or W3D_CHUNK_HLOD_AGGREGATE_ARRAY.
 bool HLodDefClass::SubObjectArrayClass::Save_W3D(ChunkSaveClass &csave)
 {
 	// Assume error
 	bool ret_val = false;
 
-	// Begin a chunk that identifies the LOD array
-	if (csave.Begin_Chunk (W3D_CHUNK_HLOD_LOD_ARRAY) == TRUE) {
+	// Begin a chunk that identifies the LOD header
+	if (csave.Begin_Chunk (W3D_CHUNK_HLOD_SUB_OBJECT_ARRAY_HEADER) == TRUE) {
 
-		// Begin a chunk that identifies the LOD header
-		if (csave.Begin_Chunk (W3D_CHUNK_HLOD_SUB_OBJECT_ARRAY_HEADER) == TRUE) {
+		W3dHLodArrayHeaderStruct header = { 0 };
+		header.ModelCount = ModelCount;
+		header.MaxScreenSize = MaxScreenSize;
 
-			W3dHLodArrayHeaderStruct header = { 0 };
-			header.ModelCount = ModelCount;
-			header.MaxScreenSize = MaxScreenSize;
+		// Write the LOD header structure out to the chunk
+		ret_val = (csave.Write (&header, sizeof (header)) == sizeof (header));
 
-			// Write the LOD header structure out to the chunk
-			ret_val = (csave.Write (&header, sizeof (header)) == sizeof (header));
+		// End the header chunk
+		csave.End_Chunk ();
+	}
 
-			// End the header chunk
-			csave.End_Chunk ();
-		}
+	if (ret_val) {
 
-		if (ret_val) {
+		// Write all of this LOD's models to the file
+		for (int index = 0;
+			  (index < ModelCount) && ret_val;
+			  index ++) {
 
-			// Write all of this LOD's models to the file
-			for (int index = 0;
-				  (index < ModelCount) && ret_val;
-				  index ++) {
+			// Save this LOD sub-obj to the chunk
+			ret_val &= (csave.Begin_Chunk (W3D_CHUNK_HLOD_SUB_OBJECT) == TRUE);
+			if (ret_val) {
 
-				// Save this LOD sub-obj to the chunk
-				ret_val &= (csave.Begin_Chunk (W3D_CHUNK_HLOD_SUB_OBJECT) == TRUE);
-				if (ret_val) {
+				W3dHLodSubObjectStruct info = { 0 };
+				info.BoneIndex = BoneIndex[index];
 
-					W3dHLodSubObjectStruct info = { 0 };
-					info.BoneIndex = BoneIndex[index];
+				// Copy this model name into the structure
+				::lstrcpyn (info.Name, ModelName[index], sizeof (info.Name));
+				info.Name[sizeof (info.Name) - 1] = 0;
 
-					// Copy this model name into the structure
-					::lstrcpyn (info.Name, ModelName[index], sizeof (info.Name));
-					info.Name[sizeof (info.Name) - 1] = 0;
+				// Write the LOD sub-obj structure out to the chunk
+				ret_val &= (csave.Write (&info, sizeof (info)) == sizeof (info));
 
-					// Write the LOD sub-obj structure out to the chunk
-					ret_val &= (csave.Write (&info, sizeof (info)) == sizeof (info));
-
-					// End the sub-obj chunk
-					csave.End_Chunk ();
-				}
+				// End the sub-obj chunk
+				csave.End_Chunk ();
 			}
 		}
-
-		// End the HLOD-Array chunk
-		csave.End_Chunk ();
 	}
 
 	// Return the true/false result code
@@ -895,17 +641,6 @@ bool HLodDefClass::SubObjectArrayClass::Save_W3D(ChunkSaveClass &csave)
 
 
 
-/***********************************************************************************************
- * HLodClass::HLodClass -- Constructor                                                         *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *=============================================================================================*/
 HLodClass::HLodClass() :
 	Animatable3DObjClass(nullptr),
 	LodCount(0),
@@ -922,18 +657,6 @@ HLodClass::HLodClass() :
 }
 
 
-/***********************************************************************************************
- * HLodClass::HLodClass -- copy constructor                                                    *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 HLodClass::HLodClass(const HLodClass & src) :
 	Animatable3DObjClass(src),
 	LodCount(0),
@@ -951,21 +674,8 @@ HLodClass::HLodClass(const HLodClass & src) :
 }
 
 
-/***********************************************************************************************
- * HLodClass::HLodClass -- Constructor                                                         *
- *                                                                                             *
- * Creates an HLodClass from an array of render objects.  Each render object is assumed to     *
- * be an alternate level of detail.                                                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
+// Creates an HLodClass from an array of render objects. Each render object is assumed to be an
+// alternate level of detail.
 HLodClass::HLodClass(const char * name,RenderObjClass ** lods,int count) :
 	Animatable3DObjClass(nullptr),
 	LodCount(0),
@@ -1056,18 +766,6 @@ HLodClass::HLodClass(const char * name,RenderObjClass ** lods,int count) :
 }
 
 
-/***********************************************************************************************
- * HLodClass::HLodClass -- Constructs an HLod from an HLodDef                                  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 HLodClass::HLodClass(const HLodDefClass & def) :
 	Animatable3DObjClass(def.HierarchyTreeName),
 	LodCount(0),
@@ -1144,18 +842,6 @@ HLodClass::HLodClass(const HLodDefClass & def) :
 }
 
 
-/***********************************************************************************************
- * HLodClass::HLodClass -- Constructs an HLod from an HModelDef                                *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 HLodClass::HLodClass(const HModelDefClass & def) :
 	Animatable3DObjClass(def.BasePoseName),
 	LodCount(0),
@@ -1215,18 +901,6 @@ HLodClass::HLodClass(const HModelDefClass & def) :
 }
 
 
-/***********************************************************************************************
- * HLodClass::operator -- assignment operator                                                  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 HLodClass & HLodClass::operator = (const HLodClass & that)
 {
 	int lod,model;
@@ -1303,36 +977,12 @@ HLodClass & HLodClass::operator = (const HLodClass & that)
 }
 
 
-/***********************************************************************************************
- * HLodClass::~HLodClass -- Destructor                                                         *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 HLodClass::~HLodClass()
 {
 	Free();
 }
 
 
-/***********************************************************************************************
- * HLodClass::Free -- releases all resources                                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Free()
 {
 	int lod,model;
@@ -1377,36 +1027,13 @@ void HLodClass::Free()
 }
 
 
-/***********************************************************************************************
- * HLodClass::Clone -- virtual copy constructor                                                *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 RenderObjClass * HLodClass::Clone() const
 {
 	return W3DNEW HLodClass(*this);
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Obj_Space_Bounding_Box -- Return the bounding box mesh if we have one.		  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/13/00    pds : Created.                                                                 *
- *=============================================================================================*/
+// Return the bounding box mesh if we have one.
 void HLodClass::Get_Obj_Space_Bounding_Box(AABoxClass & box) const
 {
 	//
@@ -1449,18 +1076,7 @@ void HLodClass::Get_Obj_Space_Bounding_Box(AABoxClass & box) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Obj_Space_Bounding_Sphere -- Use the bounding box mesh to calculate a sphere.*
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/13/00    pds : Created.                                                                 *
- *=============================================================================================*/
+// Use the bounding box mesh to calculate a sphere.
 void HLodClass::Get_Obj_Space_Bounding_Sphere(SphereClass & sphere) const
 {
 	AABoxClass box;
@@ -1470,18 +1086,7 @@ void HLodClass::Get_Obj_Space_Bounding_Sphere(SphereClass & sphere) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Obj_Space_Bounding_Sphere -- Use the bounding box mesh to calculate a sphere.*
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/13/00    pds : Created.                                                                 *
- *=============================================================================================*/
+// Use the bounding box mesh to calculate a sphere.
 const SphereClass &HLodClass::Get_Bounding_Sphere() const
 {
 	if (BoundingBoxIndex >= 0) {
@@ -1508,18 +1113,7 @@ const SphereClass &HLodClass::Get_Bounding_Sphere() const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Obj_Space_Bounding_Box -- Return the bounding box mesh if we have one.		  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/13/00    pds : Created.                                                                 *
- *=============================================================================================*/
+// Return the bounding box mesh if we have one.
 const AABoxClass &HLodClass::Get_Bounding_Box() const
 {
 	if (BoundingBoxIndex >= 0) {
@@ -1545,18 +1139,6 @@ const AABoxClass &HLodClass::Get_Bounding_Box() const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_Max_Screen_Size -- Set max-screen-size for an LOD                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Set_Max_Screen_Size(int lod_index, float size)
 {
 	// Params valid?
@@ -1580,18 +1162,6 @@ void HLodClass::Set_Max_Screen_Size(int lod_index, float size)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Max_Screen_Size -- get max-screen-size for an LOD                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 float HLodClass::Get_Max_Screen_Size(int lod_index) const
 {
 	float size = NO_MAX_SCREEN_SIZE;
@@ -1610,36 +1180,12 @@ float HLodClass::Get_Max_Screen_Size(int lod_index) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Lod_Count -- returns number of levels of detail                              *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_Lod_Count() const
 {
 	return LodCount;
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_LOD_Bias --  sets LOD bias                                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   2/08/00    nh : Created.                                                                  *
- *=============================================================================================*/
 void HLodClass::Set_LOD_Bias(float bias)
 {
 	assert(bias > 0.0f);
@@ -1653,18 +1199,6 @@ void HLodClass::Set_LOD_Bias(float bias)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Lod_Model_Count -- number of sub-objs in a given level of detail             *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_Lod_Model_Count(int lod_index) const
 {
 	int count = 0;
@@ -1683,18 +1217,6 @@ int HLodClass::Get_Lod_Model_Count(int lod_index) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Peek_Lod_Model -- returns pointer to a model in one of the LODs                  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 RenderObjClass *HLodClass::Peek_Lod_Model(int lod_index, int model_index) const
 {
 	RenderObjClass *pmodel = nullptr;
@@ -1715,18 +1237,6 @@ RenderObjClass *HLodClass::Peek_Lod_Model(int lod_index, int model_index) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Lod_Model -- returns a pointer to a model in one of the LODs                 *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 RenderObjClass *HLodClass::Get_Lod_Model(int lod_index, int model_index) const
 {
 	RenderObjClass *pmodel = nullptr;
@@ -1750,18 +1260,6 @@ RenderObjClass *HLodClass::Get_Lod_Model(int lod_index, int model_index) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Lod_Model_Bone -- returns the bone index of a model                          *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_Lod_Model_Bone(int lod_index, int model_index) const
 {
 	int bone_index = 0;
@@ -1782,36 +1280,12 @@ int HLodClass::Get_Lod_Model_Bone(int lod_index, int model_index) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Additional_Model_Count -- number of additional sub-objs                      *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   8/23/00    NH : Created.                                                                  *
- *=============================================================================================*/
 int HLodClass::Get_Additional_Model_Count() const
 {
 	return AdditionalModels.Count();
 }
 
 
-/***********************************************************************************************
- * HLodClass::Peek_Additional_Model -- returns pointer to an additional model                  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   8/23/00    NH : Created.                                                                  *
- *=============================================================================================*/
 RenderObjClass * HLodClass::Peek_Additional_Model (int model_index) const
 {
 	RenderObjClass *pmodel = nullptr;
@@ -1831,18 +1305,6 @@ RenderObjClass * HLodClass::Peek_Additional_Model (int model_index) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Additional_Model -- returns pointer to an additional model                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   8/23/00    NH : Created.                                                                  *
- *=============================================================================================*/
 RenderObjClass * HLodClass::Get_Additional_Model (int model_index) const
 {
 	RenderObjClass *pmodel = nullptr;
@@ -1865,18 +1327,6 @@ RenderObjClass * HLodClass::Get_Additional_Model (int model_index) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Additional_Model_Bone -- returns the bone index of an additional model       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   8/23/00    NH : Created.                                                                  *
- *=============================================================================================*/
 int HLodClass::Get_Additional_Model_Bone (int model_index) const
 {
 	int bone_index = 0;
@@ -1896,18 +1346,6 @@ int HLodClass::Get_Additional_Model_Bone (int model_index) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Is_NULL_Lod_Included -- does this HLod have nullptr as its lowest LOD               *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 bool HLodClass::Is_NULL_Lod_Included() const
 {
 	bool included = false;
@@ -1922,18 +1360,6 @@ bool HLodClass::Is_NULL_Lod_Included() const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Include_NULL_Lod -- Add nullptr as the lowest LOD                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Include_NULL_Lod(bool include)
 {
 	if ((include == false) && Is_NULL_Lod_Included ()) {
@@ -2013,18 +1439,6 @@ void HLodClass::Include_NULL_Lod(bool include)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Proxy_Count -- Returns the number of proxy records                           *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/27/2000 gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_Proxy_Count() const
 {
 	if (ProxyArray != nullptr) {
@@ -2035,18 +1449,6 @@ int HLodClass::Get_Proxy_Count() const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Proxy -- returns the information for the i'th proxy                          *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/27/2000 gth : Created.                                                                 *
- *=============================================================================================*/
 bool HLodClass::Get_Proxy (int index, ProxyClass &proxy) const
 {
 	bool retval = false;
@@ -2057,7 +1459,7 @@ bool HLodClass::Get_Proxy (int index, ProxyClass &proxy) const
 		//	Lookup the proxy's transform
 		//
 		HTree->Base_Update(Get_Transform());
-		Matrix3D transform = HTree->Get_Transform((*ProxyArray)[index].Get_Bone_Index());
+		const Matrix3D& transform = HTree->Get_Transform((*ProxyArray)[index].Get_Bone_Index());
 		Set_Hierarchy_Valid(false);
 
 		//
@@ -2076,18 +1478,6 @@ bool HLodClass::Get_Proxy (int index, ProxyClass &proxy) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Num_Polys -- returns polycount of the current LOD                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_Num_Polys() const
 {
 	int polycount = 0;
@@ -2110,18 +1500,6 @@ int HLodClass::Get_Num_Polys() const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Render -- render this HLod                                                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Render(RenderInfoClass & rinfo)
 {
 	int i;
@@ -2150,18 +1528,6 @@ void HLodClass::Render(RenderInfoClass & rinfo)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Special_Render -- Special_Render for HLod                                        *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Special_Render(SpecialRenderInfoClass & rinfo)
 {
 	int i;
@@ -2172,7 +1538,8 @@ void HLodClass::Special_Render(SpecialRenderInfoClass & rinfo)
 	Animatable3DObjClass::Special_Render(rinfo);
 
 	int lod_index = CurLod;
-	if (rinfo.RenderType == SpecialRenderInfoClass::RENDER_SHADOW) {			// (gth) HACK HACK! yikes
+	if (rinfo.RenderType == SpecialRenderInfoClass::RENDER_SHADOW) {
+		// (gth) HACK HACK! yikes
 		lod_index = LodCount-1;
 	}
 
@@ -2186,18 +1553,6 @@ void HLodClass::Special_Render(SpecialRenderInfoClass & rinfo)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_Transform -- Sets the transform                                              *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Set_Transform(const Matrix3D &m)
 {
 	Animatable3DObjClass::Set_Transform(m);
@@ -2205,18 +1560,6 @@ void HLodClass::Set_Transform(const Matrix3D &m)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_Position -- Sets the position                                                *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Set_Position(const Vector3 &v)
 {
 	Animatable3DObjClass::Set_Position(v);
@@ -2224,18 +1567,6 @@ void HLodClass::Set_Position(const Vector3 &v)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Notify_Added -- callback notifies subobjs that they were added                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Notify_Added(SceneClass * scene)
 {
 	RenderObjClass::Notify_Added(scene);
@@ -2252,18 +1583,6 @@ void HLodClass::Notify_Added(SceneClass * scene)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Notify_Removed -- notifies subobjs that they were removed                        *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Notify_Removed(SceneClass * scene)
 {
 	int i;
@@ -2280,18 +1599,6 @@ void HLodClass::Notify_Removed(SceneClass * scene)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Num_Sub_Objects -- returns total number of sub-objects                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_Num_Sub_Objects() const
 {
 	int count = 0;
@@ -2303,18 +1610,6 @@ int HLodClass::Get_Num_Sub_Objects() const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Sub_Object -- returns a pointer to specified sub-object                      *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 RenderObjClass * HLodClass::Get_Sub_Object(int index) const
 {
 	WWASSERT(index >= 0);
@@ -2331,36 +1626,12 @@ RenderObjClass * HLodClass::Get_Sub_Object(int index) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Add_Sub_Object -- add a sub-object to this HLod                                  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Add_Sub_Object(RenderObjClass * subobj)
 {
 	return Add_Sub_Object_To_Bone(subobj,0);
 }
 
 
-/***********************************************************************************************
- * HLodClass::Remove_Sub_Object -- remove a sub-object from this HLod                          *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Remove_Sub_Object(RenderObjClass * removeme)
 {
 	// no object given?
@@ -2424,18 +1695,6 @@ int HLodClass::Remove_Sub_Object(RenderObjClass * removeme)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Num_Sub_Objects_On_Bone -- returns the number of objects on the given bone   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_Num_Sub_Objects_On_Bone(int boneindex) const
 {
 	int count = 0;
@@ -2452,18 +1711,6 @@ int HLodClass::Get_Num_Sub_Objects_On_Bone(int boneindex) const
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Sub_Object_On_Bone -- returns obj on the given bone                          *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 RenderObjClass * HLodClass::Get_Sub_Object_On_Bone(int index,int boneindex) const
 {
 	int count = 0;
@@ -2491,18 +1738,6 @@ RenderObjClass * HLodClass::Get_Sub_Object_On_Bone(int index,int boneindex) cons
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Sub_Object_Bone_Index -- returns bone index of given object                  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_Sub_Object_Bone_Index(RenderObjClass * subobj) const
 {
 	for (int lod = 0; lod < LodCount; lod++) {
@@ -2526,18 +1761,6 @@ int HLodClass::Get_Sub_Object_Bone_Index(int LodIndex, int ModelIndex)	const
 	return Lod[LodIndex][ModelIndex].BoneIndex;
 }
 
-/***********************************************************************************************
- * HLodClass::Add_Sub_Object_To_Bone -- adds a sub-object to a bone                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Add_Sub_Object_To_Bone(RenderObjClass * subobj,int boneindex)
 {
 	WWASSERT(subobj);
@@ -2567,18 +1790,6 @@ int HLodClass::Add_Sub_Object_To_Bone(RenderObjClass * subobj,int boneindex)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_Animation -- set animation state to the base-pose                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Set_Animation()
 {
 	Animatable3DObjClass::Set_Animation();
@@ -2586,18 +1797,6 @@ void HLodClass::Set_Animation()
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_Animation -- set animation state to an animation frame                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Set_Animation(HAnimClass * motion,float frame,int mode)
 {
 	Animatable3DObjClass::Set_Animation(motion,frame,mode);
@@ -2605,18 +1804,6 @@ void HLodClass::Set_Animation(HAnimClass * motion,float frame,int mode)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_Animation -- set animation state to a blend of two animations                *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Set_Animation
 (
 	HAnimClass * motion0,
@@ -2631,18 +1818,6 @@ void HLodClass::Set_Animation
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_Animation -- set animation state to a combination of anims                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Set_Animation(HAnimComboClass * anim_combo)
 {
 	Animatable3DObjClass::Set_Animation(anim_combo);
@@ -2650,18 +1825,6 @@ void HLodClass::Set_Animation(HAnimComboClass * anim_combo)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Cast_Ray -- cast a ray against this HLod                                         *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 bool HLodClass::Cast_Ray(RayCollisionTestClass & raytest)
 {
 	if (Are_Sub_Object_Transforms_Dirty ()) {
@@ -2685,18 +1848,6 @@ bool HLodClass::Cast_Ray(RayCollisionTestClass & raytest)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Cast_AABox -- Cast a swept AABox against this HLod                               *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 bool HLodClass::Cast_AABox(AABoxCollisionTestClass & boxtest)
 {
 	if (Are_Sub_Object_Transforms_Dirty ()) {
@@ -2720,18 +1871,6 @@ bool HLodClass::Cast_AABox(AABoxCollisionTestClass & boxtest)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Cast_OBBox -- Cast a swept OBBox against this HLod                               *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 bool HLodClass::Cast_OBBox(OBBoxCollisionTestClass & boxtest)
 {
 	if (Are_Sub_Object_Transforms_Dirty ()) {
@@ -2755,18 +1894,6 @@ bool HLodClass::Cast_OBBox(OBBoxCollisionTestClass & boxtest)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Intersect_AABox -- Intersect an AABox with this HLod                             *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 bool HLodClass::Intersect_AABox(AABoxIntersectionTestClass & boxtest)
 {
 	if (Are_Sub_Object_Transforms_Dirty ()) {
@@ -2790,18 +1917,6 @@ bool HLodClass::Intersect_AABox(AABoxIntersectionTestClass & boxtest)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Intersect_OBBox -- Intersect an OBBox with this HLod                             *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 bool HLodClass::Intersect_OBBox(OBBoxIntersectionTestClass & boxtest)
 {
 	if (Are_Sub_Object_Transforms_Dirty ()) {
@@ -2825,18 +1940,6 @@ bool HLodClass::Intersect_OBBox(OBBoxIntersectionTestClass & boxtest)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Prepare_LOD -- Prepare for LOD processing                                        *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Prepare_LOD(CameraClass &camera)
 {
 	if (Is_Not_Hidden_At_All() == false) {
@@ -2886,18 +1989,6 @@ void HLodClass::Prepare_LOD(CameraClass &camera)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Recalculate_Static_LOD_Factors -- compute lod factors                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Recalculate_Static_LOD_Factors()
 {
 	/*
@@ -2932,18 +2023,6 @@ void HLodClass::Recalculate_Static_LOD_Factors()
 }
 
 
-/***********************************************************************************************
- * HLodClass::Increment_LOD -- move to next lod                                                *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Increment_LOD()
 {
 	if (CurLod >= (LodCount-1)) return;
@@ -2966,18 +2045,6 @@ void HLodClass::Increment_LOD()
 }
 
 
-/***********************************************************************************************
- * HLodClass::Decrement_LOD -- move to previous lod                                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Decrement_LOD()
 {
 	if (CurLod < 1) return;
@@ -3000,72 +2067,24 @@ void HLodClass::Decrement_LOD()
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Cost -- returns the cost of this LOD                                         *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 float HLodClass::Get_Cost() const
 {
 	return(Cost[CurLod]);
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Value -- returns the value of this LOD                                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 float HLodClass::Get_Value() const
 {
 	return(Value[CurLod]);
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Post_Increment_Value -- returns the post increment value                     *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 float HLodClass::Get_Post_Increment_Value() const
 {
 	return(Value[CurLod + 1]);
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_LOD_Level -- set the current lod level                                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Set_LOD_Level(int lod)
 {
 	lod = MAX(0, lod);
@@ -3092,54 +2111,18 @@ void HLodClass::Set_LOD_Level(int lod)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_LOD_Level -- returns the current LOD level                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_LOD_Level() const
 {
 	return CurLod;
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_LOD_Count -- returns the number of levels of detail                          *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_LOD_Count() const
 {
 	return LodCount;
 }
 
 
-/***********************************************************************************************
- * HLodClass::Calculate_Cost_Value_Arrays -- computes the cost-value arrays                    *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Calculate_Cost_Value_Arrays(float screen_area, float *values, float *costs) const
 {
 	int lod = 0;
@@ -3177,18 +2160,6 @@ int HLodClass::Calculate_Cost_Value_Arrays(float screen_area, float *values, flo
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Current_LOD -- returns a render object which represents the current LOD      *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 RenderObjClass * HLodClass::Get_Current_LOD()
 {
 	int count = Get_Lod_Model_Count(CurLod);
@@ -3200,18 +2171,6 @@ RenderObjClass * HLodClass::Get_Current_LOD()
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_Texture_Reduction_Factor -- resizeable texture support                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 /*
 void HLodClass::Set_Texture_Reduction_Factor(float trf)
 {
@@ -3228,18 +2187,6 @@ void HLodClass::Set_Texture_Reduction_Factor(float trf)
 }
 */
 
-/***********************************************************************************************
- * HLodClass::Scale -- scale this HLod model                                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Scale(float scale)
 {
 	if (scale==1.0f) return;
@@ -3270,18 +2217,6 @@ void HLodClass::Scale(float scale)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Num_Snap_Points -- returns the number of snap points in this model           *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 int HLodClass::Get_Num_Snap_Points()
 {
 	if (SnapPoints) {
@@ -3292,18 +2227,6 @@ int HLodClass::Get_Num_Snap_Points()
 }
 
 
-/***********************************************************************************************
- * HLodClass::Get_Snap_Point -- returns specified snap-point                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Get_Snap_Point(int index,Vector3 * set)
 {
 	WWASSERT(set != nullptr);
@@ -3315,18 +2238,6 @@ void HLodClass::Get_Snap_Point(int index,Vector3 * set)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Update_Sub_Object_Transforms -- updates transforms of all sub-objects            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Update_Sub_Object_Transforms()
 {
 	/*
@@ -3366,18 +2277,6 @@ void HLodClass::Update_Sub_Object_Transforms()
 }
 
 
-/***********************************************************************************************
- * HLodClass::Update_Obj_Space_Bounding_Volumes -- update object-space bounding volumes        *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Update_Obj_Space_Bounding_Volumes()
 {
 	//
@@ -3483,18 +2382,6 @@ void HLodClass::Update_Obj_Space_Bounding_Volumes()
 }
 
 
-/***********************************************************************************************
- * HLodClass::Add_Lod_Model -- adds a model to one of the lods                                 *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Add_Lod_Model(int lod, RenderObjClass * robj, int boneindex)
 {
 	WWASSERT(robj != nullptr);
@@ -3513,18 +2400,6 @@ void HLodClass::Add_Lod_Model(int lod, RenderObjClass * robj, int boneindex)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Create_Decal -- create a decal on this HLod                                      *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Create_Decal(DecalGeneratorClass * generator)
 {
 	for (int lod=0; lod<LodCount; lod++) {
@@ -3539,21 +2414,7 @@ void HLodClass::Create_Decal(DecalGeneratorClass * generator)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Delete_Decal -- remove a decal from this HLod                                    *
- *                                                                                             *
- *    The decal_id is the ID which was assigned to the DecalGeneratorClass when you created    *
- *    the decal.                                                                               *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
+// The decal_id is the ID which was assigned to the DecalGeneratorClass when you created the decal.
 void HLodClass::Delete_Decal(uint32 decal_id)
 {
 	for (int lod=0; lod<LodCount; lod++) {
@@ -3568,36 +2429,13 @@ void HLodClass::Delete_Decal(uint32 decal_id)
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_HTree -- replace the hierarchy tree                                          *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void HLodClass::Set_HTree(HTreeClass * htree)
 {
 	Animatable3DObjClass::Set_HTree(htree);
 }
 
 
-/***********************************************************************************************
- * HLodClass::Set_Hidden -- Propogates the hidden bit to particle emitters.                    *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   3/19/01    pds : Created.                                                                 *
- *=============================================================================================*/
+// Propagates the hidden bit to particle emitters.
 void HLodClass::Set_Hidden(int onoff)
 {
 	//

@@ -38,7 +38,6 @@
 /*		7/18/2002 : Initial creation                                           */
 /*---------------------------------------------------------------------------*/
 
-#include <dsound.h>
 #include "Lib/BaseType.h"
 #include "MilesAudioDevice/MilesAudioManager.h"
 
@@ -69,6 +68,7 @@
 #include <Utility/interlocked_adapter.h>
 #include "MilesLoader.h"
 
+#include <dsound.h>
 
 enum { INFINITE_LOOP_COUNT = 1000000 };
 enum { MAX_AUDIO_REQUESTS = 128, TRIMMED_AUDIO_REQUESTS = 64 };
@@ -246,7 +246,7 @@ void MilesAudioManager::audioDebugDisplay(DebugDisplayInterface *dd, void *, FIL
 
 			AudioEventRTS *event = playing->m_audioEventRTS.Peek();
 			filenameNoSlashes = event->getFilename();
-			filenameNoSlashes = filenameNoSlashes.reverseFind('\\') + 1;
+			filenameNoSlashes = getFileName(filenameNoSlashes.str());
 
 			// Calculate Sample volume
 			volume = 100.0f;
@@ -266,7 +266,7 @@ void MilesAudioManager::audioDebugDisplay(DebugDisplayInterface *dd, void *, FIL
 			playing = *it;
 			AudioEventRTS *event = playing->m_audioEventRTS.Peek();
 			filenameNoSlashes = event->getFilename();
-			filenameNoSlashes = filenameNoSlashes.reverseFind( '\\' ) + 1;
+			filenameNoSlashes = getFileName(filenameNoSlashes.str());
 
 			// Calculate Sample volume
 			volume = 100.0f;
@@ -303,7 +303,7 @@ void MilesAudioManager::audioDebugDisplay(DebugDisplayInterface *dd, void *, FIL
 
 			AudioEventRTS *event = playing->m_audioEventRTS.Peek();
 			filenameNoSlashes = event->getFilename();
-			filenameNoSlashes = filenameNoSlashes.reverseFind('\\') + 1;
+			filenameNoSlashes = getFileName(filenameNoSlashes.str());
 
 			// Calculate Sample volume
 			volume = 100.0f;
@@ -355,7 +355,7 @@ void MilesAudioManager::audioDebugDisplay(DebugDisplayInterface *dd, void *, FIL
 			playing = *it;
 			AudioEventRTS *event = playing->m_audioEventRTS.Peek();
 			filenameNoSlashes = event->getFilename();
-			filenameNoSlashes = filenameNoSlashes.reverseFind('\\') + 1;
+			filenameNoSlashes = getFileName(filenameNoSlashes.str());
 
 			// Calculate Sample volume
 			volume = 100.0f;
@@ -379,7 +379,7 @@ void MilesAudioManager::audioDebugDisplay(DebugDisplayInterface *dd, void *, FIL
 			playing = *it;
 			AudioEventRTS *event = playing->m_audioEventRTS.Peek();
 			filenameNoSlashes = event->getFilename();
-			filenameNoSlashes = filenameNoSlashes.reverseFind('\\') + 1;
+			filenameNoSlashes = getFileName(filenameNoSlashes.str());
 
 			// Calculate Sample volume
 			volume = 100.0f;
@@ -403,7 +403,7 @@ void MilesAudioManager::audioDebugDisplay(DebugDisplayInterface *dd, void *, FIL
 			playing = *it;
 			AudioEventRTS *event = playing->m_audioEventRTS.Peek();
 			filenameNoSlashes = event->getFilename();
-			filenameNoSlashes = filenameNoSlashes.reverseFind('\\') + 1;
+			filenameNoSlashes = getFileName(filenameNoSlashes.str());
 
 			// Calculate Sample volume
 			volume = 100.0f;
@@ -1116,6 +1116,11 @@ void MilesAudioManager::releaseMilesHandles( PlayingAudio *playing )
 				AIL_register_stream_callback(playing->m_stream, nullptr);
 				AIL_close_stream(playing->m_stream);
 				playing->m_stream = nullptr;
+				// TheSuperHackers @bugfix arcticdolphin 25/10/2026 The speech lock ends when the stream that set it is released.
+				if (playing->m_audioEventRTS->getAudioEventInfo()->m_soundType == AT_Streaming
+					&& playing->m_audioEventRTS->getUninterruptible()) {
+					setDisallowSpeech(FALSE);
+				}
 			}
 			break;
 		}
@@ -1596,10 +1601,6 @@ void MilesAudioManager::notifyOfAudioCompletion( UnsignedInt handle, UnsignedInt
 	if (!playing) {
 		DEBUG_CRASH(("Audio has completed playing, but we can't seem to find it. - jkmcd"));
 		return;
-	}
-
-	if (getDisallowSpeech() && playing->m_audioEventRTS->getAudioEventInfo()->m_soundType == AT_Streaming) {
-		setDisallowSpeech(FALSE);
 	}
 
 	if (playing->m_audioEventRTS->getAudioEventInfo()->m_control & AC_LOOP) {
@@ -2481,8 +2482,8 @@ void MilesAudioManager::processPlayingList()
 			{
 				Real volForConsideration = getEffectiveVolume(playing->m_audioEventRTS.Peek());
 				volForConsideration /= (m_sound3DVolume > 0.0f ? m_soundVolume : 1.0f);
-				Bool playAnyways = BitIsSet( playing->m_audioEventRTS->getAudioEventInfo()->m_type, ST_GLOBAL)
-					|| playing->m_audioEventRTS->getAudioEventInfo()->m_priority == AP_CRITICAL;
+				Bool playAnyways = BitIsSet( playing->m_audioEventRTS->getAudioEventInfo()->m_type, ST_GLOBAL) ||
+					playing->m_audioEventRTS->getAudioEventInfo()->m_priority == AP_CRITICAL;
 				if( volForConsideration < m_audioSettings->m_minVolume && !playAnyways )
 				{
 					stopPlayingAudio(playing);
@@ -2553,43 +2554,13 @@ void MilesAudioManager::processPlayingList()
 
 	if (m_volumeHasChanged) {
 		m_volumeHasChanged = false;
+
+		// TheSuperHackers @bugfix Push speech volume changes because Bink movie audio bypasses the Miles mixer.
+		if (TheVideoPlayer) {
+			TheVideoPlayer->setVolume(getVolume(AudioAffect_Speech));
+		}
 	}
 }
-
-//Patch for a rare bug (only on about 5% of in-studio machines suffer, and not all the time) .
-//The actual mechanics of this problem are still elusive as of the date of this comment. 8/21/03
-//but the cause is clear. Some cinematics do a radical change in the microphone position, which
-//calls for a radical 3DSoundVolume adjustment. If this happens while a stereo stream is *ENDING*,
-//low-level code gets caught in a tight loop. (Hangs) on some machines.
-//To prevent this condition, we just suppress the updating of 3DSoundVolume while one of these
-//is on the list. Since the music tracks play continuously, they never *END* during these cinematics.
-//so we filter them out as, *NOT SENSITIVE*... we do want to update 3DSoundVolume during music,
-//which is almost all of the time.
-
-Bool MilesAudioManager::has3DSensitiveStreamsPlaying() const
-{
-  if ( m_playingStreams.empty() )
-    return FALSE;
-
-	for ( std::list< PlayingAudio* >::const_iterator it = m_playingStreams.begin(); it != m_playingStreams.end(); ++it )
-  {
-		const PlayingAudio *playing = (*it);
-
-    if ( playing->m_audioEventRTS->getAudioEventInfo()->m_soundType != AT_Music )
-    {
-      return TRUE;
-    }
-
-    if ( playing->m_audioEventRTS->getEventName().startsWith("Game_") == FALSE )
-    {
-      return TRUE;
-    }
-  }
-
-  return FALSE;
-
-}
-
 
 //-------------------------------------------------------------------------------------------------
 void MilesAudioManager::processFadingList()

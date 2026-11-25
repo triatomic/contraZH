@@ -129,18 +129,6 @@ GameClient::~GameClient()
 	// clear any drawable TOC we might have
 	m_drawableTOC.clear();
 
-	//DEBUG_LOG(("Preloaded texture files ------------------------------------------"));
-	//for (Int oog=0; oog<preloadTextureNamesGlobalHack2.size(); ++oog)
-	//{
-	//	DEBUG_LOG(("%s", preloadTextureNamesGlobalHack2[oog]));
-	//}
-	//DEBUG_LOG(("------------------------------------------------------------------"));
-	//for (oog=0; oog<preloadTextureNamesGlobalHack.size(); ++oog)
-	//{
-	//	DEBUG_LOG(("%s", preloadTextureNamesGlobalHack[oog]));
-	//}
-	//DEBUG_LOG(("End Texture files ------------------------------------------------"));
-
 	delete TheCampaignManager;
 	TheCampaignManager = nullptr;
 
@@ -254,7 +242,7 @@ void GameClient::init()
 	}
 
 	// create the display string factory
-	TheDisplayStringManager = createDisplayStringManager();
+	TheDisplayStringManager = TheGlobalData->m_headless ? NEW DisplayStringManagerDummy : createDisplayStringManager();
 	if( TheDisplayStringManager )	{
 		TheDisplayStringManager->init();
 		TheDisplayStringManager->setName("TheDisplayStringManager");
@@ -310,7 +298,7 @@ void GameClient::init()
 	}
 
 	// create the font library
-	TheFontLibrary = createFontLibrary();
+	TheFontLibrary = TheGlobalData->m_headless ? NEW FontLibraryDummy : createFontLibrary();
 	if( TheFontLibrary )
 		TheFontLibrary->init();
 
@@ -433,7 +421,6 @@ void GameClient::init()
 /** Reset the game client for a new game */
 void GameClient::reset()
 {
-	Drawable *draw, *nextDraw;
 	m_drawableHash.clear();
 #if USING_STLPORT
 	m_drawableHash.resize(DRAWABLE_HASH_SIZE);
@@ -445,7 +432,7 @@ void GameClient::reset()
 	TheInGameUI->reset();
 
 	// destroy all Drawables
-	for( draw = m_drawableList; draw; draw = nextDraw )
+	for( Drawable *draw = m_drawableList, *nextDraw = nullptr; draw; draw = nextDraw )
 	{
 		nextDraw = draw->getNextDrawable();
 		destroyDrawable( draw );
@@ -608,7 +595,8 @@ void GameClient::update()
 		const Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
 		Drawable* draw = firstDrawable();
 		while (draw)
-		{	// update() could free the Drawable, so go ahead and grab 'next'
+		{
+			// update() could free the Drawable, so go ahead and grab 'next'
 			Drawable* next = draw->getNextDrawable();
 #if ENABLE_CONFIGURABLE_SHROUD
 			if (TheGlobalData->m_shroudOn)
@@ -800,7 +788,6 @@ void GameClient::updateFakeDrawables()
 
 /** -----------------------------------------------------------------------------------------------
  * Given an object id, return the associated object.
- * For efficiency, a small Least Recently Used cache is incorporated.
  * This method is the primary interface for accessing objects, and should be used
  * instead of pointers to "attach" objects to each other.
  */
@@ -859,7 +846,7 @@ void GameClient::addDrawableToLookupTable(Drawable *draw )
 	if( draw == nullptr )
 		return;
 
-	// add to lookup
+	// add to lookup table
 	m_drawableHash[ draw->getID() ] = draw;
 
 }
@@ -874,7 +861,7 @@ void GameClient::removeDrawableFromLookupTable( Drawable *draw )
 	if( draw == nullptr )
 		return;
 
-	// remove from table
+	// remove from lookup table
 	m_drawableHash.erase( draw->getID() );
 
 }

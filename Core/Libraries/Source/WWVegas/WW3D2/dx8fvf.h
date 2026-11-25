@@ -35,17 +35,13 @@
  * 06/26/02 KM VB Vertex format update for shaders                                       *
  * 07/17/02 KM VB Vertex format update for displacement mapping                               *
  * 08/01/02 KM VB Vertex format update for cube mapping                               *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
 
 #include "WWLib/always.h"
 #include "dx8compat.h"
-#ifdef WWDEBUG
 #include "WWDebug/wwdebug.h"
-#endif
 
 class StringClass;
 
@@ -260,13 +256,11 @@ class FVFInfoClass
 public:
 	FVFInfoClass(unsigned FVF);
 
+	static unsigned Get_FVF_Vertex_Size(unsigned FVF);
+
 	unsigned Get_Location_Offset() const { return location_offset; }
 	unsigned Get_Normal_Offset() const { return normal_offset; }
-#ifdef WWDEBUG
-	inline unsigned Get_Tex_Offset(unsigned int n) const { WWASSERT(n<D3DDP_MAXTEXCOORD); return texcoord_offset[n]; }
-#else
-	unsigned Get_Tex_Offset(unsigned int n) const { return texcoord_offset[n]; }
-#endif
+	unsigned Get_Tex_Offset(unsigned int n) const { WWASSERT(n<D3DDP_MAXTEXCOORD); return texcoord_offset[n]; }
 
 	unsigned Get_Diffuse_Offset() const { return diffuse_offset; }
 	unsigned Get_Specular_Offset() const { return specular_offset; }

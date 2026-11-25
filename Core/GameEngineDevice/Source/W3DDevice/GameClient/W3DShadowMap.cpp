@@ -22,6 +22,7 @@
 
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/rinfo.h"
@@ -648,7 +649,7 @@ MaterialPassClass* W3DShadowMap::getReceivePass()
 Bool W3DShadowMap::canUseScreenReceiver()
 {
 #if defined(BUILD_WITH_D3D9)
-	if (!ScreenShadowEnabled || m_depthMode != DEPTH_MODE_HARDWARE || !DX8Wrapper::Has_Stencil() ||
+	if (!ScreenShadowEnabled || m_depthMode != DEPTH_MODE_HARDWARE || !Renderer::Has_Stencil() ||
 		DX8Wrapper::Peek_Scene_Depth_Texture() == nullptr)
 	{
 		return FALSE;
@@ -736,9 +737,9 @@ void W3DShadowMap::renderScreenReceiver(RenderInfoClass& rinfo)
 	DX8Wrapper::Set_Material(material);
 	REF_PTR_RELEASE(material);
 	Matrix4x4 identity(true);
-	DX8Wrapper::Set_World_Identity();
-	DX8Wrapper::Set_View_Identity();
-	DX8Wrapper::Set_Transform(D3DTS_PROJECTION, identity);
+	Renderer::Set_World_Identity();
+	Renderer::Set_View_Identity();
+	Renderer::Set_Transform(RenderTransform_Projection, identity);
 	ShaderClass multiply = ShaderClass::_PresetMultiplicative2DShader;
 	multiply.Set_Cull_Mode(ShaderClass::CULL_MODE_DISABLE);
 	DX8Wrapper::Set_Shader(multiply);
@@ -869,7 +870,7 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	}
 
 	// A null colour target has nothing to clear.
-	DX8Wrapper::Clear(m_nullTarget == nullptr, true, Vector3(1.0f, 1.0f, 1.0f), 1.0f);
+	Renderer::Clear(m_nullTarget == nullptr, true, Vector3(1.0f, 1.0f, 1.0f), 1.0f);
 
 	// Stencil is outside ShaderClass, so it is the one piece of inherited state that
 	// could reject casters. Read from the device because the wrapper's cache holds a
@@ -879,8 +880,8 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
 
 	// Fixed-function casters and the instancing and skinning shaders all read the sun from these.
-	DX8Wrapper::Set_Transform(D3DTS_VIEW, m_sunView);
-	DX8Wrapper::Set_Transform(D3DTS_PROJECTION, m_sunProjection);
+	Renderer::Set_Transform(RenderTransform_View, m_sunView);
+	Renderer::Set_Transform(RenderTransform_Projection, m_sunProjection);
 
 	// A mesh with a sort level would otherwise go onto the static sort list and be
 	// drawn a second time in the main scene.

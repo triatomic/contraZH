@@ -26,6 +26,7 @@
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "Common/GlobalData.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/dx8vertexbuffer.h"
 #include "WW3D2/dx8indexbuffer.h"
@@ -805,7 +806,7 @@ void W3DHeadlightManager::render(RenderInfoClass &rinfo)
 	DX8Wrapper::Set_Material(material);
 	REF_PTR_RELEASE(material);
 	DX8Wrapper::Set_Shader(ShaderClass::_PresetAdditiveSpriteShader);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD, Matrix3D(true));
+	Renderer::Set_Transform(RenderTransform_World, Matrix3D(true));
 
 	DynamicVBAccessClass vbAccess(BUFFER_TYPE_DYNAMIC_DX8, dynamic_fvf_type, count * 8);
 	PoolDraw pools[MAX_LIGHTS];

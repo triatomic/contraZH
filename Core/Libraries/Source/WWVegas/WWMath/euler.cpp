@@ -31,12 +31,6 @@
  *                                                                                             *
  *                    $Revision:: 5                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   EulerAnglesClass::EulerAnglesClass -- constructor                                         *
- *   EulerAnglesClass::Get_Angle -- returns angle 'i' of the euler angles                      *
- *   EulerAnglesClass::From_Matrix -- computes the equivalent euler angles for the given matrix*
- *   EulerAnglesClass::To_Matrix -- Builds a matrix from the given euler angles                *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -126,52 +120,16 @@ static int _euler_axis_k(int order);
 static int _euler_axis_h(int order);
 
 
-/***********************************************************************************************
- * EulerAnglesClass::EulerAnglesClass -- constructor                                           *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   08/11/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 EulerAnglesClass::EulerAnglesClass(const Matrix3D & M,int order)
 {
 	this->From_Matrix(M,order);
 }
 
-/***********************************************************************************************
- * EulerAnglesClass::Get_Angle -- returns angle 'i' of the euler angles                        *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   08/11/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 double EulerAnglesClass::Get_Angle(int i)
 {
 	return Angle[i];
 }
 
-/***********************************************************************************************
- * EulerAnglesClass::From_Matrix -- computes the equivalent euler angles for the given matrix  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   08/11/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 void EulerAnglesClass::From_Matrix(const Matrix3D & M, int order)
 {
 	int i,j,k,h,n,s,f;
@@ -219,22 +177,22 @@ void EulerAnglesClass::From_Matrix(const Matrix3D & M, int order)
 	// Trying to "clean" up the eulers, special cased for XYZr
 	if (order == EulerOrderXYZr) {
 
-		const double PI = 3.141592654;
+		const double PIVal = 3.141592654;
 
-		double x2 = PI + Angle[0];
-		double y2 = PI - Angle[1];
-		double z2 = PI + Angle[2];
+		double x2 = PIVal + Angle[0];
+		double y2 = PIVal - Angle[1];
+		double z2 = PIVal + Angle[2];
 
-		if (x2 > PI) {
-			x2 = x2 - 2*PI;
+		if (x2 > PIVal) {
+			x2 = x2 - 2*PIVal;
 		}
 
-		if (y2 > PI) {
-			y2 = y2 - 2*PI;
+		if (y2 > PIVal) {
+			y2 = y2 - 2*PIVal;
 		}
 
-		if (z2 > PI) {
-			z2 = z2 - 2*PI;
+		if (z2 > PIVal) {
+			z2 = z2 - 2*PIVal;
 		}
 
 		double mag0 = Angle[0]*Angle[0] + Angle[1]*Angle[1] + Angle[2]*Angle[2];
@@ -250,18 +208,6 @@ void EulerAnglesClass::From_Matrix(const Matrix3D & M, int order)
 
 
 
-/***********************************************************************************************
- * EulerAnglesClass::To_Matrix -- Builds a matrix from the given euler angles                  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   08/11/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 void EulerAnglesClass::To_Matrix(Matrix3D & M)
 {
 	M.Make_Identity();

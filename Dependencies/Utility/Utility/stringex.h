@@ -55,6 +55,13 @@ template<size_t Size> size_t strlmove_t(char (&dst)[Size], const char *src);
 template<size_t Size> size_t strlmcat_t(char (&dst)[Size], const char *src);
 #endif
 
+template<typename T, typename U> T* strrpbrk_t(T* str, const U* accept);
+
+const char* strrpbrk(const char* str, const char* accept);
+char* strrpbrk(char* str, const char* accept);
+const unichar* wcsrpbrk(const unichar* str, const unichar* accept);
+unichar* wcsrpbrk(unichar* str, const unichar* accept);
+
 template<typename T> int strncmp_t(const T *str1, const T *str2, size_t maxcount);
 template<typename T> int strnicmp_t(const T* str1, const T* str2, size_t maxcount);
 
@@ -63,6 +70,7 @@ template<typename T> bool startsWithNoCase(const T *str, const T *prefix);
 template<typename T> bool endsWithNoCase(const T *str, const T *suffix);
 template<typename T> bool endsWithNoCase(const T *str, const T *suffix);
 
+const void* memcchr(const void* data, int c, size_t n);
 
 // Implementation
 
@@ -191,6 +199,31 @@ template<size_t Size> size_t strlmove_t(char (&dst)[Size], const char *src) { re
 template<size_t Size> size_t strlmcat_t(char (&dst)[Size], const char *src) { return strlmcat_t(dst, src, Size); }
 #endif
 
+// Templated reverse strpbrk.
+// Returns a pointer to the last character in str that matches any character in accept, or null if there is none.
+// T may be const qualified, so the result keeps the constness of str.
+template<typename T, typename U> T* strrpbrk_t(T* str, const U* accept)
+{
+	T* last = nullptr;
+	for (; *str; ++str)
+	{
+		for (const U* a = accept; *a; ++a)
+		{
+			if (*str == *a)
+			{
+				last = str;
+				break;
+			}
+		}
+	}
+	return last;
+}
+
+inline const char* strrpbrk(const char* str, const char* accept) { return strrpbrk_t(str, accept); }
+inline char* strrpbrk(char* str, const char* accept) { return strrpbrk_t(str, accept); }
+inline const unichar* wcsrpbrk(const unichar* str, const unichar* accept) { return strrpbrk_t(str, accept); }
+inline unichar* wcsrpbrk(unichar* str, const unichar* accept) { return strrpbrk_t(str, accept); }
+
 // Templated strncmp.
 // Compares up to maxcount chars or a null byte is encountered, whichever comes first.
 // Returns < 0 if str1 is less than str2, 0 is str1 and str2 are equal and > 0 if str2 is greater than str1.
@@ -299,3 +332,16 @@ template<typename T> inline bool endsWithNoCase(const T *str, const T *suffix)
 	return strnicmp_t(str + strlen - suffixlen, suffix, suffixlen) == 0;
 }
 
+// Memcchr. Multiple implementations: 1) VC6-compatible in x86 ASM; 2) SSE2 intrinsics; 3) portable.
+// Return a pointer to the first byte that differs from a given value, or nullptr if there is no mismatch.
+#if defined(_MSC_VER) && _MSC_VER < 1300
+  #include "stringex_memcchr_x86asm.inl"
+#else
+  #if defined(__SSE2__) || defined(_M_X64) || (defined(_MSC_VER) && defined(_M_IX86))
+    #include <bit>
+    #include <emmintrin.h>
+    #include "stringex_memcchr_sse2.inl"
+  #else
+    #include "stringex_memcchr.inl"
+  #endif
+#endif

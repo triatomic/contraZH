@@ -24,9 +24,6 @@ Max4Hybrid
 /Code/gameenginedevice/Lib/GameEngineDeviceInternal.lib
 /Code/Libraries/Lib/Benchmark.lib
 /Code/Libraries/Lib/BenchmarkD.lib
-/Code/Libraries/Lib/EABrowserDispatch.lib
-/Code/Libraries/Lib/EABrowserDispatchD.lib
-/Code/Libraries/Lib/EABrowserDispatchI.lib
 /Code/Libraries/Lib/GameSpyHTTP.lib
 /Code/Libraries/Lib/GameSpyHTTPDebug.lib
 /Code/Libraries/Lib/GameSpyHTTPInternal.lib
@@ -67,13 +64,6 @@ Max4Hybrid
 /Code/Libraries/Lib/WWMathDebugW3D.lib
 /Code/Libraries/Lib/WWMathInternal.lib
 /Code/Libraries/Lib/WWMathProfile.lib
-/Code/Libraries/Lib/WWSaveLoad.lib
-/Code/Libraries/Lib/WWSaveLoadDebug.lib
-/Code/Libraries/Lib/WWSaveLoadDebugE.lib
-/Code/Libraries/Lib/WWSaveLoadDebugW3D.lib
-/Code/Libraries/Lib/WWSaveLoadInternal.lib
-/Code/Libraries/Lib/WWSaveLoadProfile.lib
-/Code/Libraries/Lib/WWSaveLoadProfileE.lib
 /Code/Libraries/Lib/WWUtil.lib
 /Code/Libraries/Lib/WWUtilDebug.lib
 /Code/Libraries/Lib/WWUtilDebugW3D.lib
@@ -82,11 +72,6 @@ Max4Hybrid
 
 # Generated files
 generatedVersion.h
-BrowserDispatch.tli
-BrowserDispatch.tlh
-BrowserDispatch_i.c
-BrowserDispatch.h
-BrowserDispatch.tlb
 /Code/Tools/CRCDiff/out.html
 
 # Visual C++ files

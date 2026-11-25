@@ -30,6 +30,7 @@
 
 #include "windows.h"
 #include "stdlib.h"
+#include <limits.h>
 #include "Common/STLTypedefs.h"
 
 #include "Common/DataChunk.h"
@@ -84,6 +85,7 @@ public:
 /* ********* MapObject class ****************************/
 /*static*/ MapObject *MapObject::TheMapObjectListPtr = nullptr;
 /*static*/ Dict MapObject::TheWorldDict;
+static Int s_nextTreeID = 1;
 
 MapObject::MapObject(Coord3D loc, AsciiString name, Real angle, Int flags, const Dict* props,
 										 const ThingTemplate *thingTemplate )
@@ -98,6 +100,7 @@ MapObject::MapObject(Coord3D loc, AsciiString name, Real angle, Int flags, const
 	m_renderObj = nullptr;
 	m_shadowObj = nullptr;
 	m_runtimeFlags = 0;
+	m_treeID = (DrawableID)s_nextTreeID++;
 	// Note - do NOT set TheKey_objectSelectable on creation - allow it to follow the .ini value unless specified by user action.  jba. [3/20/2003]
 	if (props)
 	{
@@ -331,7 +334,9 @@ void MapObject::fastAssignAllUniqueIDs()
 void MapObject::setThingTemplate(const ThingTemplate *thing)
 {
 	m_thingTemplate = thing;
-	m_objectName = thing->getName();
+	if (thing) {
+		m_objectName = thing->getName();
+	}
 }
 
 
@@ -916,17 +921,37 @@ Bool WorldHeightMap::ParseObjectsDataChunk(DataChunkInput &file, DataChunkInfo *
 	return (file.parse(userData));
 }
 
-Bool WorldHeightMap::isValidMapSize(Int width, Int height, Int borderSize)
+Bool WorldHeightMap::isValidTotalMapSize(Int width, Int height, Int borderSize)
 {
 	if (width <= 0 || width > MAX_MAP_DIMENSION)
 		return false;
 	if (height <= 0 || height > MAX_MAP_DIMENSION)
 		return false;
+
+	if (borderSize < 0 ||
+		borderSize > (width - 1) / 2 ||
+		borderSize > (height - 1) / 2)
+		return false;
+
 	if (width * height > MAX_MAP_AREA)
 		return false;
-	if (borderSize < 0 || borderSize > (width - 1) / 2 || borderSize > (height - 1) / 2)
-		return false;
+
 	return true;
+}
+
+Bool WorldHeightMap::isValidPlayableMapSize(Int width, Int height, Int borderSize)
+{
+	if (width <= 0 || height <= 0 || borderSize < 0)
+		return false;
+
+	if (borderSize > (INT_MAX - width) / 2 ||
+		borderSize > (INT_MAX - height) / 2)
+		return false;
+
+	return isValidTotalMapSize(
+		width + 2 * borderSize,
+		height + 2 * borderSize,
+		borderSize);
 }
 
 static Bool isValidHeightDataSize(DataChunkInput &file, Int dataSize, Int width, Int height)
@@ -964,7 +989,7 @@ Bool WorldHeightMap::ParseHeightMapData(DataChunkInput &file, DataChunkInfo *inf
 		m_borderSize = 0;
 	}
 
-	if (!isValidMapSize(m_width, m_height, m_borderSize)) {
+	if (!isValidTotalMapSize(m_width, m_height, m_borderSize)) {
 		throw ERROR_CORRUPT_FILE_FORMAT;
 	}
 
@@ -1049,7 +1074,7 @@ Bool WorldHeightMap::ParseSizeOnly(DataChunkInput &file, DataChunkInfo *info, vo
 		m_borderSize = 0;
 	}
 
-	if (!isValidMapSize(m_width, m_height, m_borderSize)) {
+	if (!isValidTotalMapSize(m_width, m_height, m_borderSize)) {
 		throw ERROR_CORRUPT_FILE_FORMAT;
 	}
 
@@ -1381,7 +1406,8 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 	}
 	if (info->version >= K_BLEND_TILE_VERSION_7) {
 		if (info->version==K_BLEND_TILE_VERSION_7) {
-			Int byteWidth = (m_width+1)/8; // previous incorrect length that got used to save the file.  jba. [4/3/2003]
+			// previous incorrect length that got used to save the file.  jba. [4/3/2003]
+			Int byteWidth = (m_width+1)/8;
 			UnsignedByte *data = new UnsignedByte[m_height*byteWidth];
 			file.readArrayOfBytes((char*)data, m_height*byteWidth);
 			for (j=0; j<m_height; j++) {
@@ -1396,6 +1422,48 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 	} else {
 		initCliffFlagsFromHeights();
 	}
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+	// Retail Generals keeps the cliff bits of maps up to version 7 in rows of (width+1)/8 bytes, which are too short for
+	// the last cells of a row. These cells share their bits with the first cells of the next row, and the pathfinder
+	// relies on the shared values, so they are copied here.
+	if (info->version <= K_BLEND_TILE_VERSION_7) {
+		const Int retailRowCells = 8*((m_width+1)/8);
+		for (j=0; j<m_height-1; ++j) {
+			for (i=retailRowCells; i<m_width-1; ++i) {
+				if (info->version == K_BLEND_TILE_VERSION_7) {
+					// The file holds the shared bits in the first cells of the next row.
+					setCliffState(i, j, getCliffState(i-retailRowCells, j+1));
+				} else {
+					// The flags are computed column by column, so the last cells of a row are written last.
+					setCliffState(i-retailRowCells, j+1, getCliffState(i, j));
+				}
+			}
+		}
+	}
+	// Retail Generals also reads the cliff bits of version 8 maps in rows of (width+1)/8 bytes, but Zero Hour writes them
+	// in rows of (width+7)/8 bytes. When the rows differ in length, the bits are regrouped into the rows retail reads.
+	if (info->version == K_BLEND_TILE_VERSION_8 && m_flipStateWidth != (m_width+1)/8) {
+		const Int retailByteWidth = (m_width+1)/8;
+		UnsignedByte *data = new UnsignedByte[m_height*m_flipStateWidth];
+		memcpy(data, m_cellCliffState, m_height*m_flipStateWidth);
+		for (j=0; j<m_height-1; ++j) {
+			for (i=0; i<m_width-1; ++i) {
+				setCliffState(i, j, (data[j*retailByteWidth + (i>>3)] >> (i&7)) & 1);
+			}
+		}
+		delete[] data;
+	}
+#elif !RETAIL_COMPATIBLE_CRC
+	// Version 7 files have no bits for the last cells of a row, so they are computed from the heights.
+	if (info->version == K_BLEND_TILE_VERSION_7) {
+		const Int retailRowCells = 8*((m_width+1)/8);
+		for (j=0; j<m_height-1; ++j) {
+			for (i=retailRowCells; i<m_width-1; ++i) {
+				setCellCliffFlagFromHeights(i, j);
+			}
+		}
+	}
+#endif
 	m_numBitmapTiles = file.readInt();
 	DEBUG_ASSERTCRASH(m_numBitmapTiles>0 && m_numBitmapTiles<=NUM_SOURCE_TILES, ("Unlikely numBitmapTiles."));
 	m_numBlendedTiles = file.readInt();
@@ -2016,7 +2084,8 @@ void WorldHeightMap::getUVForNdx(Int tileNdx, float *minU, float *minV, float *m
 	// So get the proper quadrant of the tile.
 	Real midX = (*minU+*maxU)/2;
 	Real midY = (*minV+*maxV)/2;
-	if (tileNdx&2) {		// y's are flipped.
+	if (tileNdx&2) {
+		// y's are flipped.
 		*maxV = midY;
 	} else {
 		*minV = midY;
@@ -2236,7 +2305,8 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 				}
 			}
 
-			if (below==1 || above>below) { //(avgH > minH + (2*deltaH+2)/3)
+			if (below==1 || above>below) {
+				//(avgH > minH + (2*deltaH+2)/3)
 				// we got one low guy.
 				if (h0==minH) {
 					V[0] = nV+deltaV/divisor;
@@ -2253,7 +2323,8 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 				V[0] = xV; V[1] = xV; V[2] = nV; V[3] = nV;
 				return false;
 #endif
-			}	else if (above==1 || below>above) { //(avgH < minH + (deltaH+1)/3)
+			}	else if (above==1 || below>above) {
+				//(avgH < minH + (deltaH+1)/3)
 				// we got one high guy
 				if (h0==maxH) {
 					V[0] = nV+deltaV/divisor;

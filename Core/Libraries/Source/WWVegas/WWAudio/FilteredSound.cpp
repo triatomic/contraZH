@@ -30,25 +30,13 @@
  *                                                                                             *
  *                    $Revision:: 4                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
 #include "FilteredSound.h"
 #include "WWAudio.h"
 #include "SoundScene.h"
-#include "SoundChunkIDs.h"
-#include "WWSaveLoad/persistfactory.h"
 #include "soundhandle.h"
-
-
-//////////////////////////////////////////////////////////////////////////////////
-//
-//	Static factories
-//
-//////////////////////////////////////////////////////////////////////////////////
-SimplePersistFactoryClass<FilteredSoundClass, CHUNKID_FILTERED_SOUND> _FilteredSoundPersistFactory;
 
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -162,17 +150,5 @@ FilteredSoundClass::Update_Volume ()
 			Update_Pseudo_Volume (distance);
 		}
 	}
-}
-
-
-/////////////////////////////////////////////////////////////////////////////////
-//
-//	Get_Factory
-//
-/////////////////////////////////////////////////////////////////////////////////
-const PersistFactoryClass &
-FilteredSoundClass::Get_Factory () const
-{
-	return _FilteredSoundPersistFactory;
 }
 

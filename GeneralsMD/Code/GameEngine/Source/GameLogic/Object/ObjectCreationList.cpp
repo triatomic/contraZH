@@ -763,7 +763,9 @@ enum DebrisDisposition CPP_11(: Int)
 	FLOATING								= 0x00000040,
 	INHERIT_VELOCITY				= 0x00000080,
 	WHIRLING								= 0x00000100,
-	ALIGN_Z_UP							= 0x00000200
+	ALIGN_Z_UP							= 0x00000200,
+
+	DEBRIS_DISPOSITION_END // keep after the last named flag
 };
 
 static const char* const DebrisDispositionNames[] =
@@ -780,6 +782,7 @@ static const char* const DebrisDispositionNames[] =
 	"ALIGN_Z_UP",
 	nullptr
 };
+static_assert(equalsEnumBitFlagsCount(ARRAY_SIZE(DebrisDispositionNames) - 1, DEBRIS_DISPOSITION_END), "Incorrect array size");
 
 std::vector<AsciiString>	debrisModelNamesGlobalHack;
 
@@ -1402,9 +1405,9 @@ protected:
 	    // if we land in the water, we die. alas.
 	    const Coord3D* riderPos = obj->getPosition();
 	    Real waterZ, terrainZ;
-	    if (TheTerrainLogic->isUnderwater(riderPos->x, riderPos->y, &waterZ, &terrainZ)
-			    && riderPos->z <= waterZ + 10.0f
-			    && obj->getLayer() == LAYER_GROUND)
+	    if (TheTerrainLogic->isUnderwater(riderPos->x, riderPos->y, &waterZ, &terrainZ) &&
+			    riderPos->z <= waterZ + 10.0f &&
+			    obj->getLayer() == LAYER_GROUND)
 	    {
 		    // don't call kill(); do it manually, so we can specify DEATH_FLOODED
 		    DamageInfo damageInfo;
@@ -1424,10 +1427,10 @@ protected:
 
 	    // If we land outside the map, we die too.
 	    // Otherwise we exist outside the PartitionManger like a cheater.
-	  if( obj->isOffMap()
-      || (cellType == PathfindCell::CELL_CLIFF)
-      || (cellType == PathfindCell::CELL_WATER)
-      || (cellType == PathfindCell::CELL_IMPASSABLE) )
+	  if( obj->isOffMap() ||
+      (cellType == PathfindCell::CELL_CLIFF) ||
+      (cellType == PathfindCell::CELL_WATER) ||
+      (cellType == PathfindCell::CELL_IMPASSABLE) )
 	    {
 		    // We are sorry, for reasons beyond our control, we are experiencing technical difficulties. Please die.
 		    obj->kill();
@@ -1547,7 +1550,8 @@ protected:
 			if (m_nameAreObjects)
 				tmpl = TheThingFactory->findTemplate(m_names[pick]);
 			else
-			{	//this is using the generic debris type so it's probably safe to
+			{
+				//this is using the generic debris type so it's probably safe to
 				//remove if requested by the GameLOD manager.
 				if (TheGameLODManager->isDebrisSkipped())
 					continue;

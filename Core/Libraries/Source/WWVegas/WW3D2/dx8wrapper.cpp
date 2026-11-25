@@ -36,9 +36,6 @@
  * 06/27/02 KM Render to shadow buffer texture support														*
  * 06/27/02 KM Shader system updates																				*
  * 08/05/02 KM Texture class redesign
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   DX8Wrapper::_Update_Texture -- Copies a texture from system memory to video memory        *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 //#define CREATE_DX8_MULTI_THREADED
@@ -53,7 +50,6 @@
 #include "dx8wrapper.h"
 #include "dx8instancing.h"
 #include "dx8skinning.h"
-#include "dx8webbrowser.h"
 #include "dx8fvf.h"
 #include "dx8vertexbuffer.h"
 #include "dx8indexbuffer.h"
@@ -78,10 +74,10 @@
 #include "textureloader.h"
 #include "missingtexture.h"
 #include "WWLib/thread.h"
-#include "WWMath/pot.h"
 #include "WWDebug/wwprofile.h"
 #include "WWLib/ffactory.h"
 #include "dx8caps.h"
+#include "dx8convert.h"
 #include "formconv.h"
 #include "dx8texman.h"
 #include "WWLib/bound.h"
@@ -490,7 +486,6 @@ void DX8Wrapper::Do_Onetime_Device_Dependent_Inits()
 	Set_Default_Global_Render_States();
 }
 
-inline DWORD F2DW(float f) { return *((unsigned*)&f); }
 void DX8Wrapper::Set_Default_Global_Render_States()
 {
 	DX8_THREAD_ASSERT();
@@ -817,7 +812,8 @@ void DX8Wrapper::Release_Device()
 		ShaderDrawCounterClass::Release_Device();
 
 		for (int a=0;a<MAX_TEXTURE_STAGES;++a)
-		{	//release references to any textures that were used in last rendering call
+		{
+			//release references to any textures that were used in last rendering call
 			DX8CALL(SetTexture(a,nullptr));
 		}
 
@@ -1182,7 +1178,8 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 		}
 
 		if (BitDepth==32 && D3DInterface->CheckDeviceType(0,D3DDEVTYPE_HAL,desktop_mode.Format,D3DFMT_A8R8G8B8, TRUE) == D3D_OK)
-		{	//promote 32-bit modes to include destination alpha
+		{
+			//promote 32-bit modes to include destination alpha
 			_PresentParameters.BackBufferFormat = D3DFMT_A8R8G8B8;
 		}
 
@@ -1771,7 +1768,8 @@ bool DX8Wrapper::Find_Color_And_Z_Mode(int resx,int resy,int bitdepth,D3DFORMAT 
 	}
 
 	if (bitdepth==32 && *set_colorbuffer == D3DFMT_X8R8G8B8 && D3DInterface->CheckDeviceType(0,D3DDEVTYPE_HAL,*set_colorbuffer,D3DFMT_A8R8G8B8, TRUE) == D3D_OK)
-	{	//promote 32-bit modes to include destination alpha when supported
+	{
+		//promote 32-bit modes to include destination alpha when supported
 		*set_backbuffer = D3DFMT_A8R8G8B8;
 	}
 
@@ -1947,22 +1945,14 @@ void DX8Wrapper::Begin_Scene()
 {
 	DX8_THREAD_ASSERT();
 
-#if ENABLE_EMBEDDED_BROWSER
-	DX8WebBrowser::Update();
-#endif
-
 	Bind_Scene_Target();
 	DX8CALL(BeginScene());
-
-	DX8WebBrowser::Update();
 }
 
 void DX8Wrapper::End_Scene(bool flip_frames)
 {
 	DX8_THREAD_ASSERT();
 	DX8CALL(EndScene());
-
-	DX8WebBrowser::Render(0);
 
 	if (flip_frames) {
 		ShaderDrawCounterClass::End_Frame();
@@ -2419,58 +2409,16 @@ void DX8Wrapper::Draw(
 	// Debug feature to disable triangle drawing...
 	if (!_Is_Triangle_Draw_Enabled()) return;
 
-#ifdef MESH_RENDER_SNAPSHOT_ENABLED
+#ifdef DEBUG_LOGGING
 	if (WW3D::Is_Snapshot_Activated()) {
 		unsigned long passes=0;
 		SNAPSHOT_SAY(("ValidateDevice:"));
 		HRESULT res=D3DDevice->ValidateDevice(&passes);
-		switch (res) {
-		case D3D_OK:
-			SNAPSHOT_SAY(("OK"));
-			break;
-
-		case D3DERR_CONFLICTINGTEXTUREFILTER:
-			SNAPSHOT_SAY(("D3DERR_CONFLICTINGTEXTUREFILTER"));
-			break;
-		case D3DERR_CONFLICTINGTEXTUREPALETTE:
-			SNAPSHOT_SAY(("D3DERR_CONFLICTINGTEXTUREPALETTE"));
-			break;
-		case D3DERR_DEVICELOST:
-			SNAPSHOT_SAY(("D3DERR_DEVICELOST"));
-			break;
-		case D3DERR_TOOMANYOPERATIONS:
-			SNAPSHOT_SAY(("D3DERR_TOOMANYOPERATIONS"));
-			break;
-		case D3DERR_UNSUPPORTEDALPHAARG:
-			SNAPSHOT_SAY(("D3DERR_UNSUPPORTEDALPHAARG"));
-			break;
-		case D3DERR_UNSUPPORTEDALPHAOPERATION:
-			SNAPSHOT_SAY(("D3DERR_UNSUPPORTEDALPHAOPERATION"));
-			break;
-		case D3DERR_UNSUPPORTEDCOLORARG:
-			SNAPSHOT_SAY(("D3DERR_UNSUPPORTEDCOLORARG"));
-			break;
-		case D3DERR_UNSUPPORTEDCOLOROPERATION:
-			SNAPSHOT_SAY(("D3DERR_UNSUPPORTEDCOLOROPERATION"));
-			break;
-		case D3DERR_UNSUPPORTEDFACTORVALUE:
-			SNAPSHOT_SAY(("D3DERR_UNSUPPORTEDFACTORVALUE"));
-			break;
-		case D3DERR_UNSUPPORTEDTEXTUREFILTER:
-			SNAPSHOT_SAY(("D3DERR_UNSUPPORTEDTEXTUREFILTER"));
-			break;
-		case D3DERR_WRONGTEXTUREFORMAT:
-			SNAPSHOT_SAY(("D3DERR_WRONGTEXTUREFORMAT"));
-			break;
-		default:
-			SNAPSHOT_SAY(("UNKNOWN Error"));
-			break;
-		}
+		SNAPSHOT_SAY(("%s",Get_D3D_Error_Name(res)));
 	}
-#endif	// MESH_RENDER_SNAPSHOT_ENABLED
-
 
 	SNAPSHOT_SAY(("DX8 - draw %d polygons (%d vertices)",polygon_count,vertex_count));
+#endif
 
 	if (vertex_count<3) {
 		min_vertex_index=0;
@@ -2739,7 +2687,7 @@ void DX8Wrapper::Apply_Render_State_Changes()
 			if (render_state_changed&mask) {
 				SNAPSHOT_SAY(("DX8 - apply light %d",index));
 				if (render_state.LightEnable[index]) {
-#ifdef MESH_RENDER_SNAPSHOT_ENABLED
+#if defined(DEBUG_CRASHING) || defined(DEBUG_LOGGING)
 					if ( WW3D::Is_Snapshot_Activated() ) {
 						D3DLIGHT8 * light = &(render_state.Lights[index]);
 						static const char * _light_types[] = { "Unknown", "Point","Spot", "Directional" };
@@ -2778,7 +2726,8 @@ void DX8Wrapper::Apply_Render_State_Changes()
 		SNAPSHOT_SAY(("DX8 - apply vb change"));
 		for (i=0;i<MAX_VERTEX_STREAMS;++i) {
 			if (render_state.vertex_buffers[i]) {
-				switch (render_state.vertex_buffer_types[i]) {//->Type()) {
+				switch (render_state.vertex_buffer_types[i]) {
+					//->Type()) {
 				case BUFFER_TYPE_DX8:
 				case BUFFER_TYPE_DYNAMIC_DX8:
 					Set_DX8_Stream_Source(
@@ -2810,7 +2759,8 @@ void DX8Wrapper::Apply_Render_State_Changes()
 	if (render_state_changed&INDEX_BUFFER_CHANGED) {
 		SNAPSHOT_SAY(("DX8 - apply ib change"));
 		if (render_state.index_buffer) {
-			switch (render_state.index_buffer_type) {//->Type()) {
+			switch (render_state.index_buffer_type) {
+				//->Type()) {
 			case BUFFER_TYPE_DX8:
 			case BUFFER_TYPE_DYNAMIC_DX8:
 				Set_DX8_Indices(
@@ -3760,21 +3710,7 @@ IDirect3DSurface8 * DX8Wrapper::_Create_DX8_Surface(const char *filename_)
 }
 
 
-/***********************************************************************************************
- * DX8Wrapper::_Update_Texture -- Copies a texture from system memory to video memory          *
- *                                                                                             *
- *                                                                                             *
- *                                                                                             *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/26/2001  hy : Created.                                                                  *
- *=============================================================================================*/
+// Copies a texture from system memory to video memory.
 void DX8Wrapper::_Update_Texture(TextureClass *system, TextureClass *video)
 {
 	WWASSERT(system);
@@ -3998,10 +3934,10 @@ void DX8Wrapper::Set_Light(unsigned index,const LightClass &light)
 	dlight.Ambient.a=1.0f;
 
 	temp=light.Get_Position();
-	dlight.Position=*(D3DVECTOR*) &temp;
+	dlight.Position=To_D3DVECTOR(temp);
 
 	light.Get_Spot_Direction(temp);
-	dlight.Direction=*(D3DVECTOR*) &temp;
+	dlight.Direction=To_D3DVECTOR(temp);
 
 	dlight.Range=light.Get_Attenuation_Range();
 	dlight.Falloff=light.Get_Spot_Exponent();
@@ -4053,9 +3989,8 @@ void DX8Wrapper::Set_Light_Environment(LightEnvironmentClass* light_env)
 			::ZeroMemory(&light, sizeof(D3DLIGHT8));
 
 			light.Type=D3DLIGHT_DIRECTIONAL;
-			(Vector3&)light.Diffuse=light_env->Get_Light_Diffuse(l);
-			Vector3 dir=-light_env->Get_Light_Direction(l);
-			light.Direction=(const D3DVECTOR&)(dir);
+			light.Diffuse=To_D3DCOLORVALUE(light_env->Get_Light_Diffuse(l),0.0f);
+			light.Direction=To_D3DVECTOR(-light_env->Get_Light_Direction(l));
 
 			// (gth) TODO: put specular into LightEnvironment?  Much work to be done on lights :-)'
 			if (l==0) {
@@ -4064,9 +3999,9 @@ void DX8Wrapper::Set_Light_Environment(LightEnvironmentClass* light_env)
 
 			if (light_env->isPointLight(l)) {
 				light.Type = D3DLIGHT_POINT;
-				(Vector3&)light.Diffuse=light_env->getPointDiffuse(l);
-				(Vector3&)light.Ambient=light_env->getPointAmbient(l);
-				light.Position = (const D3DVECTOR&)light_env->getPointCenter(l);
+				light.Diffuse=To_D3DCOLORVALUE(light_env->getPointDiffuse(l),0.0f);
+				light.Ambient=To_D3DCOLORVALUE(light_env->getPointAmbient(l),0.0f);
+				light.Position=To_D3DVECTOR(light_env->getPointCenter(l));
 				light.Range = light_env->getPointOrad(l);
 
 				// Inverse linear light 1/(1+D)
@@ -4185,7 +4120,7 @@ DX8Wrapper::Create_Render_Target (int width, int height, WW3DFormat format)
 	if (height > 0 && height < width) {
 		poweroftwosize = height;
 	}
-	poweroftwosize = ::Find_POT (poweroftwosize);
+	poweroftwosize = std::bit_ceil(static_cast<unsigned int>(poweroftwosize));
 
 	if (poweroftwosize>dx8caps.MaxTextureWidth) {
 		poweroftwosize=dx8caps.MaxTextureWidth;
@@ -4256,7 +4191,7 @@ void DX8Wrapper::Create_Render_Target
 	{
 		poweroftwosize = height;
 	}
-	poweroftwosize = ::Find_POT (poweroftwosize);
+	poweroftwosize = std::bit_ceil(static_cast<unsigned int>(poweroftwosize));
 
 	if (poweroftwosize>dx8caps.MaxTextureWidth)
 	{

@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 7                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -39,6 +37,7 @@
 #include "always.h"
 #include "wwstring.h"
 #include <Utility/bit_adapter.h>
+#include <string.h>
 
 // Class for providing hash values
 
@@ -416,7 +415,8 @@ template <> inline unsigned int HashTemplateKeyClass<StringClass>::Get_Hash_Valu
 		}
 		return hval;
 	}
-	unsigned int hval = *((const unsigned int*)(buffer+len-8));
+	unsigned int hval;
+	memcpy(&hval, buffer+len-8, sizeof(hval));
 	hval = hval + (hval>>5) + (hval>>10) + (hval >> 20);
 	return hval;
 }

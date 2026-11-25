@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 1                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -259,6 +257,8 @@ struct W3dMeshHeaderStruct
 
 	//
 	// Physics Properties
+	// TheSuperHackers @info Legacy fields. Only the original max2w3d voxelizer computed them,
+	// and no current tool writes them.
 	//
 	W3dVectorStruct		MassCenter;			// Center of mass in object space
 	float32					Inertia[9];			// Inertia tensor (relative to MassCenter)

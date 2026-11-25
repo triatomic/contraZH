@@ -31,21 +31,20 @@
  *                                                                                             *
  *                    $Revision:: 25                                                          $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
 
 #ifndef ALWAYS_H
-#include "always.h"
+#include "WWLib/always.h"
 #endif
 
-#include <max.h>
+#include "max_sdk.h"
 
 #include "skin.h"
 #include "nodelist.h"
 
+class Matrix3D;
 
 /*
 ** Gets rid of very small numbers in the matrix
@@ -54,10 +53,15 @@
 Matrix3	Cleanup_Orthogonal_Matrix(Matrix3 & mat);
 
 /*
+** Converts a Max matrix, which transforms row vectors, into a Matrix3D, which transforms
+** column vectors.
+*/
+Matrix3D Convert_Max_Matrix(const Matrix3 & tm);
+
+/*
 ** Naming utility functions
 */
 void Set_W3D_Name(char * set_name,const char * src);
-void Split_Node_Name(const char * name,char * set_base,char * set_exten,int * set_exten_index);
 bool Append_Lod_Character(char *meshname, int lod_level, INodeListClass *origin_list);
 
 /*
@@ -65,7 +69,6 @@ bool Append_Lod_Character(char *meshname, int lod_level, INodeListClass *origin_
 */
 void Create_Full_Path(char *full_path, const char *cwd, const char *rel_path);
 void Create_Relative_Path(char *rel_path,	const char *cwd, const char *full_path);
-bool Is_Full_Path(char * path);
 
 /*
 ** Check if this is some kind of triangle mesh inside of MAX.  We will assume

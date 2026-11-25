@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 1                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -46,7 +44,7 @@ class DialogToolbarClass : public CToolBar
 {
 	public:
 		DialogToolbarClass ();
-		virtual ~DialogToolbarClass () {}
+		virtual ~DialogToolbarClass () override {}
 
 // Form Data
 public:

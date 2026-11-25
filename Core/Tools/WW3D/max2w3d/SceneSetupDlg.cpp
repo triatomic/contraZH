@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 2                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -39,7 +37,7 @@
 //
 
 #include "SceneSetupDlg.h"
-#include <max.h>
+#include "max_sdk.h"
 #include <assert.h>
 
 static BOOL CALLBACK _thunk_dialog_proc (HWND hWnd, UINT uMsg, WPARAM wAparam, LPARAM lParam);
@@ -155,8 +153,6 @@ BOOL CALLBACK _thunk_dialog_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
 
 BOOL CALLBACK SceneSetupDlg::DialogProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	int code = HIWORD(wParam);
-
 	switch (uMsg)
 	{
 

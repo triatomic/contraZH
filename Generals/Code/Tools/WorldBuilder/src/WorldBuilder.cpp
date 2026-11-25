@@ -387,7 +387,7 @@ BOOL CWorldBuilderApp::InitInstance()
 
 	initSubsystem(TheScriptEngine, (ScriptEngine*)(new ScriptEngine()));
 	initSubsystem(TheAudio, (AudioManager*)new MilesAudioManager());
-	initSubsystem(TheVideoPlayer, (VideoPlayerInterface*)(new VideoPlayer()));
+	initSubsystem(TheVideoPlayer, (VideoPlayerInterface*)(new NullVideoPlayer()));
 	initSubsystem(TheModuleFactory, (ModuleFactory*)(new W3DModuleFactory()));
 	initSubsystem(TheSidesList, new SidesList());
 	initSubsystem(TheCaveSystem, new CaveSystem());
@@ -552,7 +552,8 @@ void CWorldBuilderApp::updateCurTool(Bool forceHand)
 {
 	Tool *curTool = m_curTool;
 	DEBUG_ASSERTCRASH((m_lockCurTool>=0),("oops"));
-	if (!m_lockCurTool) {	 // don't change tools that are doing something.
+	if (!m_lockCurTool) {
+		// don't change tools that are doing something.
 		if (forceHand || (0x8000 & ::GetAsyncKeyState(VK_SPACE))) {
 			// Space bar gives scroll hand.
 			m_curTool = &m_handScrollTool;

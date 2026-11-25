@@ -35,14 +35,12 @@
  * 06/26/02 KM VB Vertex format update for shaders                                       *
  * 07/17/02 KM VB Vertex format update for displacement mapping                               *
  * 08/01/02 KM VB Vertex format update for cube mapping                               *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "dx8fvf.h"
 #include "WWLib/wwstring.h"
 
-static unsigned Get_FVF_Vertex_Size(unsigned FVF)
+unsigned FVFInfoClass::Get_FVF_Vertex_Size(unsigned FVF)
 {
 	unsigned size=0;
 

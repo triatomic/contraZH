@@ -120,11 +120,9 @@ void OpenMap::qtMPopulateMain(Bool systemMaps)
 		strcpy(dirBuf, TheGlobalData->getPath_UserData().str());
 		strcat(dirBuf, "Maps\\");
 	}
-	int len = strlen(dirBuf);
-	if (len > 0 && dirBuf[len - 1] != '\\')
+	if (!ensureTrailingSeparatorInPath(dirBuf, ARRAY_SIZE(dirBuf)).ok)
 	{
-		dirBuf[len++] = '\\';
-		dirBuf[len] = 0;
+		return;
 	}
 	s_qtView.RemoveAll();
 	strcpy(findBuf, dirBuf);
@@ -1179,10 +1177,8 @@ extern "C" int WBQtSaveMapData_Enumerate(int systemMaps)
 		strcpy(dirBuf, ".\\Maps\\");
 	else
 		sprintf(dirBuf, "%sMaps\\", TheGlobalData->getPath_UserData().str());
-	int len = strlen(dirBuf);
-	if (len > 0 && dirBuf[len - 1] != '\\') {
-		dirBuf[len++] = '\\';
-		dirBuf[len] = 0;
+	if (!ensureTrailingSeparatorInPath(dirBuf, ARRAY_SIZE(dirBuf)).ok) {
+		return 0;
 	}
 	strcpy(findBuf, dirBuf);
 	strcat(findBuf, "*.*");

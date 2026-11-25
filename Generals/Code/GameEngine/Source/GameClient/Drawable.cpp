@@ -621,14 +621,14 @@ Bool Drawable::getShouldAnimate( Bool considerPower ) const
          ! obj->isKindOf( KINDOF_PRODUCED_AT_HELIPAD )  &&
         // mal sez: helicopters just look goofy if they stop animating, so keep animating them, anyway
 
-        (  obj->isDisabledByType( DISABLED_HACKED )
-				|| obj->isDisabledByType( DISABLED_PARALYZED )
-				|| obj->isDisabledByType( DISABLED_EMP )
-				|| obj->isDisabledByType( DISABLED_SUBDUED )
+        (  obj->isDisabledByType( DISABLED_HACKED ) ||
+				obj->isDisabledByType( DISABLED_PARALYZED ) ||
+				obj->isDisabledByType( DISABLED_EMP ) ||
+				obj->isDisabledByType( DISABLED_SUBDUED ) ||
 				// srj sez: unmanned things also should not animate. (eg, gattling tanks,
 				// which have a slight barrel animation even when at rest). if this causes
 				// a problem, we will need to fix gattling tanks in another way.
-				|| obj->isDisabledByType( DISABLED_UNMANNED ) )
+				obj->isDisabledByType( DISABLED_UNMANNED ) )
 
 				)
 				return FALSE;
@@ -1072,13 +1072,14 @@ Real Drawable::getScale () const
 //-------------------------------------------------------------------------------------------------
 void Drawable::reactToBodyDamageStateChange(BodyDamageType newState)
 {
-	static const ModelConditionFlagType TheDamageMap[BODYDAMAGETYPE_COUNT] =
+	static const ModelConditionFlagType TheDamageMap[] =
 	{
 		MODELCONDITION_INVALID,
 		MODELCONDITION_DAMAGED,
 		MODELCONDITION_REALLY_DAMAGED,
 		MODELCONDITION_RUBBLE,
 	};
+	static_assert(ARRAY_SIZE(TheDamageMap) == BODYDAMAGETYPE_COUNT, "Incorrect array size");
 
 	ModelConditionFlags newDamage;
 	if (TheDamageMap[newState] != MODELCONDITION_INVALID)
@@ -2070,23 +2071,27 @@ void Drawable::calcPhysicsXformWheels( const Locomotor *locomotor, PhysicsXformI
 		m_locoInfo->m_wheelInfo.m_wheelAngle += (newInfo.m_wheelAngle - m_locoInfo->m_wheelInfo.m_wheelAngle)/WHEEL_SMOOTHNESS;
 
 		const Real SPRING_FACTOR = 0.9f;
-		if (pitchHeight<0) {	// Front raising up
+		if (pitchHeight<0) {
+			// Front raising up
 			newInfo.m_frontLeftHeightOffset = SPRING_FACTOR*(pitchHeight/3+pitchHeight/2);
 			newInfo.m_frontRightHeightOffset = SPRING_FACTOR*(pitchHeight/3+pitchHeight/2);
 			newInfo.m_rearLeftHeightOffset = -pitchHeight/2 + pitchHeight/4;
 			newInfo.m_rearRightHeightOffset = -pitchHeight/2 + pitchHeight/4;
-		}	else {	// Back rasing up.
+		}	else {
+			// Back rasing up.
 			newInfo.m_frontLeftHeightOffset = (-pitchHeight/4+pitchHeight/2);
 			newInfo.m_frontRightHeightOffset = (-pitchHeight/4+pitchHeight/2);
 			newInfo.m_rearLeftHeightOffset = SPRING_FACTOR*(-pitchHeight/2 + -pitchHeight/3);
 			newInfo.m_rearRightHeightOffset = SPRING_FACTOR*(-pitchHeight/2 + -pitchHeight/3);
 		}
-		if (rollHeight>0) {	// Right raising up
+		if (rollHeight>0) {
+			// Right raising up
 			newInfo.m_frontRightHeightOffset += -SPRING_FACTOR*(rollHeight/3+rollHeight/2);
 			newInfo.m_rearRightHeightOffset += -SPRING_FACTOR*(rollHeight/3+rollHeight/2);
 			newInfo.m_rearLeftHeightOffset += rollHeight/2 - rollHeight/4;
 			newInfo.m_frontLeftHeightOffset += rollHeight/2 - rollHeight/4;
-		}	else {	// Left rasing up.
+		}	else {
+			// Left rasing up.
 			newInfo.m_frontRightHeightOffset += -rollHeight/2 + rollHeight/4;
 			newInfo.m_rearRightHeightOffset += -rollHeight/2 + rollHeight/4;
 			newInfo.m_rearLeftHeightOffset += SPRING_FACTOR*(rollHeight/3+rollHeight/2);
@@ -2394,10 +2399,12 @@ void Drawable::calcPhysicsXformMotorcycle( const Locomotor *locomotor, PhysicsXf
 			newInfo.m_rearRightHeightOffset		= newInfo.m_rearLeftHeightOffset;
 		}
 		/*
-		if (rollHeight>0) {	// Right raising up
+		if (rollHeight>0) {
+			// Right raising up
 			newInfo.m_frontRightHeightOffset += -SPRING_FACTOR*(rollHeight/3+rollHeight/2);
 			newInfo.m_rearLeftHeightOffset += rollHeight/2 - rollHeight/4;
-		}	else {	// Left raising up.
+		}	else {
+			// Left raising up.
 			newInfo.m_frontRightHeightOffset += -rollHeight/2 + rollHeight/4;
 			newInfo.m_rearLeftHeightOffset += SPRING_FACTOR*(rollHeight/3+rollHeight/2);
 		}
@@ -2477,7 +2484,7 @@ const AudioEventRTS& Drawable::getAmbientSoundByDamage(BodyDamageType dt)
 void Drawable::validatePos() const
 {
 	const Coord3D* ourPos = getPosition();
-	if (_isnan(ourPos->x) || _isnan(ourPos->y) || _isnan(ourPos->z))
+	if (std::isnan(ourPos->x) || std::isnan(ourPos->y) || std::isnan(ourPos->z))
 	{
 		DEBUG_CRASH(("Drawable/Object position NAN! '%s'", getTemplate()->getName().str()));
 	}
@@ -3557,11 +3564,11 @@ void Drawable::drawDisabled(const IRegion2D* healthBarRegion)
 	//
 	// Disabled Emoticon /Lightning
 	//                   7/
-	if( obj->isDisabledByType( DISABLED_HACKED )
-		|| obj->isDisabledByType( DISABLED_PARALYZED )
-		|| obj->isDisabledByType( DISABLED_EMP )
-		|| obj->isDisabledByType( DISABLED_SUBDUED )
-		|| obj->isDisabledByType( DISABLED_UNDERPOWERED )
+	if( obj->isDisabledByType( DISABLED_HACKED ) ||
+		obj->isDisabledByType( DISABLED_PARALYZED ) ||
+		obj->isDisabledByType( DISABLED_EMP ) ||
+		obj->isDisabledByType( DISABLED_SUBDUED ) ||
+		obj->isDisabledByType( DISABLED_UNDERPOWERED )
 		)
 	{
 		// create icon if necessary
@@ -3841,12 +3848,14 @@ void Drawable::drawHealthBar(const IRegion2D* healthBarRegion)
 			outColor.green =inColor.green * 0.5f;
 
 			if( m_conditionState.test( MODELCONDITION_REALLY_DAMAGED ) == TRUE )
-			{//average the above color with red
+			{
+				//average the above color with red
 				inColor.red = (1.0f + inColor.red) * 0.5f;
 				inColor.green *= 0.5f;
 			}
 			else if ( m_conditionState.test( MODELCONDITION_DAMAGED ) == FALSE )
-			{//average the above color with green
+			{
+				//average the above color with green
 				inColor.green = (1.0f + inColor.green) * 0.5f;
 				inColor.red *= 0.5f;
 			}

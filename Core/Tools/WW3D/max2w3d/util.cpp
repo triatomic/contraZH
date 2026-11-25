@@ -31,14 +31,6 @@
  *                                                                                             *
  *                    $Revision:: 28                                                          $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   Cleanup_Orthogonal_Matrix -- removes very small numbers from the matrix                   *
- *   Set_W3D_Name -- set a W3D name                                                            *
- *   Split_Node_Name -- break a node name into the base and extension                          *
- *   Is_Max_Tri_Mesh -- Is this node a triangle mesh?                                          *
- *    -- checks if the node is the origin of a model                                           *
- *    -- Checks if the node is the origin for the base obect (non-LOD'd).                      *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "util.h"
@@ -46,6 +38,7 @@
 #include "skin.h"
 #include "skindata.h"
 #include "modstack.h"
+#include "WWMath/matrix3d.h"
 
 
 #define MAX_NODE_NAME_LEN 256		// max name size we can handle
@@ -64,18 +57,7 @@ static int get_geometry_type(INode * node)
 }
 
 
-/***********************************************************************************************
- * Cleanup_Orthogonal_Matrix -- removes very small numbers from the matrix                     *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/26/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
+// Removes very small numbers from the matrix.
 Matrix3	Cleanup_Orthogonal_Matrix(Matrix3 & mat)
 {
 	Matrix3 newmat = mat;
@@ -95,20 +77,19 @@ Matrix3	Cleanup_Orthogonal_Matrix(Matrix3 & mat)
 	return newmat;
 }
 
-/***********************************************************************************************
- * Set_W3D_Name -- set a W3D name                                                              *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/26/1997 GH  : Created.                                                                 *
- *   9/13/1999  AJA : Strip off the trailing ".digits" since this is a convention we've set in *
- *                    MAX to help artists manage LODs.                                         *
- *=============================================================================================*/
+Matrix3D Convert_Max_Matrix(const Matrix3 & tm)
+{
+	const Point3 x = tm.GetRow(0);
+	const Point3 y = tm.GetRow(1);
+	const Point3 z = tm.GetRow(2);
+	const Point3 t = tm.GetRow(3);
+
+	return Matrix3D(Vector3(x.x, x.y, x.z), Vector3(y.x, y.y, y.z), Vector3(z.x, z.y, z.z),
+		Vector3(t.x, t.y, t.z));
+}
+
+// Strips off the trailing ".digits" since this is a convention we've set in MAX to help artists
+// manage LODs.
 void Set_W3D_Name(char * set_name,const char * src)
 {
 	memset(set_name,0,W3D_NAME_LEN);
@@ -127,63 +108,6 @@ void Set_W3D_Name(char * set_name,const char * src)
 	strupr(set_name);
 }
 
-/***********************************************************************************************
- * Split_Node_Name -- break a node name into the base and extension                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/26/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
-void Split_Node_Name(const char * name,char * set_base,char * set_exten,int * set_exten_index)
-{
-	// Nodes are assumed to be named in the following way:
-	// <name>.<exten character><exten digits>
-	// for example: mesh.d1
-
-	char buf[MAX_NODE_NAME_LEN];
-	char * ptr;
-
-	assert(strlen(name) < MAX_NODE_NAME_LEN);
-
-	// Initialize
-	if (set_base != nullptr) set_base[0] = 0;
-	if (set_exten != nullptr) set_exten[0] = 0;
-	if (set_exten_index != nullptr) *set_exten_index = 0;
-
-	// Get the base name
-	strncpy(buf,name,MAX_NODE_NAME_LEN);
-	ptr = buf;
-	while ((*ptr != 0) && (*ptr != '.')) {
-		ptr++;
-	}
-
-	if (*ptr == '.') {
-
-		// copy what we have so far into set_base
-		*ptr = 0;
-		if (set_base != nullptr) strncpy(set_base,buf,MAX_NODE_NAME_LEN);
-
-		// copy the rest back into the extension
-		ptr++;
-		if (set_exten != nullptr) strncpy(set_exten,ptr,MAX_NODE_NAME_LEN);
-
-		// now get the extension index
-		ptr++;
-		if (set_exten_index != nullptr) *set_exten_index = atoi(ptr);
-
-	} else {
-
-		// no extension, just copy the base name
-		if (set_base != nullptr) strncpy(set_base,buf,MAX_NODE_NAME_LEN);
-		return;
-	}
-}
-
 
 bool Append_Lod_Character (char *meshname, int lod_level, INodeListClass *origin_list)
 {
@@ -200,7 +124,7 @@ bool Append_Lod_Character (char *meshname, int lod_level, INodeListClass *origin
 	** If there is, we will append the current LOD level digit to the name.
 	** If there is not, the name will not be modified.
 	*/
-	INode *conflict = nullptr, *cur_origin = nullptr;
+	INode *conflict = nullptr;
 	int i, lod;
 	for (i = 0; i < num_lods; i++)
 	{
@@ -407,37 +331,7 @@ end:
 	free(up_full);
 }
 
-bool Is_Full_Path(char * path)
-{
-	// first scan for a drive letter (scan for a colon)
-	if (strchr(path,':') != nullptr) {
-		return true;
-	}
 
-	// now scan for a "network" path (starts with "//")
-	if ((path[0] == '/') && (path[1] == '/')) {
-		return true;
-	}
-	if ((path[0] == '\\') && (path[1] == '\\')) {
-		return true;
-	}
-
-	return false;
-}
-
-
-/***********************************************************************************************
- * Is_Max_Tri_Mesh -- Is this node a triangle mesh?                                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   2/2/98     GTH : Created.                                                                 *
- *=============================================================================================*/
 bool Is_Max_Tri_Mesh(INode * node)
 {
 	Object *obj = node->EvalWorldState(0).obj;
@@ -476,22 +370,9 @@ bool Is_Damage_Root(INode *node)
 }
 
 
-/***********************************************************************************************
- * Is_Origin -- checks if the node is the origin of a model                                    *
- *                                                                                             *
- *  A node is an origin if its parent is the scene root, it is a dummy object, and its name    *
- * is of the form "origin.*" (case insensitive). All descendants of the origin will be        *
- * expressed in coordinates relative to the origin object.                                     *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   9/13/99    AJA : Created.
- *=============================================================================================*/
+// Checks if the node is the origin of a model. A node is an origin if its parent is the scene root,
+// it is a dummy object, and its name is of the form "origin.*" (case insensitive). All descendants
+// of the origin will be expressed in coordinates relative to the origin object.
 bool Is_Origin(INode * node)
 {
 	if (!node) return false;
@@ -520,18 +401,7 @@ bool Is_Origin(INode * node)
 }
 
 
-/***********************************************************************************************
- * Is_Base_Origin -- Checks if the node is the origin for the base obect (non-LOD'd).          *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   9/13/1999  AJA : Created.                                                                 *
- *=============================================================================================*/
+// Checks if the node is the origin for the base object (non-LOD'd).
 bool Is_Base_Origin(INode * node)
 {
 	if (!node) return false;

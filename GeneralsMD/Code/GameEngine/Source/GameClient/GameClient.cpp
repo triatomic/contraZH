@@ -138,18 +138,6 @@ GameClient::~GameClient()
 	// clear any drawable TOC we might have
 	m_drawableTOC.clear();
 
-	//DEBUG_LOG(("Preloaded texture files ------------------------------------------"));
-	//for (Int oog=0; oog<preloadTextureNamesGlobalHack2.size(); ++oog)
-	//{
-	//	DEBUG_LOG(("%s", preloadTextureNamesGlobalHack2[oog]));
-	//}
-	//DEBUG_LOG(("------------------------------------------------------------------"));
-	//for (oog=0; oog<preloadTextureNamesGlobalHack.size(); ++oog)
-	//{
-	//	DEBUG_LOG(("%s", preloadTextureNamesGlobalHack[oog]));
-	//}
-	//DEBUG_LOG(("End Texture files ------------------------------------------------"));
-
 	delete TheCampaignManager;
 	TheCampaignManager = nullptr;
 
@@ -277,7 +265,7 @@ void GameClient::init()
 	clock.mark("DrawGroupInfo");
 
 	// create the display string factory
-	TheDisplayStringManager = createDisplayStringManager();
+	TheDisplayStringManager = TheGlobalData->m_headless ? NEW DisplayStringManagerDummy : createDisplayStringManager();
 	if( TheDisplayStringManager )	{
 		TheDisplayStringManager->init();
 		TheDisplayStringManager->setName("TheDisplayStringManager");
@@ -340,7 +328,7 @@ void GameClient::init()
 	clock.mark("message translators");
 
 	// create the font library
-	TheFontLibrary = createFontLibrary();
+	TheFontLibrary = TheGlobalData->m_headless ? NEW FontLibraryDummy : createFontLibrary();
 	if( TheFontLibrary )
 		TheFontLibrary->init();
 	clock.mark("font library");
@@ -491,18 +479,18 @@ void GameClient::reset()
 		m_facingDragTranslator->reset();
 	}
 
-	Drawable *draw, *nextDraw;
-//	m_drawableHash.clear();
-//	m_drawableHash.resize(DRAWABLE_HASH_SIZE);
-
-	m_drawableVector.clear();
-	m_drawableVector.resize(DRAWABLE_HASH_SIZE, nullptr);
+	m_drawableHash.clear();
+#if USING_STLPORT
+	m_drawableHash.resize(DRAWABLE_HASH_SIZE);
+#else
+	m_drawableHash.reserve(DRAWABLE_HASH_SIZE);
+#endif
 
 	// need to reset the in game UI to clear drawables before they are destroyed
 	TheInGameUI->reset();
 
 	// destroy all Drawables
-	for( draw = m_drawableList; draw; draw = nextDraw )
+	for( Drawable *draw = m_drawableList, *nextDraw = nullptr; draw; draw = nextDraw )
 	{
 		nextDraw = draw->getNextDrawable();
 		destroyDrawable( draw );
@@ -692,7 +680,8 @@ void GameClient::update()
 		const Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
 		Drawable* draw = firstDrawable();
 		while (draw)
-		{	// update() could free the Drawable, so go ahead and grab 'next'
+		{
+			// update() could free the Drawable, so go ahead and grab 'next'
 			Drawable* next = draw->getNextDrawable();
 #if ENABLE_CONFIGURABLE_SHROUD
 			if (TheGlobalData->m_shroudOn)
@@ -915,6 +904,22 @@ void GameClient::updateFakeDrawables()
 }
 
 /** -----------------------------------------------------------------------------------------------
+ * Given an object id, return the associated object.
+ * This method is the primary interface for accessing objects, and should be used
+ * instead of pointers to "attach" objects to each other.
+ */
+Drawable* GameClient::findDrawableByID( const DrawableID id )
+{
+	DrawablePtrHashIt it = m_drawableHash.find(id);
+	if (it == m_drawableHash.end()) {
+		// no such drawable
+		return nullptr;
+	}
+
+	return (*it).second;
+}
+
+/** -----------------------------------------------------------------------------------------------
  * Destroy the drawable immediately.
  */
 void GameClient::destroyDrawable( Drawable *draw )
@@ -958,13 +963,8 @@ void GameClient::addDrawableToLookupTable(Drawable *draw )
 	if( draw == nullptr )
 		return;
 
-	// add to lookup
-//	m_drawableHash[ draw->getID() ] = draw;
-	DrawableID newID = draw->getID();
-	while( newID >= m_drawableVector.size() ) // Fail case is hella rare, so faster to double up on size() call
-		m_drawableVector.resize(m_drawableVector.size() * 2, nullptr);
-
-	m_drawableVector[ newID ] = draw;
+	// add to lookup table
+	m_drawableHash[ draw->getID() ] = draw;
 
 }
 
@@ -975,13 +975,11 @@ void GameClient::removeDrawableFromLookupTable( Drawable *draw )
 {
 
 	// sanity
-	// TheSuperHackers @fix Mauller/Xezon 24/04/2025 Prevent out of range access to vector lookup table
-	if( draw == nullptr || static_cast<size_t>(draw->getID()) >= m_drawableVector.size() )
+	if( draw == nullptr )
 		return;
 
-	// remove from table
-//	m_drawableHash.erase( draw->getID() );
-	m_drawableVector[ draw->getID() ] = nullptr;
+	// remove from lookup table
+	m_drawableHash.erase( draw->getID() );
 
 }
 

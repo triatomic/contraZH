@@ -202,6 +202,7 @@ protected:
 	Bool AllCommandsReady(UnsignedInt frame);											///< Do we have all the commands for the given frame?
 	void RelayCommandsToCommandList(UnsignedInt frame);						///< Put the commands for the given frame onto TheCommandList.
 	static Bool isMessageTypeWithinNetworkRange(GameMessage::Type type);
+	void updateLogicFrame();																			///< Send our frame info to the other players when the logic frame has changed.
 	Bool processCommand(GameMessage *msg);												///< Whatever needs to be done as a result of this command, do it now.
 	void processFrameSynchronizedNetCommand(NetCommandRef *msg);	///< If there is a network command that needs to be executed at the same frame number on all clients, it happens here.
 	void processRunAheadCommand(NetRunAheadCommandMsg *msg);			///< Do what needs to be done when we get a new run ahead command.
@@ -497,12 +498,17 @@ Bool Network::isMessageTypeWithinNetworkRange(GameMessage::Type type) {
 /**
  * Take commands from TheCommandList and give them to the connection manager for transport.
  */
+// TheSuperHackers @refactor The logic frame update no longer depends on a MSG_FRAME_TICK in TheCommandList.
+// It now runs once before any message is sent, and on logic frame 1 it puts the local player in game.
 void Network::GetCommandsFromCommandList() {
+	updateLogicFrame();
+
 	GameMessage *msg = TheCommandList->getFirstMessage();
 	GameMessage *next = nullptr;
 	while (msg != nullptr) {
 		next = msg->next();
-		if (isMessageTypeWithinNetworkRange(msg->getType())) { // Is this something we should be sending to the other players?
+		if (isMessageTypeWithinNetworkRange(msg->getType())) {
+			// Is this something we should be sending to the other players?
 			if (m_localStatus == NETLOCALSTATUS_INGAME) {
 				m_conMgr->sendLocalGameMessage(msg, getExecutionFrame());
 			}
@@ -528,12 +534,10 @@ Int Network::getExecutionFrame() {
 }
 
 /**
- * This is where any processing that needs to be done for specific game messages.
- * Also check here to see if the logic frame number has changed to see if we need to
+ * Check to see if the logic frame number has changed to see if we need to
  * send our info for the last frame to the other players.
- * Return true if the message should be "eaten" by the network.
  */
-Bool Network::processCommand(GameMessage *msg)
+void Network::updateLogicFrame()
 {
 	if ((m_lastFrame != TheGameLogic->getFrame()) || (m_localStatus == NETLOCALSTATUS_PREGAME)) {
 		// If this is the start of a new game logic frame, then tell the connection manager that the last
@@ -541,13 +545,13 @@ Bool Network::processCommand(GameMessage *msg)
 
 		if (m_localStatus == NETLOCALSTATUS_PREGAME) {
 			// a sort-of-hack that prevents extraneous frames from being executed before the game actually starts.
-			// Idealy this shouldn't be necessary, but I don't think its hurting anything by being here.
+			// Ideally this shouldn't be necessary, but I don't think its hurting anything by being here.
 			if (TheGameLogic->getFrame() == 1) {
 				m_localStatus = NETLOCALSTATUS_INGAME;
 				NetCommandList *netcmdlist = m_conMgr->getFrameCommandList(0); // clear out frame 0 since we skipped it
 				deleteInstance(netcmdlist);
 			} else {
-				return FALSE;
+				return;
 			}
 		}
 
@@ -568,7 +572,14 @@ Bool Network::processCommand(GameMessage *msg)
 		//DEBUG_LOG(("Next Execution Frame - %d, last frame completed - %d", getExecutionFrame(), m_lastFrameCompleted));
 		m_lastFrame = TheGameLogic->getFrame();
 	}
+}
 
+/**
+ * This is where any processing that needs to be done for specific game messages.
+ * Return true if the message should be "eaten" by the network.
+ */
+Bool Network::processCommand(GameMessage *msg)
+{
 	// Are we leaving the game?
 	// This has to happen after the check to see if this is the start of a new logic frame.
 	// The reason is that we have to send all the frame info packets necessary to get to the
@@ -680,7 +691,6 @@ void Network::processFrameSynchronizedNetCommand(NetCommandRef *msg) {
 	else if (cmdMsg->getNetCommandType() == NETCOMMANDTYPE_DESTROYPLAYER) {
 		NetDestroyPlayerCommandMsg *netmsg = (NetDestroyPlayerCommandMsg *)cmdMsg;
 		processDestroyPlayerCommand(netmsg);
-		//DEBUG_LOG(("CRC command (%8.8X) on frame %d actually executed on frame %d", netmsg->getCRC(), netmsg->getExecutionFrame(), TheGameLogic->getFrame()));
 	}
 }
 
@@ -778,14 +788,17 @@ void Network::update()
 
 	liteupdate();
 
-	if (m_localStatus == NETLOCALSTATUS_LEFT) {// || (m_localStatus == NETLOCALSTATUS_LEAVING)) {
+	if (m_localStatus == NETLOCALSTATUS_LEFT) {
+		// || (m_localStatus == NETLOCALSTATUS_LEAVING)) {
 		endOfGameCheck();
 	}
 
-	if (AllCommandsReady(TheGameLogic->getFrame())) { // If all the commands are ready for the next frame...
+	if (AllCommandsReady(TheGameLogic->getFrame())) {
+		// If all the commands are ready for the next frame...
 		m_conMgr->handleAllCommandsReady();
 //		DEBUG_LOG(("Network::update - frame %d is ready", TheGameLogic->getFrame()));
-		if (timeForNewFrame()) { // This needs to come after any other pre-frame execution checks as this changes the timing variables.
+		if (timeForNewFrame()) {
+			// This needs to come after any other pre-frame execution checks as this changes the timing variables.
 			RelayCommandsToCommandList(TheGameLogic->getFrame());	// Put the commands for the next frame on TheCommandList.
 			m_frameDataReady = TRUE; // Tell the GameEngine to run the commands for the new frame.
 		}

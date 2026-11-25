@@ -120,7 +120,7 @@ struct TransferFileRule
 	UnsignedInt maxSize;
 };
 
-static const TransferFileRule transferFileRules[TransferFileType_Count] =
+static const TransferFileRule transferFileRules[] =
 {
 	{ ".map", 5 * 1024 * 1024 },
 	{ ".ini", 2 * 1024 * 1024 },
@@ -129,6 +129,7 @@ static const TransferFileRule transferFileRules[TransferFileType_Count] =
 	{ ".tga", 2 * 1024 * 1024 },
 	{ ".wak", 128 * 1024 },
 };
+static_assert(ARRAY_SIZE(transferFileRules) == TransferFileType_Count, "Incorrect array size");
 
 static TransferFileType getTransferFileType(const char* extension)
 {
@@ -194,9 +195,9 @@ static Bool hasValidTransferFileContent(const AsciiString& filePath, const Unsig
 		}
 		TGA2Footer footer;
 		memcpy(&footer, data + dataSize - sizeof(footer), sizeof(footer));
-		const Bool isTGA2 = memcmp(footer.Signature, TGA2_SIGNATURE, sizeof(footer.Signature)) == 0
-			&& footer.RsvdChar == '.'
-			&& footer.BZST == '\0';
+		const Bool isTGA2 = memcmp(footer.Signature, TGA2_SIGNATURE, sizeof(footer.Signature)) == 0 &&
+			footer.RsvdChar == '.' &&
+			footer.BZST == '\0';
 		if (!isTGA2)
 		{
 			DEBUG_LOG(("TGA file '%s' is missing TRUEVISION-XFILE footer signature.", filePath.str()));
@@ -280,7 +281,7 @@ TransferFileProblem CheckTransferFile(const AsciiString& path)
 
 UnicodeString GetTransferFileProblemText(TransferFileProblem problem, const AsciiString& path)
 {
-	const AsciiString name = GetFileFromPath(path);
+	const AsciiString name = getFileName(path.str());
 
 	switch (problem)
 	{
@@ -818,7 +819,7 @@ void ConnectionManager::processRunAheadMetrics(NetRunAheadMetricsCommandMsg *msg
 	if (isPlayerConnected(playerID)) {
 		m_latencyAverages[playerID] = msg->getAverageLatency();
 		m_fpsAverages[playerID] = msg->getAverageFps();
-		//DEBUG_LOG(("ConnectionManager::processRunAheadMetrics - player %d, fps = %d, latency = %f", player, msg->getAverageFps(), msg->getAverageLatency()));
+		//DEBUG_LOG(("ConnectionManager::processRunAheadMetrics - player %d, fps = %d, latency = %f", playerID, msg->getAverageFps(), msg->getAverageLatency()));
 #if defined(GENERALS_ONLINE)
 		// NGMP_CHANGE: Modern machines render games at much higher framerates, 100 is no longer only achievable when a game is in the background
 		if (m_fpsAverages[playerID] > 1000) {
@@ -2974,7 +2975,8 @@ void ConnectionManager::sendSingleFrameToPlayer(UnsignedInt playerID, UnsignedIn
 
 	DEBUG_LOG_LEVEL(DEBUG_LEVEL_NET, ("ConnectionManager::sendFrameDataToPlayer - sending data for frame %d", frame));
 	for (Int i = 0; i < MAX_SLOTS; ++i) {
-		if ((m_frameData[i] != nullptr) && (i != playerID)) { // no need to send his own commands to him.
+		if ((m_frameData[i] != nullptr) && (i != playerID)) {
+			// no need to send his own commands to him.
 			NetCommandList *list = m_frameData[i]->getFrameCommandList(frame);
 			if (list != nullptr) {
 				NetCommandRef *ref = list->getFirstMessage();

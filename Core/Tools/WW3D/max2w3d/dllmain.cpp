@@ -31,19 +31,11 @@
  *                                                                                             *
  *                  Last Update : June 9, 1997 [GH]                                            *
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   DllMain -- Entry point for the dll                                                        *
- *   LibDescription -- Returns description of this library                                     *
- *   LibNumberClasses -- Returns number of classes in this library                             *
- *   LibClassDesc -- Returns a ClassDesc for the specified class                               *
- *   LibVersion -- Returns the version number of this library                                  *
- *   GetString -- Gets a string out of the resources                                           *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
 #include <stdio.h>
-#include <max.h>
+#include "max_sdk.h"
 #include "dllmain.h"
 #include "w3ddesc.h"
 #include "w3dexp.h"
@@ -51,9 +43,7 @@
 #include "skin.h"
 #include "gamemtl.h"
 #include "gamemaps.h"
-#include "MeshDeform.h"
 #include "AlphaModifier.h"
-#include "gridsnapmodifier.h"
 
 #include "resource.h"
 
@@ -70,18 +60,6 @@ static W3dClassDesc		W3d_Export_Class_Descriptor;
 
 
 
-/***********************************************************************************************
- * DllMain -- Entry point for the dll                                                          *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   06/09/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 BOOL WINAPI DllMain(HINSTANCE	hinstDLL,ULONG /*fdwReason*/,LPVOID /*lpvReserved*/)
 {
 	AppInstance = hinstDLL;
@@ -97,53 +75,17 @@ BOOL WINAPI DllMain(HINSTANCE	hinstDLL,ULONG /*fdwReason*/,LPVOID /*lpvReserved*
 }
 
 
-/***********************************************************************************************
- * LibDescription -- Returns description of this library                                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   06/09/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 DLLEXPORT const TCHAR * LibDescription()
 {
 	return  Get_String(IDS_LIB_DESCRIPTION);
 }
 
-/***********************************************************************************************
- * LibNumberClasses -- Returns number of classes in this library                               *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   06/09/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 DLLEXPORT int LibNumberClasses()
 {
-	return 9; //Moumine 7/24/2001    4:38:27 PM was 10. Removed Mesh_Deformation(#6)
+	return 8;
 }
 
 
-/***********************************************************************************************
- * LibClassDesc -- Returns a ClassDesc for the specified class                                 *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   06/09/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 DLLEXPORT ClassDesc * LibClassDesc(int i)
 {
 	switch(i)
@@ -155,9 +97,7 @@ DLLEXPORT ClassDesc * LibClassDesc(int i)
 		case 4:	return Get_Game_Material_Desc(); break;
 		case 5:	return Get_Game_Maps_Desc(); break;
 		case 6:	return Get_PS2_Game_Material_Desc(); break;
-		case 7:	return Get_PS2_Material_Conversion(); break;
-		case 8:	return Get_Alpha_Desc(); break;
-		//case 6:	return Get_Mesh_Deform_Desc(); break;
+		case 7:	return Get_Alpha_Desc(); break;
 		//Moumine 7/24/2001    4:33:52 PM Removed #6 and shifted up instead of returning nullptr
 		// nullptr causes a crash in "File->Summary info->Plug-in ifo..."
 		default: return nullptr; break;
@@ -165,36 +105,12 @@ DLLEXPORT ClassDesc * LibClassDesc(int i)
 }
 
 
-/***********************************************************************************************
- * LibVersion -- Returns the version number of this library                                    *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   06/09/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 DLLEXPORT ULONG LibVersion()
 {
 	return VERSION_3DSMAX;
 }
 
 
-/***********************************************************************************************
- * Get_String -- Gets a string out of the resources                                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   06/09/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 TCHAR * Get_String( int id )
 {
 	static TCHAR buf[256];

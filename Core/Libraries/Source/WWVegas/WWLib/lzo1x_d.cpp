@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 1                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /* $Header: /Commando/Library/LZO1X_D.cpp 1     7/22/97 12:00p Greg_h $ */
@@ -140,7 +138,8 @@ first_literal_run:
 		/* handle matches */
 		for (;;) {
 //		while (TEST_IP) {
-			if (t < 16) {						/* a M1 match */
+			if (t < 16) {
+				/* a M1 match */
 				m_pos = op - 1;
 				m_pos -= t >> 2;
 				m_pos -= *ip++ << 2;
@@ -149,7 +148,8 @@ first_literal_run:
 //				*op++ = *m_pos++;
 			} else {
 match:
-				if (t >= 64) {				/* a M2 match */
+				if (t >= 64) {
+					/* a M2 match */
 					m_pos = op - 1;
 #if defined(LZO1X)
 					m_pos -= (t >> 2) & 7;
@@ -161,7 +161,8 @@ match:
 					t = (t >> 4) - 3;
 #endif
 				} else {
-					if (t >= 32) {			/* a M3 match */
+					if (t >= 32) {
+						/* a M3 match */
 						t &= 31;
 						if (t == 0) {
 							t = 31;
@@ -173,7 +174,8 @@ match:
 						m_pos = op - 1;
 						m_pos -= *ip++ >> 2;
 						m_pos -= *ip++ << 6;
-					} else {						/* a M4 match */
+					} else {
+						/* a M4 match */
 						m_pos = op;
 						m_pos -= (t & 8) << 11;
 						t &= 7;

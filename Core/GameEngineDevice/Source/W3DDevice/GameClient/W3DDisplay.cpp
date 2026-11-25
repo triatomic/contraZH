@@ -35,6 +35,8 @@ static void drawFramerateBar();
 
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 #include <numeric>
+#include <algorithm>
+#include <functional>
 #include <stdlib.h>
 #include <windows.h>
 #include <io.h>
@@ -97,6 +99,7 @@ static void drawFramerateBar();
 #include "WWLib/registry.h"
 #include "WW3D2/ww3d.h"
 #include "WW3D2/texturefilter.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/predlod.h"
 #include "WW3D2/part_emt.h"
 #include "WW3D2/part_ldr.h"
@@ -106,7 +109,6 @@ static void drawFramerateBar();
 #include "WW3D2/render2dsentence.h"
 #include "WW3D2/sortingrenderer.h"
 #include "WW3D2/textureloader.h"
-#include "WW3D2/dx8webbrowser.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/hlod.h"
 #include "WW3D2/meshmatdesc.h"
@@ -163,7 +165,7 @@ StatDumpClass::StatDumpClass( const char *fname )
 {
 	char buffer[ _MAX_PATH ];
 	GetModuleFileName( nullptr, buffer, sizeof( buffer ) );
-	if (char *pEnd = strrchr(buffer, '\\'))
+	if (char *pEnd = getLastPathSeparator(buffer))
 	{
 		*pEnd = 0;
 	}
@@ -405,6 +407,7 @@ W3DDisplay::W3DDisplay()
 	m_2DScene = nullptr;
 	m_3DInterfaceScene = nullptr;
 	m_averageFPS = TheGlobalData->m_framesPerSecondLimit;
+	m_low1PercentFPS = TheGlobalData->m_framesPerSecondLimit;
 #if defined(RTS_DEBUG)
 	m_timerAtCumuFPSStart = 0;
 #endif
@@ -430,6 +433,13 @@ W3DDisplay::W3DDisplay()
 	for (i = 0; i < ShaderDrawCounterClass::MAX_LINES; i++)
 		m_shaderDrawStrings[i] = nullptr;
 	m_shaderDrawRefreshTime = 0;
+
+	m_historyOffset = 0;
+	m_historyCount = 1;
+	m_lastUpdateTime64 = 0;
+	m_lastLow1PercentUpdateMs = 0;
+	m_currentFPS = 30.0f;
+	std::fill(m_durationHistory, m_durationHistory + FPS_HISTORY_SIZE, QuantizedUnsignedShort((UnsignedShort)(QuantizedTicksPerSecond / 30)));
 
 #ifdef PROFILER_ENABLED
 	m_profilerFrameCapture = NEW W3DProfilerFrameCapture();
@@ -516,8 +526,6 @@ W3DDisplay::~W3DDisplay()
 	if (!TheGlobalData->m_headless)
 		WW3D::Shutdown();
 	WWMath::Shutdown();
-	if (!TheGlobalData->m_headless)
-		DX8WebBrowser::Shutdown();
 	delete TheW3DFileSystem;
 	TheW3DFileSystem = nullptr;
 
@@ -575,7 +583,8 @@ void W3DDisplay::getDisplayModeDescription(Int modeIndex, Int *xres, Int *yres, 
 		if (isResolutionSupported(resolutions[res]))
 		{
 			if (numResolutions == modeIndex)
-			{	//found the mode
+			{
+				//found the mode
 				*xres=resolutions[res].Width;
 				*yres=resolutions[res].Height;
 				*bitDepth=resolutions[res].BitDepth;
@@ -591,7 +600,7 @@ void W3DDisplay::setGamma(Real gamma, Real bright, Real contrast, Bool calibrate
 	if (m_windowed)
 		return;	//we don't allow gamma to change in window because it would affect desktop.
 
-	DX8Wrapper::Set_Gamma(gamma,bright,contrast,calibrate, false);
+	Renderer::Set_Gamma(gamma,bright,contrast,calibrate, false);
 }
 
 // Gives the game window the frame its mode needs; the wrapper then sizes and centres it from that style.
@@ -1143,13 +1152,11 @@ void W3DDisplay::init()
 			m_nativeDebugDisplay->setFontHeight( 13 );
 			m_nativeDebugDisplay->setFontWidth( 9 );
 		}
-
-		DX8WebBrowser::Initialize();
-		clock.mark("debug display and web browser");
 	}
 
 	// we're now online
 	m_initialized = true;
+	m_lastUpdateTime64 = getPerformanceCounter();
 	if( TheGlobalData->m_displayDebug )
 	{
 		m_debugDisplayCallback = StatDebugDisplay;
@@ -1200,14 +1207,77 @@ void W3DDisplay::reset()
 
 const UnsignedInt START_CUMU_FRAME = LOGICFRAMES_PER_SECOND / 2;	// skip first half-sec
 
-void W3DDisplay::updateAverageFPS()
+void W3DDisplay::addFpsSample(Real elapsedSeconds)
 {
-	constexpr const Int FPS_HISTORY_SIZE = 30;
+	QuantizedUnsignedShort duration = QuantizedUnsignedShort::fromSeconds(elapsedSeconds);
 
-	static Int64 lastUpdateTime64 = 0;
-	static Int historyOffset = 0;
-	static Real fpsHistory[FPS_HISTORY_SIZE] = {0};
+	m_currentFPS = 1.0f / elapsedSeconds;
+	m_durationHistory[m_historyOffset] = duration;
 
+	m_historyOffset = (m_historyOffset + 1) & (FPS_HISTORY_SIZE - 1);
+	if (m_historyCount < FPS_HISTORY_SIZE)
+	{
+		m_historyCount++;
+	}
+}
+
+Real W3DDisplay::calculateAverageFPS(Real timeWindowSeconds)
+{
+	UnsignedInt unitsSum = 0;
+	Int samples = 0;
+	const UnsignedInt windowUnits = (UnsignedInt)(timeWindowSeconds * QuantizedTicksPerSecond);
+
+	for (Int i = 0; i < m_historyCount; ++i)
+	{
+		Int idx = (m_historyOffset - 1 - i) & (FPS_HISTORY_SIZE - 1);
+		unitsSum += m_durationHistory[idx].getValue();
+		samples++;
+
+		if (unitsSum >= windowUnits)
+		{
+			break;
+		}
+	}
+
+	return (Real)samples * QuantizedTicksPerSecond / (Real)unitsSum;
+}
+
+Real W3DDisplay::calculateLow1PercentFPS(Real timeWindowSeconds)
+{
+	UnsignedInt unitsSum = 0;
+	Int sampleCount = 0;
+	const UnsignedInt windowUnits = (UnsignedInt)(timeWindowSeconds * QuantizedTicksPerSecond);
+	UnsignedShort sortBuffer[FPS_HISTORY_SIZE];
+
+	Int i;
+	for (i = 0; i < m_historyCount; ++i)
+	{
+		Int idx = (m_historyOffset - 1 - i) & (FPS_HISTORY_SIZE - 1);
+		const UnsignedShort units = m_durationHistory[idx].getValue();
+		unitsSum += units;
+		sortBuffer[sampleCount++] = units;
+
+		if (unitsSum >= windowUnits)
+		{
+			break;
+		}
+	}
+
+	const Int low1PercentSampleCount = std::max((sampleCount + 50) / 100, 1);
+
+	std::nth_element(sortBuffer, sortBuffer + low1PercentSampleCount, sortBuffer + sampleCount, std::greater<UnsignedShort>());
+
+	UnsignedInt durationUnitsSum = 0;
+	for (i = 0; i < low1PercentSampleCount; ++i)
+	{
+		durationUnitsSum += sortBuffer[i];
+	}
+
+	return (Real)low1PercentSampleCount * QuantizedTicksPerSecond / (Real)durationUnitsSum;
+}
+
+void W3DDisplay::updatePerformanceMetrics()
+{
 	const Int64 freq64 = getPerformanceCounterFrequency();
 	const Int64 time64 = getPerformanceCounter();
 
@@ -1218,23 +1288,13 @@ void W3DDisplay::updateAverageFPS()
 	}
 #endif
 
-	const Int64 timeDiff = time64 - lastUpdateTime64;
+	const Int64 timeDiff = time64 - m_lastUpdateTime64;
+	Real elapsedSeconds = (Real)timeDiff / (Real)freq64;
 
-	// convert elapsed time to seconds
-	Real elapsedSeconds = (Real)timeDiff/(Real)freq64;
+	addFpsSample(elapsedSeconds);
+	m_averageFPS = calculateAverageFPS(1.0f); // 1.0s window for smooth Dynamic LOD tracking and UI matching
 
-	// append new sample to fps history.
-	if (historyOffset >= FPS_HISTORY_SIZE)
-		historyOffset = 0;
-
-	m_currentFPS = 1.0f/elapsedSeconds;
-	fpsHistory[historyOffset++] = m_currentFPS;
-
-	// determine average frame rate over our past history.
-	const Real sum = std::accumulate(fpsHistory, fpsHistory + FPS_HISTORY_SIZE, 0.0f);
-	m_averageFPS = sum / FPS_HISTORY_SIZE;
-
-	lastUpdateTime64 = time64;
+	m_lastUpdateTime64 = time64;
 }
 
 #if defined(RTS_DEBUG)	//debug hack to view object under mouse stats
@@ -2006,7 +2066,8 @@ void W3DDisplay::calculateTerrainLOD()
 			// start render block
 			updateViews();
 			if (WW3D::Begin_Render( true, true, Vector3( 0.0f, 0.0f, 0.0f ) ) == WW3D_ERROR_OK)
-			{	// draw all views of the world
+			{
+				// draw all views of the world
 				drawViews();
 				// render is all done!
 				WW3D::End_Render();
@@ -2047,6 +2108,18 @@ void W3DDisplay::calculateTerrainLOD()
 Real W3DDisplay::getAverageFPS()
 {
 	return m_averageFPS;
+}
+
+Real W3DDisplay::getLow1PercentFPS()
+{
+	const UnsignedInt now = timeGetTime();
+	const UnsignedInt elapsedMs = now - m_lastLow1PercentUpdateMs;
+	if (elapsedMs >= 1000)
+	{
+		m_low1PercentFPS = calculateLow1PercentFPS(3.0f);
+		m_lastLow1PercentUpdateMs = now - (elapsedMs % 1000);
+	}
+	return m_low1PercentFPS;
 }
 
 Real W3DDisplay::getCurrentFPS()
@@ -2184,14 +2257,15 @@ void W3DDisplay::draw()
 	// TheSuperHackers @feature bobtista 10/07/2026 Show messages for screenshots finished by the screenshot thread.
 	W3D_UpdateScreenshotMessages();
 
-	updateAverageFPS();
+	updatePerformanceMetrics();
 	if (TheGlobalData->m_enableDynamicLOD && TheGameLogic->getShowDynamicLOD())
 	{
 		DynamicGameLODLevel lod=TheGameLODManager->findDynamicLODLevel(m_averageFPS);
 		TheGameLODManager->setDynamicLODLevel(lod);
 	}
 	else
-	{	//if dynamic LOD is turned off, force highest LOD
+	{
+		//if dynamic LOD is turned off, force highest LOD
 		TheGameLODManager->setDynamicLODLevel(DYNAMIC_GAME_LOD_VERY_HIGH);
 	}
 
@@ -2535,7 +2609,8 @@ void W3DDisplay::renderLetterBox(UnsignedInt currentTime)
 #endif
 		}
 		else
-		{	//letter box is disabled, but may still be fading out
+		{
+			//letter box is disabled, but may still be fading out
 			if (m_letterBoxFadeLevel != 0.0f)
 			{
 				m_letterBoxFadeLevel = 1.0f - (currentTime - m_letterBoxFadeStartTime)/LETTER_BOX_FADE_TIME;
@@ -2553,7 +2628,8 @@ void W3DDisplay::renderLetterBox(UnsignedInt currentTime)
 #endif
 			}
 			else
-			{	//box has finished fading out
+			{
+				//box has finished fading out
 #ifdef SLIDE_LETTERBOX
 				TheTacticalView->setOrigin(0, 0);
 #else
@@ -2650,7 +2726,8 @@ void W3DDisplay::enableLetterBox(Bool enable)
 	if (enable)
 	{
 		if (!m_letterBoxEnabled)
-		{	//letterbox mode not previously enabled
+		{
+			//letterbox mode not previously enabled
 			m_letterBoxEnabled = TRUE;
 			m_letterBoxFadeStartTime = timeGetTime();
 
@@ -2664,7 +2741,8 @@ void W3DDisplay::enableLetterBox(Bool enable)
 	else
 	{
 		if (m_letterBoxEnabled)
-		{	//letterbox mode no previously disabled
+		{
+			//letterbox mode no previously disabled
 			m_letterBoxEnabled = FALSE;
 			m_letterBoxFadeStartTime = timeGetTime();
 
@@ -3218,7 +3296,8 @@ void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 	RectClass uv_rect(uv->lo.x,uv->lo.y,uv->hi.x,uv->hi.y);
 
 	if (m_isClippedEnabled)
-	{	//need to clip this quad to clip rectangle
+	{
+		//need to clip this quad to clip rectangle
 		if (screen_rect.Left < m_clipRegion.lo.x || screen_rect.Right > m_clipRegion.hi.x || screen_rect.Top < m_clipRegion.lo.y || screen_rect.Bottom > m_clipRegion.hi.y)
 		{
 			RectClass clipped_rect;
@@ -3344,7 +3423,7 @@ VideoBuffer*	W3DDisplay::createVideoBuffer()
 
 	// first try to use the native format
 
-	WW3DFormat displayFormat = DX8Wrapper::getBackBufferFormat();
+	WW3DFormat displayFormat = Renderer::Get_Back_Buffer_Format();
 
 	if ( DX8Wrapper::Get_Current_Caps()->Support_Texture_Format( displayFormat ))
 	{
@@ -3722,11 +3801,7 @@ void W3DDisplay::dumpAssetUsage(const char* mapname)
 	DynamicVectorClass<StringClass> names(8000);
 	m_assetManager->Create_Asset_List(names);
 
-	const char* leafname = strrchr(mapname, '\\');
-	if (leafname)
-		++leafname;					// point to first character after the last backslash
-	else
-		leafname = mapname;		// point to the start of the filename
+	const char* leafname = getFileName(mapname);
 
 	char buf[256];
 	int idx = 1;

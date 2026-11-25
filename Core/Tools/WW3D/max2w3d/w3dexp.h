@@ -31,14 +31,12 @@
  *                                                                                             *
  *                    $Revision:: 22                                                          $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
 
-#include "always.h"
-#include <max.h>
+#include "WWLib/always.h"
+#include "max_sdk.h"
 #include "dllmain.h"
 #include "hiersave.h"
 #include "w3dutil.h"
@@ -102,8 +100,6 @@ private:
 	INodeListClass * get_origin_list();
 	INodeListClass * get_damage_root_list();
 	HierarchySaveClass * get_hierarchy_tree();
-
-	bool get_base_object_tm(Matrix3 &tm);
 
 	bool Export_Hierarchy(char * name,ChunkSaveClass & csave,Progress_Meter_Class & meter,INode *root);
 	bool Export_Animation(char * name,ChunkSaveClass & csave,Progress_Meter_Class & meter,INode *root);

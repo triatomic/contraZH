@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 13                                                          $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -129,8 +127,7 @@ RenderInfoClass::RINFO_OVERRIDE_FLAGS & RenderInfoClass::Current_Override_Flags(
 SpecialRenderInfoClass::SpecialRenderInfoClass(CameraClass & cam,int render_type) :
 	RenderInfoClass(cam),
 	RenderType(render_type),
-	VisRasterizer(nullptr),
-	BWRenderer(nullptr)
+	VisRasterizer(nullptr)
 {
 }
 

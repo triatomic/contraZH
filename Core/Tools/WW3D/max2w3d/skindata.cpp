@@ -31,28 +31,12 @@
  *                                                                                             *
  *                    $Revision:: 7                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   SkinDataClass::Save -- save the skindata in the MAX file                                  *
- *   SkinDataClass::Load -- load the skindata from a MAX file                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
 #include "skindata.h"
 
 
-/***********************************************************************************************
- * SkinDataClass::Save -- save the skindata in the MAX file                                    *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/26/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 IOResult SkinDataClass::Save(ISave *isave)
 {
 	ULONG nb;
@@ -80,13 +64,6 @@ IOResult SkinDataClass::Save(ISave *isave)
 	/*
 	** Save the named selection sets of vertices
 	*/
-#if 0
-	if (VertSelSets.Count() > 0) {
-		isave->BeginChunk(INFLUENCE_DATA_CHUNK);
-		VertSelSets.Save(isave);
-		isave->EndChunk();
-	}
-#endif
 
 	/*
 	** Save the vertex influence data
@@ -101,18 +78,6 @@ IOResult SkinDataClass::Save(ISave *isave)
 }
 
 
-/***********************************************************************************************
- * SkinDataClass::Load -- load the skindata from a MAX file                                    *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/26/1997 GH  : Created.                                                                 *
- *=============================================================================================*/
 IOResult SkinDataClass::Load(ILoad *iload)
 {
 	ULONG nb;

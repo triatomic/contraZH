@@ -30,9 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 4                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   Get_CPU_Rate -- Fetch the rate of CPU ticks per second.                                   *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include	"always.h"
@@ -51,21 +48,7 @@ typedef union {
 } QuadValue;
 
 
-/***********************************************************************************************
- * Get_CPU_Rate -- Fetch the rate of CPU ticks per second.                                     *
- *                                                                                             *
- *    This routine will query the CPU to determine how many clock per second it is.            *
- *                                                                                             *
- * INPUT:   high  -- Reference to the location that will be filled with the upper 32 bits      *
- *                   of the result.                                                            *
- *                                                                                             *
- * OUTPUT:  Returns with the lower 32 bits of the result.                                      *
- *                                                                                             *
- * WARNINGS:   none                                                                            *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   05/20/1997 JLB : Created.                                                                 *
- *=============================================================================================*/
+// Fetch the rate of CPU ticks per second.
 unsigned long Get_CPU_Rate(unsigned long & high)
 {
 	union {
@@ -112,7 +95,7 @@ unsigned long Get_CPU_Clock(unsigned long & high)
 **
 */
 
-#define ASM_RDTSC _asm _emit 0x0f _asm _emit 0x31
+#define ASM_RDTSC __asm _emit 0x0f __asm _emit 0x31
 
 // Max # of samplings to allow before giving up and returning current average.
 #define MAX_TRIES			20

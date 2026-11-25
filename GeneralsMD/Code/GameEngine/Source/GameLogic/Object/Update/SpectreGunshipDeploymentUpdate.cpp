@@ -84,7 +84,7 @@ static const char* const TheGunshipCreateLocTypeNames[] =
 	"CREATE_AT_EDGE_FARTHEST_FROM_TARGET",
 	nullptr
 };
-static_assert(ARRAY_SIZE(TheGunshipCreateLocTypeNames) == GUNSHIP_CREATE_LOC_COUNT + 1, "Wrong array size");
+static_assert(ARRAY_SIZE(TheGunshipCreateLocTypeNames) == GUNSHIP_CREATE_LOC_COUNT + 1, "Incorrect array size");
 
 
 static Real zero = 0.0f;
@@ -265,9 +265,9 @@ UpdateSleepTime SpectreGunshipDeploymentUpdate::update()
 
 	Object *me = getObject();
 	// Abort conditions.
-	if( me->testStatus(OBJECT_STATUS_SOLD)
-    || me->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION)
-    || me->isEffectivelyDead() )
+	if( me->testStatus(OBJECT_STATUS_SOLD) ||
+    me->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) ||
+    me->isEffectivelyDead() )
 	{
 
 		return UPDATE_SLEEP_FOREVER;

@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 2                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -43,11 +41,3 @@ T Bound(T original, T minval, T maxval)
 	if (original > maxval) return(maxval);
 	return(original);
 };
-#if defined(__WATCOMC__)
-//int Bound(int, int, int);
-//signed int Bound(signed int, signed int, signed int);
-//unsigned Bound(unsigned, unsigned, unsigned);
-//long Bound(long, long, long);
-//float Bound(float, float, float);
-//double Bound(double, double, double);
-#endif

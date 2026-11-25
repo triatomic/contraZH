@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 4                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -54,11 +52,6 @@ public:
 	virtual void		Get_TCB_Params(int i,float *tension,float *continuity,float *bias);
 
 	virtual void					Update_Tangents() override;
-
-	// save-load support
-	virtual const PersistFactoryClass &	Get_Factory() const override;
-	virtual bool								Save(ChunkSaveClass &csave) override;
-	virtual bool								Load(ChunkLoadClass &cload) override;
 
 protected:
 

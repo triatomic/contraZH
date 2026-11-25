@@ -34,14 +34,13 @@
  *                                                                                             *
  * 06/26/02 KM Matrix name change to avoid MAX conflicts                                       *
  * 08/05/02 KM Texture class redesign
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "WWLib/always.h"
 #include "render2d.h"
 #include "WWLib/mutex.h"
 #include "ww3d.h"
+#include "Renderer.h"
 #include "font3d.h"
 #include "WWMath/rect.h"
 #include "texture.h"
@@ -198,7 +197,8 @@ void	  Render2DClass::Update_Bias()
 
 	BiasedCoordinateOffset = CoordinateOffset;
 
-	if ( WW3D::Is_Screen_UV_Biased() ) {	// Global bais setting
+	if ( WW3D::Is_Screen_UV_Biased() ) {
+		// Global bais setting
 		Vector2 bais_add( -0.5f ,-0.5f );	// offset by -0.5,-0.5 in pixels
 
 		// Convert from pixels to (-1,1)-(1,-1) units
@@ -227,7 +227,8 @@ Vector2 Render2DClass::Convert_Vert( const Vector2 & v )
 	out.Y = WWMath::Floorf( out.Y + 0.5f );
 
 	// Bias
-	if ( WW3D::Is_Screen_UV_Biased() ) {	// Global bais setting
+	if ( WW3D::Is_Screen_UV_Biased() ) {
+		// Global bais setting
 		out.X -= 0.5f;
 		out.Y -= 0.5f;
 	}
@@ -607,8 +608,8 @@ void Render2DClass::Render()
 	Matrix4x4 view,proj;
 	Matrix4x4 identity(true);
 
-	DX8Wrapper::Get_Transform(D3DTS_VIEW,view);
-	DX8Wrapper::Get_Transform(D3DTS_PROJECTION,proj);
+	Renderer::Get_Transform(RenderTransform_View,view);
+	Renderer::Get_Transform(RenderTransform_Projection,proj);
 
 	//
 	//	Configure the viewport for the entire target, which supersampling makes larger than the screen
@@ -616,23 +617,23 @@ void Render2DClass::Render()
 	int width, height, bits;
 	bool windowed;
 	WW3D::Get_Render_Target_Resolution( width, height, bits, windowed );
-	D3DVIEWPORT8 vp = { 0 };
-	vp.X			= 0;
-	vp.Y			= 0;
-	vp.Width		= width;
-	vp.Height	= height;
-	vp.MinZ		= 0;
-	vp.MaxZ		= 1;
-	DX8Wrapper::Set_Viewport(&vp);
+	RenderViewport vp;
+	vp.x			= 0;
+	vp.y			= 0;
+	vp.width		= width;
+	vp.height	= height;
+	vp.min_z		= 0;
+	vp.max_z		= 1;
+	Renderer::Set_Viewport(vp);
 	DX8Wrapper::Set_Texture(0,Texture);
 
 	VertexMaterialClass *vm=VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
 	DX8Wrapper::Set_Material(vm);
 	REF_PTR_RELEASE(vm);
 
-	DX8Wrapper::Set_World_Identity();
-	DX8Wrapper::Set_View_Identity();
-	DX8Wrapper::Set_Transform(D3DTS_PROJECTION,identity);
+	Renderer::Set_World_Identity();
+	Renderer::Set_View_Identity();
+	Renderer::Set_Transform(RenderTransform_Projection,identity);
 
 	DynamicVBAccessClass vb(BUFFER_TYPE_DYNAMIC_DX8,dynamic_fvf_type,Vertices.Count());
 	{
@@ -663,11 +664,13 @@ void Render2DClass::Render()
 	DX8Wrapper::Set_Index_Buffer(ib,0);
 
 	if (IsGrayScale)
-	{	//special case added to draw grayscale non-alpha blended images.
+	{
+		//special case added to draw grayscale non-alpha blended images.
 		DX8Wrapper::Set_Shader(ShaderClass::_PresetOpaqueShader);
 		DX8Wrapper::Apply_Render_State_Changes();	//force update of all regular W3D states.
 		if (DX8Wrapper::Get_Current_Caps()->Support_Dot3())
-		{	//Override W3D states with customizations for grayscale
+		{
+			//Override W3D states with customizations for grayscale
 			DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, 0x80A5CA8E);
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG0, D3DTA_TFACTOR | D3DTA_ALPHAREPLICATE);
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
@@ -679,7 +682,8 @@ void Render2DClass::Render()
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_COLOROP, D3DTOP_DOTPRODUCT3);
 		}
 		else
-		{	//doesn't have DOT3 blend mode so fake it another way.
+		{
+			//doesn't have DOT3 blend mode so fake it another way.
 			DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, 0x60606060);
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
@@ -694,8 +698,8 @@ void Render2DClass::Render()
 	DX8Wrapper::Draw_Triangles(0,Indices.Count()/3,0,Vertices.Count());
 	Debug_Statistics::Record_2D_Draw();
 
-	DX8Wrapper::Set_Transform(D3DTS_VIEW,view);
-	DX8Wrapper::Set_Transform(D3DTS_PROJECTION,proj);
+	Renderer::Set_Transform(RenderTransform_View,view);
+	Renderer::Set_Transform(RenderTransform_Projection,proj);
 	if (IsGrayScale)
 		ShaderClass::Invalidate();	//force both stages to be reset.
 

@@ -114,7 +114,7 @@ set(GAMEENGINE_SRC
     Include/Common/Thing.h
     Include/Common/ThingFactory.h
     Include/Common/ThingSort.h
-    Include/Common/ThingTemplate.h
+#    Include/Common/ThingTemplate.h
     Include/Common/TunnelTracker.h
 #    Include/Common/UnicodeString.h
     Include/Common/UnitTimings.h
@@ -507,8 +507,6 @@ set(GAMEENGINE_SRC
 #    Include/GameNetwork/Transport.h
 #    Include/GameNetwork/udp.h
 #    Include/GameNetwork/User.h
-#    Include/GameNetwork/WOLBrowser/FEBDispatch.h
-#    Include/GameNetwork/WOLBrowser/WebBrowser.h
 #    Include/Precompiled/PreRTS.h
 #    Source/Common/Audio/AudioEventRTS.cpp
 #    Source/Common/Audio/AudioRequest.cpp
@@ -557,7 +555,6 @@ set(GAMEENGINE_SRC
 #    Source/Common/INI/INIVideo.cpp
 #    Source/Common/INI/INIWater.cpp
 #    Source/Common/INI/INIWeapon.cpp
-#    Source/Common/INI/INIWebpageURL.cpp
 #    Source/Common/Language.cpp
 #    Source/Common/MessageStream.cpp
 #    Source/Common/MiniLog.cpp
@@ -618,7 +615,6 @@ set(GAMEENGINE_SRC
     Source/Common/System/StackDump.cpp
 #    Source/Common/System/StreamingArchiveFile.cpp
 #    Source/Common/System/SubsystemInterface.cpp
-    Source/Common/System/Trig.cpp
 #    Source/Common/System/UnicodeString.cpp
     Source/Common/System/Upgrade.cpp
 #    Source/Common/System/Xfer.cpp
@@ -631,7 +627,7 @@ set(GAMEENGINE_SRC
     Source/Common/Thing/ModuleFactory.cpp
     Source/Common/Thing/Thing.cpp
     Source/Common/Thing/ThingFactory.cpp
-    Source/Common/Thing/ThingTemplate.cpp
+#    Source/Common/Thing/ThingTemplate.cpp
 #    Source/Common/UserPreferences.cpp
 #    Source/Common/version.cpp
 #    Source/Common/WorkerProcess.cpp
@@ -1051,25 +1047,8 @@ set(GAMEENGINE_SRC
 #    Source/GameNetwork/Transport.cpp
 #    Source/GameNetwork/udp.cpp
 #    Source/GameNetwork/User.cpp
-#    Source/GameNetwork/WOLBrowser/WebBrowser.cpp
 #    Source/Precompiled/PreRTS.cpp
 )
-
-if(RTS_GAMEMEMORY_ENABLE)
-    # Uses the original Game Memory implementation.
-    list(APPEND GAMEENGINE_SRC
-#        Source/Common/System/GameMemory.cpp
-#        Source/Common/System/GameMemoryInitDMA_Generals.inl
-#        Source/Common/System/GameMemoryInitPools_Generals.inl
-#        Source/Common/System/MemoryInit.cpp
-    )
-else()
-    # Uses the null implementation when disabled.
-    list(APPEND GAMEENGINE_SRC
-#        Source/Common/System/GameMemoryNull.cpp
-#        Include/Common/GameMemoryNull.h
-    )
-endif()
 
 
 add_library(g_gameengine STATIC)
@@ -1095,5 +1074,5 @@ target_link_libraries(g_gameengine PUBLIC
 )
 
 target_precompile_headers(g_gameengine PRIVATE
-    [["Precompiled/precompiled.h"]] # Must be first
+    [["Precompiled/BasePrecomp.h"]] # Must be first
 )

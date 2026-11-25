@@ -18,6 +18,7 @@ set(MAX2W3D_SRC
     "dazzlesave.h"
     "dllmain.cpp"
     "dllmain.h"
+    "errclass.h"
     "ExportAll.cpp"
     "ExportAllDlg.cpp"
     "ExportAllDlg.h"
@@ -52,17 +53,12 @@ set(MAX2W3D_SRC
     "geometryexportcontext.h"
     "geometryexporttask.cpp"
     "geometryexporttask.h"
-    #"gmtldlg.cpp"
-    "gridsnapmodifier.cpp"
-    "gridsnapmodifier.h"
     "hiersave.cpp"
     "hiersave.h"
     "hlodsave.cpp"
     "hlodsave.h"
     "InputDlg.cpp"
     "InputDlg.h"
-    #"LightGlareSave.cpp"
-    #"LightGlareSave.h"
     "logdlg.cpp"
     "logdlg.h"
     "max2w3d.def"
@@ -72,72 +68,37 @@ set(MAX2W3D_SRC
     "meshbuild.h"
     "meshcon.cpp"
     "meshcon.h"
-    "MeshDeform.cpp"
-    "MeshDeform.h"
-    "MeshDeformData.cpp"
-    "MeshDeformData.h"
-    "MeshDeformDefs.h"
-    "MeshDeformPanel.cpp"
-    "MeshDeformPanel.h"
-    "MeshDeformSave.cpp"
-    "MeshDeformSave.h"
-    "MeshDeformSaveDefs.h"
-    "MeshDeformSaveSet.cpp"
-    "MeshDeformSaveSet.h"
-    "MeshDeformSet.cpp"
-    "MeshDeformSet.h"
-    "MeshDeformUndo.cpp"
-    "MeshDeformUndo.h"
     "meshsave.cpp"
     "meshsave.h"
     "motion.cpp"
     "motion.h"
     "namedsel.cpp"
     "namedsel.h"
-    "nullsave.cpp"
-    "nullsave.h"
-    "PCToPS2Material.cpp"
+    "nodefilt.cpp"
+    "nodefilt.h"
+    "nodelist.cpp"
+    "nodelist.h"
     "presetexportoptionsdialog.cpp"
     "presetexportoptionsdialog.h"
-    "PS2GameMtl.cpp"
-    "PS2GameMtlShaderDlg.cpp"
-    "PS2GameMtlShaderDlg.h"
-    "rcmenu.cpp"
-    "rcmenu.h"
+    "PROGRESS.h"
     "resource.h"
     "SceneSetup.cpp"
     "SceneSetupDlg.cpp"
     "SceneSetupDlg.h"
-    "simpdib.cpp"
-    "simpdib.h"
     "skin.cpp"
     "skin.h"
     "SkinCopy.cpp"
     "skindata.cpp"
     "skindata.h"
-    "SnapPoints.cpp"
-    "SnapPoints.h"
-    "TARGA.cpp"
-    "TARGA.h"
     "util.cpp"
     "util.h"
     "Utility.cpp"
     "vchannel.cpp"
     "vchannel.h"
-    "vxl.cpp"
-    "vxl.h"
-    "vxldbg.cpp"
-    "vxldbg.h"
-    "vxllayer.cpp"
-    "vxllayer.h"
-    "w3d_file.h"
-    "w3d_obsolete.h"
     "w3dappdata.cpp"
     "w3dappdata.h"
     "w3ddesc.cpp"
     "w3ddesc.h"
-    "w3ddlg.cpp"
-    "w3ddlg.h"
     "w3dexp.cpp"
     "w3dexp.h"
     "w3dmtl.cpp"
@@ -149,24 +110,19 @@ set(MAX2W3D_SRC
 add_library(core_max2w3d SHARED)
 set_target_properties(core_max2w3d PROPERTIES OUTPUT_NAME max2w3d SUFFIX ".dle")
 
-target_include_directories(core_max2w3d PRIVATE
-    "../pluglib"
-)
-
 target_sources(core_max2w3d PRIVATE ${MAX2W3D_SRC})
-
-# TODO: What does W3D_MAX4 do? Needs cmake option?
-target_compile_definitions(core_max2w3d PRIVATE W3D_MAX4)
 
 target_link_libraries(core_max2w3d PRIVATE
     Comctl32
-    # This is only linked to have its basetsd.h used instead of the vs6's basetsd.h
-    # The headers typedef INT_PTR to different types, but maxsdk expects it
+    corei_always
+    core_wwstub
+    core_wwvegas
+    # d3d8lib is only linked to have its basetsd.h used instead of the vs6's basetsd.h
+    # The headers typedef INT_PTR to different types, but deps_maxsdk expects it
     # typedef'ed to int, otherwise throws linker errors.
     d3d8lib
-    maxsdk
+    deps_maxsdk # Must stay below corei_always so that max_undef.h is force included after Precompiled/BasePrecomp.h
     winmm
-    core_pluglib
 )
 
 set_target_properties(core_max2w3d PROPERTIES LINK_FLAGS "/DEF:max2w3d.def")

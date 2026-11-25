@@ -76,24 +76,6 @@ typedef struct tConnInfoStruct {
 	unsigned short RemotePort;
 } ConnInfoStruct;
 
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
-#endif
-
-/***********************************************************************************************
- * Get_Local_Chat_Connection_Address -- Which address are we using to talk to the chat server? *
- *                                                                                             *
- *                                                                                             *
- *                                                                                             *
- * INPUT:    Ptr to address to return local address                                            *                                                                                             *
- *                                                                                             *
- * OUTPUT:   True if success                                                                   *
- *                                                                                             *
- * WARNINGS: None                                                                              *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   10/27/00 3:24PM ST : Created                                                              *
- *=============================================================================================*/
 Bool GetLocalChatConnectionAddress(AsciiString serverName, UnsignedShort serverPort, UnsignedInt& localIP)
 {
 	//return false;

@@ -30,13 +30,11 @@
  *                                                                                             *
  *                  Last update : 11/1/1999                                                    *
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
 
-#include <max.h>
+#include "max_sdk.h"
 #include "iparamm2.h"
 #include "istdplug.h"
 #include "meshadj.h"
@@ -116,7 +114,6 @@ class AlphaModifierClass : public Modifier
 		// Load and unload our UI
 		void BeginEditParams(IObjParam *ip, ULONG flags,Animatable *prev);
 		void EndEditParams(IObjParam *ip, ULONG flags,Animatable *next);
-		void InvalidateUI();
 
 		// Message saved from window messages.
 		int			Message;

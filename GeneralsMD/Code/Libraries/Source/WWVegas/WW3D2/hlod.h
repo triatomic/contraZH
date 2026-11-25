@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 3                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -270,6 +268,8 @@ protected:
 
 	// Current LOD Bias (affects recalculation of the Value array)
 	float								LODBias;
+
+	friend class HLodDefClass;
 };
 
 
@@ -311,6 +311,7 @@ protected:
 	WW3DErrorType				Save_Header (ChunkSaveClass &csave);
 	WW3DErrorType				Save_Lod_Array (ChunkSaveClass &csave);
 	WW3DErrorType				Save_Aggregate_Array(ChunkSaveClass & csave);
+	WW3DErrorType				Save_Proxy_Array(ChunkSaveClass & csave);
 
 private:
 
@@ -326,6 +327,7 @@ private:
 		SubObjectArrayClass();
 		~SubObjectArrayClass();
 		void		Reset();
+		void		Copy_Additional_Models(const HLodClass & hlod);
 		void		operator = (const SubObjectArrayClass & that);
 
 		bool		Load_W3D(ChunkLoadClass & cload);

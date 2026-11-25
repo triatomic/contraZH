@@ -30,8 +30,6 @@
  *                                                                         *
  *                    $Revision:: 7                                       $*
  *                                                                         *
- *-------------------------------------------------------------------------*
- * Functions:                                                              *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "textdraw.h"
@@ -259,7 +257,8 @@ float	TextDrawClass::Print( Font3DInstanceClass *font, char ch, float screen_x, 
 	float	screen_y1 = screen_y0 + (font->Char_Height() * WWMath::Sign( -TranslateScale.Y ));
 	screen_y1 = floor(screen_y1 / PixelSize.Y + 0.5f) * PixelSize.Y;
 
-	if ( WW3D::Is_Screen_UV_Biased() ) {	// Global bais setting
+	if ( WW3D::Is_Screen_UV_Biased() ) {
+		// Global bais setting
 		screen_x0 += PixelSize.X / 2;
 		screen_x1 += PixelSize.X / 2;
 		screen_y0 += PixelSize.Y / 2;

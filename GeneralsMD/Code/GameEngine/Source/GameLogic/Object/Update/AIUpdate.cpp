@@ -2323,10 +2323,10 @@ Bool AIUpdateInterface::computePath( PathfindServicesInterface *pathServices, Co
 	m_pathWasCapped = FALSE;
 	Region3D extent;
 	TheTerrainLogic->getMaximumPathfindExtent(&extent);
-	if (!extent.isInRegionNoZ(*destination)) {
+	if (!extent.containsWithin(destination->asCoord2D())) {
 		// We're going off the map.
 		Coord3D pos = *getObject()->getPosition();
-		if (!extent.isInRegionNoZ(pos))	{
+		if (!extent.containsWithin(pos.asCoord2D()))	{
 			// We're starting off the map.  Since we're off the map, we can't pathfind so just build a path.
 			return computeQuickPath(destination);
 		}
@@ -3064,11 +3064,11 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 		m_curMaxBlockedSpeed = FAST_AS_POSSIBLE;
 	}
 
-	if (m_curLocomotor != nullptr
-			&& m_locomotorGoalType == NONE
-			&& m_doFinalPosition == FALSE
-			&& m_isBlocked == FALSE
-			&& requiresConstantCalling == FALSE)
+	if (m_curLocomotor != nullptr &&
+			m_locomotorGoalType == NONE &&
+			m_doFinalPosition == FALSE &&
+			m_isBlocked == FALSE &&
+			requiresConstantCalling == FALSE)
 	{
 		return UPDATE_SLEEP_FOREVER;
 	}
@@ -3092,7 +3092,7 @@ void AIUpdateInterface::setLocomotorGoalPositionExplicit(const Coord3D& newPos)
 	m_locomotorGoalType = POSITION_EXPLICIT;
 	m_locomotorGoalData = newPos;
 #ifdef RTS_DEBUG
-if (_isnan(m_locomotorGoalData.x) || _isnan(m_locomotorGoalData.y) || _isnan(m_locomotorGoalData.z))
+if (std::isnan(m_locomotorGoalData.x) || std::isnan(m_locomotorGoalData.y) || std::isnan(m_locomotorGoalData.z))
 {
 	DEBUG_CRASH(("NAN in setLocomotorGoalPositionExplicit"));
 }
@@ -3106,7 +3106,7 @@ void AIUpdateInterface::setLocomotorGoalOrientation(Real angle)
 	m_locomotorGoalData.x = angle;
 	m_locomotorGoalTurnByReversing = FALSE;
 #ifdef RTS_DEBUG
-if (_isnan(m_locomotorGoalData.x) || _isnan(m_locomotorGoalData.y) || _isnan(m_locomotorGoalData.z))
+if (std::isnan(m_locomotorGoalData.x) || std::isnan(m_locomotorGoalData.y) || std::isnan(m_locomotorGoalData.z))
 {
 	DEBUG_CRASH(("NAN in setLocomotorGoalOrientation"));
 }
@@ -3121,7 +3121,7 @@ void AIUpdateInterface::setLocomotorGoalOrientationByReversing(Real angle)
 	// Not saved/CRC'd (keeps retail CRC): the aim state re-issues this goal every update.
 	m_locomotorGoalTurnByReversing = TRUE;
 #ifdef RTS_DEBUG
-if (_isnan(m_locomotorGoalData.x) || _isnan(m_locomotorGoalData.y) || _isnan(m_locomotorGoalData.z))
+if (std::isnan(m_locomotorGoalData.x) || std::isnan(m_locomotorGoalData.y) || std::isnan(m_locomotorGoalData.z))
 {
 	DEBUG_CRASH(("NAN in setLocomotorGoalOrientation"));
 }
@@ -3139,8 +3139,8 @@ void AIUpdateInterface::setLocomotorGoalNone()
 Bool AIUpdateInterface::isDoingGroundMovement() const
 {
 
-  if (getObject()->isDisabledByType( DISABLED_UNMANNED )
-   && getObject()->isKindOf( KINDOF_PRODUCED_AT_HELIPAD ) )
+  if (getObject()->isDisabledByType( DISABLED_UNMANNED ) &&
+   getObject()->isKindOf( KINDOF_PRODUCED_AT_HELIPAD ) )
   {
     return TRUE; // an unmanned helicopter gets grounded, eventually.
   }
@@ -5119,7 +5119,7 @@ void AIUpdateInterface::privateGuardPosition( const Coord3D *pos, GuardMode guar
 		// Clip to playable area.
 		Region3D r;
 		TheTerrainLogic->getExtent(&r);
-		if (!r.isInRegionNoZ(adjPos))
+		if (!r.containsWithin(adjPos.asCoord2D()))
 			adjPos = TheTerrainLogic->findClosestEdgePoint(&adjPos);
 	}
 	m_locationToGuard = adjPos;
@@ -5797,13 +5797,33 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 		{
 			if( !canAutoAcquireWhileStealthed() )
 			{
-  			const Object *container = obj->getContainedBy();
-  			if( ! (container && container->getContain()->isPassengerAllowedToFire()) )
-  			{
+				//He's stealthed and idle, but if he's garrisoned, then that's a whole different matter....
+				const Object *container = obj->getContainedBy();
+				if( !container )
+				{
+					//Not contained
+					return nullptr;
+				}
+
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+				// TheSuperHackers @bugfix Caball009 22/09/2026 Return early to prevent a crash.
+				// This is needed when a Tunnel Network with units is transferred to another player and then sold or destroyed.
+				// The units are not properly transferred and are left in an invalid state.
+				if (!container->getContain())
+				{
+					// remove all such units from the tunnel tracker and destroy them
+					TheGameLogic->friend_destroyInTunnelContain(obj);
+
+					return nullptr;
+				}
+#endif
+
+				if( !container->getContain()->isPassengerAllowedToFire() )
+				{
 					// Sorry, stealthed and not allowed to idle fire when stealthed.
 					// Being in a firing container is an exception to this veto.
-  				return nullptr;
-  			}
+					return nullptr;
+				}
 			}
 		}
 	}
@@ -5912,9 +5932,9 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 
 	// Instead of shroud affecting the ability to attack, it affects the ability to target.
 	// The same checks apply as the old WeaponSet check (now commented out, search for getShroudedStatus)
-	if( calledByAI
-			&& obj->getControllingPlayer()
-			&& obj->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN
+	if( calledByAI &&
+			obj->getControllingPlayer() &&
+			obj->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN
 		)
 	{
 		flags |= AI::UNFOGGED;
@@ -6763,6 +6783,12 @@ void AIUpdateInterface::loadPostProcess()
 			m_pathfindGoalCell.y = -1;
 			TheAI->pathfinder()->updateGoal(getObject(), &goalPos, getObject()->getLayer());
 		}
+	}
+
+	// TheSuperHackers @bugfix bobtista 11/10/2026 The pathfind queue is not saved, so queue the pending request again.
+	if (m_waitingForPath && m_queueForPathFrame == 0)
+	{
+		TheAI->pathfinder()->queueForPath(getObject()->getID());
 	}
 
 }

@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 8                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -125,9 +123,6 @@ class SoundPseudo3DClass : public Sound3DClass
 		//	Pan control
 		//////////////////////////////////////////////////////////////////////
 		virtual void			Update_Pseudo_Pan ();
-
-		// From PersistClass
-		virtual const PersistFactoryClass &	Get_Factory () const override;
 
 	protected:
 

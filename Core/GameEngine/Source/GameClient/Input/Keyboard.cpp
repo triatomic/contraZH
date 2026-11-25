@@ -164,7 +164,7 @@ void Keyboard::updateKeys()
 			// The repeat delay runs from when the key is read, so a key read late after a stall does not repeat at once.
 			if( BitIsSet( m_keys[ index ].state, KEY_STATE_DOWN ) )
 			{
-				m_keyStatus[ m_keys[ index ].key ].keyDownTimeMsec = timeGetTime();
+				m_keyRepeatTimeMsec[ m_keys[ index ].key ] = timeGetTime() + m_repeatDelayMsec;
 				pressed = TRUE;
 			}
 		}
@@ -254,11 +254,10 @@ Bool Keyboard::checkKeyRepeat()
 		{
 
 			const UnsignedInt now = timeGetTime();
-			const UnsignedInt keyDownTime = m_keyStatus[ key ].keyDownTimeMsec;
-			// The difference is signed because a repeat slower than the delay schedules the next one ahead of now.
-			const Int elapsedMsec = (Int)(now - keyDownTime);
+			// TheSuperHackers @info The repeat time is usually ahead of now, so the difference is signed.
+			const Int msecUntilRepeat = (Int)(m_keyRepeatTimeMsec[ key ] - now);
 
-			if( elapsedMsec > (Int)m_repeatDelayMsec )
+			if( msecUntilRepeat <= 0 )
 			{
 				// Add key to this frame
 				m_keys[ index ].key = (UnsignedByte)key;
@@ -268,16 +267,13 @@ Bool Keyboard::checkKeyRepeat()
 				// Set End Flag
 				m_keys[ ++index ].key = KEY_NONE;
 
-				// Set all keys as new to prevent multiple keys repeating
-				for( index = 0; index< NUM_KEYS; index++ )
-					m_keyStatus[ index ].keyDownTimeMsec = now;
+				// Delay all other keys to prevent multiple keys repeating
+				for( index = 0; index < ARRAY_SIZE(m_keyRepeatTimeMsec); index++ )
+				{
+					m_keyRepeatTimeMsec[ index ] = now + m_repeatDelayMsec;
+				}
 
-				// TheSuperHackers @bugfix bobtista 09/06/2026 Schedule the next repeat one INTERVAL
-				// from now (time-based). The previous code subtracted DELAY+INTERVAL, leaving the key
-				// permanently past the repeat threshold so it repeated EVERY frame and ignored
-				// KEY_REPEAT_INTERVAL_MSEC. At high frame rates (e.g. macOS) that caused runaway
-				// repeats - one backspace tap deleting several characters.
-				m_keyStatus[ key ].keyDownTimeMsec = now - (m_repeatDelayMsec - m_repeatIntervalMsec);
+				m_keyRepeatTimeMsec[ key ] = now + m_repeatIntervalMsec;
 
 				retVal = TRUE;
 				break;  // exit for key
@@ -392,13 +388,13 @@ void Keyboard::initKeyNames()
 
 	HKL kLayout = GetKeyboardLayout(0);
 
-	Int low = (UnsignedInt)kLayout & 0xFFFF;
+	Int low = (Int)(uintptr_t)kLayout & 0xFFFF;
 	LanguageID currentLanguage = OurLanguage;
-	if(low == 0x040c
-		 || low == 0x080c
-		 || low == 0x0c0c
-		 || low == 0x100c
-		 || low == 0x140c)
+	if(low == 0x040c ||
+		 low == 0x080c ||
+		 low == 0x0c0c ||
+		 low == 0x100c ||
+		 low == 0x140c)
 		currentLanguage = LANGUAGE_ID_FRENCH;
 
 	switch( currentLanguage )
@@ -750,6 +746,7 @@ Keyboard::Keyboard()
 
 	memset( m_keys, 0, sizeof( m_keys ) );
 	memset( m_keyStatus, 0, sizeof( m_keyStatus ) );
+	memset( m_keyRepeatTimeMsec, 0, sizeof( m_keyRepeatTimeMsec ) );
 	m_modifiers = KEY_STATE_NONE;
 	m_updateCount = 0;
 	m_shift2Key = KEY_NONE;
@@ -805,13 +802,13 @@ void Keyboard::update()
 //-------------------------------------------------------------------------------------------------
 void Keyboard::resetKeys()
 {
-
 	// TheSuperHackers @fix Caball009 13/12/2025 Fix bug where game remains in waypoint mode
 	// because the key up state for the alt key is not detected after alt tab.
-	refreshAltKeys();
+	emitModifierKeyUps();
 
 	memset( m_keys, 0, sizeof( m_keys ) );
 	memset( m_keyStatus, 0, sizeof( m_keyStatus ) );
+	memset( m_keyRepeatTimeMsec, 0, sizeof( m_keyRepeatTimeMsec ) );
 	m_modifiers = KEY_STATE_NONE;
 	if( getCapsState() )
 	{
@@ -821,22 +818,25 @@ void Keyboard::resetKeys()
 }
 
 //-------------------------------------------------------------------------------------------------
-// Refresh the state of the alt keys, necessary after alt tab
-//-------------------------------------------------------------------------------------------------
-void Keyboard::refreshAltKeys() const
+static void emitRawKeyUpIfDown(const KeyboardIO *keyStatus, KeyDefType key)
 {
-	if (BitIsSet(m_keyStatus[KEY_LALT].state, KEY_STATE_DOWN))
+	if (BitIsSet(keyStatus[key].state, KEY_STATE_DOWN))
 	{
 		GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RAW_KEY_UP);
-		msg->appendIntegerArgument(KEY_LALT);
+		msg->appendIntegerArgument(key);
 		msg->appendIntegerArgument(KEY_STATE_UP);
 	}
-	if (BitIsSet(m_keyStatus[KEY_RALT].state, KEY_STATE_DOWN))
-	{
-		GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_RAW_KEY_UP);
-		msg->appendIntegerArgument(KEY_RALT);
-		msg->appendIntegerArgument(KEY_STATE_UP);
-	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void Keyboard::emitModifierKeyUps() const
+{
+	emitRawKeyUpIfDown(m_keyStatus, KEY_LCTRL);
+	emitRawKeyUpIfDown(m_keyStatus, KEY_RCTRL);
+	emitRawKeyUpIfDown(m_keyStatus, KEY_LSHIFT);
+	emitRawKeyUpIfDown(m_keyStatus, KEY_RSHIFT);
+	emitRawKeyUpIfDown(m_keyStatus, KEY_LALT);
+	emitRawKeyUpIfDown(m_keyStatus, KEY_RALT);
 }
 
 //-------------------------------------------------------------------------------------------------

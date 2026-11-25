@@ -33,14 +33,13 @@
  *                    $Revision:: 5                                                           $*
  *                                                                                             *
  * 06/26/02 KM Matrix name change to avoid MAX conflicts                                       *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "seglinerenderer.h"
 #include "ww3d.h"
 #include "rinfo.h"
 #include "dx8wrapper.h"
+#include "Renderer.h"
 #include "sortingrenderer.h"
 #include "WWMath/vp.h"
 #include "WWMath/Vector3i.h"
@@ -236,11 +235,11 @@ void SegLineRendererClass::Render
 )
 {
 	Matrix4x4 view;
-	DX8Wrapper::Get_Transform(D3DTS_VIEW,view);
+	Renderer::Get_Transform(RenderTransform_View,view);
 
 	Matrix4x4 identity(true);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,identity);
-	DX8Wrapper::Set_Transform(D3DTS_VIEW,identity);
+	Renderer::Set_Transform(RenderTransform_World,identity);
+	Renderer::Set_Transform(RenderTransform_View,identity);
 
 	/*
 	** Handle texture UV offset animation (done once for entire line).
@@ -449,7 +448,8 @@ void SegLineRendererClass::Render
 		// segment.
 		LineSegmentIntersection intersection[MAX_SEGLINE_POINT_BUFFER_SIZE + 1][NUM_EDGES];
 
-		for (sidx = 1; sidx < point_cnt; sidx++) {	// #segments = #points - 1 (+ 2 dummy segments)
+		for (sidx = 1; sidx < point_cnt; sidx++) {
+			// #segments = #points - 1 (+ 2 dummy segments)
 
 			Vector3 &curr_point = points[sidx - 1];
 			Vector3 &next_point = points[sidx];
@@ -1187,31 +1187,20 @@ void SegLineRendererClass::Render
 		{
 			DynamicVBAccessClass::WriteLockClass Lock(&Verts);
 			unsigned int i;
-			unsigned char *vb=(unsigned char*)Lock.Get_Formatted_Vertex_Array();
-			const FVFInfoClass& fvfinfo=Verts.FVF_Info();
-
-			const unsigned int verticesOffset = fvfinfo.Get_Location_Offset();
-			const unsigned diffuseOffset = fvfinfo.Get_Diffuse_Offset();
-			const unsigned textureOffset = fvfinfo.Get_Tex_Offset(0);
-			const unsigned beamOffset = fvfinfo.Get_Tex_Offset(1);
-			const unsigned vbSize = fvfinfo.Get_FVF_Size();
+			VertexFormatXYZNDUV2* vb=Lock.Get_Formatted_Vertex_Array();
 
 			for (i=0; i<vnum; i++)
 			{
-				// Copy Locations
-				Vector3 *vertex = reinterpret_cast<Vector3 *>(vb + verticesOffset);
-				vertex->X = vArray[i].x;
-				vertex->Y = vArray[i].y;
-				vertex->Z = vArray[i].z;
-				*reinterpret_cast<unsigned int *>(vb + diffuseOffset) = vArray[i].diffuse;
-				Vector2 *texture = reinterpret_cast<Vector2 *>(vb + textureOffset);
-				texture->U = vArray[i].u1;
-				texture->V = vArray[i].v1;
+				// Copy the location, color and texture coordinates
+				vb[i].x = vArray[i].x;
+				vb[i].y = vArray[i].y;
+				vb[i].z = vArray[i].z;
+				vb[i].diffuse = vArray[i].diffuse;
+				vb[i].u1 = vArray[i].u1;
+				vb[i].v1 = vArray[i].v1;
 				// Across the line from 0 to 1, and along it in world units
-				Vector2 *beam = reinterpret_cast<Vector2 *>(vb + beamOffset);
-				beam->U = vArray[i].u2;
-				beam->V = vArray[i].x * beam_dir.X + vArray[i].y * beam_dir.Y + vArray[i].z * beam_dir.Z - beam_base;
-				vb += vbSize;
+				vb[i].u2 = vArray[i].u2;
+				vb[i].v2 = vArray[i].x * beam_dir.X + vArray[i].y * beam_dir.Y + vArray[i].z * beam_dir.Z - beam_base;
 			}
 		}
 
@@ -1255,7 +1244,7 @@ void SegLineRendererClass::Render
 
 	}
 
-	DX8Wrapper::Set_Transform(D3DTS_VIEW,view);
+	Renderer::Set_Transform(RenderTransform_View,view);
 
 }
 

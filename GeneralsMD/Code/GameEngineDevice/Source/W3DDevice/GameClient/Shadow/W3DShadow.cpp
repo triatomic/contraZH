@@ -40,7 +40,6 @@
 #include "WW3D2/hlod.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
-#include "Lib/BaseType.h"
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "Common/GlobalData.h"
 #include "W3DDevice/GameClient/W3DVolumetricShadow.h"

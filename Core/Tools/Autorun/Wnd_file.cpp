@@ -46,6 +46,7 @@
 #include <sys/stat.h>
 #include "Wnd_File.h"
 #include "WinFix.h"
+#include <Lib/PathUtil.h>
 //#include "autorun.h"
 
 
@@ -82,32 +83,12 @@ char DebugFile	[ MAX_PATH ] = { '\0' };
 //-----------------------------------------------------------------------------
 // public file class functions...
 //-----------------------------------------------------------------------------
-#if(0)
-#ifndef RTS_DEBUG
-void __cdecl Msg( int, char *, char *, ... ) { };	// line, file, fmt
-void 	Delete_Msg_File ()  { };
-#endif
-#endif
-
 
 #ifdef RTS_DEBUG
 
-/****************************************************************************
- * MSG -- Write Message to Debug file with line and filename.				*
- *																			*
- * INPUT:		int line       --	line where message originated.			*
- *				char *filename -- file where message originated.			*
- *				char *fmt      -- variable argument list.					*
- *																			*
- * OUTPUT:		none.														*
- *																			*
- * WARNINGS:	none.														*
- *																			*
- * HISTORY:																	*
- *   08/19/1998   MML : Created.											*
- *==========================================================================*/
+// Write Message to Debug file with line and filename.
 
-void __cdecl Msg( int line, const char *filename, const char *fmt, ... )
+void Msg( int line, const char *filename, const char *fmt, ... )
 {
 	char     szBuffer1[ MAX_PATH * 3 ];
 	char     szBuffer2[ MAX_PATH * 2 ];
@@ -131,11 +112,7 @@ void __cdecl Msg( int line, const char *filename, const char *fmt, ... )
 	//----------------------------------------------------------------------
 	// Make filename.
 	//----------------------------------------------------------------------
-	const char *temp = strrchr( filename, '\\' );
-	if ( temp != nullptr || temp[0] != '\0' ) {
-		temp++;
-		strcpy( szFile, temp );
-	}
+	strcpy( szFile, getFileName( filename ) );
 
 	//----------------------------------------------------------------------
 	// format message with header
@@ -163,25 +140,12 @@ void __cdecl Msg( int line, const char *filename, const char *fmt, ... )
 	//----------------------------------------------------------------------
 	OutputDebugString( szBuffer1 );
 
-} /* Msg */
+}
 
 
-/****************************************************************************
- * MSG -- Write Message to Debug file with line and filename.				*
- *																			*
- * INPUT:		int		line		--	line where message originated.	   	*
- *				unichar *filename	-- file where message originated.	   	*
- *				unichar *fmt		-- variable argument list. 				*
- *																			*
- * OUTPUT:		none.														*
- *																			*
- * WARNINGS:	none.														*
- *																			*
- * HISTORY:																	*
- *   08/19/1998   MML : Created.											*
- *==========================================================================*/
+// Write Message to Debug file with line and filename.
 
-void __cdecl Msg( int line, const char *filename, const unichar *fmt, UINT codepage, ... )
+void Msg( int line, const char *filename, const unichar *fmt, UINT codepage, ... )
 {
 	unichar		szBuffer1[ MAX_PATH * 3 ];
 	unichar		szBuffer2[ MAX_PATH * 3 ];
@@ -213,12 +177,9 @@ void __cdecl Msg( int line, const char *filename, const unichar *fmt, UINT codep
 	//----------------------------------------------------------------------
 	// Make filename.
 	//----------------------------------------------------------------------
-	const char *temp = strrchr( filename, '\\' );
-	if ( temp != nullptr || temp[0] != '\0' ) {
-		temp++;
-		length = strlen( temp );
-		mbstowcs( szFile, temp, length );
-	}
+	const char *temp = getFileName( filename );
+	length = strlen( temp );
+	mbstowcs( szFile, temp, length );
 
 	//----------------------------------------------------------------------
 	// format message with header
@@ -254,21 +215,8 @@ void __cdecl Msg( int line, const char *filename, const unichar *fmt, UINT codep
 	//----------------------------------------------------------------------
 	OutputDebugString( szBuffer3 );
 
-} /* Msg */
+}
 
-
-/***************************************************************************
- * DELETE_MSG_FILE -- Delete the Debug file.							   *
- *                                                                         *
- * INPUT:         none.													   *
- *                                                                         *
- * OUTPUT:        none.													   *
- *                                                                         *
- * WARNINGS:      none.                                                    *
- *                                                                         *
- * HISTORY:                                                                *
- *   08/19/1998   MML : Created.                                           *
- *=========================================================================*/
 
 //----------------------------------------------------------------------
 // Delete_Msg_File
@@ -287,8 +235,8 @@ void Delete_Msg_File ()
 	//----------------------------------------------------------------------
 //	strcat( strcpy( DebugFile, ".\\" ), DEBUG_FILE );
 	GetWindowsDirectory( DebugFile, MAX_PATH );
-	if ( DebugFile[ strlen( DebugFile )-1 ] != '\\' ) {
-		strcat( DebugFile, "\\" );
+	if ( !ensureTrailingSeparatorInPath( DebugFile, ARRAY_SIZE( DebugFile ) ).ok ) {
+		return;
 	}
 	strcat( DebugFile, DEBUG_FILE );
 

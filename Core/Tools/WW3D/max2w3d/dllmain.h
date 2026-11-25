@@ -31,13 +31,12 @@
  *                                                                                             *
  *                  Last Update : June 9, 1997 [GH]                                            *
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
 
 #include <windows.h>
+#include <commdlg.h>
 
 extern HINSTANCE AppInstance;
 

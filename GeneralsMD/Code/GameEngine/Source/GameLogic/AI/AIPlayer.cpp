@@ -1209,10 +1209,10 @@ Bool AIPlayer::computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord
 	Region2D bounds;
 	getPlayerStructureBounds(&bounds, playerNdx);
 
-	if( bounds.hi.x == 0
-		&& bounds.lo.x == 0
-		&& bounds.hi.y == 0
-		&& bounds.lo.y == 0
+	if( bounds.hi.x == 0 &&
+		bounds.lo.x == 0 &&
+		bounds.hi.y == 0 &&
+		bounds.lo.y == 0
 		)
 	{
 		Region3D bounds3D;
@@ -2853,7 +2853,8 @@ void AIPlayer::doBaseBuilding()
 			if (m_readyToBuildStructure) {
 				processBaseBuilding();
 			}
-			if (m_buildDelay<1) {	// processBaseBuilding may reset m_buildDelay.
+			if (m_buildDelay<1) {
+				// processBaseBuilding may reset m_buildDelay.
 				m_buildDelay = 2*LOGICFRAMES_PER_SECOND; // check again in 2 seconds.
 			}
 			// Note that this timer gets shortcut when a building is completed.
@@ -2868,7 +2869,8 @@ void AIPlayer::doBaseBuilding()
 void AIPlayer::checkReadyTeams()
 {
 	// See if any ready teams are gathered at their rally point
-	{	// needed to scope iter.  silly ms c++.
+	{
+		// needed to scope iter.  silly ms c++.
 		for ( DLINK_ITERATOR<TeamInQueue> iter = iterate_TeamReadyQueue(); !iter.done(); iter.advance())
 		{
 			TeamInQueue *team = iter.cur();
@@ -2949,7 +2951,8 @@ void AIPlayer::checkReadyTeams()
 void AIPlayer::checkQueuedTeams()
 {
 	// See if any teams are expired.
-	{	// needed to scope iter.  silly ms c++.
+	{
+		// needed to scope iter.  silly ms c++.
 		for ( DLINK_ITERATOR<TeamInQueue> iter = iterate_TeamBuildQueue(); !iter.done(); iter.advance())
 		{
 			TeamInQueue *team = iter.cur();
@@ -2978,7 +2981,8 @@ void AIPlayer::checkQueuedTeams()
 	}
 
 	// See if any teams are ready.
-	{	// needed to scope iter.  silly ms c++.
+	{
+		// needed to scope iter.  silly ms c++.
 		for ( DLINK_ITERATOR<TeamInQueue> iter = iterate_TeamBuildQueue(); !iter.done(); iter.advance())
 		{
 			TeamInQueue *team = iter.cur();
@@ -3247,7 +3251,8 @@ void AIPlayer::computeCenterAndRadiusOfBase(Coord3D *center, Real *radius)
  */
 Bool AIPlayer::dozerInQueue()
 {
-	{	// needed to scope iter.  silly ms c++.
+	{
+		// needed to scope iter.  silly ms c++.
 		for ( DLINK_ITERATOR<TeamInQueue> iter = iterate_TeamBuildQueue(); !iter.done(); iter.advance())
 		{
 			TeamInQueue *team = iter.cur();
@@ -3950,10 +3955,7 @@ void AIPlayer::getPlayerStructureBounds(Region2D *bounds, Int playerNdx, Bool co
 					}
 					else
 					{
-						if (objBounds.lo.x>pos.x) objBounds.lo.x = pos.x;
-						if (objBounds.lo.y>pos.y) objBounds.lo.y = pos.y;
-						if (objBounds.hi.x<pos.x) objBounds.hi.x = pos.x;
-						if (objBounds.hi.y<pos.y) objBounds.hi.y = pos.y;
+						objBounds.uniteWith(pos.asCoord2D());
 					}
 					if (firstStructure)
 					{
@@ -3963,10 +3965,7 @@ void AIPlayer::getPlayerStructureBounds(Region2D *bounds, Int playerNdx, Bool co
 					}
 					else
 					{
-						if (bounds->lo.x>pos.x) bounds->lo.x = pos.x;
-						if (bounds->lo.y>pos.y) bounds->lo.y = pos.y;
-						if (bounds->hi.x<pos.x) bounds->hi.x = pos.x;
-						if (bounds->hi.y<pos.y) bounds->hi.y = pos.y;
+						bounds->uniteWith(pos.asCoord2D());
 					}
 				}
 			}

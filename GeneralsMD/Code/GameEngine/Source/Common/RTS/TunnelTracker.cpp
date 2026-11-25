@@ -50,7 +50,9 @@
 // ------------------------------------------------------------------------
 TunnelTracker::TunnelTracker()
 {
+#if RETAIL_COMPATIBLE_CRC
 	m_tunnelCount = 0;
+#endif
 	m_tunnelAutoExitCount = 0;
 	m_containListSize = 0;
 	m_heroUnitsContained = 0;
@@ -350,7 +352,12 @@ Bool TunnelTracker::isInContainer( Object *obj )
 // ------------------------------------------------------------------------
 void TunnelTracker::onTunnelCreated( const Object *newTunnel )
 {
+	DEBUG_ASSERTCRASH(std::find(m_tunnelIDs.begin(), m_tunnelIDs.end(), newTunnel->getID()) == m_tunnelIDs.end(),
+		("TunnelTracker::onTunnelCreated - New tunnel was already added; this shouldn't happen"));
+
+#if RETAIL_COMPATIBLE_CRC
 	m_tunnelCount++;
+#endif
 	m_tunnelIDs.push_back( newTunnel->getID() );
 	m_needsFullHealTimeUpdate = true;
 }
@@ -359,29 +366,16 @@ void TunnelTracker::onTunnelCreated( const Object *newTunnel )
 void TunnelTracker::onTunnelDestroyed( const Object *deadTunnel )
 {
 	{
-		std::list< ObjectID >::iterator inTunnelList, inExitList;
-		ObjectID tunnelID = deadTunnel->getID();
-
-		inTunnelList = std::find(m_tunnelIDs.begin(), m_tunnelIDs.end(), tunnelID);
-		if (inTunnelList == m_tunnelIDs.end())
-		{
-			DEBUG_CRASH(("TunnelTracker::onTunnelDestroyed - Attempting to remove object '%s' that has never been tracked as a tunnel", deadTunnel->getName().str()));
-			return;
-		}
-
-		inExitList = std::find(m_autoExitIDs.begin(), m_autoExitIDs.end(), tunnelID);
-
-		Object* obj;
-
+		std::list< ObjectID >::iterator inExitList = std::find(m_autoExitIDs.begin(), m_autoExitIDs.end(), deadTunnel->getID());
 		if (inExitList != m_autoExitIDs.end())
 		{
 			m_autoExitIDs.erase(inExitList);
 			m_tunnelAutoExitCount--;
 			if (!m_tunnelAutoExitCount)
 			{
-				for (inTunnelList = m_tunnelIDs.begin(); inTunnelList != m_tunnelIDs.end(); inTunnelList++)
+				for (std::list< ObjectID >::iterator inTunnelList = m_tunnelIDs.begin(); inTunnelList != m_tunnelIDs.end(); inTunnelList++)
 				{
-					obj = TheGameLogic->findObjectByID(*inTunnelList);
+					Object* obj = TheGameLogic->findObjectByID(*inTunnelList);
 					if (!obj)
 						continue;
 					obj->clearModelConditionState(MODELCONDITION_TUNNEL_AUTO_ENTRANCE);
@@ -389,11 +383,21 @@ void TunnelTracker::onTunnelDestroyed( const Object *deadTunnel )
 				}
 			}
 		}
-
-		m_tunnelCount--;
-		m_tunnelIDs.erase(inTunnelList);
-		m_needsFullHealTimeUpdate = true;
 	}
+
+#if RETAIL_COMPATIBLE_CRC
+
+	DEBUG_ASSERTLOG(static_cast<Int>(m_tunnelCount) > 0 && m_tunnelCount == m_tunnelIDs.size(),
+		("TunnelTracker::onTunnelDestroyed - Tunnel count is unexpected"));
+
+	const size_t oldSize = m_tunnelIDs.size();
+	m_tunnelIDs.remove(deadTunnel->getID());
+
+	(void)oldSize;
+	DEBUG_ASSERTLOG(oldSize != m_tunnelIDs.size(),
+		("TunnelTracker::onTunnelDestroyed - Attempting to remove object '%s' that has never been tracked as a tunnel", deadTunnel->getName().str()));
+
+	m_tunnelCount--;
 
 	if( m_tunnelCount == 0 )
 	{
@@ -404,7 +408,48 @@ void TunnelTracker::onTunnelDestroyed( const Object *deadTunnel )
 	}
 	else
 	{
+		// TheSuperHackers @bugfix Caball009 01/09/2026 Check if container is empty before accessing it.
+		// The tunnel count may diverge from the container size, because of bugs that cannot be fixed with
+		// retail compatibility enabled. Expected retail behavior: empty container access results in a nullptr.
+		Object *tunnel = m_tunnelIDs.empty() ? nullptr : TheGameLogic->findObjectByID( m_tunnelIDs.front() );
+
+		// Otherwise, make sure nobody inside remembers the dead tunnel as the one they entered
+		// (scripts need to use so there must be something valid here)
+		for(ContainedItemsList::iterator it = m_containList.begin(); it != m_containList.end(); )
+		{
+			Object* obj = *it;
+			++it;
+			if( obj->getContainedBy() == deadTunnel )
+				obj->onContainedBy( tunnel );
+		}
+	}
+
+#else
+
+	const std::list<ObjectID>::iterator it = std::find(m_tunnelIDs.begin(), m_tunnelIDs.end(), deadTunnel->getID());
+	if (it != m_tunnelIDs.end())
+	{
+		m_tunnelIDs.erase(it);
+
+		m_needsFullHealTimeUpdate = true;
+	}
+	else
+	{
+		DEBUG_CRASH(("TunnelTracker::onTunnelDestroyed - Attempting to remove object '%s' that has never been tracked as a tunnel",
+			deadTunnel->getName().str()));
+	}
+
+	if( m_tunnelIDs.empty() )
+	{
+		// Kill everyone in our contain list.  Cave in!
+		iterateContained( destroyObject, nullptr, FALSE );
+		m_containList.clear();
+		m_containListSize = 0;
+	}
+	else
+	{
 		Object *validTunnel = TheGameLogic->findObjectByID( m_tunnelIDs.front() );
+
 		// Otherwise, make sure nobody inside remembers the dead tunnel as the one they entered
 		// (scripts need to use so there must be something valid here)
 		for(ContainedItemsList::iterator it = m_containList.begin(); it != m_containList.end(); )
@@ -415,6 +460,8 @@ void TunnelTracker::onTunnelDestroyed( const Object *deadTunnel )
 				obj->onContainedBy( validTunnel );
 		}
 	}
+
+#endif // RETAIL_COMPATIBLE_CRC
 }
 
 Bool TunnelTracker::doAutoPopIconInit(const Object* newTunnel) const
@@ -551,13 +598,19 @@ void TunnelTracker::crc( Xfer *xfer )
 /** Xfer method
 	* Version Info:
 	* 1: Initial version
-	* 2: Auto-pop exit tunnels */
+	* 2: Auto-pop exit tunnels
+	* 3: TheSuperHackers @tweak Removed m_tunnelCount (should always be equal to m_tunnelIDs.size())
+	*/
 // ------------------------------------------------------------------------------------------------
 void TunnelTracker::xfer( Xfer *xfer )
 {
 
 	// version
+#if RETAIL_COMPATIBLE_XFER_SAVE
 	XferVersion currentVersion = 2;
+#else
+	XferVersion currentVersion = 3;
+#endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -596,8 +649,25 @@ void TunnelTracker::xfer( Xfer *xfer )
 		m_needsFullHealTimeUpdate = true;
 	}
 
-	// tunnel count
-	xfer->xferUnsignedInt( &m_tunnelCount );
+#if RETAIL_COMPATIBLE_CRC
+	if (version <= 2)
+	{
+		xfer->xferUnsignedInt(&m_tunnelCount);
+	}
+	else
+	{
+		if (xfer->getXferMode() == XFER_LOAD)
+		{
+			m_tunnelCount = m_tunnelIDs.size();
+		}
+	}
+#else
+	if (version <= 2)
+	{
+		UnsignedInt tunnelCount = m_tunnelIDs.size();
+		xfer->xferUnsignedInt(&tunnelCount);
+	}
+#endif
 
 	if( version >= 2 )
 	{

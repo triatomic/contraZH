@@ -160,7 +160,7 @@ enum GameSpyColors CPP_11(: Int) {
 	GSCOLOR_MAX
 };
 
-extern Color GameSpyColor[GSCOLOR_MAX];
+extern Color GameSpyColor[];
 
 enum GameSpyBuddyStatus CPP_11(: Int) {
 	BUDDY_OFFLINE,

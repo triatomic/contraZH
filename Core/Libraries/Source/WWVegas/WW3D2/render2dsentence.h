@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 6                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -122,6 +120,7 @@ private:
 	const FontCharsClassCharDataStruct *	Store_GDI_Char( WCHAR ch );
 	void							Update_Current_Buffer( int char_width );
 	const FontCharsClassCharDataStruct	*	Get_Char_Data( WCHAR ch );
+	const FontCharsClass *			Get_Char_Font( WCHAR ch ) const;
 
 	void							Grow_Unicode_Array( WCHAR ch );
 	void							Free_Character_Arrays();
@@ -211,14 +210,13 @@ public:
 	//
 	void	Build_Sentence (const WCHAR *text, int *hkX, int *hkY);
 	void	Draw_Sentence (uint32 color = 0xFFFFFFFF);
+	bool	Has_Sentence_Data () const						{ return SentenceData.Count () > 0; }
 
 	//
 	//	Texture hint
 	//
 	void	Set_Texture_Size_Hint( int hint )				{ TextureSizeHint = hint; }
 	int	Get_Texture_Size_Hint() const				{ return TextureSizeHint; }
-
-	void	Set_Mono_Spaced( bool onoff )						{ MonoSpaced = onoff; }
 
 private:
 
@@ -275,7 +273,6 @@ private:
 	int													CurrTextureSize;
 	int													TextureSizeHint;
 	SurfaceClass *							CurSurface;
-	bool												MonoSpaced;
 	float												WrapWidth;
 	bool												Centered;			// Determines whether or not to center each line
 	RectClass										ClipRect;

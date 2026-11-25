@@ -18,6 +18,8 @@
 #include <mutex>
 #include <utility>
 
+// GameEngineDevice links its own stb_image_write for screenshots, so this copy stays private to this file
+#define STB_IMAGE_WRITE_STATIC
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "GameNetwork/GeneralsOnline/Vendor/stb_image/stb_image_write.h"

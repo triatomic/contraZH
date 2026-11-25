@@ -30,33 +30,10 @@
  *                                                                                             *
  *                    $Revision:: 18                                                          $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   GridCullSystemClass::GridCullSystemClass -- Constructor                                   *
- *   GridCullSystemClass::~GridCullSystemClass -- Destructor                                   *
- *   GridCullSystemClass::Collect_Objects -- Collect all objects touching the given point      *
- *   GridCullSystemClass::Collect_Objects -- Collect all objects touching the given AABox      *
- *   GridCullSystemClass::Collect_Objects -- Collect all objects touching the given OBBox      *
- *   GridCullSystemClass::Collect_Objects -- Collect all objects touching the given Frustum    *
- *   GridCullSystemClass::Re_Partition -- re-compute grid parameters for the given volume      *
- *   GridCullSystemClass::Collect_And_Unlink_All -- collects all objects and removes them from *
- *   GridCullSystemClass::Update_Culling -- updates an objects position in the grid            *
- *   GridCullSystemClass::Load -- load function                                                *
- *   GridCullSystemClass::Save -- Save function                                                *
- *   GridCullSystemClass::Reset_Statistics -- reset debugging stats                            *
- *   GridCullSystemClass::Get_Statistics -- returns reference to the statistics structure      *
- *   GridCullSystemClass::Add_Object_Internal -- links an object into the system               *
- *   GridCullSystemClass::Remove_Object_Internal -- unlinks an object from the system          *
- *   GridCullSystemClass::link_object -- figures out which cell the object is in and links it  *
- *   GridCullSystemClass::unlink_object -- unlinks the object from the cell it is in           *
- *   GridCullSystemClass::link_object_to_list -- grid list link function                       *
- *   GridCullSystemClass::unlink_object_from_list -- grid list unlink function                 *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
 #include "gridcull.h"
-#include "WWLib/chunkio.h"
-#include "WWLib/iostruct.h"
 #include "colmath.h"
 #include "colmathinlines.h"
 
@@ -66,36 +43,6 @@
 ** Declare the pool for GridLinks
 */
 DEFINE_AUTO_POOL(GridLinkClass,256);
-
-
-/*
-** Current version of the file format
-*/
-const uint32 GRID_CURRENT_VERSION = 0x00010000;
-
-
-/*
-** Chunk Id's used by the aabtree code to save itself into a file
-*/
-enum
-{
-	GRID_CHUNK_VERSION					= 0x00000001,	// version wrapper, contains 32bit version #
-	GRID_CHUNK_PARAMETERS				= 0x00000100,	// parameters for the grid cull system
-};
-
-
-/*
-** IOGridParametersStruct
-** Data structure for the contents of a node in the AAB-Tree
-*/
-struct IOGridParametersStruct
-{
-	IOVector3Struct	MinCellSize;
-	IOVector3Struct	Origin;
-	IOVector3Struct	CellDim;
-	uint32				CellCount[3];
-	float32				MaxObjExtent;
-};
 
 
 /*************************************************************************
@@ -136,18 +83,6 @@ GridLinkClass::~GridLinkClass()
 *************************************************************************/
 
 
-/***********************************************************************************************
- * GridCullSystemClass::GridCullSystemClass -- Constructor                                     *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 GridCullSystemClass::GridCullSystemClass() :
 	MinCellSize(10,10,10),
 	MaxObjExtent(15),
@@ -164,18 +99,6 @@ GridCullSystemClass::GridCullSystemClass() :
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::~GridCullSystemClass -- Destructor                                     *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 GridCullSystemClass::~GridCullSystemClass()
 {
 	delete Cells;
@@ -183,18 +106,6 @@ GridCullSystemClass::~GridCullSystemClass()
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Collect_Objects -- Collect all objects touching the given point        *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::Collect_Objects(const Vector3 & point)
 {
 	/*
@@ -229,18 +140,6 @@ void GridCullSystemClass::Collect_Objects(const Vector3 & point)
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Collect_Objects -- Collect all objects touching the given AABox        *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::Collect_Objects(const AABoxClass & box)
 {
 	/*
@@ -276,18 +175,6 @@ void GridCullSystemClass::Collect_Objects(const AABoxClass & box)
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Collect_Objects -- Collect all objects touching the given OBBox        *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::Collect_Objects(const OBBoxClass & box)
 {
 	/*
@@ -323,18 +210,6 @@ void GridCullSystemClass::Collect_Objects(const OBBoxClass & box)
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Collect_Objects -- Collect all objects touching the given Frustum      *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::Collect_Objects(const FrustumClass & frustum)
 {
 	/*
@@ -370,24 +245,6 @@ void GridCullSystemClass::Collect_Objects(const FrustumClass & frustum)
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Re_Partition -- re-compute grid parameters for the given volume        *
- *                                                                                             *
- *                                                                                             *
- *                                                                                             *
- *                                                                                             *
- * INPUT:                                                                                      *
- * input_min - 'min' corner of the world                                                       *
- * input_max - 'max' corner of the world                                                       *
- * objdim - largest object dimesion that will be allowed in the grid                           *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::Re_Partition(const Vector3 & input_min,const Vector3 & input_max,float objdim)
 {
 	/*
@@ -485,21 +342,8 @@ void GridCullSystemClass::Re_Partition(const Vector3 & input_min,const Vector3 &
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Collect_And_Unlink_All -- collects all objects and removes them from t *
- *                                                                                             *
- * This is used when re-partitioning the grid.  All objects are pulled out and linked into     *
- * the collection list.  When the grid has been re-initialized, the objects are put back in.   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
+// This is used when re-partitioning the grid. All objects are pulled out and linked into the
+// collection list. When the grid has been re-initialized, the objects are put back in.
 void GridCullSystemClass::Collect_And_Unlink_All()
 {
 	Reset_Collection();
@@ -543,18 +387,6 @@ void GridCullSystemClass::Collect_And_Unlink_All()
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Update_Culling -- updates an objects position in the grid              *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::Update_Culling(CullableClass * obj)
 {
 	WWASSERT(obj);
@@ -571,141 +403,6 @@ void GridCullSystemClass::Update_Culling(CullableClass * obj)
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Load -- load function                                                  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
-void GridCullSystemClass::Load(ChunkLoadClass & cload)
-{
-	/*
-	** read the version chunk
-	*/
-	uint32 version;
-	cload.Open_Chunk();
-	WWASSERT(cload.Cur_Chunk_ID() == GRID_CHUNK_VERSION);
-	cload.Read(&version,sizeof(version));
-	cload.Close_Chunk();
-
-	/*
-	** read the parameters chunk
-	*/
-	IOGridParametersStruct params;
-	memset(&params,0,sizeof(params));
-	cload.Open_Chunk();
-	WWASSERT(cload.Cur_Chunk_ID() == GRID_CHUNK_PARAMETERS);
-	cload.Read(&params,sizeof(params));
-	cload.Close_Chunk();
-
-	/*
-	** unlink all objects
-	*/
-	Collect_And_Unlink_All();
-
-	/*
-	** partition the grid according to the loaded parameters
-	*/
-	CellCount[0]		= params.CellCount[0];
-	CellCount[1]		= params.CellCount[1];
-	CellCount[2]		= params.CellCount[2];
-	CellDim.X			= params.CellDim.X;
-	CellDim.Y			= params.CellDim.Y;
-	CellDim.Z			= params.CellDim.Z;
-	MaxObjExtent		= params.MaxObjExtent;
-	MinCellSize.X		= params.MinCellSize.X;
-	MinCellSize.Y		= params.MinCellSize.Y;
-	MinCellSize.Z		= params.MinCellSize.Z;
-	Origin.X				= params.Origin.X;
-	Origin.Y				= params.Origin.Y;
-	Origin.Z				= params.Origin.Z;
-
-	OOCellDim.X = 1.0f / CellDim.X;
-	OOCellDim.Y = 1.0f / CellDim.Y;
-	OOCellDim.Z = 1.0f / CellDim.Z;
-
-	delete [] Cells;
-	Cells = W3DNEWARRAY CullableClass * [total_cell_count()];
-	memset(&(Cells[0]),0,total_cell_count() * sizeof(CullableClass *));
-
-	/*
-	** re-link the objects in
-	*/
-	CullableClass * obj;
-	for (	obj = Get_First_Collected_Object_Internal();
-			obj != nullptr;
-			obj = Get_Next_Collected_Object_Internal(obj))
-	{
-		link_object(obj);
-	}
-}
-
-
-/***********************************************************************************************
- * GridCullSystemClass::Save -- Save function                                                  *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
-void GridCullSystemClass::Save(ChunkSaveClass & csave)
-{
-	/*
-	** write the version chunk
-	*/
-	uint32 version = GRID_CURRENT_VERSION;
-	csave.Begin_Chunk(GRID_CHUNK_VERSION);
-	csave.Write(&version,sizeof(version));
-	csave.End_Chunk();
-
-	/*
-	** write the grid parameters
-	*/
-	IOGridParametersStruct params;
-	memset(&params,0,sizeof(params));
-	params.CellCount[0] = CellCount[0];
-	params.CellCount[1] = CellCount[1];
-	params.CellCount[2] = CellCount[2];
-	params.CellDim.X = CellDim.X;
-	params.CellDim.Y = CellDim.Y;
-	params.CellDim.Z = CellDim.Z;
-	params.MaxObjExtent = MaxObjExtent;
-	params.MinCellSize.X = MinCellSize.X;
-	params.MinCellSize.Y = MinCellSize.Y;
-	params.MinCellSize.Z = MinCellSize.Z;
-	params.Origin.X = Origin.X;
-	params.Origin.Y = Origin.Y;
-	params.Origin.Z = Origin.Z;
-
-	csave.Begin_Chunk(GRID_CHUNK_PARAMETERS);
-	csave.Write(&params,sizeof(params));
-	csave.End_Chunk();
-}
-
-
-/***********************************************************************************************
- * GridCullSystemClass::Reset_Statistics -- reset debugging stats                              *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::Reset_Statistics()
 {
 	// number of (virtual) nodes = 2n-1
@@ -716,36 +413,12 @@ void GridCullSystemClass::Reset_Statistics()
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Get_Statistics -- returns reference to the statistics structure        *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 const GridCullSystemClass::StatsStruct & GridCullSystemClass::Get_Statistics()
 {
 	return Stats;
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Add_Object_Internal -- links an object into the system                 *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::Add_Object_Internal(CullableClass * obj)
 {
 	WWASSERT(obj);
@@ -760,18 +433,6 @@ void GridCullSystemClass::Add_Object_Internal(CullableClass * obj)
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::Remove_Object_Internal -- unlinks an object from the system            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::Remove_Object_Internal(CullableClass * obj)
 {
 	WWASSERT(obj);
@@ -788,18 +449,6 @@ void GridCullSystemClass::Remove_Object_Internal(CullableClass * obj)
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::link_object -- figures out which cell the object is in and links it    *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::link_object(CullableClass * obj)
 {
 	WWASSERT(obj);
@@ -838,18 +487,6 @@ void GridCullSystemClass::link_object(CullableClass * obj,int address)
 	}
 }
 
-/***********************************************************************************************
- * GridCullSystemClass::unlink_object -- unlinks the object from the cell it is in             *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::unlink_object(CullableClass * obj)
 {
 	WWASSERT(obj);
@@ -864,18 +501,6 @@ void GridCullSystemClass::unlink_object(CullableClass * obj)
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::link_object_to_list -- grid list link function                         *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::link_object_to_list(CullableClass ** head,CullableClass * obj)
 {
 	WWASSERT(obj);
@@ -898,18 +523,6 @@ void GridCullSystemClass::link_object_to_list(CullableClass ** head,CullableClas
 }
 
 
-/***********************************************************************************************
- * GridCullSystemClass::unlink_object_from_list -- grid list unlink function                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   4/27/2000  gth : Created.                                                                 *
- *=============================================================================================*/
 void GridCullSystemClass::unlink_object_from_list(CullableClass ** head,CullableClass * obj)
 {
 	WWASSERT(obj);
@@ -919,7 +532,7 @@ void GridCullSystemClass::unlink_object_from_list(CullableClass ** head,Cullable
 	/*
 	** check to see that the object is actually in this list
 	*/
-#ifdef WWDEBUG
+#ifdef DEBUG_CRASHING
 	CullableClass * tmp = *head;
 	bool found = false;
 	while (tmp && !found) {

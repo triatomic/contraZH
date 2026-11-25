@@ -83,6 +83,7 @@
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/light.h"
 #include "WW3D2/scene.h"
 #include "W3DDevice/GameClient/W3DPoly.h"
@@ -107,7 +108,6 @@ static ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
 #define DEFAULT_MAX_MAP_SHORELINE_TILES		4096	//default size of array allocated to hold all map shoreline tiles.
 
 #define ADJUST_FROM_INDEX_TO_REAL(k) ((k-m_map->getBorderSizeInline())*MAP_XY_FACTOR)
-inline Int IABS(Int x) {	if (x>=0) return x; return -x;};
 
 const Int CELLS_PER_TILE = 16; // In order to be efficient in texture, needs to be a power of 2. [3/24/2003]
 
@@ -475,7 +475,6 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	}
 	W3DSlopeMap::update(rinfo);
 
-	Matrix3D tm(Transform);
 	// If there are trees, tell them to draw at the transparent time to draw.
 	if (m_treeBuffer) {
 		m_treeBuffer->setIsTerrain();
@@ -493,7 +492,7 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	}
 #endif
 
-	DX8Wrapper::Set_Light_Environment(rinfo.light_environment);
+	Renderer::Set_Light_Environment(rinfo.light_environment);
 
 	// Flat terrain does not glint, and the maps a 3D terrain frame left may belong to an unloaded map.
 	W3DShaderManager::setTerrainGlintMaps(nullptr, Vector4(0.0f, 0.0f, 0.0f, 0.0f), nullptr, 1.0f, 1.0f);
@@ -508,8 +507,7 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	DX8Wrapper::Set_Texture(1,nullptr);
 	ShaderClass::Invalidate();
 
-	//	tm.Scale(ObjSpaceExtent);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,tm);
+	Renderer::Set_Transform(RenderTransform_World,Transform);
 
 
 	DX8Wrapper::Set_Material(m_vertexMaterialClass);
@@ -523,12 +521,14 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
  	}
  	else
  	if (TheGlobalData->m_useLightMap)
- 	{	//lightmap only
+ 	{
+ 		//lightmap only
  		st=W3DShaderManager::ST_FLAT_TERRAIN_BASE_NOISE2;
  	}
  	else
  	if (doCloud)
- 	{	//cloudmap only
+ 	{
+ 		//cloudmap only
  		st=W3DShaderManager::ST_FLAT_TERRAIN_BASE_NOISE1;
  	}
 
@@ -551,7 +551,7 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
  	W3DShaderManager::setTexture(2,cloudMapTexture());	//cloud
  	W3DShaderManager::setTexture(3,m_stageThreeTexture);//noise
 	//Disable writes to destination alpha channel (if there is one)
-	if (DX8Wrapper::getBackBufferFormat() == WW3D_FORMAT_A8R8G8B8) {
+	if (Renderer::Get_Back_Buffer_Format() == WW3D_FORMAT_A8R8G8B8) {
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE,D3DCOLORWRITEENABLE_BLUE|D3DCOLORWRITEENABLE_GREEN|D3DCOLORWRITEENABLE_RED);
 	}
 

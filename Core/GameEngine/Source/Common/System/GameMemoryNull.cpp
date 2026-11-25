@@ -18,9 +18,11 @@
 
 #include "PreRTS.h"
 
+#ifdef DISABLE_GAMEMEMORY
+
 #include <malloc.h>
 
-#include "Common/GameMemoryNull.h"
+#include "Common/GameMemory.h"
 
 static Bool theMainInitFlag = false;
 
@@ -112,7 +114,7 @@ void initMemoryManager()
 		TheMemoryPoolFactory = new (malloc(sizeof MemoryPoolFactory)) MemoryPoolFactory;
 		TheDynamicMemoryAllocator = new (malloc(sizeof DynamicMemoryAllocator)) DynamicMemoryAllocator;
 
-		DEBUG_INIT(DEBUG_FLAGS_DEFAULT);
+		GAME_DEBUG_INIT(DEBUG_FLAGS_DEFAULT);
 		DEBUG_LOG(("*** Initialized the Null Memory Manager"));
 	}
 	else
@@ -225,4 +227,6 @@ void __cdecl operator delete[](void *p, const char *, int)
 	free(p);
 }
 
-#endif
+#endif // DISABLE_GAMEMEMORY_NEW_OPERATORS
+
+#endif // DISABLE_GAMEMEMORY

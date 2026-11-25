@@ -637,7 +637,7 @@ void GameTextManager::reverseWord ( Char *file, Char *lp )
 {
 	Int first = TRUE;
 	Char f, l;
-	Int ok = TRUE	;
+	Bool ok = TRUE;
 
 	while ( ok )
 	{
@@ -821,7 +821,7 @@ void GameTextManager::translateCopy( WideChar *outbuf, Char *inbuf, Int codePage
 
 Bool GameTextManager::getStringCount( const char *filename, Int& textCount )
 {
-	Int ok = TRUE;
+	Bool ok = TRUE;
 	Int codePage = -1;
 
 	textCount = 0;
@@ -867,7 +867,7 @@ Bool GameTextManager::getStringCount( const char *filename, Int& textCount )
 Bool GameTextManager::getCSFInfo ( const Char *filename )
 {
 	CSFHeader header;
-	Int ok = FALSE;
+	Bool ok = FALSE;
 	File *file = TheFileSystem->openFile(filename, File::READ | File::BINARY);
 	DEBUG_LOG(("Looking in %s for compiled string file", filename));
 
@@ -1033,7 +1033,7 @@ quit:
 Bool GameTextManager::parseStringFile( const char *filename )
 {
 	Int listCount = 0;
-	Int ok = TRUE;
+	Bool ok = TRUE;
 	Int codePage = -1;
 
 	File *file = TheFileSystem->openFile(filename, File::READ | File::TEXT);
@@ -1164,7 +1164,7 @@ void GameTextManager::initMapStringFile( const AsciiString& filename )
 Bool GameTextManager::parseMapStringFile( const char *filename )
 {
 	Int listCount = 0;
-	Int ok = TRUE;
+	Bool ok = TRUE;
 	Int codePage = -1;
 
 	File *file;
@@ -1440,7 +1440,7 @@ Bool	GameTextManager::readLine( char *buffer, Int max, File *file, Int *codePage
 #if defined(RTS_ZEROHOUR)
 	Char *line = buffer;
 #endif
-	Int ok = FALSE;
+	Bool ok = FALSE;
 
 	while ( max && file->read( buffer, 1 ) == 1 )
 	{

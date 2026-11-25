@@ -29,6 +29,7 @@
 #include "Common/GameCommon.h"
 #include "Common/GlobalData.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/dx8vertexbuffer.h"
 #include "WW3D2/dx8indexbuffer.h"
@@ -648,7 +649,7 @@ void W3DStormManager::render(RenderInfoClass &rinfo)
 	DX8Wrapper::Set_Material(material);
 	REF_PTR_RELEASE(material);
 	DX8Wrapper::Set_Shader(ShaderClass::_PresetAlphaSpriteShader);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD, Matrix3D(true));
+	Renderer::Set_Transform(RenderTransform_World, Matrix3D(true));
 
 	// No shader restores ZENABLE, so it is put back after.
 	DWORD depthTest = D3DZB_TRUE;

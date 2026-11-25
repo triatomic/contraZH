@@ -578,6 +578,15 @@ void WeaponTemplate::postProcessLoad()
 	{
 		m_projectileTmpl = TheThingFactory->findTemplate(m_projectileName);
 		DEBUG_ASSERTCRASH(m_projectileTmpl, ("projectile %s not found!",m_projectileName.str()));
+
+#ifdef DEBUG_LOGGING
+		if (m_projectileTmpl && m_primaryDamage > 0.0)
+		{
+			const Real projectileRadius = m_projectileTmpl->getTemplateGeometryInfo().getMajorRadius();
+			if (m_primaryDamageRadius < projectileRadius)
+				DEBUG_LOG(("Weapon template %s has a PrimaryDamageRadius (%f) smaller than its projectile object's GeometryMajorRadius (%f)! This may lead to inconsistent damage application.", getName().str(), m_primaryDamageRadius, projectileRadius));
+		}
+#endif
 	}
 
 	// Veterancy ranks beyond HEROIC (FOUR/FIVE) inherit HEROIC's per-level FX/OCL/exhaust entries unless
@@ -1148,9 +1157,9 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 
 		// TheSuperHackers @todo: Remove hardcoded KINDOF_MINE check and apply PlayFXWhenStealthed = Yes to the mine weapons instead.
 
-		if (!sourceObj->isLogicallyVisible()									// if user watching cannot see us
-			&& !sourceObj->isKindOf(KINDOF_MINE)								// and not a mine (which always do the FX, even if hidden)...
-			&& !isPlayFXWhenStealthed()													// and not a weapon marked to playwhenstealthed
+		if (!sourceObj->isLogicallyVisible() &&									// if user watching cannot see us
+			!sourceObj->isKindOf(KINDOF_MINE) &&								// and not a mine (which always do the FX, even if hidden)...
+			!isPlayFXWhenStealthed()													// and not a weapon marked to playwhenstealthed
 			)
 		{
 			handled = TRUE;		// then let's just pretend like we did the fx by returning true
@@ -2707,9 +2716,9 @@ void Weapon::reloadWithBonus(const Object *sourceObj, const WeaponBonus& bonus, 
 {
 	settleGradualAmmo(TheGameLogic->getFrame());
 
-	if (m_template->getClipSize() > 0
-			&& m_ammoInClip == m_template->getClipSize()
-			&& !sourceObj->isReloadTimeShared())
+	if (m_template->getClipSize() > 0 &&
+			m_ammoInClip == m_template->getClipSize() &&
+			!sourceObj->isReloadTimeShared())
 		return;	// don't restart our reload delay.
 
 	m_ammoInClip = m_template->getClipSize();

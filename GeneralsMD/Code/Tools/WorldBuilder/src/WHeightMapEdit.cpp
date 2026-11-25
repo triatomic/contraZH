@@ -202,7 +202,7 @@ WorldHeightMapEdit::WorldHeightMapEdit(Int width, Int height, UnsignedByte initi
 		m_sourceTiles[i]=nullptr;
 		m_edgeTiles[i]=nullptr;
 	}
-	if (width<0 || height < 0) {
+	if (!isValidPlayableMapSize(width, height, border)) {
 		AfxMessageBox(IDS_BAD_VALUE);
 		return;
 	}
@@ -453,7 +453,7 @@ WorldHeightMapEdit::WorldHeightMapEdit(ChunkInputStream *pStrm):
 Bool WorldHeightMapEdit::remapTextures()
 {
 	Int i;
-	Bool anyChanges;
+	Bool anyChanges = false;
 	for (i=0; i<m_numTextureClasses; i++) {
 #ifdef RTS_HAS_QT
 		int qtPicked = -1;
@@ -561,11 +561,8 @@ void WorldHeightMapEdit::loadDirectoryOfImages(const char *pFilePath)
 	char				fileBuf[_MAX_PATH];
 
 	strlcpy(dirBuf, pFilePath, ARRAY_SIZE(dirBuf));
-	int len = strlen(dirBuf);
-
-	if (len > 0 && dirBuf[len - 1] != '\\') {
-		dirBuf[len++] = '\\';
-		dirBuf[len] = 0;
+	if (!ensureTrailingSeparatorInPath(dirBuf, ARRAY_SIZE(dirBuf)).ok) {
+		return;
 	}
 
 	FilenameList filenameList;
@@ -753,13 +750,28 @@ void WorldHeightMapEdit::saveToFile(DataChunkOutput &chunkWriter)
 	chunkWriter.closeDataChunk();
 
 	/***************BLEND TILE DATA ***************/
-	chunkWriter.openDataChunk("BlendTileData", K_BLEND_TILE_VERSION_8);
+#if RTS_GENERALS && RETAIL_COMPATIBLE_DATA
+	const DataChunkVersionType blendTileVersion = K_BLEND_TILE_VERSION_7;
+#else
+	const DataChunkVersionType blendTileVersion = K_BLEND_TILE_VERSION_8;
+#endif
+	chunkWriter.openDataChunk("BlendTileData", blendTileVersion);
 		chunkWriter.writeInt(m_dataSize);
 		chunkWriter.writeArrayOfBytes((char*)m_tileNdxes, m_dataSize*sizeof(Short));
 		chunkWriter.writeArrayOfBytes((char*)m_blendTileNdxes, m_dataSize*sizeof(Short));
 		chunkWriter.writeArrayOfBytes((char*)m_extraBlendTileNdxes, m_dataSize*sizeof(Short));
 		chunkWriter.writeArrayOfBytes((char*)m_cliffInfoNdxes, m_dataSize*sizeof(Short));
-		chunkWriter.writeArrayOfBytes((char*)m_cellCliffState, m_height*m_flipStateWidth);
+		if (blendTileVersion >= K_BLEND_TILE_VERSION_7) {
+			if (blendTileVersion == K_BLEND_TILE_VERSION_7) {
+				// Version 7 uses the legacy row width, even when the in-memory rows are wider.
+				Int byteWidth = (m_width+1)/8;
+				for (Int j=0; j<m_height; j++) {
+					chunkWriter.writeArrayOfBytes((char*)m_cellCliffState + j*m_flipStateWidth, byteWidth);
+				}
+			} else {
+				chunkWriter.writeArrayOfBytes((char*)m_cellCliffState, m_height*m_flipStateWidth);
+			}
+		}
 		chunkWriter.writeInt(m_numBitmapTiles);
 		chunkWriter.writeInt(m_numBlendedTiles);
 		chunkWriter.writeInt(m_numCliffInfo);
@@ -913,7 +925,8 @@ void WorldHeightMapEdit::saveToFile(DataChunkOutput &chunkWriter)
 
 			Int j=1;
 			for (; j<MAX_GLOBAL_LIGHTS; j++)
-			{	//save state of new lights added in version 3.
+			{
+				//save state of new lights added in version 3.
 				chunkWriter.writeReal(TheGlobalData->m_terrainObjectsLighting[i+TIME_OF_DAY_FIRST][j].ambient.red);
 				chunkWriter.writeReal(TheGlobalData->m_terrainObjectsLighting[i+TIME_OF_DAY_FIRST][j].ambient.green);
 				chunkWriter.writeReal(TheGlobalData->m_terrainObjectsLighting[i+TIME_OF_DAY_FIRST][j].ambient.blue);
@@ -1268,12 +1281,14 @@ void WorldHeightMapEdit::blendTile(Int xIndex, Int yIndex, Int srcXIndex, Int sr
 	if (textureClass < 0) {
 		textureClass = getTextureClass(srcXIndex, srcYIndex);	//index into globalTextureClass
 	}
-	if (textureClass >= 0) {	//get index of sub-tile that would show up here if we continued tiling src.
+	if (textureClass >= 0) {
+		//get index of sub-tile that would show up here if we continued tiling src.
 		blendTileNdx = getBlendTileNdxForClass(xIndex, yIndex, textureClass);
 		DEBUG_ASSERTCRASH((blendTileNdx/4 < m_numBitmapTiles),("oops"));	//check it falls into one of the 64x64 tiles of textures used on map.
 	}
 
-	if (curTileNdx == blendTileNdx) {//destination already contains continuation of source tile so no blend needed.
+	if (curTileNdx == blendTileNdx) {
+		//destination already contains continuation of source tile so no blend needed.
 		m_tileNdxes[ndx] = blendTileNdx;
 		m_blendTileNdxes[ndx] = 0;
 		m_extraBlendTileNdxes[ndx] = 0;
@@ -1351,7 +1366,8 @@ void WorldHeightMapEdit::blendSpecificTiles(Int xIndex, Int yIndex, Int srcXInde
 	}
 
 	Bool flipped = false;
-	if (srcYIndex == yIndex) {	//same vertical coordinates so horizontal blend
+	if (srcYIndex == yIndex) {
+		//same vertical coordinates so horizontal blend
 		blendInfo.horiz = true;
 		blendInfo.inverted = (srcXIndex < xIndex); //blend from opaque at left to transparent at right.
 		//check if this blend tile will end up in a third blend layer and if so, copy flip state
@@ -1363,7 +1379,8 @@ void WorldHeightMapEdit::blendSpecificTiles(Int xIndex, Int yIndex, Int srcXInde
 		blendInfo.inverted = (srcYIndex < yIndex);	//invert if blend from bottom to top
 		if (baseBlendInfo && baseNeedsFlip)
 			blendInfo.inverted |= FLIPPED_MASK;
-	} else {	//diagonal blends
+	} else {
+		//diagonal blends
 		if (srcXIndex > xIndex) {
 			blendInfo.rightDiagonal = true;
 		} else {
@@ -1371,7 +1388,8 @@ void WorldHeightMapEdit::blendSpecificTiles(Int xIndex, Int yIndex, Int srcXInde
 		}
 		blendInfo.inverted = (srcYIndex < yIndex);
 		blendInfo.longDiagonal = longDiagonal;
-		if (longDiagonal) {	// Flip it.
+		if (longDiagonal) {
+			// Flip it.
 			blendInfo.inverted = !blendInfo.inverted;
 			blendInfo.rightDiagonal = !blendInfo.rightDiagonal;
 			blendInfo.leftDiagonal = !blendInfo.leftDiagonal;
@@ -1397,13 +1415,15 @@ void WorldHeightMapEdit::blendSpecificTiles(Int xIndex, Int yIndex, Int srcXInde
 		Int ndx = (yIndex*m_width)+xIndex;
 		m_tileNdxes[ndx] = curTileNdx;
 		if (TheGlobalData->m_use3WayTerrainBlends && m_blendTileNdxes[ndx] != 0)
-		{	//this tile already has a blend applied to it.  So we put the new blend into the
+		{
+			//this tile already has a blend applied to it.  So we put the new blend into the
 			//secondary layer.
 			m_extraBlendTileNdxes[ndx]=newNdx;
 			//force the primary layer to flip if the extra blend layer needs flip.
 			//we only do this on vertical/horizontal base blends because they work in either flip cases.
 			if (flipped && !baseIsDiagonal)
-			{	//Find a new tile so as not to affect other cells using the base one.
+			{
+				//Find a new tile so as not to affect other cells using the base one.
 				TBlendTileInfo tempBlendTileInfo=m_blendedTiles[m_blendTileNdxes[ndx]];
 				tempBlendTileInfo.inverted |= FLIPPED_MASK;
 				Short newNdx = findOrCreateBlendTile(&tempBlendTileInfo);
@@ -1969,7 +1989,8 @@ Bool WorldHeightMapEdit::floodFill(Int xIndex, Int yIndex, Int textureClass, Boo
 					setTileNdx(i, j, textureClass, false);
 					m_blendTileNdxes[ndx] = blendNdx;
 					m_cliffInfoNdxes[ndx] = 0; // remove any cliff adjustment as we are doing a new texture.
-				} else {	//adjust blended tiles so the blend texture matches the new filled texture
+				} else {
+					//adjust blended tiles so the blend texture matches the new filled texture
 					/* Check blend */
 					if (blendNdx == 0) continue; // no blend.
 					TBlendTileInfo blendInfo = m_blendedTiles[blendNdx];
@@ -2189,7 +2210,8 @@ Bool WorldHeightMapEdit::optimizeTiles()
 				curBlendInfo.blendNdx = getBlendTileNdxForClass(x,y,curBlendInfo.blendNdx);
 
 				if (curBlendInfo.blendNdx == m_tileNdxes[i])
-				{	//Tile index same as blend index would mean same texture
+				{
+					//Tile index same as blend index would mean same texture
 					//blending into itself.  Should not happen.
 					newBlendNdx = 0;
 				}
@@ -2340,6 +2362,10 @@ Bool WorldHeightMapEdit::resize(Int newXSize, Int newYSize, Int newHeight, Int n
 							Bool anchorLeft, Bool anchorRight, Coord3D *pObjOffset)
 {
 	if (newBorder<0) newBorder = 0;
+	if (!isValidPlayableMapSize(newXSize, newYSize, newBorder)) {
+		AfxMessageBox(IDS_BAD_VALUE);
+		return(false);
+	}
 	newXSize += 2*newBorder;
 	newYSize += 2*newBorder;
 	Int newDataSize = newXSize*newYSize;
@@ -2378,7 +2404,7 @@ Bool WorldHeightMapEdit::resize(Int newXSize, Int newYSize, Int newHeight, Int n
 	Short *tileNdxes = new Short[newDataSize];
 	Short *blendTileNdxes = new Short[newDataSize];
 	Short *extraBlendTileNdxes = new Short[newDataSize];
-	HeightSampleType *data = new HeightSampleType[newDataSize];
+	HeightSampleType *data = new HeightSampleType[newDataSize + newXSize+1];
 	Short  *cliffInfoNdxes = new Short[newDataSize];
 	UnsignedByte *stochasticData = (m_stochasticData != nullptr) ? new UnsignedByte[newDataSize*STOCHASTIC_BYTES] : nullptr;
 
@@ -2427,11 +2453,11 @@ Bool WorldHeightMapEdit::resize(Int newXSize, Int newYSize, Int newHeight, Int n
 		}
 	}
 
-	delete(m_tileNdxes);
-	delete(m_cliffInfoNdxes);
-	delete(m_blendTileNdxes);
-	delete(m_extraBlendTileNdxes);
-	delete(m_data);
+	delete[] m_tileNdxes;
+	delete[] m_cliffInfoNdxes;
+	delete[] m_blendTileNdxes;
+	delete[] m_extraBlendTileNdxes;
+	delete[] m_data;
 	m_tileNdxes = tileNdxes;
 	m_blendTileNdxes = blendTileNdxes;
 	m_extraBlendTileNdxes = extraBlendTileNdxes;
@@ -2445,13 +2471,15 @@ Bool WorldHeightMapEdit::resize(Int newXSize, Int newYSize, Int newHeight, Int n
 	m_height = newYSize;
 	m_borderSize = newBorder;
 	m_dataSize = newDataSize;
-	delete(m_cellCliffState);
-	delete(m_cellFlipState);
+	delete[] m_cellCliffState;
+	delete[] m_cellFlipState;
 	Int numBytesX = (m_width+7)/8;	//how many bytes to fit all bitflags
  	m_flipStateWidth=numBytesX;
 
 	m_cellFlipState	= MSGNEW("WorldHeightMapEdit::resize") UnsignedByte[numBytesX*m_height];
 	m_cellCliffState	= MSGNEW("WorldHeightMapEdit::resize") UnsignedByte[numBytesX*m_height];
+	memset(m_cellFlipState,0,numBytesX*m_height);
+	memset(m_cellCliffState,0,numBytesX*m_height);
 
 	// Verify index remapping
 	for(i=0; i<m_dataSize; i++) {
@@ -2593,6 +2621,9 @@ void WorldHeightMapEdit::addObject(MapObject *pMapObj)
 void WorldHeightMapEdit::removeFirstObject()
 {
 	MapObject *firstObj = MapObject::TheMapObjectListPtr;
+	if (!firstObj) {
+		return;
+	}
 	MapObject::TheMapObjectListPtr = firstObj->getNext();
 	firstObj->setNextMap(nullptr); // so we don't delete the whole list.
 	deleteInstance(firstObj);
@@ -2644,21 +2675,23 @@ Bool WorldHeightMapEdit::selectDuplicates()
 			}
 
 			if (pObj->getFlag(FLAG_ROAD_FLAGS)) {
-				if (pObj->getNext() == nullptr) continue;
 				if (!pObj->getFlag(FLAG_ROAD_POINT1)) {
 					continue;
 				}
 				if (!prevObj->getFlag(FLAG_ROAD_POINT1)) {
 					continue;
 				}
-				Coord3D nextLoc = *pObj->getNext()->getLocation();
-				Real nextAngle = pObj->getAngle();
-				prevObj = prevObj->getNext();
-				if (!prevObj) continue;
-				if (!prevObj->getFlag(FLAG_ROAD_POINT2)) {
+				MapObject *nextObj = pObj->getNext();
+				if (!nextObj || !nextObj->getFlag(FLAG_ROAD_POINT2)) {
 					continue;
 				}
-				prevLoc = *prevObj->getLocation();
+				MapObject *prevNextObj = prevObj->getNext();
+				if (!prevNextObj || !prevNextObj->getFlag(FLAG_ROAD_POINT2)) {
+					continue;
+				}
+				Coord3D nextLoc = *nextObj->getLocation();
+				Real nextAngle = pObj->getAngle();
+				prevLoc = *prevNextObj->getLocation();
 				if (abs(nextLoc.x-prevLoc.x)>DELTA) {
 					continue; // locations don't match.
 				}
@@ -2667,7 +2700,7 @@ Bool WorldHeightMapEdit::selectDuplicates()
 				}
 
 				if (fabs(nextLoc.z - prevLoc.z) > Z_DELTA)   continue;
-				if (fabs(nextAngle - prevObj->getAngle()) > ANGLE_DELTA) continue;
+				if (fabs(nextAngle - prevNextObj->getAngle()) > ANGLE_DELTA) continue;
 
 				pObj->setSelected(true);
 				pObj = pObj->getNext();
@@ -2848,7 +2881,6 @@ AsciiString WorldHeightMapEdit::getTexClassUiName(int ndx)
 
 static const Real HEIGHT_SCALE = MAP_HEIGHT_SCALE / MAP_XY_FACTOR;
 static const Real STRETCH_LIMIT = 1.5f;	 // If it is stretching less than this, don't adjust.
-static inline Int IABS(Int x) {	if (x>=0) return x; return -x;};
 
 static const Real TEX_PER_CELL = 32.0f/CLIFF_UV_REFERENCE_WIDTH; // we use 32 texels per cell.
 
@@ -4042,6 +4074,7 @@ void WorldHeightMapEdit::findBoundaryNear(Coord3D *pt, float okDistance, Int *ou
 
 	if (!pt) {
 		(*outNdx) = -1;
+		return;
 	}
 
 	int numBoundaries = m_boundaries.size();
@@ -4092,5 +4125,7 @@ void WorldHeightMapEdit::findBoundaryNear(Coord3D *pt, float okDistance, Int *ou
 	}
 
 	(*outNdx) = -1;
-	(*outHandle) = -1;
+	if (outHandle) {
+		(*outHandle) = -1;
+	}
 }

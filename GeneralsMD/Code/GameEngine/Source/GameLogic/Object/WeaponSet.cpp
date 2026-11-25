@@ -530,12 +530,24 @@ void WeaponSet::updateWeaponSet(const Object* obj)
 //-------------------------------------------------------------------------------------------------
 /*static*/ ModelConditionFlags WeaponSet::getModelConditionForWeaponSlot(WeaponSlotType wslot, WeaponSetConditionType a)
 {
-	static const ModelConditionFlagType Nothing[WEAPONSLOT_COUNT] = { MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID };
-	static const ModelConditionFlagType Firing[WEAPONSLOT_COUNT] = { MODELCONDITION_FIRING_A, MODELCONDITION_FIRING_B, MODELCONDITION_FIRING_C, MODELCONDITION_FIRING_D, MODELCONDITION_FIRING_E, MODELCONDITION_FIRING_F, MODELCONDITION_FIRING_G, MODELCONDITION_FIRING_H };
-	static const ModelConditionFlagType Betweening[WEAPONSLOT_COUNT] = { MODELCONDITION_BETWEEN_FIRING_SHOTS_A, MODELCONDITION_BETWEEN_FIRING_SHOTS_B, MODELCONDITION_BETWEEN_FIRING_SHOTS_C, MODELCONDITION_BETWEEN_FIRING_SHOTS_D, MODELCONDITION_BETWEEN_FIRING_SHOTS_E, MODELCONDITION_BETWEEN_FIRING_SHOTS_F, MODELCONDITION_BETWEEN_FIRING_SHOTS_G, MODELCONDITION_BETWEEN_FIRING_SHOTS_H };
-	static const ModelConditionFlagType Reloading[WEAPONSLOT_COUNT] = { MODELCONDITION_RELOADING_A, MODELCONDITION_RELOADING_B, MODELCONDITION_RELOADING_C, MODELCONDITION_RELOADING_D, MODELCONDITION_RELOADING_E, MODELCONDITION_RELOADING_F, MODELCONDITION_RELOADING_G, MODELCONDITION_RELOADING_H };
-	static const ModelConditionFlagType PreAttack[WEAPONSLOT_COUNT] = { MODELCONDITION_PREATTACK_A, MODELCONDITION_PREATTACK_B, MODELCONDITION_PREATTACK_C, MODELCONDITION_PREATTACK_D, MODELCONDITION_PREATTACK_E, MODELCONDITION_PREATTACK_F, MODELCONDITION_PREATTACK_G, MODELCONDITION_PREATTACK_H };
-	static const ModelConditionFlagType* Lookup[WSF_COUNT] = { Nothing, Firing, Betweening, Reloading, PreAttack };
+	static const ModelConditionFlagType Nothing[] = { MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID, MODELCONDITION_INVALID };
+	static const ModelConditionFlagType Firing[] = { MODELCONDITION_FIRING_A, MODELCONDITION_FIRING_B, MODELCONDITION_FIRING_C, MODELCONDITION_FIRING_D, MODELCONDITION_FIRING_E, MODELCONDITION_FIRING_F, MODELCONDITION_FIRING_G, MODELCONDITION_FIRING_H };
+	static const ModelConditionFlagType Betweening[] = { MODELCONDITION_BETWEEN_FIRING_SHOTS_A, MODELCONDITION_BETWEEN_FIRING_SHOTS_B, MODELCONDITION_BETWEEN_FIRING_SHOTS_C, MODELCONDITION_BETWEEN_FIRING_SHOTS_D, MODELCONDITION_BETWEEN_FIRING_SHOTS_E, MODELCONDITION_BETWEEN_FIRING_SHOTS_F, MODELCONDITION_BETWEEN_FIRING_SHOTS_G, MODELCONDITION_BETWEEN_FIRING_SHOTS_H };
+	static const ModelConditionFlagType Reloading[] = { MODELCONDITION_RELOADING_A, MODELCONDITION_RELOADING_B, MODELCONDITION_RELOADING_C, MODELCONDITION_RELOADING_D, MODELCONDITION_RELOADING_E, MODELCONDITION_RELOADING_F, MODELCONDITION_RELOADING_G, MODELCONDITION_RELOADING_H };
+	static const ModelConditionFlagType PreAttack[] = { MODELCONDITION_PREATTACK_A, MODELCONDITION_PREATTACK_B, MODELCONDITION_PREATTACK_C, MODELCONDITION_PREATTACK_D, MODELCONDITION_PREATTACK_E, MODELCONDITION_PREATTACK_F, MODELCONDITION_PREATTACK_G, MODELCONDITION_PREATTACK_H };
+	static const ModelConditionFlagType* Lookup[] = {
+		Nothing,
+		Firing,
+		Betweening,
+		Reloading,
+		PreAttack
+	};
+	static_assert(ARRAY_SIZE(Nothing) == WEAPONSLOT_COUNT, "Incorrect array size");
+	static_assert(ARRAY_SIZE(Firing) == WEAPONSLOT_COUNT, "Incorrect array size");
+	static_assert(ARRAY_SIZE(Betweening) == WEAPONSLOT_COUNT, "Incorrect array size");
+	static_assert(ARRAY_SIZE(Reloading) == WEAPONSLOT_COUNT, "Incorrect array size");
+	static_assert(ARRAY_SIZE(PreAttack) == WEAPONSLOT_COUNT, "Incorrect array size");
+	static_assert(ARRAY_SIZE(Lookup) == WSF_COUNT, "Incorrect array size");
 
 	ModelConditionFlags flags;	// defaults to all clear
 
@@ -543,7 +555,8 @@ void WeaponSet::updateWeaponSet(const Object* obj)
 	if (f != MODELCONDITION_INVALID)
 		flags.set(f);
 
-	static const ModelConditionFlagType Using[WEAPONSLOT_COUNT] = { MODELCONDITION_USING_WEAPON_A, MODELCONDITION_USING_WEAPON_B, MODELCONDITION_USING_WEAPON_C, MODELCONDITION_USING_WEAPON_D, MODELCONDITION_USING_WEAPON_E, MODELCONDITION_USING_WEAPON_F, MODELCONDITION_USING_WEAPON_G, MODELCONDITION_USING_WEAPON_H };
+	static const ModelConditionFlagType Using[] = { MODELCONDITION_USING_WEAPON_A, MODELCONDITION_USING_WEAPON_B, MODELCONDITION_USING_WEAPON_C, MODELCONDITION_USING_WEAPON_D, MODELCONDITION_USING_WEAPON_E, MODELCONDITION_USING_WEAPON_F, MODELCONDITION_USING_WEAPON_G, MODELCONDITION_USING_WEAPON_H };
+	static_assert(ARRAY_SIZE(Using) == WEAPONSLOT_COUNT, "Incorrect array size");
 	if (a != WSF_NONE)
 		flags.set(Using[wslot]);
 
@@ -886,7 +899,8 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 			Bool handled = FALSE;
 			ContainModuleInterface *contain = containedBy ? containedBy->getContain() : nullptr;
 			if( contain && contain->isGarrisonable() && contain->isEnclosingContainerFor( source ))
-			{                                       // non enclosing garrison containers do not use firepoints. Lorenzen, 6/11/03
+			{
+				// non enclosing garrison containers do not use firepoints. Lorenzen, 6/11/03
 				//For contained things, we need to fake-move objects to the best garrison point in order
 				//to get precise range checks.
 				Coord3D targetPos = *pos;
@@ -1011,9 +1025,9 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 // selected and get the "attack if I move" cursor against an enemy. since the stinger site can't
 // move or fire, you shouldn't really EVER get this cursor for it. and since we just verified above
 // that our slaves (the soldiers) can attack correctly, just nork it.
-		if (source->isKindOf( KINDOF_IMMOBILE )
-				&& source->isKindOf( KINDOF_SPAWNS_ARE_THE_WEAPONS )
-				&& okResult == ATTACKRESULT_POSSIBLE_AFTER_MOVING)
+		if (source->isKindOf( KINDOF_IMMOBILE ) &&
+				source->isKindOf( KINDOF_SPAWNS_ARE_THE_WEAPONS ) &&
+				okResult == ATTACKRESULT_POSSIBLE_AFTER_MOVING)
 			okResult = ATTACKRESULT_POSSIBLE;
 
 		return okResult;
@@ -1393,6 +1407,11 @@ Bool WeaponSet::setWeaponLock( WeaponSlotType weaponSlot, WeaponLockType lockTyp
 	if (lockType == NOT_LOCKED)
 	{
 		DEBUG_CRASH(("calling setWeaponLock with NOT_LOCKED, so I am doing nothing... did you mean to use releaseWeaponLock()?\n"));
+		return false;
+	}
+
+	if (static_cast<UnsignedInt>(weaponSlot) >= ARRAY_SIZE(m_weapons))
+	{
 		return false;
 	}
 

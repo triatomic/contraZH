@@ -141,7 +141,7 @@ void McpJson::dumpTo(std::string &out) const
 			break;
 		case TYPE_NUMBER: {
 			char buf[64];
-			if (!_finite(m_number)) {
+			if (!std::isfinite(m_number)) {
 				out += "null";
 			} else if (m_number == floor(m_number) && fabs(m_number) < 1e15) {
 				sprintf(buf, "%.0f", m_number);

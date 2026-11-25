@@ -32,8 +32,6 @@
  *                                                                                             *
  *                    $Revision:: 7                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
@@ -46,9 +44,9 @@
 #include "WWMath/vector3.h"
 #include "WWMath/Vector3i.h"
 #include "WWMath/vector4.h"
-#include "shader.h"
-#include "vertmaterial.h"
-#include "meshgeometry.h"
+#include "WW3D2/shader.h"
+#include "WW3D2/vertmaterial.h"
+#include "WW3D2/meshgeometry.h"
 
 class MeshClass;
 class RenderInfoClass;
@@ -76,7 +74,7 @@ class DecalMeshClass : public RefCountClass
 public:
 
 	DecalMeshClass(MeshClass * parent,DecalSystemClass * system);
-	virtual ~DecalMeshClass();
+	virtual ~DecalMeshClass() override;
 
 	// world_vertex_locs and world_vertex_norms are dynamically updated worldspace vertex data
 	// which are used by some decal types which cannot use static object geometry (such as decals
@@ -121,21 +119,21 @@ class RigidDecalMeshClass : public DecalMeshClass
 public:
 
 	RigidDecalMeshClass(MeshClass * parent,DecalSystemClass * system);
-	virtual ~RigidDecalMeshClass();
+	virtual ~RigidDecalMeshClass() override;
 
 	// Rigid decal meshes have static geometry so they do not use world_vertex_locs/norms
 
-	virtual void											Render();
+	virtual void											Render() override;
 
 	virtual bool											Create_Decal(	DecalGeneratorClass * generator,
 																					const OBBoxClass & localbox,
 																					SimpleDynVecClass<uint32> & apt,
-																					const DynamicVectorClass<Vector3> * world_vertex_locs = 0);
+																					const DynamicVectorClass<Vector3> * world_vertex_locs = 0) override;
 
-	virtual bool											Delete_Decal(uint32 id);
+	virtual bool											Delete_Decal(uint32 id) override;
 
-	int														Decal_Count();
-	uint32													Get_Decal_ID(int decal_index);
+	int														Decal_Count() override;
+	uint32													Get_Decal_ID(int decal_index) override;
 
 protected:
 
@@ -186,21 +184,21 @@ class SkinDecalMeshClass : public DecalMeshClass
 public:
 
 	SkinDecalMeshClass(MeshClass * parent,DecalSystemClass * system);
-	virtual ~SkinDecalMeshClass();
+	virtual ~SkinDecalMeshClass() override;
 
 	// Skin decals use world_vertex_locs/norms since they cannot use static geometry
 
-	virtual void											Render();
+	virtual void											Render() override;
 
 	virtual bool											Create_Decal(	DecalGeneratorClass * generator,
 																					const OBBoxClass & localbox,
 																					SimpleDynVecClass<uint32> & apt,
-																					const DynamicVectorClass<Vector3> * world_vertex_locs);
+																					const DynamicVectorClass<Vector3> * world_vertex_locs) override;
 
-	virtual bool											Delete_Decal(uint32 id);
+	virtual bool											Delete_Decal(uint32 id) override;
 
-	int														Decal_Count();
-	uint32													Get_Decal_ID(int decal_index);
+	int														Decal_Count() override;
+	uint32													Get_Decal_ID(int decal_index) override;
 
 protected:
 

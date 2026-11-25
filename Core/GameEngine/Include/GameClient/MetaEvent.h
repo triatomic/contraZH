@@ -63,6 +63,7 @@ static const LookupListRec CategoryListName[] =
 #endif
 	{ nullptr, 0}
 };
+static_assert(ARRAY_SIZE(CategoryListName) == CATEGORY_NUM_CATEGORIES + 1, "Incorrect array size");
 
 
 // -------------------------------------------------------------------------------
@@ -344,6 +345,8 @@ enum CommandUsableInType CPP_11(: Int)
 	COMMANDUSABLE_GAME				= (1 << 1), // Command is usable when not in Shell
 	COMMANDUSABLE_OBSERVER		= (1 << 2), // TheSuperHackers @feature Command is usable when observing
 
+	COMMAND_USABLE_IN_TYPE_END, // keep after the last named flag
+
 	COMMANDUSABLE_EVERYWHERE = ~0,
 };
 
@@ -355,6 +358,7 @@ static const char* const TheCommandUsableInNames[] =
 
 	nullptr
 };
+static_assert(equalsEnumBitFlagsCount(ARRAY_SIZE(TheCommandUsableInNames) - 1, COMMAND_USABLE_IN_TYPE_END), "Incorrect array size");
 
 // -------------------------------------------------------------------------------
 class MetaMapRec : public MemoryPoolObject

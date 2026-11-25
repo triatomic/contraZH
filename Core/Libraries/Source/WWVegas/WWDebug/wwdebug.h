@@ -30,18 +30,15 @@
  *                                                                                             *
  *                    $Revision:: 18                                                          $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma once
 
-// TheSuperHackers @todo Recover WWDEBUG?
 #ifdef WWDEBUG
 #include <Utility/intrin_compat.h>
 #endif
 
-#include "../../../../../Core/GameEngine/Include/Common/Debug.h"
+#include "Lib/Debug.h"
 
 // The macro MESSAGE allows user to put:
 // #pragma MESSAGE("Hello world")

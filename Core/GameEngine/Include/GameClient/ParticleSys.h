@@ -247,14 +247,16 @@ protected:
 
 
 	Bool							m_isCulled;														///< status of particle relative to screen bounds
+	Bool							m_xferSystemUnderControl;							///< union tag to signal which field is active for systemUnderControl
+
 public:
 	Bool							m_inSystemList;
 	Bool							m_inOverallList;
 
 	union
 	{
+		ParticleSystemID	m_xferSystemUnderControlID;	///< xfer uses IDs to store pointers and looks them up after
 		ParticleSystem *	m_systemUnderControl;			///< the particle system attached to this particle (not the system that created us)
-		ParticleSystemID	m_systemUnderControlID;	///< id of system attached to this particle (not the system that created us);
 	};
 
 };
@@ -439,7 +441,15 @@ public:
 	m_emissionVolume;														///< the dimensions of the emission volume
 
 	Bool m_isEmissionVolumeHollow;							///< if true, only create particles at boundary of volume
-	Bool m_isGroundAligned;											///< if true, align with the ground. if false, then do the normal billboarding.
+
+	enum ParticleAlignmentType CPP_11(: Int)
+	{
+		PARTICLE_ALIGNMENT_BILLBOARD = 0,		///< Align the particle toward the camera.
+		PARTICLE_ALIGNMENT_XYPLANAR,		///< Align the particle on a flat horizontal surface.
+		PARTICLE_ALIGNMENT_CONFORMING,		///< Align the particle as projected on the terrain.
+		PARTICLE_ALIGNMENT_TYPE_COUNT
+	};
+	ParticleAlignmentType m_particleAlignment;		///< align particles toward the camera or with the XY plane.
 	Bool m_isEmitAboveGroundOnly;								///< if true, only emit particles when the system is above ground.
 	// TheSuperHackers @feature If true, each corner of a ground aligned quad takes the terrain
 	// height beneath it, so the quad tilts to match the slope rather than lying flat across it.
@@ -527,37 +537,87 @@ public:
 
 static const char *const ParticleShaderTypeNames[] =
 {
-	"NONE", "ADDITIVE", "ALPHA", "ALPHA_TEST", "MULTIPLY", nullptr
+	"NONE",
+	"ADDITIVE",
+	"ALPHA",
+	"ALPHA_TEST",
+	"MULTIPLY",
+	nullptr
 };
 static_assert(ARRAY_SIZE(ParticleShaderTypeNames) == ParticleSystemInfo::PARTICLE_SHADER_TYPE_COUNT + 1, "Incorrect array size");
 
 static const char *const ParticleTypeNames[] =
 {
-	"NONE", "PARTICLE", "DRAWABLE", "STREAK", "VOLUME_PARTICLE", "SMUDGE", nullptr
+	"NONE",
+	"PARTICLE",
+	"DRAWABLE",
+	"STREAK",
+	"VOLUME_PARTICLE",
+	"SMUDGE",
+	nullptr
 };
 static_assert(ARRAY_SIZE(ParticleTypeNames) == ParticleSystemInfo::PARTICLE_TYPE_COUNT + 1, "Incorrect array size");
 
 static const char *const EmissionVelocityTypeNames[] =
 {
-	"NONE", "ORTHO", "SPHERICAL", "HEMISPHERICAL", "CYLINDRICAL", "OUTWARD", nullptr
+	"NONE",
+	"ORTHO",
+	"SPHERICAL",
+	"HEMISPHERICAL",
+	"CYLINDRICAL",
+	"OUTWARD",
+	nullptr
 };
 static_assert(ARRAY_SIZE(EmissionVelocityTypeNames) == ParticleSystemInfo::EMISSION_VELOCITY_TYPE_COUNT + 1, "Incorrect array size");
 
 static const char *const EmissionVolumeTypeNames[] =
 {
-	"NONE", "POINT", "LINE", "BOX", "SPHERE", "CYLINDER", nullptr
+	"NONE",
+	"POINT",
+	"LINE",
+	"BOX",
+	"SPHERE",
+	"CYLINDER",
+	nullptr
 };
 static_assert(ARRAY_SIZE(EmissionVolumeTypeNames) == ParticleSystemInfo::EMISSION_VOLUME_TYPE_COUNT + 1, "Incorrect array size");
 
 static const char *const ParticlePriorityNames[] =
 {
-	"NONE", "WEAPON_EXPLOSION","SCORCHMARK","DUST_TRAIL","BUILDUP","DEBRIS_TRAIL","UNIT_DAMAGE_FX","DEATH_EXPLOSION","SEMI_CONSTANT","CONSTANT","WEAPON_TRAIL","AREA_EFFECT","CRITICAL", "ALWAYS_RENDER", nullptr
+	"NONE",
+	"WEAPON_EXPLOSION",
+	"SCORCHMARK",
+	"DUST_TRAIL",
+	"BUILDUP",
+	"DEBRIS_TRAIL",
+	"UNIT_DAMAGE_FX",
+	"DEATH_EXPLOSION",
+	"SEMI_CONSTANT",
+	"CONSTANT",
+	"WEAPON_TRAIL",
+	"AREA_EFFECT",
+	"CRITICAL",
+	"ALWAYS_RENDER",
+	nullptr
 };
 static_assert(ARRAY_SIZE(ParticlePriorityNames) == NUM_PARTICLE_PRIORITIES + 1, "Incorrect array size");
 
+static const char *const GroundAlignmentTypeNames[] =
+{
+	"No",
+	"Yes",
+	"Conforming",
+	nullptr
+};
+static_assert(ARRAY_SIZE(GroundAlignmentTypeNames) == ParticleSystemInfo::PARTICLE_ALIGNMENT_TYPE_COUNT + 1, "Incorrect array size");
+
 static const char *const WindMotionNames[] =
 {
-	"NONE", "Unused", "PingPong", "Circular", nullptr
+	"NONE",
+	"Unused",
+	"PingPong",
+	"Circular",
+	nullptr
 };
 static_assert(ARRAY_SIZE(WindMotionNames) == ParticleSystemInfo::WIND_MOTION_COUNT + 1, "Incorrect array size");
 
@@ -770,11 +830,12 @@ public:
 	Bool isUsingVolumeParticles() const { return m_particleType == VOLUME_PARTICLE; }
 	UnsignedInt getVolumeParticleDepth() const { return m_volumeParticleDepth; }
 
-	Bool shouldBillboard() const { return !m_isGroundAligned; }
+	ParticleAlignmentType getParticleAlignment() const { return m_particleAlignment; }
+	Bool isFieldParticle() const { return m_particleAlignment != PARTICLE_ALIGNMENT_BILLBOARD; }
 
 	// TheSuperHackers @feature see m_conformToTerrain. Named to match the upstream
 	// TheSuperHackers option of the same name, so a future port lines up.
-	Bool shouldConformToTerrain() const { return m_isGroundAligned && m_conformToTerrain; }
+	Bool shouldConformToTerrain() const { return m_particleAlignment == PARTICLE_ALIGNMENT_CONFORMING || (m_particleAlignment == PARTICLE_ALIGNMENT_XYPLANAR && m_conformToTerrain); }
 
 	ParticleShaderType getShaderType() const { return m_shaderType; }
 

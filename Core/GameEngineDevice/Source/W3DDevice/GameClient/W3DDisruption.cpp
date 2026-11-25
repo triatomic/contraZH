@@ -26,6 +26,7 @@
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "GameClient/DisruptionShader.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/dx8vertexbuffer.h"
 #include "WW3D2/dx8indexbuffer.h"
 #include "WW3D2/dx8fvf.h"
@@ -232,7 +233,7 @@ void W3DDisruptionManager::render(RenderInfoClass &rinfo)
 		const Field &field = m_fields[i];
 		Matrix3D transform(true);
 		transform.Set_Translation(Vector3(field.position.x, field.position.y, field.position.z));
-		DX8Wrapper::Set_Transform(D3DTS_WORLD, transform);
+		Renderer::Set_Transform(RenderTransform_World, transform);
 		DX8Wrapper::Apply_Render_State_Changes();
 
 		if (!TheW3DSoftParticles->Begin(shader, SoftParticleHookClass::EFFECT_DISRUPT, field.info))
@@ -255,7 +256,7 @@ void W3DDisruptionManager::render(RenderInfoClass &rinfo)
 	}
 
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, depthTest);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD, Matrix3D(true));
+	Renderer::Set_Transform(RenderTransform_World, Matrix3D(true));
 	device->SetTexture(0, nullptr);
 	DX8Wrapper::Set_Vertex_Buffer(nullptr);
 	DX8Wrapper::Set_Index_Buffer(nullptr, 0);

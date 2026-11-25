@@ -30,14 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 6                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   BlowfishEngine::Decrypt -- Decrypts data using blowfish algorithm.                        *
- *   BlowfishEngine::Encrypt -- Encrypt an arbitrary block of data.                            *
- *   BlowfishEngine::Process_Block -- Process a block of data using Blowfish algorithm.        *
- *   BlowfishEngine::Sub_Key_Encrypt -- Encrypts a block for use in S-Box processing.          *
- *   BlowfishEngine::Submit_Key -- Submit a key that will allow data processing.               *
- *   BlowfishEngine::~BlowfishEngine -- Destructor for the Blowfish engine.                    *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #pragma warning(disable : 4514)
@@ -60,24 +52,11 @@ typedef union {
 		unsigned char C1;
 		unsigned char C0;
 	} Char;
-} Int;
+} Integer;
 
 
-/***********************************************************************************************
- * BlowfishEngine::~BlowfishEngine -- Destructor for the Blowfish engine.                      *
- *                                                                                             *
- *    This destructor will clear out the s-box tables so that even if the memory for the       *
- *    class remains, it will contain no compromising data.                                     *
- *                                                                                             *
- * INPUT:   none                                                                               *
- *                                                                                             *
- * OUTPUT:  none                                                                               *
- *                                                                                             *
- * WARNINGS:   none                                                                            *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   07/08/1996 JLB : Created.                                                                 *
- *=============================================================================================*/
+// Clears out the s-box tables so that even if the memory for the class remains, it will contain no
+// compromising data.
 BlowfishEngine::~BlowfishEngine()
 {
 	if (IsKeyed) {
@@ -86,30 +65,14 @@ BlowfishEngine::~BlowfishEngine()
 }
 
 
-/***********************************************************************************************
- * BlowfishEngine::Submit_Key -- Submit a key that will allow data processing.                 *
- *                                                                                             *
- *    This routine must be called before any data can be encrypted or decrypted. This routine  *
- *    need only be called when the key is to be changed or set for the first time. Once the    *
- *    key has been set, the engine may be used to encrypt, decrypt, or both operations         *
- *    indefinitely. The key must be 56 bytes or less in length. This is necessary because      *
- *    any keys longer than that will not correctly affect the encryption process.              *
- *                                                                                             *
- *    If the key pointer is null, then the S-Box tables are reset to identity. This will       *
- *    mask the previous key setting. Use this method to clear the engine after processing in   *
- *    order to gain a measure of security.                                                     *
- *                                                                                             *
- * INPUT:   key      -- Pointer to the key data block.                                         *
- *                                                                                             *
- *          length   -- The length of the submitted key.                                       *
- *                                                                                             *
- * OUTPUT:  none                                                                               *
- *                                                                                             *
- * WARNINGS:   This is a time consuming process.                                               *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   04/14/1996 JLB : Created.                                                                 *
- *=============================================================================================*/
+// This routine must be called before any data can be encrypted or decrypted. This routine need
+// only be called when the key is to be changed or set for the first time. Once the key has been
+// set, the engine may be used to encrypt, decrypt, or both operations indefinitely. The key must
+// be 56 bytes or less in length. This is necessary because any keys longer than that will not
+// correctly affect the encryption process. If the key pointer is null, then the S-Box tables are
+// reset to identity. This will mask the previous key setting. Use this method to clear the engine
+// after processing in order to gain a measure of security.
+// WARNING: This is a time consuming process.
 void BlowfishEngine::Submit_Key(void const * key, int length)
 {
 	assert(length <= MAX_KEY_LENGTH);
@@ -188,28 +151,10 @@ void BlowfishEngine::Submit_Key(void const * key, int length)
 }
 
 
-/***********************************************************************************************
- * BlowfishEngine::Encrypt -- Encrypt an arbitrary block of data.                              *
- *                                                                                             *
- *    Use this routine to encrypt an arbitrary block of data. The block must be an even        *
- *    multiple of 8 bytes. Any bytes left over will not be encrypted. The 8 byte requirement   *
- *    is necessary because the underlying algorithm processes blocks in 8 byte chunks.         *
- *    Partial blocks are unrecoverable and useless.                                            *
- *                                                                                             *
- * INPUT:   plaintext-- Pointer to the data block to be encrypted.                             *
- *                                                                                             *
- *          length   -- The length of the data block.                                          *
- *                                                                                             *
- *          cyphertext- Pointer to the output buffer that will hold the encrypted data.        *
- *                                                                                             *
- * OUTPUT:  Returns with the actual number of bytes encrypted.                                 *
- *                                                                                             *
- * WARNINGS:   You must submit the key before calling this routine. This will only encrypt     *
- *             the plaintext in 8 byte increments. Modulo bytes left over are not processed.   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   04/14/1996 JLB : Created.                                                                 *
- *=============================================================================================*/
+// The block must be an even multiple of 8 bytes. Any bytes left over will not be encrypted. The 8
+// byte requirement is necessary because the underlying algorithm processes blocks in 8 byte
+// chunks. Partial blocks are unrecoverable and useless.
+// WARNING: You must submit the key before calling this routine.
 int BlowfishEngine::Encrypt(void const * plaintext, int length, void * cyphertext)
 {
 	if (plaintext == 0 || length == 0) {
@@ -254,28 +199,10 @@ int BlowfishEngine::Encrypt(void const * plaintext, int length, void * cyphertex
 }
 
 
-/***********************************************************************************************
- * BlowfishEngine::Decrypt -- Decrypt an arbitrary block of data.                              *
- *                                                                                             *
- *    Use this routine to decrypt an arbitrary block of data. The block must be an even        *
- *    multiple of 8 bytes. Any bytes left over will not be decrypted. The 8 byte requirement   *
- *    is necessary because the underlying algorithm processes blocks in 8 byte chunks.         *
- *    Partial blocks are unrecoverable and useless.                                            *
- *                                                                                             *
- * INPUT:   cyphertext- Pointer to the data block to be decrypted.                             *
- *                                                                                             *
- *          length   -- The length of the data block.                                          *
- *                                                                                             *
- *          plaintext-- Pointer to the output buffer that will hold the decrypted data.        *
- *                                                                                             *
- * OUTPUT:  Returns with the actual number of bytes decrypted.                                 *
- *                                                                                             *
- * WARNINGS:   You must submit the key before calling this routine. This will only decrypt     *
- *             the cyphertext in 8 byte increments. Modulo bytes left over are not processed.  *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   04/14/1996 JLB : Created.                                                                 *
- *=============================================================================================*/
+// The block must be an even multiple of 8 bytes. Any bytes left over will not be decrypted. The 8
+// byte requirement is necessary because the underlying algorithm processes blocks in 8 byte
+// chunks. Partial blocks are unrecoverable and useless.
+// WARNING: You must submit the key before calling this routine.
 int BlowfishEngine::Decrypt(void const * cyphertext, int length, void * plaintext)
 {
 	if (cyphertext == 0 || length == 0) {
@@ -320,30 +247,12 @@ int BlowfishEngine::Decrypt(void const * cyphertext, int length, void * plaintex
 }
 
 
-/***********************************************************************************************
- * BlowfishEngine::Process_Block -- Process a block of data using Blowfish algorithm.          *
- *                                                                                             *
- *    This is the main processing routine for encryption and decryption. The algorithm         *
- *    consists of a 16 round Feistal network and uses mathematics from different algebraic     *
- *    groups (strengthens against differential cryptanalysis). The large S-Boxes and the       *
- *    rounds strengthen it against linear cryptanalysis.                                       *
- *                                                                                             *
- * INPUT:   plaintext   -- Pointer to the source text (it actually might be a pointer to       *
- *                         the cyphertext if this is called as a decryption process).          *
- *                                                                                             *
- *          cyphertext  -- Pointer to the output buffer that will hold the processed block.    *
- *                                                                                             *
- *          ptable      -- Pointer to the permutation table. This algorithm will encrypt       *
- *                         and decrypt using the same S-Box tables. The encryption control     *
- *                         is handled by the permutation table.                                *
- *                                                                                             *
- * OUTPUT:  none                                                                               *
- *                                                                                             *
- * WARNINGS:   The source and destination buffers must be 8 bytes long.                        *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   04/19/1996 JLB : Created.                                                                 *
- *=============================================================================================*/
+// This is the main processing routine for encryption and decryption. This algorithm will encrypt
+// and decrypt using the same S-Box tables. The encryption control is handled by the permutation
+// table. The algorithm consists of a 16 round Feistel network and uses mathematics from different
+// algebraic groups (strengthens against differential cryptanalysis). The large S-Boxes and the
+// rounds strengthen it against linear cryptanalysis.
+// WARNING: The source and destination buffers must be 8 bytes long.
 void BlowfishEngine::Process_Block(void const * plaintext, void * cyphertext, unsigned long const * ptable)
 {
 	/*
@@ -354,13 +263,13 @@ void BlowfishEngine::Process_Block(void const * plaintext, void * cyphertext, un
 	**	could be done for big endian processors in that case.
 	*/
 	unsigned char const * source = (unsigned char const *)plaintext;
-	Int left;
+	Integer left;
 	left.Char.C0 = *source++;
 	left.Char.C1 = *source++;
 	left.Char.C2 = *source++;
 	left.Char.C3 = *source++;
 
-	Int right;
+	Integer right;
 	right.Char.C0 = *source++;
 	right.Char.C1 = *source++;
 	right.Char.C2 = *source++;
@@ -406,33 +315,17 @@ void BlowfishEngine::Process_Block(void const * plaintext, void * cyphertext, un
 }
 
 
-/***********************************************************************************************
- * BlowfishEngine::Sub_Key_Encrypt -- Encrypts a block for use in S-Box processing.            *
- *                                                                                             *
- *    This is the same as the normal process block function but it doesn't have the endian     *
- *    fixup logic. Since this routine is only called for S-Box table generation and it is      *
- *    known that the S-Box initial data is already in local machine endian format, the         *
- *    byte order fixups are not needed. This also has a tendency to speed up S-Box generation  *
- *    as well.                                                                                 *
- *                                                                                             *
- * INPUT:   left  -- The left half of the data block.                                          *
- *                                                                                             *
- *          right -- The right half of the data block.                                         *
- *                                                                                             *
- * OUTPUT:  none, but the processed block is stored back into the left and right half          *
- *          integers.                                                                          *
- *                                                                                             *
- * WARNINGS:   none                                                                            *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   04/19/1996 JLB : Created.                                                                 *
- *=============================================================================================*/
+// Encrypts a block for use in S-Box processing. This is the same as the normal process block
+// function but it doesn't have the endian fixup logic. Since this routine is only called for S-Box
+// table generation and it is known that the S-Box initial data is already in local machine endian
+// format, the byte order fixups are not needed. This also has a tendency to speed up S-Box
+// generation as well.
 void BlowfishEngine::Sub_Key_Encrypt(unsigned long & left, unsigned long & right)
 {
-	Int l;
+	Integer l;
 	l.Long = left;
 
-	Int r;
+	Integer r;
 	r.Long = right;
 
 	for (int index = 0; index < ROUNDS; index += 2) {
@@ -492,7 +385,7 @@ unsigned long const BlowfishEngine::S_Init[4][UCHAR_MAX+1] = {
 		0x2464369BU,0xF009B91EU,0x5563911DU,0x59DFA6AAU,0x78C14389U,0xD95A537FU,0x207D5BA2U,0x02E5B9C5U,
 		0x83260376U,0x6295CFA9U,0x11C81968U,0x4E734A41U,0xB3472DCAU,0x7B14A94AU,0x1B510052U,0x9A532915U,
 		0xD60F573FU,0xBC9BC6E4U,0x2B60A476U,0x81E67400U,0x08BA6FB5U,0x571BE91FU,0xF296EC6BU,0x2A0DD915U,
-		0xB6636521U,0xE7B9F9B6U,0xFF34052EU,0xC5855664U,0x53B02D5DU,0xA99F8FA1U,0x08BA4799U,0x6E85076AU,
+		0xB6636521U,0xE7B9F9B6U,0xFF34052EU,0xC5855664U,0x53B02D5DU,0xA99F8FA1U,0x08BA4799U,0x6E85076AU
 	},{
 		0x4B7A70E9U,0xB5B32944U,0xDB75092EU,0xC4192623U,0xAD6EA6B0U,0x49A7DF7DU,0x9CEE60B8U,0x8FEDB266U,
 		0xECAA8C71U,0x699A17FFU,0x5664526CU,0xC2B19EE1U,0x193602A5U,0x75094C29U,0xA0591340U,0xE4183A3EU,
@@ -525,7 +418,7 @@ unsigned long const BlowfishEngine::S_Init[4][UCHAR_MAX+1] = {
 		0x3372F092U,0x8D937E41U,0xD65FECF1U,0x6C223BDBU,0x7CDE3759U,0xCBEE7460U,0x4085F2A7U,0xCE77326EU,
 		0xA6078084U,0x19F8509EU,0xE8EFD855U,0x61D99735U,0xA969A7AAU,0xC50C06C2U,0x5A04ABFCU,0x800BCADCU,
 		0x9E447A2EU,0xC3453484U,0xFDD56705U,0x0E1E9EC9U,0xDB73DBD3U,0x105588CDU,0x675FDA79U,0xE3674340U,
-		0xC5C43465U,0x713E38D8U,0x3D28F89EU,0xF16DFF20U,0x153E21E7U,0x8FB03D4AU,0xE6E39F2BU,0xDB83ADF7U,
+		0xC5C43465U,0x713E38D8U,0x3D28F89EU,0xF16DFF20U,0x153E21E7U,0x8FB03D4AU,0xE6E39F2BU,0xDB83ADF7U
 	},{
 		0xE93D5A68U,0x948140F7U,0xF64C261CU,0x94692934U,0x411520F7U,0x7602D4F7U,0xBCF46B2EU,0xD4A20068U,
 		0xD4082471U,0x3320F46AU,0x43B7D4B7U,0x500061AFU,0x1E39F62EU,0x97244546U,0x14214F74U,0xBF8B8840U,
@@ -558,7 +451,7 @@ unsigned long const BlowfishEngine::S_Init[4][UCHAR_MAX+1] = {
 		0x11E69ED7U,0x2338EA63U,0x53C2DD94U,0xC2C21634U,0xBBCBEE56U,0x90BCB6DEU,0xEBFC7DA1U,0xCE591D76U,
 		0x6F05E409U,0x4B7C0188U,0x39720A3DU,0x7C927C24U,0x86E3725FU,0x724D9DB9U,0x1AC15BB4U,0xD39EB8FCU,
 		0xED545578U,0x08FCA5B5U,0xD83D7CD3U,0x4DAD0FC4U,0x1E50EF5EU,0xB161E6F8U,0xA28514D9U,0x6C51133CU,
-		0x6FD5C7E7U,0x56E14EC4U,0x362ABFCEU,0xDDC6C837U,0xD79A3234U,0x92638212U,0x670EFA8EU,0x406000E0U,
+		0x6FD5C7E7U,0x56E14EC4U,0x362ABFCEU,0xDDC6C837U,0xD79A3234U,0x92638212U,0x670EFA8EU,0x406000E0U
 	},{
 		0x3A39CE37U,0xD3FAF5CFU,0xABC27737U,0x5AC52D1BU,0x5CB0679EU,0x4FA33742U,0xD3822740U,0x99BC9BBEU,
 		0xD5118E9DU,0xBF0F7315U,0xD62D1C7EU,0xC700C47BU,0xB78C1B6BU,0x21A19045U,0xB26EB1BEU,0x6A366EB4U,

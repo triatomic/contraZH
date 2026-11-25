@@ -33,22 +33,6 @@
  *                    $Revision:: 24                                                          $*
  *                                                                                             *
  * 06/26/02 KM Matrix name change to avoid MAX conflicts                                       *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
- *   DecalMeshClass::DecalMeshClass -- Constructor                                             *
- *   DecalMeshClass::~DecalMeshClass -- Destructor                                             *
- *   RigidDecalMeshClass::RigidDecalMeshClass -- Constructor                                   *
- *   RigidDecalMeshClass::~RigidDecalMeshClass -- Destructor                                   *
- *   RigidDecalMeshClass::Render -- Render the decals                                          *
- *   RigidDecalMeshClass::Process_Material_Run -- scans the mesh for material runs             *
- *   RigidDecalMeshClass::Create_Decal -- Generate a new decal                                 *
- *   RigidDecalMeshClass::Delete_Decal -- Delete a decal                                       *
- *   SkinDecalMeshClass::SkinDecalMeshClass -- Constructor                                     *
- *   SkinDecalMeshClass::~SkinDecalMeshClass -- Destructor                                     *
- *   SkinDecalMeshClass::Render -- Render the decals                                           *
- *   SkinDecalMeshClass::Create_Decal -- Generate a new decal                                  *
- *   SkinDecalMeshClass::Delete_Decal -- Delete a decal                                        *
- *   SkinDecalMeshClass::Process_Material_Run -- scans the mesh for material runs              *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 #include "decalmsh.h"
@@ -63,6 +47,7 @@
 #include "WWLib/simplevec.h"
 #include "texture.h"
 #include "dx8wrapper.h"
+#include "Renderer.h"
 
 #define DISABLE_CLIPPING	0
 
@@ -182,18 +167,6 @@ static DecalPolyClass _DecalPoly1;
 ** DecalMeshClass Implementation
 */
 
-/***********************************************************************************************
- * DecalMeshClass::DecalMeshClass -- Constructor                                               *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 DecalMeshClass::DecalMeshClass(MeshClass * parent,DecalSystemClass * system) :
 	Parent(parent),
 	DecalSystem(system)
@@ -203,18 +176,6 @@ DecalMeshClass::DecalMeshClass(MeshClass * parent,DecalSystemClass * system) :
 }
 
 
-/***********************************************************************************************
- * DecalMeshClass::~DecalMeshClass -- Destructor                                               *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 DecalMeshClass::~DecalMeshClass()
 {
 }
@@ -225,36 +186,12 @@ DecalMeshClass::~DecalMeshClass()
 */
 
 
-/***********************************************************************************************
- * RigidDecalMeshClass::RigidDecalMeshClass -- Constructor                                     *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/31/00    NH : Created.                                                                  *
- *=============================================================================================*/
 RigidDecalMeshClass::RigidDecalMeshClass(MeshClass * parent, DecalSystemClass * system) :
 	DecalMeshClass(parent, system)
 {
 }
 
 
-/***********************************************************************************************
- * RigidDecalMeshClass::~RigidDecalMeshClass -- Destructor                                     *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/31/00    NH : Created.                                                                  *
- *=============================================================================================*/
 RigidDecalMeshClass::~RigidDecalMeshClass()
 {
 	int i;
@@ -276,18 +213,6 @@ RigidDecalMeshClass::~RigidDecalMeshClass()
 }
 
 
-/***********************************************************************************************
- * RigidDecalMeshClass::Render -- Render the decals                                            *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 void RigidDecalMeshClass::Render()
 {
 	if ((Decals.Count() == 0) || (WW3D::Are_Decals_Enabled() == false)) return;
@@ -297,7 +222,7 @@ void RigidDecalMeshClass::Render()
 	** transform between the time that the mesh is rendered and the time that the decal
 	** mesh is rendered...  It shouldn't happen though.
 	*/
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,Parent->Get_Transform());
+	Renderer::Set_Transform(RenderTransform_World,Parent->Get_Transform());
 
 	/*
 	** Copy the vertices into the dynamic vb
@@ -365,21 +290,8 @@ void RigidDecalMeshClass::Render()
 }
 
 
-/***********************************************************************************************
- * RigidDecalMeshClass::Process_Material_Run -- scans the mesh for material runs               *
- *                                                                                             *
- *    This function will install the materials for poly[start_index] and scan forward for      *
- *    the next material change.  It will return the start index for the next material change   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   2/22/2001  gth : Created.                                                                 *
- *=============================================================================================*/
+// This function will install the materials for poly[start_index] and scan forward for the next
+// material change. It will return the start index for the next material change.
 int RigidDecalMeshClass::Process_Material_Run(int start_index)
 {
 	DX8Wrapper::Set_Texture(0,Textures[start_index]);
@@ -397,19 +309,7 @@ int RigidDecalMeshClass::Process_Material_Run(int start_index)
 	return next_index;
 }
 
-/***********************************************************************************************
- * RigidDecalMeshClass::Create_Decal -- Generate a new decal                                   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- * All Decals on a mesh must be generated from the same DecalSystemClass!                      *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
+// WARNING: All Decals on a mesh must be generated from the same DecalSystemClass!
 bool RigidDecalMeshClass::Create_Decal
 (
 	DecalGeneratorClass *			generator,
@@ -580,7 +480,7 @@ bool RigidDecalMeshClass::Create_Decal
 
 	material->Release_Ref();
 
-#ifdef WWDEBUG
+#ifdef DEBUG_CRASHING
 	/*
 	** Some paranoid debug code: ensure all tris have valid vertex indices
 	*/
@@ -603,18 +503,6 @@ bool RigidDecalMeshClass::Create_Decal
 }
 
 
-/***********************************************************************************************
- * RigidDecalMeshClass::Delete_Decal -- Delete a decal                                         *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/26/00    gth : Created.                                                                 *
- *=============================================================================================*/
 bool RigidDecalMeshClass::Delete_Decal(uint32 id)
 {
 	/*
@@ -673,7 +561,7 @@ bool RigidDecalMeshClass::Delete_Decal(uint32 id)
 	}
 	Decals.Delete(decal_index);
 
-#ifdef WWDEBUG
+#ifdef DEBUG_CRASHING
 	/*
 	** Some paranoid debug code: ensure all tris have valid vertex indices
 	*/
@@ -707,36 +595,12 @@ static SimpleVecClass<Vector3>	_TempNormalBuffer;
 */
 
 
-/***********************************************************************************************
- * SkinDecalMeshClass::SkinDecalMeshClass -- Constructor                                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/31/00    NH : Created.                                                                  *
- *=============================================================================================*/
 SkinDecalMeshClass::SkinDecalMeshClass(MeshClass * parent, DecalSystemClass * system) :
 	DecalMeshClass(parent, system)
 {
 }
 
 
-/***********************************************************************************************
- * SkinDecalMeshClass::~SkinDecalMeshClass -- Destructor                                       *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/31/00    NH : Created.                                                                  *
- *=============================================================================================*/
 SkinDecalMeshClass::~SkinDecalMeshClass()
 {
 	int i;
@@ -758,18 +622,6 @@ SkinDecalMeshClass::~SkinDecalMeshClass()
 }
 
 
-/***********************************************************************************************
- * SkinDecalMeshClass::Render -- Render the decals                                             *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/31/00    NH : Created.                                                                  *
- *=============================================================================================*/
 void SkinDecalMeshClass::Render()
 {
 	if ((Decals.Count() == 0) || (WW3D::Are_Decals_Enabled() == false)) return;
@@ -786,7 +638,7 @@ void SkinDecalMeshClass::Render()
 	/*
 	** Skin decals coordinates are in world space
 	*/
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,Matrix3D::Identity);
+	Renderer::Set_Transform(RenderTransform_World,Matrix3D::Identity);
 
 	/*
 	** Skin decals have to get the deformed vertices of their parent meshes.  For this
@@ -862,21 +714,8 @@ void SkinDecalMeshClass::Render()
 }
 
 
-/***********************************************************************************************
- * SkinDecalMeshClass::Process_Material_Run -- scans the mesh for material runs                *
- *                                                                                             *
- *    This function will install the materials for poly[start_index] and scan forward for      *
- *    the next material change.  It will return the start index for the next material change   *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   2/22/2001  gth : Created.                                                                 *
- *=============================================================================================*/
+// This function will install the materials for poly[start_index] and scan forward for the next
+// material change. It will return the start index for the next material change.
 int SkinDecalMeshClass::Process_Material_Run(int start_index)
 {
 	DX8Wrapper::Set_Texture(0,Textures[start_index]);
@@ -895,19 +734,7 @@ int SkinDecalMeshClass::Process_Material_Run(int start_index)
 }
 
 
-/***********************************************************************************************
- * SkinDecalMeshClass::Create_Decal -- Generate a new decal                                    *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- * All Decals on a mesh must be generated from the same DecalSystemClass!                      *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/31/00    NH : Created.                                                                  *
- *=============================================================================================*/
+// WARNING: All Decals on a mesh must be generated from the same DecalSystemClass!
 bool SkinDecalMeshClass::Create_Decal(DecalGeneratorClass * generator,
 	const OBBoxClass & localbox, SimpleDynVecClass<uint32> & apt,
 	const DynamicVectorClass<Vector3> * world_vertex_locs)
@@ -999,7 +826,7 @@ bool SkinDecalMeshClass::Create_Decal(DecalGeneratorClass * generator,
 	*/
 	generator->Add_Mesh(Parent);
 
-#ifdef WWDEBUG
+#ifdef DEBUG_CRASHING
 	/*
 	** Some paranoid debug code: ensure all tris have valid vertex indices
 	*/
@@ -1020,18 +847,6 @@ bool SkinDecalMeshClass::Create_Decal(DecalGeneratorClass * generator,
 }
 
 
-/***********************************************************************************************
- * SkinDecalMeshClass::Delete_Decal -- Delete a decal                                         *
- *                                                                                             *
- * INPUT:                                                                                      *
- *                                                                                             *
- * OUTPUT:                                                                                     *
- *                                                                                             *
- * WARNINGS:                                                                                   *
- *                                                                                             *
- * HISTORY:                                                                                    *
- *   1/31/00    NH : Created.                                                                  *
- *=============================================================================================*/
 bool SkinDecalMeshClass::Delete_Decal(uint32 id)
 {
 	/*
@@ -1089,7 +904,7 @@ bool SkinDecalMeshClass::Delete_Decal(uint32 id)
 	}
 	Decals.Delete(decal_index);
 
-#ifdef WWDEBUG
+#ifdef DEBUG_CRASHING
 	/*
 	** Some paranoid debug code: ensure all tris have valid vertex indices
 	*/

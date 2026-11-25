@@ -30,8 +30,6 @@
  *                                                                                             *
  *                    $Revision:: 2                                                           $*
  *                                                                                             *
- *---------------------------------------------------------------------------------------------*
- * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
@@ -40,7 +38,7 @@
 //
 
 #include "ExportAllDlg.h"
-#include <max.h>
+#include "max_sdk.h"
 #include <assert.h>
 #include <shlobj.h>	// SHBrowseForFolder
 
@@ -97,8 +95,6 @@ BOOL CALLBACK _thunk_dialog_proc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
 
 BOOL CALLBACK ExportAllDlg::DialogProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	int code = HIWORD(wParam);
-
 	switch (uMsg)
 	{
 

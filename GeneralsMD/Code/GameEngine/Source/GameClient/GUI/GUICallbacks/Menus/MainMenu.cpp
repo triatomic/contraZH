@@ -32,7 +32,6 @@
 
 #include "gamespy/ghttp/ghttp.h"
 
-#include "Lib/BaseType.h"
 #include "Common/GameEngine.h"
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
@@ -254,7 +253,8 @@ static void quitCallback()
 
 
 	//if (!TheGameLODManager->didMemPass())
-	{	//GIANT CRAPTACULAR HACK ALERT!!!!  On sytems with little memory, we skip all normal exit code
+	{
+		//GIANT CRAPTACULAR HACK ALERT!!!!  On sytems with little memory, we skip all normal exit code
 //		//and let Windows clean up the mess.  This reduces exit times from minutes to seconds.
 //		//8-19-03. MW
 //		delete TheGameClient;
