@@ -89,6 +89,7 @@ static Bool SearchStringMatches(AsciiString str, AsciiString searchString)
 ArchiveFile::~ArchiveFile()
 {
 	if (m_file != nullptr) {
+		RAMFile::forgetArchiveData();
 		m_file->close();
 		m_file = nullptr;
 	}
@@ -179,6 +180,7 @@ void ArchiveFile::getFileListInDirectory(const DetailedArchivedDirectoryInfo *di
 void ArchiveFile::attachFile(File *file)
 {
 	if (m_file != nullptr) {
+		RAMFile::forgetArchiveData();
 		m_file->close();
 		m_file = nullptr;
 	}

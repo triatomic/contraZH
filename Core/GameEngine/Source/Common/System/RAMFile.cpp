@@ -55,6 +55,7 @@
 #include "Common/FileSystem.h"
 #include "Common/RAMFile.h"
 #include "Common/PerfTimer.h"
+#include "WWLib/mutex.h"
 
 
 //----------------------------------------------------------------------------
@@ -79,6 +80,13 @@
 //         Private Data
 //----------------------------------------------------------------------------
 
+// The last closed archive entry is kept so reopening it right away skips the copy.
+static FastCriticalSectionClass s_keptMutex;
+static File *s_keptArchive = nullptr;
+static Int s_keptOffset = 0;
+static Int s_keptSize = 0;
+static Char *s_keptData = nullptr;
+static UnsignedInt s_archiveEpoch = 0;
 
 
 //----------------------------------------------------------------------------
@@ -104,7 +112,10 @@
 RAMFile::RAMFile()
 : m_size(0),
 	m_data(nullptr),
-	m_pos(0)
+	m_pos(0),
+	m_archiveFile(nullptr),
+	m_archiveOffset(0),
+	m_archiveEpoch(0)
 {
 
 }
@@ -212,15 +223,32 @@ Bool RAMFile::openFromArchive(File *archiveFile, const AsciiString& filename, In
 	}
 
 	delete[] m_data;
-	m_data = MSGNEW("RAMFILE") Char [size];	// pool[]ify
+	m_data = nullptr;
+
+	{
+		FastCriticalSectionClass::LockClass lock(s_keptMutex);
+		m_archiveEpoch = s_archiveEpoch;
+		if (s_keptData != nullptr && s_keptArchive == archiveFile && s_keptOffset == offset && s_keptSize == size) {
+			m_data = s_keptData;
+			s_keptData = nullptr;
+			s_keptArchive = nullptr;
+		}
+	}
+
 	m_size = size;
 
-	if (archiveFile->seek(offset, File::START) != offset) {
-		return FALSE;
+	if (m_data == nullptr) {
+		m_data = MSGNEW("RAMFILE") Char [size];	// pool[]ify
+
+		if (archiveFile->seek(offset, File::START) != offset) {
+			return FALSE;
+		}
+		if (archiveFile->read(m_data, size) != size) {
+			return FALSE;
+		}
 	}
-	if (archiveFile->read(m_data, size) != size) {
-		return FALSE;
-	}
+	m_archiveFile = archiveFile;
+	m_archiveOffset = offset;
 	m_nameStr = filename;
 
 	return TRUE;
@@ -245,8 +273,33 @@ void RAMFile::close()
 
 void RAMFile::closeFile()
 {
+	if (m_data != nullptr && m_archiveFile != nullptr) {
+		FastCriticalSectionClass::LockClass lock(s_keptMutex);
+		if (m_archiveEpoch == s_archiveEpoch) {
+			delete [] s_keptData;
+			s_keptData = m_data;
+			s_keptArchive = m_archiveFile;
+			s_keptOffset = m_archiveOffset;
+			s_keptSize = m_size;
+			m_data = nullptr;
+		}
+	}
 	delete [] m_data;
 	m_data = nullptr;
+	m_archiveFile = nullptr;
+}
+
+//=================================================================
+// RAMFile::forgetArchiveData
+//=================================================================
+
+void RAMFile::forgetArchiveData()
+{
+	FastCriticalSectionClass::LockClass lock(s_keptMutex);
+	++s_archiveEpoch;
+	delete [] s_keptData;
+	s_keptData = nullptr;
+	s_keptArchive = nullptr;
 }
 
 //=================================================================

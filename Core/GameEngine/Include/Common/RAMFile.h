@@ -75,6 +75,9 @@ class RAMFile : public File
 		Char				*m_data;											///< File data in memory
 		Int					m_pos;												///< current read position
 		Int					m_size;												///< size of file in memory
+		File				*m_archiveFile;								///< archive this data came from, or null
+		Int					m_archiveOffset;							///< entry offset in that archive
+		UnsignedInt	m_archiveEpoch;								///< archive epoch when opened
 
 	public:
 
@@ -103,6 +106,7 @@ class RAMFile : public File
 		virtual Bool	open( File *file );																	///< Open file for fast RAM access
 		virtual Bool	openFromArchive(File *archiveFile, const AsciiString& filename, Int offset, Int size); ///< copy file data from the given file at the given offset for the given size.
 		virtual Bool	copyDataToFile(File *localFile);										///< write the contents of the RAM file to the given local file.  This could be REALLY slow.
+		static void		forgetArchiveData();																///< drop the kept archive entry; any archive closing calls this
 
 		/**
 			Allocate a buffer large enough to hold entire file, read
