@@ -197,7 +197,7 @@ namespace
 		for (; it != filenameList.end(); ++it)
 		{
 			AsciiString filename = *it;
-			len = filename.getLength();
+			int len = filename.getLength();
 			if (len < 5)
 			{
 				continue;
