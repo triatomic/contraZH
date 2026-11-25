@@ -34,7 +34,7 @@
 #include "Win32Device/Common/Win32LocalFile.h"
 #include <io.h>
 
-Win32LocalFileSystem::Win32LocalFileSystem() : LocalFileSystem()
+Win32LocalFileSystem::Win32LocalFileSystem(Bool cacheMissingDirectories) : LocalFileSystem(), m_cacheMissingDirectories(cacheMissingDirectories)
 {
 }
 
@@ -48,6 +48,11 @@ File * Win32LocalFileSystem::openFile(const Char *filename, Int access, size_t b
 
 	// sanity check
 	if (*filename == '\0') {
+		return nullptr;
+	}
+
+	const Bool isRead = (access & (File::WRITE | File::CREATE)) == 0;
+	if (isRead && isInMissingDirectory(filename)) {
 		return nullptr;
 	}
 
@@ -74,6 +79,11 @@ File * Win32LocalFileSystem::openFile(const Char *filename, Int access, size_t b
 	if (file->open(filename, access, bufferSize) == FALSE) {
 		deleteInstance(file);
 		file = nullptr;
+
+		// The probe tells a missing directory from a missing file and remembers the directory
+		if (isRead && isMissingDirectoryCacheActive()) {
+			doesFileExist(filename);
+		}
 	} else {
 		file->deleteOnClose();
 	}
@@ -116,11 +126,87 @@ void Win32LocalFileSystem::reset()
 Bool Win32LocalFileSystem::doesFileExist(const Char *filename) const
 {
 	//USE_PERF_TIMER(Win32LocalFileSystem_doesFileExist)
-	if (_access(filename, 0) == 0) {
+	if (isInMissingDirectory(filename)) {
+		return FALSE;
+	}
+
+	if (GetFileAttributesA(filename) != INVALID_FILE_ATTRIBUTES) {
 		return TRUE;
 	}
 
+	if (GetLastError() == ERROR_PATH_NOT_FOUND) {
+		noteMissingDirectory(filename);
+	}
+
 	return FALSE;
+}
+
+Bool Win32LocalFileSystem::makeDirectoryKey(Char *key, size_t keySize, const Char *path, Bool pathIsFile)
+{
+	if (isPathSeparator(path[0]) || (path[0] != '\0' && path[1] == ':')) {
+		return FALSE;
+	}
+
+	size_t length = strlen(path);
+	if (pathIsFile) {
+		const Char *separator = getLastPathSeparator(path);
+		if (separator == nullptr) {
+			return FALSE;
+		}
+		length = separator - path;
+	}
+
+	while (length > 0 && isPathSeparator(path[length - 1])) {
+		--length;
+	}
+
+	Char directory[_MAX_PATH];
+	if (length == 0 || length >= ARRAY_SIZE(directory)) {
+		return FALSE;
+	}
+
+	memcpy(directory, path, length);
+	directory[length] = '\0';
+	return FileSystem::makePathKey(key, keySize, directory);
+}
+
+Bool Win32LocalFileSystem::isMissingDirectoryCacheActive() const
+{
+	return m_cacheMissingDirectories && !FileSystem::isLiveLooseFiles();
+}
+
+Bool Win32LocalFileSystem::isInMissingDirectory(const Char *filename) const
+{
+	Char key[_MAX_PATH];
+	if (!isMissingDirectoryCacheActive() || !makeDirectoryKey(key, ARRAY_SIZE(key), filename, TRUE)) {
+		return FALSE;
+	}
+
+	FastCriticalSectionClass::LockClass lock(m_missingDirectoriesMutex);
+	return m_missingDirectories.find(AsciiString(key)) != m_missingDirectories.end();
+}
+
+void Win32LocalFileSystem::noteMissingDirectory(const Char *filename) const
+{
+	Char key[_MAX_PATH];
+	if (!isMissingDirectoryCacheActive() || !makeDirectoryKey(key, ARRAY_SIZE(key), filename, TRUE)) {
+		return;
+	}
+
+	// AsciiString reference counts are not atomic, so the key string lives only under the lock
+	FastCriticalSectionClass::LockClass lock(m_missingDirectoriesMutex);
+	m_missingDirectories.insert(AsciiString(key));
+}
+
+void Win32LocalFileSystem::forgetMissingDirectory(const Char *directory)
+{
+	Char key[_MAX_PATH];
+	if (!m_cacheMissingDirectories || !makeDirectoryKey(key, ARRAY_SIZE(key), directory, FALSE)) {
+		return;
+	}
+
+	FastCriticalSectionClass::LockClass lock(m_missingDirectoriesMutex);
+	m_missingDirectories.erase(AsciiString(key));
 }
 
 void Win32LocalFileSystem::getFileListInDirectory(const AsciiString& currentDirectory, const AsciiString& originalDirectory, const AsciiString& searchName, FilenameList & filenameList, Bool searchSubdirectories) const
@@ -196,6 +282,8 @@ Bool Win32LocalFileSystem::getFileInfo(const AsciiString& filename, FileInfo *fi
 
 Bool Win32LocalFileSystem::createDirectory(AsciiString directory)
 {
+	forgetMissingDirectory(directory.str());
+
 	if ((!directory.isEmpty()) && (directory.getLength() < _MAX_DIR)) {
 		return (CreateDirectory(directory.str(), nullptr) != 0);
 	}

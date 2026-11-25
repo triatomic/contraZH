@@ -30,10 +30,12 @@
 
 #include "Common/LocalFileSystem.h"
 
+#include <set>
+
 class Win32LocalFileSystem : public LocalFileSystem
 {
 public:
-	Win32LocalFileSystem();
+	explicit Win32LocalFileSystem(Bool cacheMissingDirectories = FALSE);
 	virtual ~Win32LocalFileSystem() override;
 
 	virtual void init() override;
@@ -50,4 +52,14 @@ public:
 	virtual AsciiString normalizePath(const AsciiString& filePath) const override;
 
 protected:
+	static Bool makeDirectoryKey(Char *key, size_t keySize, const Char *path, Bool pathIsFile);	///< key of the file's directory or of a directory path; FALSE when the path is absolute, has no directory or the key does not fit
+	Bool isMissingDirectoryCacheActive() const;
+	Bool isInMissingDirectory(const Char *filename) const;	///< is the file's directory known to be missing?
+	void noteMissingDirectory(const Char *filename) const;	///< remember that the file's directory is missing
+	void forgetMissingDirectory(const Char *directory);
+
+	// Only relative directories are cached because other code creates absolute ones without this class
+	Bool m_cacheMissingDirectories;
+	mutable std::set<AsciiString> m_missingDirectories;
+	mutable FastCriticalSectionClass m_missingDirectoriesMutex;
 };

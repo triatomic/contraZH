@@ -257,6 +257,11 @@ void FileSystem::setLiveLooseFiles(Bool live)
 	s_liveLooseFiles = live;
 }
 
+Bool FileSystem::isLiveLooseFiles()
+{
+	return s_liveLooseFiles;
+}
+
 Bool FileSystem::isKnownArchiveOnlyRead(const Char *filename, Int access) const
 {
 #if ENABLE_FILESYSTEM_EXISTENCE_CACHE

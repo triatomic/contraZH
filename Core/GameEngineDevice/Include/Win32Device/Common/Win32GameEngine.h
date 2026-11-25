@@ -92,7 +92,7 @@ inline GameClient *Win32GameEngine::createGameClient() { return NEW W3DGameClien
 inline ModuleFactory *Win32GameEngine::createModuleFactory() { return NEW W3DModuleFactory; }
 inline ThingFactory *Win32GameEngine::createThingFactory() { return NEW W3DThingFactory; }
 inline FunctionLexicon *Win32GameEngine::createFunctionLexicon() { return NEW W3DFunctionLexicon; }
-inline LocalFileSystem *Win32GameEngine::createLocalFileSystem() { return NEW Win32LocalFileSystem; }
+inline LocalFileSystem *Win32GameEngine::createLocalFileSystem() { return NEW Win32LocalFileSystem(TRUE); }
 inline ArchiveFileSystem *Win32GameEngine::createArchiveFileSystem() { return NEW BIGFileSystem; }
 inline ParticleSystemManager* Win32GameEngine::createParticleSystemManager(Bool dummy)
 {

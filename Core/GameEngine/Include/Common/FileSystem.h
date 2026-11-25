@@ -181,6 +181,7 @@ public:
 	static bool removeExtension(UnicodeString& path);
 
 	static void setLiveLooseFiles(Bool live);	///< check the loose file on every read, even when a probe found only the archived one
+	static Bool isLiveLooseFiles();	///< whether every read checks the loose file
 
 	void clearExistenceCache();	///< forget every cached probe, for when the archive directory tree changes
 
