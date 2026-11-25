@@ -1022,7 +1022,8 @@ CursorCaptureMode OptionPreferences::getCursorCaptureMode() const
 
 Bool OptionPreferences::getScreenEdgeScrollEnabledInWindowedApp() const
 {
-	OptionPreferences::const_iterator it = find("ScreenEdgeScrollEnabledInWindowedApp");
+	// Not TSH's ScreenEdgeScrollEnabledInWindowedApp, because saves from before the checkbox hold it as no
+	OptionPreferences::const_iterator it = find("ScreenEdgeScrollInWindowedApp");
 	if (it == end())
 		return (ScreenEdgeScrollMode_Default & ScreenEdgeScrollMode_EnabledInWindowedApp) != 0;
 

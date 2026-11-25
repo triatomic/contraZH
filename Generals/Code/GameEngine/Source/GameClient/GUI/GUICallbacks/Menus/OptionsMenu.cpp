@@ -568,7 +568,7 @@ static void saveOptions()
 	// TheSuperHackers @todo Add combo box ?
 	{
 		ScreenEdgeScrollMode mode = pref->getScreenEdgeScrollMode();
-		(*pref)["ScreenEdgeScrollEnabledInWindowedApp"] = (mode & ScreenEdgeScrollMode_EnabledInWindowedApp) ? "yes" : "no";
+		(*pref)["ScreenEdgeScrollInWindowedApp"] = (mode & ScreenEdgeScrollMode_EnabledInWindowedApp) ? "yes" : "no";
 		(*pref)["ScreenEdgeScrollEnabledInFullscreenApp"] = (mode & ScreenEdgeScrollMode_EnabledInFullscreenApp) ? "yes" : "no";
 		TheLookAtTranslator->setScreenEdgeScrollMode(mode);
 	}
