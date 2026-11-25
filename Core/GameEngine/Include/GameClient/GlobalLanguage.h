@@ -127,6 +127,7 @@ public:
 	Real			m_userResolutionFontSizeAdjustment;
 	ResolutionFontSizeMethod m_resolutionFontSizeMethod;
 	StringList m_localFonts; // List of the font filenames that are in our local directory
+	StringList m_addedFonts; // Full paths of the local fonts that were added
 };
 
 //-----------------------------------------------------------------------------

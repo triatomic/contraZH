@@ -137,8 +137,8 @@ GlobalLanguage::GlobalLanguage()
 
 GlobalLanguage::~GlobalLanguage()
 {
-	StringList::iterator it = m_localFonts.begin();
-	while( it != m_localFonts.end())
+	StringList::iterator it = m_addedFonts.begin();
+	while( it != m_addedFonts.end())
 	{
 		AsciiString font = *it;
 		RemoveFontResource(font.str());
@@ -157,16 +157,25 @@ void GlobalLanguage::init()
 		ini.loadFileDirectory( fname, INI_LOAD_OVERWRITE, nullptr );
 	}
 
+	// A bare font name makes Windows search the whole PATH, so only fonts present in the game folder are added, by full path.
 	StringList::iterator it = m_localFonts.begin();
 	while( it != m_localFonts.end())
 	{
 		AsciiString font = *it;
-		if(AddFontResource(font.str()) == 0)
+		char fullPath[_MAX_PATH];
+		DWORD fullPathLength = GetFullPathNameA(font.str(), _MAX_PATH, fullPath, nullptr);
+		DWORD attributes = INVALID_FILE_ATTRIBUTES;
+		if (fullPathLength > 0 && fullPathLength < _MAX_PATH)
+		{
+			attributes = GetFileAttributesA(fullPath);
+		}
+		if(attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0 || AddFontResource(fullPath) == 0)
 		{
 			DEBUG_CRASH(("GlobalLanguage::init Failed to add font %s", font.str()));
 		}
 		else
 		{
+			m_addedFonts.push_back(AsciiString(fullPath));
 			//SendMessage( HWND_BROADCAST, WM_FONTCHANGE, 0, 0);
 		}
 		++it;
