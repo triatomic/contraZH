@@ -3220,31 +3220,6 @@ void GadgetListBoxReset( GameWindow *listbox )
 
 }
 
-#if defined(GENONLINE)
-//-------------------------------------------------------------------------------------------------
-/** Suppress per-entry height/scrollbar recompute until GadgetListBoxEndBatchAdd. */
-//-------------------------------------------------------------------------------------------------
-void GadgetListBoxBeginBatchAdd( GameWindow *listbox )
-{
-	DEBUG_ASSERTCRASH( s_batchAddListbox == nullptr,
-		("GadgetListBoxBeginBatchAdd: a batch is already open - nesting is not supported") );
-
-	s_batchAddListbox = listbox;
-}
-
-//-------------------------------------------------------------------------------------------------
-/** End the batch and recompute layout once. */
-//-------------------------------------------------------------------------------------------------
-void GadgetListBoxEndBatchAdd( GameWindow *listbox )
-{
-	if( s_batchAddListbox == listbox )
-		s_batchAddListbox = nullptr;
-
-	if( listbox != nullptr && listbox->winGetUserData() != nullptr )
-		computeTotalHeight( listbox );
-}
-
-#endif
 //-------------------------------------------------------------------------------------------------
 /** Suppress per-entry height/scrollbar recompute until GadgetListBoxEndBatchAdd. */
 //-------------------------------------------------------------------------------------------------

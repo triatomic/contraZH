@@ -49,7 +49,11 @@
 #include "WinMain.h"
 #include "Common/CommandLine.h"
 #include "Common/CriticalSection.h"
+#if defined(GENONLINE)
+// GenOnlineInit.cpp carries the dedicated GPU exports
+#else
 #include "Common/DedicatedGpuExports.h"
+#endif
 #include "Common/GlobalData.h"
 #include "Common/GameEngine.h"
 #include "Common/GameSounds.h"

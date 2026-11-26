@@ -40,6 +40,10 @@ class STLSpecialAlloc;
 // PLEASE DO NOT ABUSE WINDOWS OR IT WILL BE REMOVED ENTIRELY. :-)
 //--------------------------------------------------------------------------------- System Includes
 
+#if defined(GENONLINE)
+// GenOnline's network headers need winsock2 ahead of the winsock.h that windows.h pulls in
+#include <winsock2.h>
+#endif
 #include <windows.h>
 
 #include <assert.h>

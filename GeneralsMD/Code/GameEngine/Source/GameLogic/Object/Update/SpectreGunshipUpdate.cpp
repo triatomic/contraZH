@@ -677,7 +677,11 @@ UpdateSleepTime SpectreGunshipUpdate::update()
 				      TheTerrainLogic->isUnderwater( impactPosition.x, impactPosition.y, &waterZ, &terrainZ );
 
 				  // Over water, prefer the water-specific FX when one is configured.
+#if defined(GENONLINE)
+				  const ParticleSystemTemplate *useTmp = data->m_gattlingStrafeFXParticleSystem;
+#else
 				  const ParticleSystemTemplate *useTmp = tmp;
+#endif
 				  if( overWater && data->m_gattlingStrafeFXParticleSystemWater )
 				    useTmp = data->m_gattlingStrafeFXParticleSystemWater;
 

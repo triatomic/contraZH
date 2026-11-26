@@ -130,6 +130,9 @@
 #include "GameNetwork/NetworkInterface.h"
 extern NetworkInterface * TheNetwork;
 #include <steam/isteamnetworkingsockets.h>
+// GameSpy's gsplatformutil.h defines min and max macros that break std::min and std::max here
+#undef max
+#undef min
 #endif
 
 
@@ -6681,6 +6684,16 @@ void InGameUI::postWindowDraw()
 		drawPlayerInfoList();
 	}
 
+#if defined(GENONLINE)
+	hudOffsetX = 0;
+	hudOffsetY += 250;
+
+	if (m_observerStatsPointSize > 0)
+		drawObserverStats(hudOffsetX, hudOffsetY);
+
+	if (m_observerNotificationPointSize > 0)
+		drawObserverNotifications(hudOffsetX, hudOffsetY);
+#endif
 }
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
@@ -6873,17 +6886,6 @@ void InGameUI::drawWindowNameOverlay()
 		m_windowNameString->draw( boxX + padding, lineY, color, GameMakeColor( 0, 0, 0, 255 ) );
 		lineY += lineHeight;
 	}
-#if defined(GENONLINE)
-
-	hudOffsetX = 0;
-	hudOffsetY += 250;
-
-	if (m_observerStatsPointSize > 0)
-		drawObserverStats(hudOffsetX, hudOffsetY);
-
-	if (m_observerNotificationPointSize > 0)
-		drawObserverNotifications(hudOffsetX, hudOffsetY);
-#endif
 }
 
 #endif

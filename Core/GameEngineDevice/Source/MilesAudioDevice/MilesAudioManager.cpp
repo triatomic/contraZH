@@ -945,7 +945,11 @@ void MilesAudioManager::handleLoopStopEarly(PlayingAudio* audio) {
 			AIL_stop_3D_sample(audio->m_3DSample);
 			closeFile(audio->m_file);	// close it so as not to leak it.
 
+#if defined(GENONLINE)
+			playSample3D(audio);
+#else
 			audio->m_file = playSample3D(audio->m_audioEventRTS.Peek(), audio->m_3DSample);
+#endif
 
 			// If we have a file, the decay portion is now playing on the same handle; leave the audio
 			// PAT_3DSample/PS_Playing and let its normal EOS completion clean it up.

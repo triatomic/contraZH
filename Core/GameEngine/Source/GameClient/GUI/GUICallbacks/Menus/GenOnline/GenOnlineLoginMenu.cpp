@@ -78,7 +78,6 @@ void GenOnlineLoginMenuLoginCallback(ELoginResult loginResult);
 
 #include "GameNetwork/GameSpyOverlay.h"
 
-#include "GameNetwork/WOLBrowser/WebBrowser.h"
 #include "GameNetwork/GenOnline/GenOnlineInterfaces.h"
 #include "GameNetwork/DownloadManager.h"
 #include "GameClient/GadgetProgressBar.h"
@@ -1021,14 +1020,7 @@ void GenOnlineLoginMenuShutdown( WindowLayout *layout, void *userData )
 	isShuttingDown = true;
 	loggedInOK = false;
 	TheWindowManager->clearTabList();
-	if (webBrowserActive)
-	{
-		if (TheWebBrowser != NULL)
-		{
-			TheWebBrowser->closeBrowserWindow(listboxTOS);
-		}
-		webBrowserActive = FALSE;
-	}
+	webBrowserActive = FALSE;
 
 	// if we are shutting down for an immediate pop, skip the animations
 	Bool popImmediate = *(Bool *)userData;
@@ -1601,12 +1593,6 @@ WindowMsgHandledType GenOnlineLoginMenuSystem( GameWindow *window, UnsignedInt m
 				{
 					parentTOS->winHide(FALSE);
 					useWebBrowserForTOS = FALSE;//loginPref->getBool("UseTOSBrowser", TRUE);
-					if (useWebBrowserForTOS && (TheWebBrowser != NULL))
-					{
-						TheWebBrowser->createBrowserWindow("TermsOfService", listboxTOS);
-						webBrowserActive = TRUE;
-					}
-					else
 					{
 						// Okay, no web browser.  This means we're looking at a UTF-8 text file.
 						GadgetListBoxReset(listboxTOS);
@@ -1653,13 +1639,6 @@ WindowMsgHandledType GenOnlineLoginMenuSystem( GameWindow *window, UnsignedInt m
 					GenOnlineEnableLoginControls( TRUE );
 
 					parentTOS->winHide(TRUE);
-					if (useWebBrowserForTOS && (TheWebBrowser != NULL))
-					{
-						if (listboxTOS != NULL)
-						{
-							TheWebBrowser->closeBrowserWindow(listboxTOS);
-						}
-					}
 
 					OptionPreferences optionPref;
 					optionPref["SawTOS"] = "yes";
