@@ -241,7 +241,12 @@ WeaponSet::WeaponSet()
 WeaponSet::~WeaponSet()
 {
 	for (Int i = 0; i < WEAPONSLOT_COUNT; ++i)
+#if defined(GENONLINE)
+		if (m_weapons[i])
+			deleteInstance(m_weapons[i]);
+#else
 		deleteInstance(m_weapons[i]);
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -125,7 +125,7 @@ public:
 
 	Bool calculateAcademyAdvice( AcademyAdviceInfo *info );
 
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
 	UnsignedInt getSupplyCentersBuilt() const { return m_supplyCentersBuilt; }
 	UnsignedInt getPeonsBuilt() const { return m_peonsBuilt; }
 	UnsignedInt getStructuresCaptured() const { return m_structuresCaptured; }
@@ -144,8 +144,8 @@ public:
 	UnsignedInt getMinesCleared() const { return m_minesCleared; }
 	UnsignedInt getVehiclesDisguised() const { return m_vehiclesDisguised; }
 	UnsignedInt getFirestormsCreated() const { return m_firestormsCreated; }
-#endif
 
+#endif
 protected:
 	// snapshot methods
 	virtual void crc( Xfer *xfer ) override;

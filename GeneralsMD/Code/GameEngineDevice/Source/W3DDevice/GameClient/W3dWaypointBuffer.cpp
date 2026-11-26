@@ -64,7 +64,9 @@
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 
+#if !defined(GENONLINE)
 #include "GameClient/ControlBar.h"
+#endif
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"

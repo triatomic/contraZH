@@ -1,0 +1,2 @@
+# vcpkg applies these with git apply, which rejects CRLF patches.
+GenOnline/cmake/ports/**/*.patch -text

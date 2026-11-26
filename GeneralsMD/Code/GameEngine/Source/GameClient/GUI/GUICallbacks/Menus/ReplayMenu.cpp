@@ -35,6 +35,9 @@
 #include "Common/GameEngine.h"
 #include "Common/GameState.h"
 #include "Common/Recorder.h"
+#if defined(GENONLINE)
+#include "Common/StatsExporter.h"
+#endif
 #include "Common/version.h"
 #include "GameClient/WindowLayout.h"
 #include "GameClient/Gadget.h"
@@ -827,6 +830,15 @@ void deleteReplay()
 		errorStr.translate(translate);
 		MessageBoxOk(TheGameText->fetch("GUI:Error"),errorStr, nullptr);
 	}
+#if defined(GENONLINE)
+	else
+	{
+		// GenOnline @feature arcticdolphin 21/11/2026 A deleted replay takes its stats file with it
+		AsciiString statsPath;
+		StatsExporterGetStatsPathForReplay(statsPath, filename);
+		DeleteFile(statsPath.str());
+	}
+#endif
 	//Load the listbox shiznit
 	GadgetListBoxReset(listboxReplayFiles);
 	PopulateReplayFileListbox(listboxReplayFiles);

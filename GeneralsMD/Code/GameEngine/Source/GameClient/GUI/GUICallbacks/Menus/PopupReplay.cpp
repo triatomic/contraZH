@@ -50,6 +50,9 @@
 #include "Common/LocalFileSystem.h"
 #include "Common/MessageStream.h"
 #include "Common/Recorder.h"
+#if defined(GENONLINE)
+#include "Common/StatsExporter.h"
+#endif
 #include "GameClient/GadgetListBox.h"
 #include "GameClient/GadgetTextEntry.h"
 #include "GameClient/GameText.h"
@@ -305,6 +308,13 @@ void reallySaveReplay()
 			PopulateReplayFileListbox(listboxGames);
 			return;
 		}
+#if defined(GENONLINE)
+
+		// GenOnline @feature arcticdolphin 21/11/2026 The overwritten replay takes its stats file with it
+		AsciiString oldStatsPath;
+		StatsExporterGetStatsPathForReplay(oldStatsPath, filename);
+		DeleteFile(oldStatsPath.str());
+#endif
 	}
 
 	// copy the replay to the right place
@@ -324,6 +334,17 @@ void reallySaveReplay()
 		return;
 	}
 
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 21/11/2026 The saved replay keeps the stats file of the game it recorded
+	{
+		AsciiString sourceStatsPath;
+		AsciiString destStatsPath;
+		StatsExporterGetStatsPathForReplay(sourceStatsPath, oldFilename);
+		StatsExporterGetStatsPathForReplay(destStatsPath, filename);
+		CopyFile(sourceStatsPath.str(), destStatsPath.str(), FALSE);
+	}
+
+#endif
 	// get the listbox that will have the save games in it
 	GameWindow *listboxGames = TheWindowManager->winGetWindowFromId( parent, listboxGamesKey );
 	DEBUG_ASSERTCRASH( listboxGames != nullptr, ("reallySaveReplay - Unable to find games listbox") );

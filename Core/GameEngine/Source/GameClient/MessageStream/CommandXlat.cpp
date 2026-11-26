@@ -55,6 +55,9 @@
 #include "Common/GameLOD.h"
 
 #include "GameClient/InGameUI.h"
+#if defined(GENONLINE)
+#include "GameClient/Keyboard.h"
+#endif
 #include "GameClient/CommandXlat.h"
 #include "GameClient/DebugDisplay.h"
 #include "GameClient/Drawable.h"
@@ -98,9 +101,8 @@
 #include "GameNetwork/GameSpy/BuddyThread.h"
 
 #include "WW3D2/ww3d.h"
-
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/GeneralsOnline/OnlineServices_Init.h"
+#if defined(GENONLINE)
+#include "../GenOnlineInit.h"
 #endif
 
 #if defined(RTS_DEBUG)
@@ -282,6 +284,72 @@ Bool hasThingsInProduction(PlayerType playerType)
 
 #endif // defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 
+#if defined(GENONLINE)
+enum ObserverFontSizeChange
+{
+	ObserverFontSizeChange_Increase,
+	ObserverFontSizeChange_Decrease,
+};
+
+static const Int ObserverFontSizeMin = 0;
+static const Int ObserverFontSizeMax = 15;
+
+static Int applyObserverFontSizeChange(Int fontSize, ObserverFontSizeChange change)
+{
+	switch (change)
+	{
+		case ObserverFontSizeChange_Increase:
+			if (fontSize < ObserverFontSizeMax)
+				++fontSize;
+			break;
+
+		case ObserverFontSizeChange_Decrease:
+			if (fontSize > ObserverFontSizeMin)
+				--fontSize;
+			break;
+	}
+
+	return fontSize;
+}
+
+static bool changeObserverNotificationFontSize(ObserverFontSizeChange change)
+{
+	const Int fontSize = applyObserverFontSizeChange(TheWritableGlobalData->m_observerNotificationFontSize, change);
+
+	if (fontSize == TheWritableGlobalData->m_observerNotificationFontSize)
+		return false;
+
+	TheWritableGlobalData->m_observerNotificationFontSize = fontSize;
+
+	if (TheInGameUI)
+		TheInGameUI->refreshObserverNotificationResources();
+
+#if defined(GENONLINE)
+	GenOnlineServicesManager::Settings.Observer_SetNotificationFontSize(fontSize);
+#endif
+
+	return true;
+}
+
+static bool changeObserverStatsFontSize(ObserverFontSizeChange change)
+{
+	const Int fontSize = applyObserverFontSizeChange(TheWritableGlobalData->m_observerStatsFontSize, change);
+
+	if (fontSize == TheWritableGlobalData->m_observerStatsFontSize)
+		return false;
+
+	TheWritableGlobalData->m_observerStatsFontSize = fontSize;
+
+	if (TheInGameUI)
+		TheInGameUI->initObserverOverlay();
+
+#if defined(GENONLINE)
+	GenOnlineServicesManager::Settings.Observer_SetStatsFontSize(fontSize);
+#endif
+
+	return true;
+}
+#endif
 
 bool changeMaxRenderFps(FpsValueChange change)
 {
@@ -291,6 +359,14 @@ bool changeMaxRenderFps(FpsValueChange change)
 	TheFramePacer->setFramesPerSecondLimit(maxRenderFps);
 	TheWritableGlobalData->m_useFpsLimit = (maxRenderFps != RenderFpsPreset::UncappedFpsValue);
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+    // Save to GO settings, SH does not save it yet
+    // TODO_GENONLINE: Remove this, SH saves it now
+    GenOnlineServicesManager::Settings.Graphics_SetFPS(maxRenderFps, TheWritableGlobalData->m_useFpsLimit);
+#endif
+
+#endif
 	UnicodeString message;
 
 	if (TheWritableGlobalData->m_useFpsLimit)
@@ -3742,6 +3818,48 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+#if defined(GENONLINE)
+		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_INCREASE_OBSERVER_NOTIFICATION_FONT:
+		{
+			if (changeObserverNotificationFontSize(ObserverFontSizeChange_Increase))
+			{
+				disp = DESTROY_MESSAGE;
+			}
+			break;
+		}
+
+		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_DECREASE_OBSERVER_NOTIFICATION_FONT:
+		{
+			if (changeObserverNotificationFontSize(ObserverFontSizeChange_Decrease))
+			{
+				disp = DESTROY_MESSAGE;
+			}
+			break;
+		}
+
+		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_INCREASE_OBSERVER_STATS_FONT:
+		{
+			if (changeObserverStatsFontSize(ObserverFontSizeChange_Increase))
+			{
+				disp = DESTROY_MESSAGE;
+			}
+			break;
+		}
+
+		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_DECREASE_OBSERVER_STATS_FONT:
+		{
+			if (changeObserverStatsFontSize(ObserverFontSizeChange_Decrease))
+			{
+				disp = DESTROY_MESSAGE;
+			}
+			break;
+		}
+
+#endif
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_INCREASE_LOGIC_TIME_SCALE:
 		{
@@ -3833,8 +3951,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 				}
 
 				ToggleControlBar();
-#if defined(GENERALS_ONLINE)
-				TheInGameUI->toggleObserverOverlay();
+#if defined(GENONLINE)
+				TheInGameUI->toggleObserverStats();
 #endif
 			}
 			disp = DESTROY_MESSAGE;
@@ -4024,9 +4142,33 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			DEBUG_ASSERTCRASH(TheInGameUI->isCameraZoomingOut(), ("Clearing zoom camera out, but it's already clear!"));
 			TheInGameUI->setCameraZoomOut( false );
 			break;
+#if defined(GENONLINE)
+		case GameMessage::MSG_META_BEGIN_CAMERA_PITCH_UP:
+		case GameMessage::MSG_META_ALT_BEGIN_CAMERA_PITCH_UP:
+			TheInGameUI->setCameraPitchUp( true );
+			break;
+		case GameMessage::MSG_META_END_CAMERA_PITCH_UP:
+		case GameMessage::MSG_META_ALT_END_CAMERA_PITCH_UP:
+			TheInGameUI->setCameraPitchUp( false );
+			break;
+		case GameMessage::MSG_META_BEGIN_CAMERA_PITCH_DOWN:
+		case GameMessage::MSG_META_ALT_BEGIN_CAMERA_PITCH_DOWN:
+			TheInGameUI->setCameraPitchDown( true );
+			break;
+		case GameMessage::MSG_META_END_CAMERA_PITCH_DOWN:
+		case GameMessage::MSG_META_ALT_END_CAMERA_PITCH_DOWN:
+			TheInGameUI->setCameraPitchDown( false );
+			break;
+#endif
 		case GameMessage::MSG_META_CAMERA_RESET:
 			TheInGameUI->resetCamera();
 			break;
+#if defined(GENONLINE)
+		case GameMessage::MSG_META_CAMERA_PITCH_RESET:
+		case GameMessage::MSG_META_ALT_CAMERA_PITCH_RESET:
+			TheTacticalView->userSetPitchToDefault();
+			break;
+#endif
 		case GameMessage::MSG_META_TOGGLE_CAMERA_TRACKING_DRAWABLE:
 			TheInGameUI->setCameraTrackingDrawable( true );
 			break;
@@ -4803,16 +4945,22 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		}
 
 		// --------------------------------------------------------------------------------------------
-#if defined(GENERALS_ONLINE)
-		// GO's keys (F10, F5 and Insert by default), rebindable in the Hotkeys screen's GO section
+#if defined(GENONLINE)
 		case GameMessage::MSG_META_TOGGLE_NETWORK_STATS:
-			NGMP_OnlineServicesManager::ToggleAdvancedNetworkStats();
+			GenOnlineServicesManager::ToggleNetworkOverlay(GenOnlineServicesManager::GetNetworkOverlayMode() == 0 ? 1 : 2);
 			disp = DESTROY_MESSAGE;
 			break;
 
 		case GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY:
 		case GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT:
-			GameSpyToggleOverlay( GSOVERLAY_BUDDY );
+			if (GameSpyIsOverlayOpen(GSOVERLAY_BUDDY))
+			{
+				GameSpyCloseOverlay(GSOVERLAY_BUDDY);
+			}
+			else
+			{
+				GameSpyOpenOverlay(GSOVERLAY_BUDDY);
+			}
 			disp = DESTROY_MESSAGE;
 			break;
 

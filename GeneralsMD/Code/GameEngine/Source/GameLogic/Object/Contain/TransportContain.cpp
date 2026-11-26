@@ -603,6 +603,16 @@ Bool TransportContain::isSpecificRiderFreeToExit(Object* specificObject)
 	if (ai && ai->getAiFreeToExit(specificObject) != FREE_TO_EXIT)
 		return FALSE;
 
+#if defined(GENONLINE)
+#if !RETAIL_COMPATIBLE_CRC && defined(USE_STUBBJAX_TRANSPORT_CONTAIN_FIX)
+	// TheSuperHackers @bugfix Stubbjax/bobtista 01/08/2026 If our container is itself contained,
+	// then we are not free to exit.
+	if (me->isContained())
+	{
+		return FALSE;
+	}
+#endif
+#else
 #if !RETAIL_COMPATIBLE_CRC
 	// TheSuperHackers @bugfix Stubbjax/bobtista 01/08/2026 If our container is itself contained,
 	// then we are not free to exit.
@@ -610,6 +620,7 @@ Bool TransportContain::isSpecificRiderFreeToExit(Object* specificObject)
 	{
 		return FALSE;
 	}
+#endif
 #endif
 
   // I can always kick people out if I am in the air, I know what I'm doing

@@ -1218,6 +1218,16 @@ set(GAMEENGINE_SRC
     Source/GameNetwork/User.cpp
     Source/Precompiled/PreRTS.cpp
 )
+if(RTS_BUILD_GENERALS_ONLINE)
+    include(${CMAKE_SOURCE_DIR}/GenOnline/cmake/core-gameengine.cmake)
+    list(APPEND GAMEENGINE_SRC
+        Include/GameNetwork/GenOnline/GenOnlineForkLobbyRules.h
+        Include/GameNetwork/GenOnline/GenOnlineForkMatchSettings.h
+        Include/GameNetwork/GenOnline/GenOnlineForkPolicy.h
+        Source/GameNetwork/GenOnline/GenOnlineForkLobbyRules.cpp
+        Source/GameNetwork/GenOnline/GenOnlineForkMatchSettings.cpp
+    )
+endif()
 
 
 add_library(corei_gameengine_private INTERFACE)

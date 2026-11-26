@@ -102,6 +102,14 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/ChallengeGenerals.h"
 
+#if defined(GENONLINE)
+#include "../GenOnlineInterfaces.h"
+#include "../GenOnlineInit.h"
+#include "../GenOnlineStatsInterface.h"
+#include "GameClient/GenOnlineUserSection.h"
+#include "Common/LocalApiLive.h"
+
+#endif
 
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
@@ -148,12 +156,26 @@ std::string LastReplayFileName;
 static Bool canSaveReplay = FALSE;
 extern void PopupReplayUpdate(WindowLayout *layout, void *userData);
 
+#if defined(GENONLINE)
+void initSinglePlayer( void );
+void finishSinglePlayerInit( void );
+#else
 void initSinglePlayer();
 void finishSinglePlayerInit();
+#endif
 static Bool s_needToFinishSinglePlayerInit = FALSE;
 static Bool buttonIsFinishCampaign = FALSE;
 static WindowLayout *s_blankLayout = nullptr;
 
+#if defined(GENONLINE)
+void initSkirmish( void );
+void initLANMultiPlayer(void);
+void initInternetMultiPlayer(void);
+void initReplayMultiPlayer(void);
+void initReplaySinglePlayer(void);
+void grabMultiPlayerInfo( void );
+void grabSinglePlayerInfo( void );
+#else
 void initSkirmish();
 void initLANMultiPlayer();
 void initInternetMultiPlayer();
@@ -161,6 +183,7 @@ void initReplayMultiPlayer();
 void initReplaySinglePlayer();
 void grabMultiPlayerInfo();
 void grabSinglePlayerInfo();
+#endif
 void hideWindows( Int pos );
 void ScoreScreenEnableControls(Bool enable);
 void setObserverWindows( Player *player, Int i );
@@ -191,7 +214,11 @@ void populateSideInfo( UnicodeString side,ScoreGather *sg, Int pos, Color color)
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
 
+#if defined(GENONLINE)
+void startNextCampaignGame(void)
+#else
 void startNextCampaignGame()
+#endif
 {
 	TheShell->popImmediate();
 	TheShell->hideShell();
@@ -252,13 +279,23 @@ void ScoreScreenEnableControls(Bool enable)
 extern Bool DontShowMainMenu; //KRIS
 Bool g_playMusic = FALSE;
 Bool ReplayWasPressed = FALSE;
+#if defined(GENONLINE)
+
+Bool g_bNeedToTakeDoneEOGScreenshot = FALSE;
+int64_t g_TimeEnterState = -1;
+#endif
 /** Initialize the ScoreScreen */
 //-------------------------------------------------------------------------------------------------
 void ScoreScreenInit( WindowLayout *layout, void *userData )
 {
 	//Play music after subsystems get reset including the audio...
 	g_playMusic = TRUE;
+#if defined(GENONLINE)
+	g_bNeedToTakeDoneEOGScreenshot = FALSE;
+	
+#else
 
+#endif
 	if (TheGameSpyInfo)
 	{
 		DEBUG_LOG(("ScoreScreenInit(): TheGameSpyInfo->stuff(%s/%s/%s)", TheGameSpyInfo->getLocalBaseName().str(), TheGameSpyInfo->getLocalEmail().str(), TheGameSpyInfo->getLocalPassword().str()));
@@ -379,9 +416,48 @@ void ScoreScreenInit( WindowLayout *layout, void *userData )
 		s_blankLayout->bringForward();
 	}
 
+#if defined(GENONLINE)
+    // Update the communicator button anytime we get notifications
+    GenOnlineSocialInterface* pSocialInterface = GenOnlineServicesManager::GetInterface<GenOnlineSocialInterface>();
+    if (pSocialInterface != nullptr)
+    {
+        // notifiactions callback
+        pSocialInterface->RegisterForCallback_OnNumberGlobalNotificationsChanged([](int numNotifications)
+            {
+                // update communicator button
+                GameWindow *currentButtonBuddies = TheWindowManager->winGetWindowFromId(nullptr, buttonBuddiesID);
+                if (currentButtonBuddies != nullptr)
+                {
+                    UnicodeString buttonText;
+
+					if (numNotifications > 0)
+					{
+						buttonText.format(L"%s [%d]", TheGameText->fetch("GUI:Buddies").str(), numNotifications);
+					}
+					else
+					{
+						buttonText.format(L"%s", TheGameText->fetch("GUI:Buddies").str());
+					}
+					currentButtonBuddies->winSetText(buttonText);
+                }
+            });
+
+        // And also initialize it
+        if (buttonBuddies != nullptr && pSocialInterface->GetNumTotalNotifications() > 0)
+        {
+            UnicodeString buttonText;
+            buttonText.format(L"%s [%d]", TheGameText->fetch("GUI:Buddies").str(), pSocialInterface->GetNumTotalNotifications());
+            buttonBuddies->winSetText(buttonText);
+        }
+    }
+#endif
 }
 
+#if defined(GENONLINE)
+void FixupScoreScreenMovieWindow( void )
+#else
 void FixupScoreScreenMovieWindow()
+#endif
 {
 	if (s_blankLayout)
 	{
@@ -396,6 +472,16 @@ void ScoreScreenShutdown( WindowLayout *layout, void *userData )
 {
 	DontShowMainMenu = FALSE; //KRIS
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	GenOnlineSocialInterface* pSocialInterface = GenOnlineServicesManager::GetInterface<GenOnlineSocialInterface>();
+	if (pSocialInterface != nullptr)
+		pSocialInterface->RegisterForCallback_OnNumberGlobalNotificationsChanged(nullptr);
+	GenOnlineUserSectionHide();
+#endif
+	buttonBuddies = nullptr;
+
+#endif
 	// hide the layout
 	layout->hide( TRUE );
 
@@ -417,6 +503,20 @@ void ScoreScreenUpdate( WindowLayout * layout, void *userData)
 		}
 	}
 
+#if defined(GENONLINE)
+	// TODO_GENONLINE: Find a better way of doing this... before the user exists
+	if (GenOnlineServicesManager::GetInstance() != nullptr && g_bNeedToTakeDoneEOGScreenshot)
+	{
+		int64_t currTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::utc_clock::now().time_since_epoch()).count();
+		if (currTime - g_TimeEnterState >= 1000)
+		{
+			g_bNeedToTakeDoneEOGScreenshot = false;
+
+			GenOnlineServicesManager::GetInstance()->CaptureScreenshotForProbe(EScreenshotType::SCREENSHOT_TYPE_SCORESCREEN, std::string()); // pass no URI here, wait until we have one received from server
+		}
+	}
+
+#endif
 	if (s_needToFinishSinglePlayerInit)
 	{
 		finishSinglePlayerInit();
@@ -430,24 +530,70 @@ void ScoreScreenUpdate( WindowLayout * layout, void *userData)
 	{
 		g_playMusic = FALSE;
 
+#if defined(GENONLINE)
+		Int localSlotNum = TheGameInfo->getLocalSlotNum();
+#else
 		GameSlot *lSlot = TheGameInfo->getSlot(TheGameInfo->getLocalSlotNum());
 		const PlayerTemplate* pt;
+#endif
 
+#if defined(GENONLINE)
+		if (localSlotNum != -1)
+#else
 		if (lSlot && lSlot->getPlayerTemplate() >= 0)
 			pt = ThePlayerTemplateStore->getNthPlayerTemplate(lSlot->getPlayerTemplate());
 		else
 			pt = ThePlayerTemplateStore->findPlayerTemplate( TheNameKeyGenerator->nameToKey("FactionObserver") );
 		AsciiString musicName = pt->getScoreScreenMusic();
 		if ( !musicName.isEmpty() )
+#endif
 		{
+#if defined(GENONLINE)
+			GameSlot* lSlot = TheGameInfo->getSlot(localSlotNum);
+			const PlayerTemplate* pt;
+
+			if (lSlot && lSlot->getPlayerTemplate() >= 0)
+				pt = ThePlayerTemplateStore->getNthPlayerTemplate(lSlot->getPlayerTemplate());
+			else
+				pt = ThePlayerTemplateStore->findPlayerTemplate(TheNameKeyGenerator->nameToKey("FactionObserver"));
+			AsciiString musicName = pt->getScoreScreenMusic();
+			if (!musicName.isEmpty())
+			{
+				TheAudio->removeAudioEvent(AHSV_StopTheMusicFade);
+				AudioEventRTS event(musicName);
+				event.setShouldFade(TRUE);
+				TheAudio->addAudioEvent(&event);
+				TheAudio->update();//Since GameEngine::update() is suspended until after I am gone... 
+			}
+#else
 			TheAudio->removeAudioEvent( AHSV_StopTheMusicFade );
 			AudioEventRTS event( musicName );
 			event.setShouldFade( TRUE );
 			TheAudio->addAudioEvent( &event );
 			TheAudio->update();//Since GameEngine::update() is suspended until after I am gone...
+#endif
 		}
 
+#if defined(GENONLINE)
+		GenOnlineLobbyInterface* pLobbyInterface = GenOnlineServicesManager::GetInterface<GenOnlineLobbyInterface>();
+		if (pLobbyInterface != nullptr)
+		{
+			if (pLobbyInterface->IsInLobby())
+			{
+				// commit current lobby player list to 'recently played with'
+				GenOnlineSocialInterface* pSocialInterface = GenOnlineServicesManager::GetInterface<GenOnlineSocialInterface>();
+				if (pSocialInterface != nullptr)
+				{
+					pSocialInterface->CommitLobbyPlayerListToRecentlyPlayedWithList();
+				}
+#endif
 
+#if defined(GENONLINE)
+				pLobbyInterface->LeaveCurrentLobby();
+
+			}
+		}
+#endif
 	}
 }
 
@@ -500,6 +646,16 @@ WindowMsgHandledType ScoreScreenInput( GameWindow *window, UnsignedInt msg,
 
 }
 
+#if defined(GENONLINE)
+// The GameReplays page of a match. Matches of the test services are on the staging leaderboards.
+static const char* matchPageAddress()
+{
+	return GenOnlineServicesManager::GetEnvironment() == GenOnlineServicesManager::EEnvironment::TEST
+		? "https://stage-leaderboards.gamereplays.org/zh/match/"
+		: "https://strata.gamereplays.org/zh/match/";
+}
+
+#endif
 static Bool showReplayButtonContinue()
 {
 	bool hasSimulationReplay = ReplaySimulation::getReplayCount() > 0;
@@ -544,6 +700,9 @@ WindowMsgHandledType ScoreScreenSystem( GameWindow *window, UnsignedInt msg,
 			Int controlID = control->winGetWindowId();
 			if( controlID == buttonOkID )
 			{
+#if defined(GENONLINE)
+				GameSpyCloseOverlay(GSOVERLAY_BUDDY);
+#endif
 				TheShell->pop();
 				TheCampaignManager->setCampaign(AsciiString::TheEmptyString);
 
@@ -574,7 +733,26 @@ WindowMsgHandledType ScoreScreenSystem( GameWindow *window, UnsignedInt msg,
 						}
 						else
 						{
+#if defined(GENONLINE)
+
+						}
+					}
+					else if (screenType == SCORESCREEN_INTERNET)
+					{
+						GenOnlineLobbyInterface* pLobbyInterface = GenOnlineServicesManager::GetInterface<GenOnlineLobbyInterface>();
+						if (pLobbyInterface != nullptr)
+						{
+							uint64_t currentMatchID = pLobbyInterface->GetCurrentMatchID();
+
+							if (currentMatchID != 0)
+							{
+								AsciiString strMatchURL;
+								strMatchURL.format("%s%" PRIu64, matchPageAddress(), currentMatchID);
+								ShellExecuteA(NULL, "open", strMatchURL.str(), NULL, NULL, SW_SHOWNORMAL);
+							}
+#else
 							startNextCampaignGame();
+#endif
 						}
 					}
 				}
@@ -683,7 +861,11 @@ WindowMsgHandledType ScoreScreenSystem( GameWindow *window, UnsignedInt msg,
 
 /** Special Init path for making this a single player Score Screen */
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+void initSkirmish( void )
+#else
 void initSkirmish()
+#endif
 {
 	screenType = SCORESCREEN_SKIRMISH;
 	grabMultiPlayerInfo();
@@ -737,7 +919,11 @@ void PlayMovieAndBlock(AsciiString movieTitle)
 
 	GameWindow *movieWindow = s_blankLayout->getFirstWindow();
 	TheWritableGlobalData->m_loadScreenRender = TRUE;
+#if defined(GENONLINE)
+	while (!videoStream->isPlaybackComplete())
+#else
 	while (videoStream->frameIndex() < videoStream->frameCount() - 1)
+#endif
 	{
 		// TheSuperHackers @feature User can now skip video by pressing ESC
 		if (TheKeyboard)
@@ -785,7 +971,11 @@ void PlayMovieAndBlock(AsciiString movieTitle)
 	setFPMode();
 }
 
+#if defined(GENONLINE)
+void initSinglePlayer( void )
+#else
 void initSinglePlayer()
+#endif
 {
 	screenType = SCORESCREEN_SINGLEPLAYER;
 	TheCampaignManager->setRankPoints(ThePlayerList->getLocalPlayer()->getSkillPoints());
@@ -815,7 +1005,11 @@ void displayChallengeWinLoss( const Image *imageGeneral, const UnicodeString str
 	GadgetStaticTextSetText(challengeRemarks, strRemarks);
 }
 
+#if defined(GENONLINE)
+void finishSinglePlayerInit( void )
+#else
 void finishSinglePlayerInit()
+#endif
 {
 	if(TheCampaignManager->isVictorious())
 	{
@@ -1001,7 +1195,11 @@ void finishSinglePlayerInit()
 
 /** Special Init path for making this a single player replay Score Screen */
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+void initReplaySinglePlayer( void )
+#else
 void initReplaySinglePlayer()
+#endif
 {
 	screenType = SCORESCREEN_REPLAY;
 	grabSinglePlayerInfo();
@@ -1030,7 +1228,11 @@ void initReplaySinglePlayer()
 
 /** Special Init path for making this a Multiplayer Score Screen(LAN) */
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+void initLANMultiPlayer(void)
+#else
 void initLANMultiPlayer()
+#endif
 {
 	screenType = SCORESCREEN_LAN;
 	grabMultiPlayerInfo();
@@ -1059,7 +1261,11 @@ void initLANMultiPlayer()
 
 /** Special Init path for making this a Multiplayer Score Screen(Internet) */
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+void initInternetMultiPlayer(void)
+#else
 void initInternetMultiPlayer()
+#endif
 {
 	screenType = SCORESCREEN_INTERNET;
 	grabMultiPlayerInfo();
@@ -1068,7 +1274,11 @@ void initInternetMultiPlayer()
 	if(staticTextGameSaved)
 		staticTextGameSaved->winHide(TRUE);
 	if (buttonContinue)
+#if defined(GENONLINE)
+		buttonContinue->winHide(FALSE);
+#else
 		buttonContinue->winHide(TRUE);
+#endif
 	if (textEntryChat)
 		textEntryChat->winHide(TRUE);
 	if (buttonChat)
@@ -1076,6 +1286,64 @@ void initInternetMultiPlayer()
 	if (listboxChatWindowScoreScreen)
 		listboxChatWindowScoreScreen->winHide(FALSE);
 
+#if defined(GENONLINE)
+	// attempt to register our outcome
+    GenOnlineStatsInterface* pStatsInterface = GenOnlineServicesManager::GetInterface<GenOnlineStatsInterface>();
+    if (pStatsInterface != nullptr && TheGenOnlineGame != nullptr)
+    {
+        Player* localPlayer = ThePlayerList->getLocalPlayer();
+
+        if (localPlayer != nullptr)
+        {
+            if (!TheGenOnlineGame->HasCommittedOutcome())
+            {
+                TheGenOnlineGame->SetHasCommittedOutcome();
+                pStatsInterface->CommitMyOutcome(localPlayer->getScoreKeeper(), TheVictoryConditions->isLocalAlliedVictory());
+            }
+        }
+    }
+
+	// Leave the lobby
+#if defined(GENONLINE)
+	GenOnlineLobbyInterface* pLobbyInterface = GenOnlineServicesManager::GetInterface<GenOnlineLobbyInterface>();
+	if (pLobbyInterface != nullptr)
+	{
+		// populate match info
+		if (pLobbyInterface->IsInLobby())
+		{
+			LobbyEntry& lobby = pLobbyInterface->GetCurrentLobby();
+
+ 			UnicodeString strMatchID;
+ 			strMatchID.format(L"\nMatch ID: %" PRIu64, lobby.match_id);
+ 
+ 			UnicodeString strMatchURL;
+
+			if (lobby.match_id == 0) // probably AI or < 2 humans
+			{
+				buttonContinue->winHide(TRUE);
+
+				GadgetListBoxAddEntryText(listboxAcademyWindowScoreScreen, UnicodeString(L"\nMatch data is not available online because the match had AI present OR less than 2 human players."), GameSpyColor[GSCOLOR_DEFAULT], -1);
+			}
+			else
+			{
+				buttonContinue->winHide(FALSE);
+
+				strMatchURL.format(L"\nView match data, participants, replays, anti-cheat data: %hs%" PRIu64, matchPageAddress(), lobby.match_id);
+
+				buttonContinue->winSetText(UnicodeString(L"VIEW MATCH ONLINE"));
+
+				GadgetListBoxAddEntryText(listboxAcademyWindowScoreScreen, strMatchID, GameSpyColor[GSCOLOR_DEFAULT], -1);
+				GadgetListBoxAddEntryText(listboxAcademyWindowScoreScreen, strMatchURL, GameSpyColor[GSCOLOR_DEFAULT], -1);
+			}
+
+
+ 			
+
+		}
+	}
+#endif
+
+#endif
 	//Provide academy advice in internet games.
 	if( listboxAcademyWindowScoreScreen )
 		listboxAcademyWindowScoreScreen->winHide( FALSE );
@@ -1085,10 +1353,26 @@ void initInternetMultiPlayer()
 	if (chatBoxBorder)
 		chatBoxBorder->winHide(FALSE);
 
+#if defined(GENONLINE)
+	// TODO_GENONLINE: Enable this once friends works
+#if !defined(GENONLINE)
 	if(TheGameSpyInfo && TheGameSpyInfo->getLocalProfileID() ==0)
 		buttonBuddies->winHide(TRUE);
 	else
 		buttonBuddies->winHide(FALSE);
+#else
+	// GenOnline @feature arcticdolphin 22/11/2026 The user section in the ruler strip replaces the communicator button.
+	GenOnlineUserSectionShow(parent);
+#endif
+
+	g_bNeedToTakeDoneEOGScreenshot = true;
+	g_TimeEnterState = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::utc_clock::now().time_since_epoch()).count();
+#else
+	if(TheGameSpyInfo && TheGameSpyInfo->getLocalProfileID() ==0)
+		buttonBuddies->winHide(TRUE);
+	else
+		buttonBuddies->winHide(FALSE);
+#endif
 
 	if (!TheGameSpyBuddyMessageQueue)
 		return;
@@ -1102,7 +1386,11 @@ void initInternetMultiPlayer()
 
 /** Special Init path for making this a Multiplayer Score Screen(Replay) */
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+void initReplayMultiPlayer(void)
+#else
 void initReplayMultiPlayer()
+#endif
 {
 	screenType = SCORESCREEN_REPLAY;
 	grabMultiPlayerInfo();
@@ -1429,7 +1717,11 @@ void populatePlayerInfo( Player *player, Int pos)
 	ScoreKeeper *scoreKpr = player->getScoreKeeper();
 	if(!scoreKpr)
 	{
+#if defined(GENONLINE)
+		DEBUG_ASSERTCRASH(FALSE,("Player %s does not have a scoreKeeper", player->getPlayerDisplayName().str()));
+#else
 		DEBUG_CRASH(("Player %s does not have a scoreKeeper", player->getPlayerDisplayName().str()));
+#endif
 		return;
 	}
 	AsciiString winName;
@@ -1654,26 +1946,440 @@ winName.format("ScoreScreen.wnd:StaticTextScore%d", pos);
 	if ( screenType == SCORESCREEN_INTERNET )
 	{
 		DEBUG_LOG(("populatePlayerInfo() - SCORESCREEN_INTERNET"));
+#if defined(GENONLINE)
+
+#if defined(GENONLINE)
+		if (TheGenOnlineGame == nullptr)
+			return;
+
+		if (!TheGenOnlineGame->getUseStats() &&
+			!TheGenOnlineGame->isQMGame())  //QuickMatch games always record stats
+			return;	//the host has requested not to record stats for this game.
+#else
 		if (TheGameSpyGame && !TheGameSpyGame->getUseStats() &&
 		 !TheGameSpyGame->isQMGame() )  //QuickMatch games always record stats
 			return;	//the host has requested not to record stats for this game.
 
 		Int localID = TheGameSpyInfo->getLocalProfileID();
 		if (localID)
+#endif
+
+#else
+		if (TheGameSpyGame && !TheGameSpyGame->getUseStats() &&
+		 !TheGameSpyGame->isQMGame() )  //QuickMatch games always record stats
+			return;	//the host has requested not to record stats for this game.
+
+		Int localID = TheGameSpyInfo->getLocalProfileID();
+		if (localID)
+#endif
 		{
+#if defined(GENONLINE)
+			Int localSlotNum = TheGenOnlineGame->getLocalSlotNum();
+#else
 			Int localSlotNum = TheGameSpyGame->getLocalSlotNum();
+#endif
 			if (player->isLocalPlayer())
 			{
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+				GenOnlineGameSlot* localSlot = TheGenOnlineGame->getGameSpySlot(localSlotNum);
+#else
+				GameSpyGameSlot* localSlot = TheGameSpyGame->getGameSpySlot(localSlotNum);
+#endif
+#else
 				GameSpyGameSlot *localSlot = TheGameSpyGame->getGameSpySlot(localSlotNum);
+#endif
 				if (localSlot)
 				{
 					if (TheVictoryConditions->amIObserver())
 					{
 						// nothing to track
+#if defined(GENONLINE)
+						DEBUG_LOG(("populatePlayerInfo() - not tracking stats for observer\n"));
+#else
 						DEBUG_LOG(("populatePlayerInfo() - not tracking stats for observer"));
+#endif
 						return;
 					}
 
+#if defined(GENONLINE)
+					// Generals Online keeps no stats of its own here, the service takes them from the match result.
+#if !defined(GENONLINE)
+					PSPlayerStats stats = TheGameSpyPSMessageQueue->findPlayerStatsByID(localID);
+					{
+						UnsignedInt latestHumanInGame = 0;
+						UnsignedInt lastFrameOfGame = 0;
+						Bool gameEndedInDisconnect = TRUE;
+						Bool sawAnyDisconnects = FALSE;
+						Bool anyNonAI = FALSE;
+						Bool anyAI = FALSE;
+						Int i = 0;
+						for (; i < MAX_SLOTS; ++i)
+						{
+							const GameSlot* slot = TheGameInfo->getConstSlot(i);
+							if (slot->isOccupied() && i != localSlotNum)
+							{
+								if (slot->isAI())
+									anyAI = TRUE;
+								else
+									anyNonAI = TRUE;
+							}
+							if (slot->isOccupied())
+							{
+								lastFrameOfGame = max(lastFrameOfGame, slot->lastFrameInGame());
+							}
+							if (slot->isHuman())
+							{
+								if (i != localSlotNum)
+								{
+									latestHumanInGame = max(latestHumanInGame, slot->lastFrameInGame());
+								}
+							}
+						}
+						DEBUG_LOG(("Game ended on frame %d - TheGameLogic->getFrame()=%d\n", lastFrameOfGame - 1, TheGameLogic->getFrame() - 1));
+						for (i = 0; i < MAX_SLOTS; ++i)
+						{
+							const GameSlot* slot = TheGameInfo->getConstSlot(i);
+							DEBUG_LOG(("latestHumanInGame=%d, slot->isOccupied()=%d, slot->disconnected()=%d, slot->isAI()=%d, slot->lastFrameInGame()=%d\n",
+								latestHumanInGame, slot->isOccupied(), slot->disconnected(), slot->isAI(), slot->lastFrameInGame()));
+							if (slot->isOccupied() && slot->disconnected())
+							{
+								DEBUG_LOG(("Marking game as a possible disconnect game\n"));
+								sawAnyDisconnects = TRUE;
+							}
+							if (slot->isOccupied() && !slot->disconnected() && i != localSlotNum &&
+								(slot->isAI() || (slot->lastFrameInGame() >= lastFrameOfGame/*TheGameLogic->getFrame()*/ - 1)))
+							{
+								DEBUG_LOG(("Marking game as not ending in disconnect\n"));
+								gameEndedInDisconnect = FALSE;
+							}
+						}
+
+						if (!sawAnyDisconnects)
+						{
+							DEBUG_LOG(("Didn't see any disconnects - making gameEndedInDisconnect == FALSE\n"));
+							gameEndedInDisconnect = FALSE;
+						}
+
+						if (gameEndedInDisconnect)
+						{
+							if (TheNetwork->getPingsRecieved() < max(1, TheNetwork->getPingsSent() / 2))
+							{
+								DEBUG_LOG(("We were to blame. Leaving gameEndedInDisconnect = true\n"));
+							}
+							else
+							{
+								DEBUG_LOG(("We were not to blame. Changing gameEndedInDisconnect = false\n"));
+								gameEndedInDisconnect = FALSE;
+							}
+						}
+
+						ScoreKeeper* s = player->getScoreKeeper();
+						if (!anyNonAI)
+						{
+							// play against all ai players -- no stats to gather.
+
+							// even though we don't want to register stats, we still want to register the match outcome, since we started it on the backend, it needs finishing too
+
+							return;
+						}
+
+						if (anyAI)
+						{
+							// Holy mis-implemented, Batman, You get no stats for _any_ AI, not _all_ AI.  
+							// No wonder we fired the whole department.
+
+							// even though we don't want to register stats, we still want to register the match outcome, since we started it on the backend, it needs finishing too
+
+							return;
+						}
+
+						//Remove the extra disconnection we add to all games when they start.
+						DEBUG_LOG(("populatePlayerInfo() - removing extra disconnect\n"));
+
+						// TODO_GENONLINE_STATS
+						//if (TheGameSpyInfo)
+							//TheGameSpyInfo->updateAdditionalGameSpyDisconnections(-1);
+
+						Bool sawEndOfGame = FALSE;
+						if (TheVictoryConditions->isLocalAlliedDefeat() || TheVictoryConditions->isLocalAlliedVictory())
+						{
+							sawEndOfGame = TRUE;
+						}
+						if (TheVictoryConditions->isLocalDefeat())
+						{
+							sawEndOfGame = TRUE;
+						}
+						if (TheNetwork->sawCRCMismatch() || gameEndedInDisconnect)
+						{
+							sawEndOfGame = TRUE;
+						}
+						if (!sawEndOfGame)
+						{
+							DEBUG_LOG(("Not sending results - we didn't finish a game. %d\n", TheVictoryConditions->getEndFrame()));
+
+							// even though we don't want to register stats, we still want to register the match outcome, since we started it on the backend, it needs finishing too
+
+							return;
+						}
+
+						// TODO_GENONLINE_STATS: Impl ladders again, how did these work in the base game?
+						// send ladder results (even if we end the game in the first N seconds)
+
+						if (TheGameSpyGame->getLadderPort() && TheGameSpyGame->getLadderIP().isNotEmpty())
+						{
+							GameResultsRequest gameResReq;
+							gameResReq.hostname = TheGameSpyGame->getLadderIP().str();
+							gameResReq.port = TheGameSpyGame->getLadderPort();
+							gameResReq.results = TheGameSpyGame->generateLadderGameResultsPacket().str();
+							DEBUG_ASSERTCRASH(TheGameResultsQueue, ("No Game Results queue!\n"));
+							if (TheGameResultsQueue)
+							{
+								TheGameResultsQueue->addRequest(gameResReq);
+							}
+						}
+
+						// TODO_GENONLINE: Find out why short games are not registered.
+						if (TheVictoryConditions->getEndFrame() < LOGICFRAMES_PER_SECOND * 25 && TheVictoryConditions->getEndFrame())
+						{
+							return;
+						}
+
+						// generate and send a gameres packet
+						AsciiString resultsPacket = TheGameSpyGame->generateGameSpyGameResultsPacket();
+						DEBUG_LOG(("About to send results packet: %s\n", resultsPacket.str()));
+						PSRequest grReq;
+						grReq.requestType = PSRequest::PSREQUEST_SENDGAMERESTOGAMESPY;
+						grReq.results = resultsPacket.str();
+						TheGameSpyPSMessageQueue->addRequest(grReq);
+
+						Int ptIdx;
+						const PlayerTemplate* myTemplate = player->getPlayerTemplate();
+						DEBUG_LOG(("myTemplate = %X(%s)\n", myTemplate, myTemplate->getName().str()));
+						for (ptIdx = 0; ptIdx < ThePlayerTemplateStore->getPlayerTemplateCount(); ++ptIdx)
+						{
+							const PlayerTemplate* nthTemplate = ThePlayerTemplateStore->getNthPlayerTemplate(ptIdx);
+							DEBUG_LOG(("nthTemplate = %X(%s)\n", nthTemplate, nthTemplate->getName().str()));
+							if (nthTemplate == myTemplate)
+							{
+								break;
+							}
+						}
+
+						if (stats.id == 0)
+						{
+							// we haven't gotten stats for ourselves yet.  Bummer.
+							// what we'll do is just update our disconnects in the registry if we disconnected.
+							// other than that, there's not much we can do.  :P
+							if (gameEndedInDisconnect || TheNetwork->sawCRCMismatch())
+							{
+								/* @todo: this the right way
+								UnsignedInt discons = 0;
+								UnsignedInt syncs = 0;
+								GetUnsignedIntFromRegistry("", "dc", discons);
+								GetUnsignedIntFromRegistry("", "se", sync);
+								++discons;
+								++syncs;
+								SetUnsignedIntInRegistry("", "dc", discons);
+								SetUnsignedIntInRegistry("", "se", syncs);
+								*/
+								DEBUG_LOG(("populatePlayerInfo() - need to save off info for disconnect games!\n"));
+
+								PSRequest req;
+								req.requestType = PSRequest::PSREQUEST_UPDATEPLAYERSTATS;
+								req.email = TheGameSpyInfo->getLocalEmail().str();
+								req.nick = TheGameSpyInfo->getLocalBaseName().str();
+								req.password = "";
+								req.player = stats;
+								req.addDesync = TheNetwork->sawCRCMismatch();
+								req.addDiscon = gameEndedInDisconnect;
+								req.lastHouse = ptIdx;
+								TheGameSpyPSMessageQueue->addRequest(req);
+							}
+							DEBUG_CRASH(("populatePlayerInfo() - not tracking stats - we haven't gotten the original stuff yet\n"));
+							return;
+						}
+
+						if (TheNetwork->sawCRCMismatch())
+						{
+							++stats.desyncs[ptIdx];
+						}
+						else if (gameEndedInDisconnect)
+						{
+							++stats.discons[ptIdx];
+						}
+						else if (TheVictoryConditions->isLocalAlliedDefeat() || !TheVictoryConditions->getEndFrame())
+						{
+							++stats.losses[ptIdx];
+						}
+						else
+						{
+							++stats.wins[ptIdx];
+						}
+
+						stats.buildingsBuilt[ptIdx] += s->getTotalBuildingsBuilt();
+						stats.buildingsKilled[ptIdx] += s->getTotalBuildingsDestroyed();
+						stats.buildingsLost[ptIdx] += s->getTotalBuildingsLost();
+
+						if (TheGameSpyGame->isQMGame())
+						{
+							stats.QMGames[ptIdx]++;
+						}
+						else
+						{
+							stats.customGames[ptIdx]++;
+						}
+
+						if (TheNetwork->sawCRCMismatch())
+						{
+							stats.lossesInARow = 0;
+							stats.desyncsInARow++;
+							stats.disconsInARow = 0;
+							stats.winsInARow = 0;
+							stats.maxDesyncsInARow = max(stats.desyncsInARow, stats.maxDesyncsInARow);
+						}
+						else if (gameEndedInDisconnect)
+						{
+							stats.lossesInARow = 0;
+							stats.desyncsInARow = 0;
+							stats.disconsInARow++;
+							stats.winsInARow = 0;
+							stats.maxDisconsInARow = max(stats.disconsInARow, stats.maxDisconsInARow);
+						}
+						else if (TheVictoryConditions->isLocalAlliedVictory())
+						{
+							stats.lossesInARow = 0;
+							stats.desyncsInARow = 0;
+							stats.disconsInARow = 0;
+							stats.winsInARow++;
+							stats.maxWinsInARow = max(stats.winsInARow, stats.maxWinsInARow);
+						}
+						else
+						{
+							stats.lossesInARow++;
+							stats.desyncsInARow = 0;
+							stats.disconsInARow = 0;
+							stats.winsInARow = 0;
+							stats.maxLossesInARow = max(stats.lossesInARow, stats.maxLossesInARow);
+						}
+
+						stats.earnings[ptIdx] += s->getTotalMoneyEarned();
+						stats.duration[ptIdx] += TheGameLogic->getFrame() / LOGICFRAMES_PER_SECOND / 60; // in minutes
+						stats.games[ptIdx]++;
+						//since we raise this number when game starts, we need to lower it back on completion
+						Int disCons;
+						disCons = stats.discons[ptIdx];
+						disCons -= 1;
+						if (disCons >= 0)
+							stats.discons[ptIdx] = disCons;
+
+						stats.gamesAsRandom += (localSlot->getOriginalPlayerTemplate() == PLAYERTEMPLATE_RANDOM);
+
+						if (stats.lastGeneral != ptIdx)
+							stats.gamesInRowWithLastGeneral = 0;
+						stats.gamesInRowWithLastGeneral++;
+						stats.lastGeneral = ptIdx;
+
+						Int gameSize = 0;
+						for (int i = 0; i < MAX_SLOTS; ++i)
+						{
+							if (TheGameSpyGame->getConstSlot(i)->isOccupied() && TheGameSpyGame->getConstSlot(i)->getPlayerTemplate() != PLAYERTEMPLATE_OBSERVER)
+								++gameSize;
+						}
+						switch (gameSize)
+						{
+						case 2:
+							stats.gamesOf2p[ptIdx]++;
+							break;
+						case 3:
+							stats.gamesOf3p[ptIdx]++;
+							break;
+						case 4:
+							stats.gamesOf4p[ptIdx]++;
+							break;
+						case 5:
+							stats.gamesOf5p[ptIdx]++;
+							break;
+						case 6:
+							stats.gamesOf6p[ptIdx]++;
+							break;
+						case 7:
+							stats.gamesOf7p[ptIdx]++;
+							break;
+						case 8:
+							stats.gamesOf8p[ptIdx]++;
+							break;
+						default:
+							return; // nothing to track.
+						}
+
+						stats.surrenders[ptIdx] += TheGameInfo->haveWeSurrendered() || !TheVictoryConditions->getEndFrame();
+
+						AsciiString systemSpec;
+						systemSpec.format("LOD%d", TheGameLODManager->getRecommendedStaticLODLevel());
+						stats.systemSpec = systemSpec.str();
+
+						stats.techCaptured[ptIdx] += s->getTotalTechBuildingsCaptured();
+
+						stats.unitsBuilt[ptIdx] += s->getTotalUnitsBuilt();
+						stats.unitsKilled[ptIdx] += s->getTotalUnitsDestroyed();
+						stats.unitsLost[ptIdx] += s->getTotalUnitsLost();
+
+						DEBUG_LOG(("Before game built scud:%d, cannon:%d, nuke:%d\n", stats.builtSCUD, stats.builtParticleCannon, stats.builtNuke));
+						stats.builtSCUD += CheckForApocalypse(s, "GLAScudStorm");
+						stats.builtSCUD += CheckForApocalypse(s, "Chem_GLAScudStorm");
+						stats.builtSCUD += CheckForApocalypse(s, "Demo_GLAScudStorm");
+						stats.builtSCUD += CheckForApocalypse(s, "Slth_GLAScudStorm");
+						stats.builtParticleCannon += CheckForApocalypse(s, "AmericaParticleCannonUplink");
+						stats.builtParticleCannon += CheckForApocalypse(s, "AirF_AmericaParticleCannonUplink");
+						stats.builtParticleCannon += CheckForApocalypse(s, "Lazr_AmericaParticleCannonUplink");
+						stats.builtParticleCannon += CheckForApocalypse(s, "SupW_AmericaParticleCannonUplink");
+						stats.builtNuke += CheckForApocalypse(s, "ChinaNuclearMissileLauncher");
+						stats.builtNuke += CheckForApocalypse(s, "Nuke_ChinaNuclearMissileLauncher");
+						stats.builtNuke += CheckForApocalypse(s, "Infa_ChinaNuclearMissileLauncher");
+						stats.builtNuke += CheckForApocalypse(s, "Tank_ChinaNuclearMissileLauncher");
+						DEBUG_LOG(("After game built scud:%d, cannon:%d, nuke:%d\n", stats.builtSCUD, stats.builtParticleCannon, stats.builtNuke));
+
+						// TODO_GENONLINE_STATS: ladders
+						if (TheGameSpyGame->getLadderPort() && TheGameSpyGame->getLadderIP().isNotEmpty())
+						{
+							stats.lastLadderPort = TheGameSpyGame->getLadderPort();
+							stats.lastLadderHost = TheGameSpyGame->getLadderIP().str();
+						}
+
+						if (!TheNetwork->sawCRCMismatch() && !gameEndedInDisconnect && !TheVictoryConditions->isLocalAlliedDefeat() && TheVictoryConditions->getEndFrame())
+						{
+							updateMPBattleHonors(stats.battleHonors, stats);
+							updateChallengeMedals(stats.challengeMedals);
+						}
+
+						DEBUG_LOG(("populatePlayerInfo() - tracking stats for %s/%s/%s\n", TheGameSpyGame->getLocalBaseName().str(), TheGameSpyGame->getLocalEmail().str(), TheGenOnlineGameTheGameSpyGamegetLocalPassword().str()));
+
+						PSRequest req;
+						req.requestType = PSRequest::PSREQUEST_UPDATEPLAYERSTATS;
+						req.email = TheGameSpyInfo->getLocalEmail().str();
+						req.nick = TheGameSpyInfo->getLocalBaseName().str();
+						req.password = TheGameSpyInfo->getLocalPassword().str();
+						req.player = stats;
+						req.addDesync = TheNetwork->sawCRCMismatch();
+						req.addDiscon = gameEndedInDisconnect;
+						req.lastHouse = ptIdx;
+						TheGameSpyPSMessageQueue->addRequest(req);
+						TheGameSpyPSMessageQueue->trackPlayerStats(stats);
+
+						// force an update of our shtuff
+						PSResponse newResp;
+						newResp.responseType = PSResponse::PSRESPONSE_PLAYERSTATS;
+						newResp.player = stats;
+						TheGameSpyPSMessageQueue->addResponse(newResp);
+
+						// cache our stuff for easy reading next time
+						GameSpyMiscPreferences mPref;
+						mPref.setCachedStats(GameSpyPSMessageQueueInterface::formatPlayerKVPairs(stats).c_str());
+						mPref.write();
+					}
+#endif
+#else
 					PSPlayerStats stats = TheGameSpyPSMessageQueue->findPlayerStatsByID(localID);
 
 					UnsignedInt latestHumanInGame = 0;
@@ -2031,6 +2737,7 @@ winName.format("ScoreScreen.wnd:StaticTextScore%d", pos);
 					GameSpyMiscPreferences mPref;
 					mPref.setCachedStats(GameSpyPSMessageQueueInterface::formatPlayerKVPairs(stats).c_str());
 					mPref.write();
+#endif
 				}
 			}
 		}
@@ -2040,18 +2747,45 @@ winName.format("ScoreScreen.wnd:StaticTextScore%d", pos);
 /** We Grab information about the players differently in Multiplayer.  We only want the players
 		listed in the slots */
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+void grabMultiPlayerInfo( void )
+#else
 void grabMultiPlayerInfo()
+#endif
 {
+#if defined(GENONLINE)
+	typedef std::multimap<Int, Player *> ScoreMap;
+#else
 	typedef std::map<Int, Player *> ScoreMap;
 	typedef ScoreMap::iterator ScoreMapIt;
+#endif
 	typedef ScoreMap::reverse_iterator RevScoreMapIt;
 
 	Int playerCount = 0;
 	ScoreMap scores;
+#if !defined(GENONLINE)
 	ScoreMapIt it;
+#endif
 	scores.clear();
+#if !defined(GENONLINE)
 	Int adder = 1; // Varible used to add on an offset to the score to make sure we don't add people to the same map
+#endif
 
+#if defined(GENONLINE)
+	// GenOnline @bugfix arcticdolphin 22/11/2026 The retail score art has the ruler lines painted in, so the GO kit ruler panel draws alone.
+#if !defined(GENONLINE)
+	Player *localPlayer = ThePlayerList->getLocalPlayer();
+	if (localPlayer && parent)
+	{
+		const Image *image = TheMappedImageCollection->findImageByName("MutiPlayer_ScoreScreen");
+		if(image)
+		{
+			parent->winSetEnabledImage(0, image);
+			parent->winSetStatus(parent->winGetStatus() | WIN_STATUS_IMAGE );
+		}
+	}
+#endif
+#else
 	Player *localPlayer = ThePlayerList->getLocalPlayer();
 	if (localPlayer)
 	{
@@ -2062,6 +2796,7 @@ void grabMultiPlayerInfo()
 			parent->winSetStatus(parent->winGetStatus() | WIN_STATUS_IMAGE );
 		}
 	}
+#endif
 
 	// Add each player and score to the map. THis allows us to sort the players based on score.
 	for( Int i = 0; i < MAX_SLOTS; ++i)
@@ -2070,10 +2805,14 @@ void grabMultiPlayerInfo()
 		if(player)
 		{
 			Int score = player->getScoreKeeper()->calculateScore();
+#if defined(GENONLINE)
+			scores.emplace(score, player);
+#else
 			it = scores.find( score );
 			if (it != scores.end())
 			score += adder++;
 			scores[score] = player;
+#endif
 			++playerCount;
 		}
 	}
@@ -2093,6 +2832,11 @@ void grabMultiPlayerInfo()
 
 	DEBUG_ASSERTCRASH(count == playerCount, ("For some reason we added %d players to the scores map, but only read %d", playerCount, count));
 
+#if defined(GENONLINE)
+	// last point where every Player/ScoreKeeper is still populated
+	LocalApiLiveMatchSummary();
+	
+#endif
 }
 
 enum
@@ -2108,7 +2852,11 @@ enum
 };
 /**	Grab the single player info */
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+void grabSinglePlayerInfo( void )
+#else
 void grabSinglePlayerInfo()
+#endif
 {
 	Int playerCount = 0;
 	Player *player, *localPlayer;
@@ -2138,12 +2886,24 @@ void grabSinglePlayerInfo()
 		PlayerTemplate const *fact = ThePlayerList->getLocalPlayer()->getPlayerTemplate();
 		if(fact != nullptr)
 		{
+#if defined(GENONLINE)
+			// GenOnline @bugfix arcticdolphin 22/11/2026 The side art has the retail ruler lines painted in, so the GO kit ruler panel draws alone.
+#if !defined(GENONLINE)
 			const Image *image = TheMappedImageCollection->findImageByName(ThePlayerList->getLocalPlayer()->getPlayerTemplate()->getScoreScreen());
 			if(image)
 			{
 				parent->winSetEnabledImage(0, image);
 				parent->winSetStatus(parent->winGetStatus() | WIN_STATUS_IMAGE );
 			}
+#endif
+#else
+			const Image *image = TheMappedImageCollection->findImageByName(ThePlayerList->getLocalPlayer()->getPlayerTemplate()->getScoreScreen());
+			if(image)
+			{
+				parent->winSetEnabledImage(0, image);
+				parent->winSetStatus(parent->winGetStatus() | WIN_STATUS_IMAGE );
+			}
+#endif
 		}
 	}
 	if(!localPlayer)

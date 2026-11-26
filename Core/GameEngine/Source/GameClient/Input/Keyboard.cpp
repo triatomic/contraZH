@@ -59,15 +59,15 @@ void Keyboard::createStreamMessages()
 	while( key->key != KEY_NONE )
 	{
 
-#if defined(GENERALS_ONLINE)
-		// Skip repeat duplicates suppressed by updateKeys().
+#if defined(GENONLINE)
+		// Skip keys suppressed by updateKeys() (e.g. OS-level repeat duplicates)
 		if( key->status == KeyboardIO::STATUS_USED )
 		{
 			key++;
 			continue;
 		}
-#endif
 
+#endif
 		// add message to stream
 		if( BitIsSet( key->state, KEY_STATE_DOWN ) )
 		{
@@ -148,15 +148,18 @@ void Keyboard::updateKeys()
 		/** @todo -- if we don't have focus, we could destroy all the keys retrieved
 		here so that we don't process anything */
 
-#if defined(GENERALS_ONLINE)
-		// The OS auto repeat arrives as a fresh DOWN; drop it so checkKeyRepeat() owns the repeat rate.
+#if defined(GENONLINE)
+		// GO_CHANGE:
+		// Suppress OS-level key repeat events: DirectInput buffers every OS repeat as a
+		// fresh DOWN, which would fire multiple deletions per physical keypress. Discard
+		// any DOWN event for a key already tracked as down and let checkKeyRepeat() handle
+		// the repeat at its controlled rate.
 		if( BitIsSet( m_keys[ index ].state, KEY_STATE_DOWN ) &&
 		    BitIsSet( m_keyStatus[ m_keys[ index ].key ].state, KEY_STATE_DOWN ) )
 		{
 			m_keys[ index ].status = KeyboardIO::STATUS_USED;
 		}
 		else
-#endif
 		{
 			m_keyStatus[ m_keys[ index ].key ].state = m_keys[ index ].state;
 			m_keyStatus[ m_keys[ index ].key ].status = m_keys[ index ].status;
@@ -168,6 +171,19 @@ void Keyboard::updateKeys()
 				pressed = TRUE;
 			}
 		}
+#else
+		{
+			m_keyStatus[ m_keys[ index ].key ].state = m_keys[ index ].state;
+			m_keyStatus[ m_keys[ index ].key ].status = m_keys[ index ].status;
+
+			// The repeat delay runs from when the key is read, so a key read late after a stall does not repeat at once.
+			if( BitIsSet( m_keys[ index ].state, KEY_STATE_DOWN ) )
+			{
+				m_keyRepeatTimeMsec[ m_keys[ index ].key ] = timeGetTime() + m_repeatDelayMsec;
+				pressed = TRUE;
+			}
+		}
+#endif
 
 		// prevent ALT-TAB from causing a TAB event
 		if( m_keys[ index ].key == KEY_TAB )

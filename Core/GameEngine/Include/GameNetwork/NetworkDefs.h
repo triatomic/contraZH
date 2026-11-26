@@ -34,14 +34,21 @@ static constexpr const Int MAX_COMMANDS = 256;
 // TheSuperHackers @tweak Mauller 26/08/2025 reduce the minimum runahead from 10
 // This lets network games run at latencies down to 133ms when the network conditions allow
 static constexpr const Int MIN_LOGIC_FRAMES = 5;
-static constexpr const Int MAX_FRAMES_AHEAD = 128;
-#if defined(GENERALS_ONLINE)
-// GeneralsOnline port: the service config can override this at runtime (NGMPGame.cpp),
-// so it is a mutable static. Upstream GO makes it a plain per-translation-unit static,
-// so a runtime write is only visible in the writing file - replicated as-is to stay
-// behaviorally identical to official GeneralsOnline clients.
-static Int MIN_RUNAHEAD = 6;
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+// The run ahead is capped at half of this: 128 frames is 2.1 s at 60 Hz, the limit of retail.
+static constexpr const Int MAX_FRAMES_AHEAD = 256;
 #else
+static constexpr const Int MAX_FRAMES_AHEAD = 128;
+#endif
+
+#if defined(GENONLINE)
+extern Int MIN_RUNAHEAD;
+#else
+static constexpr const Int MIN_RUNAHEAD = 4;
+#endif
+#else
+static constexpr const Int MAX_FRAMES_AHEAD = 128;
 static constexpr const Int MIN_RUNAHEAD = 4;
 #endif
 
@@ -56,6 +63,12 @@ enum ConnectionNumbers CPP_11(: Int)
 	MAX_PLAYER = 7,			// The index of the highest possible player number.  This is 0 based, so the most players allowed in a game is MAX_PLAYER+1.
 };
 
+#if defined(GENONLINE)
+static constexpr const Int MAX_SLOTS = MAX_PLAYER + 1;
+
+static constexpr const Int NETWORK_STATS_WINDOW_MS = 10000;
+
+#endif
 #pragma pack(push, 1)
 struct TransportMessageHeader
 {
@@ -66,39 +79,61 @@ struct TransportMessageHeader
 };
 #pragma pack(pop)
 
+#if defined(GENONLINE)
+// TheSuperHackers @info As we are not detecting for network fragmentation and adjusting max payload, we set 1200 bytes UDP payload as a safe upper limit for various networks
+// We chose 1200 bytes as when taking mobile networks into account, maximum transmission unit sizes can vary from 1340 - 1500 bytes
+// and when the packet headers for PPPOE, IPV6 and virtual network encapsulation are considered, we need a lower safe UDP payload to prevent fragmentation.
+#if defined(GENONLINE)
+static constexpr const Int MAX_UDP_PAYLOAD = 1194 - 96; // 96 for TURN + Valve overhead
+#else
+static constexpr const Int MAX_UDP_PAYLOAD = 1194;
+#endif
+#else
 static constexpr const Int MAX_SLOTS = MAX_PLAYER+1;
 
 // TheSuperHackers @info As we are not detecting for network fragmentation and dynamically adjusting payload sizes, we set an 1100 bytes UDP payload as a safe upper limit for various networks
 // We chose 1100 bytes as when taking mobile networks into account, maximum transmission unit sizes can vary from 1340 - 1500 bytes
 // and when the packet headers for PPPOE, IPV6 and other virtual network encapsulation are considered, we need a lower safe UDP payload to prevent fragmentation.
 static constexpr const Int MAX_UDP_PAYLOAD_SIZE = 1100;
+#endif
 // UDP (8 bytes) + IP header (28 bytes) = 36 bytes total.  We want a total packet size of 512, so 512 - 36 = 476
+#if defined(GENONLINE)
+static constexpr const Int RESTRICTED_UDP_PAYLOAD = 476;
+#else
 static constexpr const Int RETAIL_GAME_PACKET_SIZE = 476;
+#endif
 
 // TheSuperHackers @info The legacy lanapi cannot use a larger packet size without breaking the gameinfo command
+#if defined(GENONLINE)
+static constexpr const Int MAX_LANAPI_PACKET_SIZE = RESTRICTED_UDP_PAYLOAD;
+#else
 static constexpr const Int MAX_LANAPI_PACKET_SIZE = RETAIL_GAME_PACKET_SIZE;
+#endif
 
 // TheSuperHackers @bugfix Mauller 08/02/2026 Allow larger ethernet UDP payload to be used for game messages, this fixes connection issues and eliminates disconnection bugs
+#if defined(GENONLINE)
+#if RETAIL_COMPATIBLE_NETWORKING
+static constexpr const Int MAX_PACKET_SIZE = RESTRICTED_UDP_PAYLOAD;
+static constexpr const Int MAX_MESSAGE_LEN = 1024;
+#elif defined(GENONLINE)
+static constexpr const Int MAX_PACKET_SIZE = MAX_UDP_PAYLOAD;
+static constexpr const Int MAX_MESSAGE_LEN = 1104;
+#else
+static constexpr const Int MAX_PACKET_SIZE = MAX_UDP_PAYLOAD;
+static constexpr const Int MAX_MESSAGE_LEN = MAX_UDP_PAYLOAD;
+#endif
+#else
 #if RETAIL_COMPATIBLE_PACKET_SIZE
 static constexpr const Int MAX_PACKET_SIZE = RETAIL_GAME_PACKET_SIZE;
 static constexpr const Int MAX_NETWORK_MESSAGE_LEN = 1024;
-#elif defined(GENERALS_ONLINE)
-// GeneralsOnline port: upstream GO's packet sizing - 96 bytes are reserved for TURN
-// relay and Valve GameNetworkingSockets overhead.
-static constexpr const Int MAX_PACKET_SIZE = 1194 - 96;
-static constexpr const Int MAX_NETWORK_MESSAGE_LEN = 1104;
 #else
 static constexpr const Int MAX_PACKET_SIZE = MAX_UDP_PAYLOAD_SIZE - sizeof(TransportMessageHeader);
 static constexpr const Int MAX_NETWORK_MESSAGE_LEN = MAX_UDP_PAYLOAD_SIZE;
 #endif
+#endif
 
 // LAN peers must agree on this to share a game. The high word counts changes to the bytes on the wire, the low word is the packet size.
 static constexpr const UnsignedInt NETWORK_PROTOCOL_VERSION = (1u << 16) | MAX_PACKET_SIZE;
-
-#if defined(GENERALS_ONLINE)
-// Alias used by the GeneralsOnline sources; upstream GO renamed the constant.
-static constexpr const Int MAX_MESSAGE_LEN = MAX_NETWORK_MESSAGE_LEN;
-#endif
 
 // TheSuperHackers @bugfix Mauller 08/02/2026 Double send and receive buffer sizes to alleviate the occurance of disconnection issues in retail and non retail code.
 static constexpr const Int MAX_MESSAGES = 256;
@@ -110,7 +145,11 @@ static constexpr const Int UDP_RECEIVE_BUFFER_SIZE = 512 * 1024;
  * Command packet - contains frame #, total # of commands, and each command.  This is what gets sent
  * to each player every frame
  */
+#if defined(GENONLINE)
+static constexpr const Int numCommandsPerCommandPacket = (MAX_MESSAGE_LEN - sizeof(UnsignedInt) - sizeof(UnsignedShort))/sizeof(GameMessage);
+#else
 static constexpr const Int numCommandsPerCommandPacket = (MAX_NETWORK_MESSAGE_LEN - sizeof(UnsignedInt) - sizeof(UnsignedShort))/sizeof(GameMessage);
+#endif
 #pragma pack(push, 1)
 struct CommandPacket
 {
@@ -134,13 +173,21 @@ struct TransportMessage
 	// TheSuperHackers @info This value is not the correct one that should be used here, it should have been max packet size
 	// The non retail max network message len takes the extra bytes of the network message header into account when handling UDP payload data
 	// In retail this only works since no data larger than the retail game packet size is put into a network message
+#if defined(GENONLINE)
+	UnsignedByte data[MAX_MESSAGE_LEN];
+#else
 	UnsignedByte data[MAX_NETWORK_MESSAGE_LEN];
+#endif
 #else
 	UnsignedByte data[MAX_PACKET_SIZE];
 #endif
 	Int length;
 	UnsignedInt addr;
 	UnsignedShort port;
+#if defined(GENONLINE)
+	Bool senderKnown;		///< The transport knows which user this packet came from, set by the receiving side only.
+	Int64 senderUserID;
+#endif
 };
 #pragma pack(pop)
 
@@ -200,6 +247,11 @@ enum NetCommandType CPP_11(: Int) {
 	NETCOMMANDTYPE_DISCONNECTFRAME,
 	NETCOMMANDTYPE_DISCONNECTSCREENOFF,
 	NETCOMMANDTYPE_DISCONNECTEND,
+#if defined(GENONLINE)
+
+	NETCOMMANDTYPE_SIGNEDFRAMEINFO = 32,			// A frame info with its author's signature, only on the wire.
+	NETCOMMANDTYPE_SIGNATURES,						// Signatures of an author sent apart from its frames: for its chat.
+#endif
 };
 
 enum NetLocalStatus CPP_11(: Int) {
@@ -218,7 +270,12 @@ enum PlayerLeaveCode CPP_11(: Int) {
 };
 
 // Magic number for identifying a Generals packet.
+#if defined(GENONLINE)
+// 0xF00E: packets carry the sequence envelope, so builds without it fail on the magic number
+static constexpr const UnsignedShort GENERALS_MAGIC_NUMBER = 0xF00E;
+#else
 static constexpr const UnsignedShort GENERALS_MAGIC_NUMBER = 0xF00D;
+#endif
 
 // The number of fps history entries.
 //static constexpr const Int NETWORK_FPS_HISTORY_LENGTH = 30;

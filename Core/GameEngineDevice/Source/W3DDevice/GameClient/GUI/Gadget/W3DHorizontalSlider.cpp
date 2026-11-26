@@ -53,6 +53,9 @@
 #include "GameClient/DisplayString.h"
 #include "GameClient/GameFont.h"
 #include "GameClient/GlobalLanguage.h"
+#if defined(GENONLINE)
+#include "GameClient/Mouse.h"
+#endif
 #include "W3DDevice/GameClient/W3DGadget.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 
@@ -60,8 +63,42 @@
 
 // PRIVATE TYPES //////////////////////////////////////////////////////////////
 
+#if defined(GENONLINE)
+enum KitSliderImage
+{
+	KIT_SLIDER_TRACK_LEFT,
+	KIT_SLIDER_TRACK_CENTER,
+	KIT_SLIDER_TRACK_RIGHT,
+	KIT_SLIDER_FILL_LEFT,
+	KIT_SLIDER_FILL_CENTER,
+	KIT_SLIDER_FILL_RIGHT,
+	KIT_SLIDER_THUMB,
+	KIT_SLIDER_THUMB_HILITE,
+	KIT_SLIDER_THUMB_DISABLED,
+
+	KIT_SLIDER_IMAGE_COUNT
+};
+
+#endif
 // PRIVATE DATA ///////////////////////////////////////////////////////////////
 
+#if defined(GENONLINE)
+static const char *const s_kitSliderImageNames[KIT_SLIDER_IMAGE_COUNT] =
+{
+	"GOSliderTrackLeft",
+	"GOSliderTrackCenter",
+	"GOSliderTrackRight",
+	"GOSliderFillLeft",
+	"GOSliderFillCenter",
+	"GOSliderFillRight",
+	"GOSliderThumb",
+	"GOSliderThumbHilite",
+	"GOSliderThumbDisabled"
+};
+
+static const Image *s_kitSliderImages[KIT_SLIDER_IMAGE_COUNT];
+
+#endif
 // PUBLIC DATA ////////////////////////////////////////////////////////////////
 
 // PRIVATE PROTOTYPES /////////////////////////////////////////////////////////
@@ -120,6 +157,153 @@ static void drawSliderValue( GameWindow *window, WinInstanceData *instData )
 	text->draw( thumbPos.x + thumbSize.x / 2 - width / 2, origin.y - height, textColor, GameMakeColor( 0, 0, 0, 255 ) );
 }
 
+#if defined(GENONLINE)
+static Bool findKitSliderImages()
+{
+	Int i;
+	for( i = 0; i < KIT_SLIDER_IMAGE_COUNT; ++i )
+	{
+		if( s_kitSliderImages[i] == nullptr )
+			s_kitSliderImages[i] = TheMappedImageCollection->findImageByName( s_kitSliderImageNames[i] );
+
+		if( s_kitSliderImages[i] == nullptr )
+			return FALSE;
+	}
+	return TRUE;
+}
+
+// GenOnline @bugfix arcticdolphin 08/11/2026 TRUE while the mouse holds the slider or its thumb.
+static Bool isKitSliderGrabbed( GameWindow *slider )
+{
+	GameWindow *grab = TheWindowManager->winGetGrabWindow();
+	return grab != nullptr && ( grab == slider || grab->winGetParent() == slider );
+}
+
+// GenOnline @bugfix arcticdolphin 08/11/2026 The kit thumb is drawn by the slider, so skip the retail thumb hilite image of the layout.
+static void kitSliderThumbDraw( GameWindow *window, WinInstanceData *instData )
+{
+}
+
+static void kitSliderTooltip( GameWindow *window, WinInstanceData *instData, UnsignedInt mouse )
+{
+	GameWindow *slider = window;
+	if( BitIsSet( window->winGetStyle(), GWS_HORZ_SLIDER ) == FALSE && window->winGetParent() != nullptr )
+	{
+		slider = window->winGetParent();
+	}
+
+	SliderData *s = (SliderData *)slider->winGetUserData();
+	if( s == nullptr )
+	{
+		return;
+	}
+
+	// GenOnline @bugfix arcticdolphin 08/11/2026 Only the value while dragging, the label and value on hover, shown at once while dragging.
+	WinInstanceData *sliderData = slider->winGetInstanceData();
+	const Bool grabbed = isKitSliderGrabbed( slider );
+	UnicodeString label = sliderData->getTooltipText();
+	UnicodeString text;
+	if( label.isEmpty() == FALSE && grabbed == FALSE )
+	{
+		text.format( L"%ls: %d", label.str(), s->position );
+	}
+	else
+	{
+		text.format( L"%d", s->position );
+	}
+
+	Int delay = sliderData->m_tooltipDelay;
+	if( grabbed )
+	{
+		delay = 0;
+	}
+
+	TheMouse->setCursorTooltip( text, delay );
+}
+
+static Bool drawKitSliderTrack( GameWindow *window, WinInstanceData *instData,
+																const ICoord2D &origin, const ICoord2D &size )
+{
+	GameWindow *thumb = window->winGetChild();
+	if( thumb == nullptr || findKitSliderImages() == FALSE )
+		return FALSE;
+
+	// GenOnline @bugfix arcticdolphin 08/11/2026 Stop the thumb child drawing the retail hover arrow over the kit marker.
+	if( thumb->winGetDrawFunc() != kitSliderThumbDraw )
+		thumb->winSetDrawFunc( kitSliderThumbDraw );
+
+	Bool grabbed = isKitSliderGrabbed( window );
+
+	ICoord2D thumbPos, thumbSize;
+	thumb->winGetScreenPosition( &thumbPos.x, &thumbPos.y );
+	thumb->winGetSize( &thumbSize.x, &thumbSize.y );
+	Int thumbCX = thumbPos.x + thumbSize.x / 2;
+	// GenOnline @tweak arcticdolphin 08/11/2026 Track, fill and marker are centred vertically in the slider rect, in line with its label.
+	Int sliderCY = origin.y + size.y / 2;
+
+	Real yScale = INT_TO_REAL( TheDisplay->getHeight() ) / 600.0f;
+	Bool enabled = BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED );
+
+	Int trackHeight = REAL_TO_INT( 8.0f * yScale + 0.5f );
+	if( trackHeight < 6 )
+		trackHeight = 6;
+	Int trackY = sliderCY - trackHeight / 2;
+	Int trackStart = origin.x + thumbSize.x / 2;
+	Int trackEnd = origin.x + size.x - thumbSize.x / 2;
+
+	if( trackEnd - trackStart >= 1 )
+	{
+		TheWindowManager->winDrawThreePieceImage( s_kitSliderImages[KIT_SLIDER_TRACK_LEFT],
+																							s_kitSliderImages[KIT_SLIDER_TRACK_CENTER],
+																							nullptr,
+																							s_kitSliderImages[KIT_SLIDER_TRACK_RIGHT],
+																							trackStart, trackY, trackEnd - trackStart, trackHeight );
+	}
+
+	Int fillEnd = thumbCX;
+	if( fillEnd > trackEnd )
+		fillEnd = trackEnd;
+	if( enabled && fillEnd - trackStart >= 1 )
+	{
+		TheWindowManager->winDrawThreePieceImage( s_kitSliderImages[KIT_SLIDER_FILL_LEFT],
+																							s_kitSliderImages[KIT_SLIDER_FILL_CENTER],
+																							nullptr,
+																							s_kitSliderImages[KIT_SLIDER_FILL_RIGHT],
+																							trackStart, trackY, fillEnd - trackStart, trackHeight );
+	}
+
+	// GenOnline @tweak arcticdolphin 08/11/2026 The marker is a rounded pill 4 units wide and 1.75 track heights tall, centred on the value.
+	Int thumbWidth = REAL_TO_INT( 4.0f * yScale + 0.5f );
+	if( thumbWidth < 3 )
+		thumbWidth = 3;
+	Int thumbHeight = (trackHeight * 7 + 2) / 4;
+	Int thumbX = thumbCX - thumbWidth / 2;
+	Int thumbY = sliderCY - thumbHeight / 2;
+
+	const Image *thumbImage = s_kitSliderImages[KIT_SLIDER_THUMB];
+	if( enabled == FALSE )
+		thumbImage = s_kitSliderImages[KIT_SLIDER_THUMB_DISABLED];
+	else if( BitIsSet( instData->getState(), WIN_STATE_HILITED ) ||
+					 BitIsSet( thumb->winGetInstanceData()->getState(), WIN_STATE_HILITED ) ||
+					 grabbed )
+		thumbImage = s_kitSliderImages[KIT_SLIDER_THUMB_HILITE];
+
+	TheWindowManager->winDrawImage( thumbImage, thumbX, thumbY,
+																	thumbX + thumbWidth, thumbY + thumbHeight );
+
+	if( window->winGetTooltipFunc() == nullptr )
+		window->winSetTooltipFunc( kitSliderTooltip );
+	if( thumb->winGetTooltipFunc() == nullptr )
+		thumb->winSetTooltipFunc( kitSliderTooltip );
+
+	// GenOnline @bugfix arcticdolphin 08/11/2026 The window manager sets no tooltip while a window is held, so keep the value up while dragging.
+	if( grabbed && window->winGetTooltipFunc() == kitSliderTooltip )
+		kitSliderTooltip( window, instData, 0 );
+
+	return TRUE;
+}
+
+#endif
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -136,6 +320,12 @@ void W3DGadgetHorizontalSliderDraw( GameWindow *window, WinInstanceData *instDat
 	window->winGetScreenPosition( &origin.x, &origin.y );
 	window->winGetSize( &size.x, &size.y );
 
+#if defined(GENONLINE)
+	// GenOnline @bugfix arcticdolphin 08/11/2026 Sliders without image status get the kit track too.
+	if( drawKitSliderTrack( window, instData, origin, size ) )
+		return;
+
+#endif
 	// get the right colors
 	if( BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED ) == FALSE )
 	{
@@ -200,16 +390,22 @@ void W3DGadgetHorizontalSliderImageDraw( GameWindow *window,
 	window->winGetScreenPosition( &origin.x, &origin.y );
 	window->winGetSize( &size.x, &size.y );
 
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 08/11/2026 Draw a track and thumb with a value tooltip when the GO kit slider images exist.
+	if( drawKitSliderTrack( window, instData, origin, size ) )
+		return;
+
+#endif
 	highlightSquare = GadgetSliderGetHiliteImageLeft( window );
 	blankSquare	= GadgetSliderGetDisabledImageRight( window );
 	fillSquare = GadgetSliderGetDisabledImageLeft( window );
 
 	SliderData *s = (SliderData *)window->winGetUserData();
 
-#if defined(GENERALS_ONLINE_WIDESCREEN)
-	Real xMulti = INT_TO_REAL(TheDisplay->getWidth()) / GENERALS_ONLINE_WIDESCREEN_X_SCALE;
-#else
+#if !defined(GENONLINE_WIDESCREEN)
 	Real xMulti = INT_TO_REAL(TheDisplay->getWidth()) / DEFAULT_DISPLAY_WIDTH;
+#else
+	Real xMulti = INT_TO_REAL(TheDisplay->getWidth()) / GENONLINE_WIDESCREEN_X_SCALE;
 #endif
 
 	// figure out how many boxes we draw for this slider

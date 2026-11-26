@@ -49,7 +49,11 @@
 #include "WinMain.h"
 #include "Common/CommandLine.h"
 #include "Common/CriticalSection.h"
+#if defined(GENONLINE)
+// GenOnlineInit.cpp carries the dedicated GPU exports
+#else
 #include "Common/DedicatedGpuExports.h"
+#endif
 #include "Common/GlobalData.h"
 #include "Common/GameEngine.h"
 #include "Common/GameSounds.h"
@@ -66,6 +70,9 @@
 #include "GameLogic/GameLogic.h"  ///< @todo for demo, remove
 #include "GameClient/Mouse.h"
 #include "GameClient/IMEManager.h"
+#if defined(GENONLINE)
+#include "GameNetwork/NetworkInterface.h"
+#endif
 #include "Win32Device/GameClient/Win32Mouse.h"
 #include "Win32Device/Common/Win32GameEngine.h"
 #include "Common/version.h"
@@ -76,9 +83,8 @@
 #ifdef RTS_ENABLE_CRASHDUMP
 #include "MiniDumper/MiniDumper.h"
 #endif
-
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/GeneralsOnline/OnlineServices_Init.h"
+#if defined(GENONLINE)
+#include "../GenOnlineInit.h"
 #endif
 
 
@@ -300,11 +306,110 @@ static const char *messageToString(unsigned int message)
 }
 #endif
 
+#if defined(GENONLINE)
+static void setWinMainActive(Bool active)
+{
+	isWinMainActive = active;
+
+	if (TheGameEngine)
+		TheGameEngine->setIsActive(isWinMainActive);
+
+	if (isWinMainActive)
+	{
+		//restore mouse cursor to our custom version.
+		if (TheWin32Mouse)
+			TheWin32Mouse->setCursor(TheWin32Mouse->getMouseCursor());
+	}
+}
+
+// GenOnline @bugfix arcticdolphin 07/11/2026 A windowed game is a normal window, so the taskbar, which is topmost, covered
+// the part of a window as large as the monitor that lies over it. While the game has focus, such a window is topmost.
+static const UINT_PTR WINDOWED_TOPMOST_TIMER_ID = 0x5450;
+static void updateWindowedTopmost(HWND hWnd, Bool active);
+
+static Bool isTaskbarAbove(HWND hWnd)
+{
+	char className[32];
+	for (HWND above = GetWindow(hWnd, GW_HWNDPREV); above != nullptr; above = GetWindow(above, GW_HWNDPREV))
+	{
+		if (IsWindowVisible(above) && GetClassNameA(above, className, sizeof(className)) > 0
+			&& (strcmp(className, "Shell_TrayWnd") == 0 || strcmp(className, "Shell_SecondaryTrayWnd") == 0))
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+// the taskbar can raise itself again without a message to the game, so a focused topmost window checks a few times a second
+static VOID CALLBACK windowedTopmostTimer(HWND hWnd, UINT, UINT_PTR, DWORD)
+{
+	updateWindowedTopmost(hWnd, isWinMainActive);
+}
+
+static void updateWindowedTopmost(HWND hWnd, Bool active)
+{
+	if (TheGlobalData == nullptr || !TheGlobalData->m_windowed)
+	{
+		return;
+	}
+
+	Bool wantTopmost = FALSE;
+	if (active && GetForegroundWindow() == hWnd && !IsIconic(hWnd))
+	{
+		RECT window;
+		GetWindowRect(hWnd, &window);
+		MONITORINFO monitorInfo = { sizeof(MONITORINFO) };
+		GetMonitorInfo(MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST), &monitorInfo);
+		RECT visible;
+		if (IntersectRect(&visible, &window, &monitorInfo.rcMonitor))
+		{
+			// the part on the monitor reaches outside the work area, where the taskbar is
+			wantTopmost = visible.left < monitorInfo.rcWork.left || visible.top < monitorInfo.rcWork.top
+				|| visible.right > monitorInfo.rcWork.right || visible.bottom > monitorInfo.rcWork.bottom;
+		}
+	}
+
+	const Bool isTopmost = (GetWindowLong(hWnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
+	if (wantTopmost)
+	{
+		if (!isTopmost || isTaskbarAbove(hWnd))
+		{
+			SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+		}
+		SetTimer(hWnd, WINDOWED_TOPMOST_TIMER_ID, 250, windowedTopmostTimer);
+	}
+	else
+	{
+		KillTimer(hWnd, WINDOWED_TOPMOST_TIMER_ID);
+		if (isTopmost)
+		{
+			SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+			// leaving topmost puts the window above all normal windows, so it goes back behind a normal window that took focus
+			// going behind a topmost window such as the taskbar would make it topmost again
+			HWND foreground = GetForegroundWindow();
+			if (foreground != nullptr && foreground != hWnd && (GetWindowLong(foreground, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0)
+			{
+				SetWindowPos(hWnd, foreground, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+			}
+		}
+	}
+}
+
+#endif
 // WndProc ====================================================================
 /** Window Procedure */
 //=============================================================================
+#if defined(GENONLINE)
+static const UINT_PTR NETWORK_TIMER_ID = 1;
+static const UINT NETWORK_TIMER_INTERVAL = USER_TIMER_MINIMUM;
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message,
+	WPARAM wParam, LPARAM lParam)
+#else
 LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 													WPARAM wParam, LPARAM lParam )
+#endif
 {
 
 	try
@@ -322,7 +427,11 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 #ifdef	DEBUG_WINDOWS_MESSAGES
 		static msgCount=0;
 		char testString[256];
+#if defined(GENONLINE)
+		snprintf(testString, sizeof(testString), "\n%d: %s (%X,%X)", msgCount++, messageToString(message), wParam, lParam);
+#else
 		sprintf(testString,"\n%d: %s (%X,%X)", msgCount++,messageToString(message), wParam, lParam);
+#endif
 		OutputDebugString(testString);
 #endif
 
@@ -337,6 +446,10 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 				break;
 
 			//-------------------------------------------------------------------------
+#if defined(GENONLINE)
+		case WM_POWERBROADCAST:
+			switch (wParam)
+#else
 			case WM_POWERBROADCAST:
 				switch( wParam )
 				{
@@ -378,21 +491,89 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 				break;
 
 			case WM_QUERYENDSESSION:
+#endif
 			{
+#if defined(GENONLINE)
+#ifndef PBT_APMQUERYSUSPEND
+#define PBT_APMQUERYSUSPEND 0x0000
+#endif
+			case PBT_APMQUERYSUSPEND:
+				// At this point, the app should save any data for open
+				// network connections, files, etc., and prepare to go into
+				// a suspended mode.
+				return TRUE;
+
+#ifndef PBT_APMRESUMESUSPEND
+#define PBT_APMRESUMESUSPEND 0x0007
+#endif
+			case PBT_APMRESUMESUSPEND:
+				// At this point, the app should recover any data, network
+				// connections, files, etc., and resume running from when
+				// the app was suspended.
+				return TRUE;
+			}
+			break;
+			//-------------------------------------------------------------------------
+			// Online sessions step frames from a timer during the Windows move, size and menu loops.
+		case WM_ENTERSIZEMOVE:
+			if (TheMouse != nullptr)
+				TheMouse->onWindowMoveSizeBegin();
+			// fall through
+		case WM_ENTERMENULOOP:
+			if (TheGameEngine != nullptr)
+				static_cast<Win32GameEngine*>(TheGameEngine)->releaseInputForModalLoop();
+			SetTimer(hWnd, NETWORK_TIMER_ID, NETWORK_TIMER_INTERVAL, nullptr);
+			break;
+
+		case WM_EXITSIZEMOVE:
+			if (TheMouse != nullptr)
+				TheMouse->onWindowMoveSizeEnd();
+			// fall through
+		case WM_EXITMENULOOP:
+			KillTimer(hWnd, NETWORK_TIMER_ID);
+			if (TheGameEngine != nullptr)
+				static_cast<Win32GameEngine*>(TheGameEngine)->releaseInputForModalLoop();
+			break;
+
+		case WM_TIMER:
+			if (wParam == NETWORK_TIMER_ID)
+			{
+				Win32GameEngine* pEngine = static_cast<Win32GameEngine*>(TheGameEngine);
+				if (pEngine == nullptr || !pEngine->stepFrameFromModalLoop())
+#else
 				if (TheGameEngine && !TheGameEngine->getQuitting())
+#endif
 				{
+#if defined(GENONLINE)
+					if (TheNetwork != nullptr)
+#else
 					if (TheMessageStream && TheMessageStream->isReadyForMessages())
+#endif
 					{
+#if defined(GENONLINE)
+						TheNetwork->liteupdate();
+#else
 						TheMessageStream->appendMessage(GameMessage::MSG_META_DEMO_INSTANT_QUIT);
 					}
 					else
 					{
 						TheGameEngine->setQuitting(TRUE);
+#endif
 					}
 				}
+#if !defined(GENONLINE)
 				return 0;	//don't allow Windows to shutdown while game is running.
+#endif
 			}
+#if defined(GENONLINE)
+			break;
+#endif
 
+#if defined(GENONLINE)
+		case WM_SYSCOMMAND:
+			// Prevent moving/sizing and power loss in fullscreen mode
+			switch (wParam & 0xFFF0)
+#else
 			// ------------------------------------------------------------------------
 			case WM_CLOSE:
 				// TheSuperHackers @feature Intercept Alt+F4/Close to show the quit menu in-game. 
@@ -413,16 +594,41 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 
 			//-------------------------------------------------------------------------
 			case WM_MOVE:
+#endif
 			{
+#if defined(GENONLINE)
+			case SC_KEYMENU:
+				// TheSuperHackers @bugfix Mauller 10/05/2025 Always handle this command to prevent halting the game when left Alt is pressed.
+				return 1;
+			case SC_MOVE:
+			case SC_SIZE:
+			case SC_MAXIMIZE:
+			case SC_MONITORPOWER:
+				if (!TheGlobalData->m_windowed)
+					return 1;
+#else
 				if (TheMouse)
 					TheMouse->refreshCursorCapture();
 
+#endif
 				break;
 			}
+#if defined(GENONLINE)
+			break;
+#endif
 
+#if defined(GENONLINE)
+		case WM_QUERYENDSESSION:
+		{
+			if (TheGameEngine && !TheGameEngine->getQuitting())
+#else
 			//-------------------------------------------------------------------------
 			case WM_SIZE:
+#endif
 			{
+#if defined(GENONLINE)
+				if (TheMessageStream && TheMessageStream->isReadyForMessages())
+#else
 				// When W3D initializes, it resizes the window.  So stop repainting.
 				if (!gInitializing)
 					gDoPaint = false;
@@ -466,7 +672,11 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 				}
 
 				if (TheMouse)
+#endif
 				{
+#if defined(GENONLINE)
+					TheMessageStream->appendMessage(GameMessage::MSG_META_DEMO_INSTANT_QUIT);
+#else
 					TheMouse->loseFocus();
 
 					if (TheMouse->isCursorInside())
@@ -514,35 +724,281 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 				{
 					if (TheAudio)
 						TheAudio->muteAudio(AudioManager::MuteAudioReason_WindowFocus);
+#endif
 				}
 				else
 				{
+#if defined(GENONLINE)
+					TheGameEngine->setQuitting(TRUE);
+#else
 					if (TheAudio)
 						TheAudio->unmuteAudio(AudioManager::MuteAudioReason_WindowFocus);
 
 					// Cursor can only be captured after one of the activation events.
 					if (TheMouse)
 						TheMouse->refreshCursorCapture();
+#endif
 				}
-				break;
+#if defined(GENONLINE)
+			}
+			return 0;	//don't allow Windows to shutdown while game is running.
+		}
+
+		// ------------------------------------------------------------------------
+		case WM_CLOSE:
+			// TheSuperHackers @feature Intercept Alt+F4/Close to show the quit menu in-game. 
+			// Repeating the command when the menu is visible triggers a Self-Destruct followed by a sequenced quit.
+			// If not in a match (e.g. main menu), the command instantly closes the application.
+			if (TheGameEngine && !TheGameEngine->getQuitting())
+			{
+				if (TheMessageStream && TheMessageStream->isReadyForMessages())
+				{
+					TheMessageStream->appendMessage(GameMessage::MSG_META_DEMO_INSTANT_QUIT);
+				}
+				else
+				{
+					TheGameEngine->setQuitting(TRUE);
+				}
+			}
+			return 0;
+
+		case WM_MOVE:
+		{
+			if (TheMouse)
+				TheMouse->refreshCursorCapture();
+
+			break;
+		}
+
+		//-------------------------------------------------------------------------
+		case WM_SIZE:
+		{
+			// When W3D initializes, it resizes the window.  So stop repainting.
+			if (!gInitializing)
+				gDoPaint = false;
+
+			if (TheMouse)
+				TheMouse->refreshCursorCapture();
+
+			break;
+		}
+
+		// ------------------------------------------------------------------------
+		case WM_SETFOCUS:
+		{
+			//
+			// reset the state of our keyboard cause we haven't been paying
+			// attention to the keys while focus was away
+			//
+			if (TheKeyboard)
+				TheKeyboard->resetKeys();
+
+			if (TheInGameUI)
+			{
+				TheInGameUI->clearModifierModes();
 			}
 
+			if (TheMouse)
+				TheMouse->regainFocus();
+
+			break;
+		}
+
+		//-------------------------------------------------------------------------
+		case WM_KILLFOCUS:
+		{
+			if (TheKeyboard)
+				TheKeyboard->resetKeys();
+
+			if (TheInGameUI)
+			{
+				TheInGameUI->clearModifierModes();
+			}
+
+			if (TheMouse)
+			{
+				TheMouse->loseFocus();
+
+				if (TheMouse->isCursorInside())
+				{
+					TheMouse->onCursorMovedOutside();
+				}
+			}
+
+			break;
+		}
+
+		//-------------------------------------------------------------------------
+		case WM_ACTIVATEAPP:
+		{
+			if ((bool)wParam != isWinMainActive)
+			{
+				// TheSuperHackers @bugfix xezon 11/05/2025 This event originally called DX8Wrapper::Reset_Device,
+				// intended to clear resources on a lost device in fullscreen, but effectively also in
+				// windowed mode, if the DXMaximizedWindowedMode shim was applied in newer versions of Windows,
+				// which lead to unfortunate application crashing. Resetting the device on WM_ACTIVATEAPP instead
+				// of TestCooperativeLevel() == D3DERR_DEVICENOTRESET is not a requirement. There are other code
+				// paths that take care of that.
+
+				setWinMainActive((BOOL)wParam);
+			}
+			updateWindowedTopmost(hWnd, (Bool)wParam);
+			return 0;
+		}
+
+		//-------------------------------------------------------------------------
+		case WM_WINDOWPOSCHANGED:
+		{
+			// a resize or move can bring the focused window over the taskbar
+			if (isWinMainActive)
+			{
+				updateWindowedTopmost(hWnd, TRUE);
+			}
+			break;
+		}
+
+		//-------------------------------------------------------------------------
+		case WM_ACTIVATE:
+		{
+			Int active = LOWORD(wParam);
+
+			if (active == WA_INACTIVE)
+			{
+				if (TheAudio)
+					TheAudio->muteAudio(AudioManager::MuteAudioReason_WindowFocus);
+			}
+			else
+			{
+				if (TheAudio)
+					TheAudio->unmuteAudio(AudioManager::MuteAudioReason_WindowFocus);
+
+				// taking over from the splash stays within the app, so no WM_ACTIVATEAPP arrives
+				if (!isWinMainActive)
+					setWinMainActive(TRUE);
+
+				// Cursor can only be captured after one of the activation events.
+				if (TheMouse)
+					TheMouse->refreshCursorCapture();
+			}
+			break;
+		}
+
+		//-------------------------------------------------------------------------
+		case WM_KEYDOWN:
+		{
+			Int key = (Int)wParam;
+
+			switch (key)
+			{
+			case VK_ESCAPE:
+			{
+				PostQuitMessage(0);
+#endif
+				break;
+			}
+#if defined(GENONLINE)
+			}
+			return 0;
+		}
+#endif
+
+#if defined(GENONLINE)
+		//-------------------------------------------------------------------------
+		case WM_LBUTTONDOWN:
+		case WM_LBUTTONUP:
+		case WM_LBUTTONDBLCLK:
+
+		case WM_MBUTTONDOWN:
+		case WM_MBUTTONUP:
+		case WM_MBUTTONDBLCLK:
+
+		case WM_RBUTTONDOWN:
+		case WM_RBUTTONUP:
+		case WM_RBUTTONDBLCLK:
+		{
+			if (TheWin32Mouse)
+				TheWin32Mouse->addWin32Event(message, wParam, lParam, TheMessageTime);
+
+			return 0;
+		}
+
+		//-------------------------------------------------------------------------
+		case 0x020B: // WM_XBUTTONDOWN
+		case 0x020C: // WM_XBUTTONUP
+		case 0x020D: // WM_XBUTTONDBLCLK
+		{
+			if( TheWin32Mouse )
+			{
+				TheWin32Mouse->addWin32Event( message, wParam, lParam, TheMessageTime );
+			}
+			return TRUE;
+		}
+
+		//-------------------------------------------------------------------------
+		case 0x020A: // WM_MOUSEWHEEL
+		{
+			if (TheWin32Mouse == nullptr)
+				return 0;
+
+			long x = (long)LOWORD(lParam);
+			long y = (long)HIWORD(lParam);
+			RECT rect;
+
+			// ignore when outside of client area
+			GetWindowRect(ApplicationHWnd, &rect);
+			if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
+				return 0;
+
+			TheWin32Mouse->addWin32Event(message, wParam, lParam, TheMessageTime);
+			return 0;
+		}
+
+		//-------------------------------------------------------------------------
+		case WM_MOUSEMOVE:
+		{
+			if (TheWin32Mouse == nullptr)
+				return 0;
+
+			// ignore when window is not active
+			if (!isWinMainActive)
+				return 0;
+
+			Int x = (Int)LOWORD(lParam);
+			Int y = (Int)HIWORD(lParam);
+			RECT rect;
+
+			// ignore when outside of client area
+			GetClientRect(ApplicationHWnd, &rect);
+			if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
+#else
 			//-------------------------------------------------------------------------
 			case WM_KEYDOWN:
+#endif
 			{
+#if defined(GENONLINE)
+				if (TheMouse->isCursorInside())
+#else
 				Int key = (Int)wParam;
 
 				switch( key )
+#endif
 				{
+#if defined(GENONLINE)
+					TheMouse->onCursorMovedOutside();
+#else
 					case VK_ESCAPE:
 					{
 						PostQuitMessage( 0 );
 						break;
 					}
+#endif
 				}
 				return 0;
 			}
 
+#if defined(GENONLINE)
+			if (!TheMouse->isCursorInside())
+#else
 			//-------------------------------------------------------------------------
 			case WM_LBUTTONDOWN:
 			case WM_LBUTTONUP:
@@ -555,13 +1011,23 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 			case WM_RBUTTONDOWN:
 			case WM_RBUTTONUP:
 			case WM_RBUTTONDBLCLK:
+#endif
 			{
+#if defined(GENONLINE)
+				TheMouse->onCursorMovedInside();
+#else
 				if( TheWin32Mouse )
 					TheWin32Mouse->addWin32Event( message, wParam, lParam, TheMessageTime );
 
 				return 0;
+#endif
 			}
 
+#if defined(GENONLINE)
+			TheWin32Mouse->addWin32Event(message, wParam, lParam, TheMessageTime);
+			return 0;
+		}
+#else
 			//-------------------------------------------------------------------------
 			case 0x020B: // WM_XBUTTONDOWN
 			case 0x020C: // WM_XBUTTONUP
@@ -580,16 +1046,40 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 			{
 				if( TheWin32Mouse == nullptr )
 					return 0;
+#endif
 
+#if defined(GENONLINE)
+		//-------------------------------------------------------------------------
+		case WM_SETCURSOR:
+		{
+			// the title bar and borders keep the system cursor, also while the window is moved
+			if (LOWORD(lParam) != HTCLIENT)
+				break;
+#else
 				long x = (long) LOWORD(lParam);
 				long y = (long) HIWORD(lParam);
 				RECT rect;
+#endif
 
+#if defined(GENONLINE)
+			if (TheWin32Mouse && (HWND)wParam == ApplicationHWnd)
+				TheWin32Mouse->setCursor(TheWin32Mouse->getMouseCursor());
+			return TRUE;	//tell Windows not to reset mouse cursor image to default.
+		}
+#else
 				// ignore when outside of client area
 				GetWindowRect( ApplicationHWnd, &rect );
 				if( x < rect.left || x > rect.right || y < rect.top || y > rect.bottom )
 					return 0;
+#endif
 
+#if defined(GENONLINE)
+		case WM_PAINT:
+		{
+			if (gDoPaint) {
+				PAINTSTRUCT paint;
+				HDC dc = ::BeginPaint(hWnd, &paint);
+#else
 				TheWin32Mouse->addWin32Event( message, wParam, lParam, TheMessageTime );
 				return 0;
 			}
@@ -641,11 +1131,22 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 				if (gDoPaint) {
 					PAINTSTRUCT paint;
 					HDC dc = ::BeginPaint(hWnd, &paint);
+#endif
 #if 0
 					::SetTextColor(dc, RGB(255,255,255));
 					::SetBkColor(dc, RGB(0,0,0));
 					::TextOut(dc, 30, 30, "Loading Command & Conquer Generals...", 37);
 #endif
+#if defined(GENONLINE)
+				if (gLoadScreenBitmap != nullptr) {
+					Int savContext = ::SaveDC(dc);
+					HDC tmpDC = ::CreateCompatibleDC(dc);
+					HBITMAP savBitmap = (HBITMAP)::SelectObject(tmpDC, gLoadScreenBitmap);
+					::BitBlt(dc, 0, 0, DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, tmpDC, 0, 0, SRCCOPY);
+					::SelectObject(tmpDC, savBitmap);
+					::DeleteDC(tmpDC);
+					::RestoreDC(dc, savContext);
+#else
 					if (gLoadScreenBitmap!=nullptr) {
 						Int savContext = ::SaveDC(dc);
 						HDC tmpDC = ::CreateCompatibleDC(dc);
@@ -657,9 +1158,19 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 					}
 					::EndPaint(hWnd, &paint);
 					return TRUE;
+#endif
 				}
+#if defined(GENONLINE)
+				::EndPaint(hWnd, &paint);
+				return TRUE;
+#else
 				break;
+#endif
 			}
+#if defined(GENONLINE)
+			break;
+		}
+#endif
 
 			case WM_ERASEBKGND:
 			{
@@ -672,8 +1183,19 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 // (Really unfortunate, actually.) I'm leaving this in in-case some one wants
 // to trap a different device change (for instance, removal of a mouse) - jkmcd
 #if 0
+#if defined(GENONLINE)
+		case WM_DEVICECHANGE:
+		{
+			if (((UINT)wParam) == DBT_DEVICEREMOVEPENDING)
+#else
 			case WM_DEVICECHANGE:
+#endif
 			{
+#if defined(GENONLINE)
+				DEV_BROADCAST_HDR* hdr = (DEV_BROADCAST_HDR*)lParam;
+				if (!hdr) {
+					break;
+#else
 				if (((UINT) wParam) == DBT_DEVICEREMOVEPENDING)
 				{
 					DEV_BROADCAST_HDR *hdr = (DEV_BROADCAST_HDR*) lParam;
@@ -691,9 +1213,28 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 					DEV_BROADCAST_VOLUME *vol = (DEV_BROADCAST_VOLUME*) (hdr);
 
 					return TRUE;
+#endif
 				}
+#if defined(GENONLINE)
+
+				if (hdr->dbch_devicetype != DBT_DEVTYP_VOLUME) {
+					break;
+				}
+
+				// Lets discuss how Windows is a flaming pile of poo. I'm now casting the header
+				// directly into the structure, because its the one I want, and this is just how
+				// its done. I hate Windows. - jkmcd
+				DEV_BROADCAST_VOLUME* vol = (DEV_BROADCAST_VOLUME*)(hdr);
+
+				return TRUE;
+#else
 				break;
+#endif
 			}
+#if defined(GENONLINE)
+			break;
+		}
+#endif
 #endif
 		}
 
@@ -704,6 +1245,65 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 		// no rethrow
 	}
 
+#if defined(GENONLINE)
+	//In full-screen mode, only pass these messages onto the default windows handler.
+	//Appears to fix issues with dual monitor systems but doesn't seem safe?
+	///@todo: Look into proper support for dual monitor systems.
+	/*	if (!TheGlobalData->m_windowed)
+		switch (message)
+		{
+			case WM_PAINT:
+			case WM_NCCREATE:
+			case WM_NCDESTROY:
+			case WM_NCCALCSIZE:
+			case WM_NCPAINT:
+					return DefWindowProc( hWnd, message, wParam, lParam );
+		}
+		return 0;*/
+
+	return DefWindowProcW(hWnd, message, wParam, lParam);
+
+}
+
+// SplashWndProc ==============================================================
+/** Paints the load screen bitmap; the bitmap lives exactly as long as this window. */
+//=============================================================================
+static LRESULT CALLBACK SplashWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch (message)
+	{
+		case WM_PAINT:
+		{
+			PAINTSTRUCT paint;
+			HDC dc = ::BeginPaint(hWnd, &paint);
+			if (gLoadScreenBitmap != nullptr)
+			{
+				RECT client;
+				::GetClientRect(hWnd, &client);
+				HDC tmpDC = ::CreateCompatibleDC(dc);
+				HBITMAP savBitmap = (HBITMAP)::SelectObject(tmpDC, gLoadScreenBitmap);
+				::BitBlt(dc, 0, 0, client.right, client.bottom, tmpDC, 0, 0, SRCCOPY);
+				::SelectObject(tmpDC, savBitmap);
+				::DeleteDC(tmpDC);
+			}
+			::EndPaint(hWnd, &paint);
+			return 0;
+		}
+
+		case WM_ERASEBKGND:
+			return TRUE;	// the bitmap covers the whole window
+
+		case WM_NCDESTROY:
+			if (gLoadScreenBitmap != nullptr)
+			{
+				::DeleteObject(gLoadScreenBitmap);
+				gLoadScreenBitmap = nullptr;
+			}
+			break;
+	}
+	return DefWindowProc(hWnd, message, wParam, lParam);
+}
+#else
 //In full-screen mode, only pass these messages onto the default windows handler.
 //Appears to fix issues with dual monitor systems but doesn't seem safe?
 ///@todo: Look into proper support for dual monitor systems.
@@ -718,9 +1318,49 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 				return DefWindowProc( hWnd, message, wParam, lParam );
 	}
 	return 0;*/
+#endif
 
+#if defined(GENONLINE)
+// createSplashWindow =========================================================
+/** Frameless window with the load screen bitmap, centred on the primary monitor. */
+//=============================================================================
+static HWND createSplashWindow(HINSTANCE hInstance, HICON icon)
+{
+	BITMAP bitmap;
+	if (gLoadScreenBitmap == nullptr || ::GetObject(gLoadScreenBitmap, sizeof(bitmap), &bitmap) == 0
+		|| bitmap.bmWidth <= 0 || bitmap.bmHeight <= 0)
+	{
+		return nullptr;
+	}
+#else
 	return DefWindowProcW( hWnd, message, wParam, lParam );
+#endif
 
+#if defined(GENONLINE)
+	WNDCLASS splashClass = { 0, SplashWndProc, 0, 0, hInstance, icon,
+							 LoadCursor(nullptr, IDC_APPSTARTING),
+							 (HBRUSH)GetStockObject(BLACK_BRUSH), nullptr,
+							 TEXT("Game Splash") };
+	if (RegisterClass(&splashClass) == 0)
+	{
+		return nullptr;
+	}
+
+	const POINT origin = { 0, 0 };
+	MONITORINFO monitorInfo = { sizeof(MONITORINFO) };
+	GetMonitorInfo(MonitorFromPoint(origin, MONITOR_DEFAULTTOPRIMARY), &monitorInfo);
+	const Int x = (monitorInfo.rcWork.left + monitorInfo.rcWork.right - bitmap.bmWidth) / 2;
+	const Int y = (monitorInfo.rcWork.top + monitorInfo.rcWork.bottom - bitmap.bmHeight) / 2;
+
+	HWND hWnd = CreateWindow(TEXT("Game Splash"), TEXT("Command and Conquer Generals"), WS_POPUP | WS_VISIBLE,
+		x, y, bitmap.bmWidth, bitmap.bmHeight, nullptr, nullptr, hInstance, nullptr);
+	if (hWnd != nullptr)
+	{
+		SetForegroundWindow(hWnd);
+		UpdateWindow(hWnd);
+	}
+	return hWnd;
+#endif
 }
 
 // initializeAppWindows =======================================================
@@ -741,8 +1381,19 @@ static Bool initializeAppWindows( HINSTANCE hInstance, Int nCmdShow, Bool runWin
 	                     L"Game Window" };
   RegisterClassW( &wndClass );
 
+#if defined(GENONLINE)
+	// The splash gets its own frameless window; the game window stays hidden until W3DDisplay hands over,
+	// so it never shows stale splash pixels while its frame, size and render device are set up
+	ApplicationSplashHWnd = createSplashWindow(hInstance, wndClass.hIcon);
+
+	// Create our main window
+	windowStyle = WS_POPUP;
+	if (ApplicationSplashHWnd == nullptr)
+		windowStyle |= WS_VISIBLE;
+#else
    // Create our main window
 	windowStyle =  WS_POPUP|WS_VISIBLE;
+#endif
 	if (runWindowed)
 		windowStyle |= WS_MINIMIZEBOX | WS_SYSMENU | WS_DLGFRAME | WS_CAPTION;
 	else
@@ -780,9 +1431,31 @@ static Bool initializeAppWindows( HINSTANCE hInstance, Int nCmdShow, Bool runWin
 														nullptr );
 
 
+#if defined(GENONLINE)
+    if (!runWindowed)
+    {
+#if defined(GENONLINE_WINDOWED_FULLSCREEN)
+        SetWindowPos(hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+#else
+        SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+#endif
+    }
+    else
+        SetWindowPos(hWnd, HWND_TOP, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+
+	if (ApplicationSplashHWnd == nullptr)
+	{
+		SetFocus(hWnd);
+
+		SetForegroundWindow(hWnd);
+		ShowWindow(hWnd, nCmdShow);
+		UpdateWindow(hWnd);
+#else
 	if (!runWindowed)
 	{	SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,SWP_NOSIZE |SWP_NOMOVE);
+#endif
 	}
+#if !defined(GENONLINE)
 	else
 		SetWindowPos(hWnd, HWND_TOP, 0, 0, 0, 0,SWP_NOSIZE |SWP_NOMOVE);
 
@@ -791,11 +1464,16 @@ static Bool initializeAppWindows( HINSTANCE hInstance, Int nCmdShow, Bool runWin
 	SetForegroundWindow(hWnd);
 	ShowWindow( hWnd, nCmdShow );
 	UpdateWindow( hWnd );
+#endif
 
 	// save our application window handle for future use
 	ApplicationHWnd = hWnd;
 	gInitializing = false;
+#if defined(GENONLINE)
+	if (!runWindowed || ApplicationSplashHWnd != nullptr) {
+#else
 	if (!runWindowed) {
+#endif
 		gDoPaint = false;
 	}
 
@@ -829,6 +1507,47 @@ static CriticalSection critSec1, critSec2, critSec3, critSec4;
 // UnHandledExceptionFilter ===================================================
 /** Handler for unhandled win32 exceptions. */
 //=============================================================================
+#if defined(GENONLINE)
+static void WriteGameCrashData(struct _EXCEPTION_POINTERS* e_info)
+{
+	DumpExceptionInfo( e_info->ExceptionRecord->ExceptionCode, e_info );
+#ifdef DEBUG_LOGGING
+	DebugFlushLog();
+#endif
+#ifdef RTS_ENABLE_CRASHDUMP
+	if (TheMiniDumper && TheMiniDumper->IsInitialized())
+	{
+		// Create both minimal and full memory dumps
+		TheMiniDumper->TriggerMiniDumpForException(e_info, DumpType_Minimal);
+		TheMiniDumper->TriggerMiniDumpForException(e_info, DumpType_Full);
+	}
+
+	MiniDumper::shutdownMiniDumper();
+#endif
+}
+
+// GenOnline @bugfix arcticdolphin 08/11/2026 A fault while writing the crash data of the game must not stop the Sentry report
+static void WriteGameCrashDataGuarded(struct _EXCEPTION_POINTERS* e_info)
+{
+	__try
+	{
+		WriteGameCrashData(e_info);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+}
+
+static LONG WINAPI UnHandledExceptionFilter(struct _EXCEPTION_POINTERS* e_info)
+{
+	// The dumps and crash info of the game come first, then the Sentry filter waits while its crash daemon uploads the report.
+	// The game ends the process itself because the Sentry filter asks Windows to keep searching, which opens the Windows crash dialog.
+	WriteGameCrashDataGuarded(e_info);
+	LONG sentryResult = EXCEPTION_EXECUTE_HANDLER;
+	GenOnlineServicesManager::ForwardCrashToSentry(e_info, &sentryResult);
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+#else
 static LONG WINAPI UnHandledExceptionFilter( struct _EXCEPTION_POINTERS* e_info )
 {
 	DumpExceptionInfo( e_info->ExceptionRecord->ExceptionCode, e_info );
@@ -847,6 +1566,7 @@ static LONG WINAPI UnHandledExceptionFilter( struct _EXCEPTION_POINTERS* e_info 
 #endif
 	return EXCEPTION_EXECUTE_HANDLER;
 }
+#endif
 
 // WinMain ====================================================================
 /** Application entry point */
@@ -905,9 +1625,15 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 			// check both localized directory and root dir
 		char filePath[_MAX_PATH];
+#if defined(GENONLINE)
+		const char* fileName = "Install_Final.bmp";
+		static const char* localizedPathFormat = "Data/%s/";
+			snprintf(filePath, sizeof(filePath), localizedPathFormat, GetRegistryLanguage().str());
+#else
 		const char *fileName = "Install_Final.bmp";
 		static const char *localizedPathFormat = "Data/%s/";
 		sprintf(filePath,localizedPathFormat, GetRegistryLanguage().str());
+#endif
 		strlcat(filePath, fileName, ARRAY_SIZE(filePath));
 		FILE *fileImage = fopen(filePath, "r");
 		if (fileImage) {
@@ -934,14 +1660,19 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 			return exitcode;
 		}
 
-#if defined(GENERALS_ONLINE)
-		NGMP_OnlineServicesManager::AttemptLoadSteam();
-#endif
+#if defined(GENONLINE)
+		GenOnlineServicesManager::AttemptLoadSteam();
 
+#endif
 		// save our application instance for future use
 		ApplicationHInstance = hInstance;
 
+#if defined(GENONLINE)
+		// the splash window owns the bitmap while it exists
+		if (gLoadScreenBitmap != nullptr && ApplicationSplashHWnd == nullptr) {
+#else
 		if (gLoadScreenBitmap!=nullptr) {
+#endif
 			::DeleteObject(gLoadScreenBitmap);
 			gLoadScreenBitmap = nullptr;
 		}
@@ -954,16 +1685,9 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 		// Set up version info
 		TheVersion = NEW Version;
-#if defined(GENERALS_ONLINE)
-		// TODO_NGMP: Better solution
-		TheVersion->setVersion(VERSION_MAJOR, VERSION_MINOR, GENERALS_ONLINE_VERSION, GENERALS_ONLINE_NET_VERSION,
-			AsciiString("triatomic"), AsciiString(""),
-			AsciiString(__TIME__), AsciiString(__DATE__));
-#else
 		TheVersion->setVersion(VERSION_MAJOR, VERSION_MINOR, VERSION_BUILDNUM, VERSION_LOCALBUILDNUM,
 			AsciiString(VERSION_BUILDUSER), AsciiString(VERSION_BUILDLOC),
 			AsciiString(__TIME__), AsciiString(__DATE__));
-#endif
 
 		// TheSuperHackers @refactor The instance mutex now lives in its own class.
 
@@ -989,6 +1713,14 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		// run the game main loop
 		exitcode = GameMain();
 
+#if defined(GENONLINE)
+		// startup ended before the first frame was drawn
+		if (ApplicationSplashHWnd != nullptr) {
+			::DestroyWindow(ApplicationSplashHWnd);
+			ApplicationSplashHWnd = nullptr;
+		}
+
+#endif
 		delete TheVersion;
 		TheVersion = nullptr;
 

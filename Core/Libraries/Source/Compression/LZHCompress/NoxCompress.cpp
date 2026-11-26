@@ -67,11 +67,15 @@ Bool DecompressFile		(char *infile, char *outfile)
 		outBlock= (char *) DbgMalloc( rawSize );
 
 		if (( inBlock == nullptr ) || ( outBlock == nullptr ))
+#if !defined(GENONLINE)
 		{
 			if (inBlock) DbgFree(inBlock);
 			if (outBlock) DbgFree(outBlock);
+#endif
 			return FALSE;
+#if !defined(GENONLINE)
 		}
+#endif
 
 		// Read in a big chunk o file
 		NoxRead(inBlock, 1, compressedSize, inFilePtr);
@@ -99,19 +103,32 @@ Bool DecompressFile		(char *infile, char *outfile)
 
 		DEBUG_LOG(("Decompressed %s to %s, output size = %d", infile, outfile, rawSize));
 
+#if !defined(GENONLINE)
 		Bool success = FALSE;
+#endif
 		LZHLDestroyDecompressor(decompress);
 		outFilePtr = fopen(outfile, "wb");
 		if (outFilePtr)
 		{
 			fwrite (outBlock, rawSize, 1, outFilePtr);
 			fclose(outFilePtr);
+#if !defined(GENONLINE)
 			success = TRUE;
+#endif
 		}
+#if defined(GENONLINE)
+		else
+			return FALSE;
+#endif
 
 		DbgFree(inBlock);
 		DbgFree(outBlock);
+#if defined(GENONLINE)
+		return TRUE;
+
+#else
 		return success;
+#endif
 	}
 
 	return FALSE;
@@ -148,11 +165,15 @@ Bool CompressFile			(char *infile, char *outfile)
 		outBlock= (char *) DbgMalloc( LZHLCompressorCalcMaxBuf( rawSize ));
 
 		if (( inBlock == nullptr ) || ( outBlock == nullptr ))
+#if !defined(GENONLINE)
 		{
 			DbgFree(inBlock);
 			DbgFree(outBlock);
+#endif
 			return FALSE;
+#if !defined(GENONLINE)
 		}
+#endif
 
 		// Read in a big chunk o file
 		NoxRead(inBlock, 1, rawSize, inFilePtr);
@@ -168,7 +189,9 @@ Bool CompressFile			(char *infile, char *outfile)
 			compressedSize += compressed;
 		}
 
+#if !defined(GENONLINE)
 		Bool success = FALSE;
+#endif
 		LZHLDestroyCompressor(compressor);
 		outFilePtr = fopen(outfile, "wb");
 		if (outFilePtr)
@@ -177,12 +200,22 @@ Bool CompressFile			(char *infile, char *outfile)
 			fwrite(&rawSize, sizeof(UnsignedInt), 1, outFilePtr);
 			fwrite(outBlock, compressedSize, 1, outFilePtr);
 			fclose(outFilePtr);
+#if !defined(GENONLINE)
 			success = TRUE;
+#endif
 		}
+#if defined(GENONLINE)
+		else
+			return FALSE;
+#endif
 
 		DbgFree(inBlock);
 		DbgFree(outBlock);
+#if defined(GENONLINE)
+		return TRUE;
+#else
 		return success;
+#endif
 	}
 
 	return FALSE;

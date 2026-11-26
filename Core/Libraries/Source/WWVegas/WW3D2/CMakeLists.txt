@@ -240,6 +240,9 @@ set(WW3D2_SRC
     ww3dformat.h
     ww3dtrig.h
 )
+if(RTS_BUILD_GENERALS_ONLINE)
+    include(${CMAKE_SOURCE_DIR}/GenOnline/cmake/core-ww3d2.cmake)
+endif()
 
 add_library(corei_ww3d2 INTERFACE)
 

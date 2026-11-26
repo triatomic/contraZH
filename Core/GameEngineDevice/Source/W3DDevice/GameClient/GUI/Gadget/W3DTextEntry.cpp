@@ -48,6 +48,11 @@
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "GameClient/GameWindowGlobal.h"
+#if defined(GENONLINE)
+#include "GameClient/GameWindowManager.h"
+#include "GameClient/GadgetComboBox.h"
+#include "GameClient/GadgetListBox.h"
+#endif
 #include "GameClient/GadgetTextEntry.h"
 #include "GameClient/IMEManager.h"
 #include "W3DDevice/GameClient/W3DGadget.h"
@@ -149,7 +154,12 @@ static void drawTextEntryText( GameWindow *window, WinInstanceData *instData,
 		//if( e->constructList && e->constructText->getTextLength() )
 		//	e->constructList->winSetPosition( (x + textWidth1), (y + fontHeight) );
 
+#if defined(GENONLINE)
+		// GenOnline @tweak arcticdolphin 08/11/2026 The text margins scale with the screen height.
+		x+= GameWindowManager::winScaleLayoutSize( 2 );
+#else
 		x+= 2;
+#endif
 		// draw the text
 		if(textWidth < width)
 		{
@@ -180,7 +190,11 @@ static void drawTextEntryText( GameWindow *window, WinInstanceData *instData,
 		//if( e->constructList && e->constructText->getTextLength() )
 		//	e->constructList->winSetPosition( (x + textWidth1), (y + fontHeight) );
 
+#if defined(GENONLINE)
+		x+= GameWindowManager::winScaleLayoutSize( 5 );
+#else
 		x+= 5;
+#endif
 		// draw the text
 		text->draw( x, y, textColor, textDropColor );
 		cursorPos = textWidth + x;
@@ -198,6 +212,20 @@ static void drawTextEntryText( GameWindow *window, WinInstanceData *instData,
 	if(parent && !BitIsSet(parent->winGetStyle(), GWS_COMBO_BOX))
 		parent = nullptr;
 
+#if defined(GENONLINE)
+	const Bool hasFocus = window == TheWindowManager->winGetFocus() || (parent && parent == TheWindowManager->winGetFocus());
+	if( e->completionEnabled && !e->secretText && hasFocus &&
+			e->constructText->getTextLength() == 0 && e->completionHint->getTextLength() > 0 )
+	{
+		if( e->completionHint->getFont() != window->winGetFont() )
+		{
+			e->completionHint->setFont( window->winGetFont() );
+		}
+		e->completionHint->setClipRegion( &clipRegion );
+		e->completionHint->draw( cursorPos, y, GameMakeColor( 128, 128, 128, 255 ), textDropColor );
+	}
+
+#endif
 	if( (window == TheWindowManager->winGetFocus() || (parent && parent == TheWindowManager->winGetFocus())) && ((drawCnt++ >> 3) & 0x1) )
 		TheWindowManager->winFillRect( textColor, WIN_DRAW_LINE_WIDTH,
 																	 cursorPos, origin.y + 3,
@@ -262,8 +290,23 @@ void W3DGadgetTextEntryDraw( GameWindow *window, WinInstanceData *instData )
 
 	}
 
+#if defined(GENONLINE)
+	// GenOnline @tweak arcticdolphin 08/11/2026 With the GO kit, a visible border draws at the kit line weight like the kit list frames.
+	Bool kitBorder = FALSE;
+	if( backBorder != WIN_COLOR_UNDEFINED && GadgetListBoxGetKitScrollLineWidth() > 0 )
+	{
+		UnsignedByte red, green, blue, alpha;
+		GameGetColorComponents( backBorder, &red, &green, &blue, &alpha );
+		kitBorder = alpha > 0;
+	}
+
+#endif
 	// draw the back border
+#if defined(GENONLINE)
+	if( backBorder != WIN_COLOR_UNDEFINED && kitBorder == FALSE )
+#else
 	if( backBorder != WIN_COLOR_UNDEFINED )
+#endif
 	{
 
 		start.x = origin.x;
@@ -288,17 +331,32 @@ void W3DGadgetTextEntryDraw( GameWindow *window, WinInstanceData *instData )
 
 	}
 
+#if defined(GENONLINE)
+	if( kitBorder )
+		GadgetListBoxDrawKitLines( origin.x, origin.y, size.x, size.y, TRUE, TRUE, TRUE, TRUE );
+
+#endif
 	// draw the text
 	Int fontHeight = TheWindowManager->winFontHeight( instData->getFont() );
+#if defined(GENONLINE)
+	// GenOnline @tweak arcticdolphin 08/11/2026 The text margin scales with the screen height.
+	Int startOffset = GameWindowManager::winScaleLayoutSize( 5 );
+#else
 	Int startOffset = 5;
+#endif
 	Int width;
 
 	width = size.x - (2 * startOffset);
 	start.x = origin.x + startOffset;  // offset a little bit into the entry
+#if defined(GENONLINE)
+	// GenOnline @bugfix arcticdolphin 23/10/2026 The text is centered vertically in the entry.
+	start.y = origin.y + (size.y - fontHeight) / 2;
+#else
 	if( BitIsSet( window->winGetStatus(), WIN_STATUS_ONE_LINE ) )
 		start.y = size.y / 2 - fontHeight / 2;
 	else
 		start.y = origin.y + startOffset;  // offset a little bit into the entry
+#endif
 
 	// draw the edit text
 	drawTextEntryText( window, instData, textColor, textBorder, compositeColor, compositeBorder,
@@ -314,12 +372,18 @@ void W3DGadgetTextEntryDraw( GameWindow *window, WinInstanceData *instData )
 void W3DGadgetTextEntryImageDraw( GameWindow *window, WinInstanceData *instData )
 {
 	EntryData *e = (EntryData *)window->winGetUserData();
+#if defined(GENONLINE)
+	ICoord2D origin, size, start;
+#else
 	ICoord2D origin, size, start, end;
+#endif
 	Color textColor, textBorder;
 	Color compositeColor, compositeBorder;
 	const Image *leftImage, *rightImage, *centerImage, *smallCenterImage;
 	Int xOffset, yOffset;
+#if !defined(GENONLINE)
 	Int i;
+#endif
 
 	// cancel unichar flag
 	e->receivedUnichar = FALSE;
@@ -332,6 +396,12 @@ void W3DGadgetTextEntryImageDraw( GameWindow *window, WinInstanceData *instData 
 	xOffset = instData->m_imageOffset.x;
 	yOffset = instData->m_imageOffset.y;
 
+#if defined(GENONLINE)
+	// GenOnline @tweak arcticdolphin 08/11/2026 The edit box of a kit combo lights with its whole field and draws no line before the arrow.
+	GameWindow *combo = window->winGetParent();
+	const Bool kitField = GadgetComboBoxIsKitField( combo ) && GadgetComboBoxGetEditBox( combo ) == window;
+
+#endif
 	// get the right colors
 	if( BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED ) == FALSE )
 	{
@@ -346,7 +416,11 @@ void W3DGadgetTextEntryImageDraw( GameWindow *window, WinInstanceData *instData 
 		smallCenterImage	= GadgetTextEntryGetDisabledImageSmallCenter( window );
 
 	}
+#if defined(GENONLINE)
+	else if( BitIsSet( instData->getState(), WIN_STATE_HILITED ) || (kitField && GadgetComboBoxIsKitFieldLit( combo )) )
+#else
 	else if( BitIsSet( instData->getState(), WIN_STATE_HILITED ) )
+#endif
 	{
 
 		textColor					= window->winGetHiliteTextColor();
@@ -358,6 +432,15 @@ void W3DGadgetTextEntryImageDraw( GameWindow *window, WinInstanceData *instData 
 		centerImage				= GadgetTextEntryGetHiliteImageCenter( window );
 		smallCenterImage	= GadgetTextEntryGetHiliteImageSmallCenter( window );
 
+#if defined(GENONLINE)
+		// GenOnline @tweak arcticdolphin 08/11/2026 A lit kit combo field keeps its enabled text colours, only its outline lights.
+		if( kitField )
+		{
+			textColor				= window->winGetEnabledTextColor();
+			textBorder			= window->winGetEnabledTextBorderColor();
+		}
+
+#endif
 	}
 	else
 	{
@@ -373,13 +456,22 @@ void W3DGadgetTextEntryImageDraw( GameWindow *window, WinInstanceData *instData 
 
 	}
 
+#if defined(GENONLINE)
+	if( kitField )
+		rightImage = smallCenterImage != nullptr ? smallCenterImage : centerImage;
+#else
 	// get image sizes for the ends
 	ICoord2D leftSize, rightSize;
 	leftSize.x = leftImage->getImageWidth();
 	leftSize.y = leftImage->getImageHeight();
 	rightSize.x = rightImage->getImageWidth();
 	rightSize.y = rightImage->getImageHeight();
+#endif
 
+#if defined(GENONLINE)
+	TheWindowManager->winDrawThreePieceImage( leftImage, centerImage, smallCenterImage, rightImage,
+																						 origin.x + xOffset, origin.y + yOffset, size.x, size.y );
+#else
 	// get two key points used in the end drawing
 	ICoord2D leftEnd, rightStart;
 	leftEnd.x = origin.x + leftSize.x + xOffset;
@@ -441,18 +533,29 @@ void W3DGadgetTextEntryImageDraw( GameWindow *window, WinInstanceData *instData 
 	end.x = start.x + rightSize.x;
 	end.y = start.y + size.y;
 	TheWindowManager->winDrawImage(rightImage, start.x, start.y, end.x, end.y);
+#endif
 
 	// draw the text
 	Int fontHeight = TheWindowManager->winFontHeight( instData->getFont() );
+#if defined(GENONLINE)
+	// GenOnline @tweak arcticdolphin 08/11/2026 The text margin scales with the screen height.
+	Int startOffset = GameWindowManager::winScaleLayoutSize( 5 );
+#else
 	Int startOffset = 5;
+#endif
 	Int width;
 
 	width = size.x - (2 * startOffset);
 	start.x = origin.x + startOffset;  // offset a little bit into the entry
+#if defined(GENONLINE)
+	// GenOnline @bugfix arcticdolphin 23/10/2026 The text is centered vertically in the entry.
+	start.y = origin.y + (size.y - fontHeight) / 2;
+#else
 		if( BitIsSet( window->winGetStatus(), WIN_STATUS_ONE_LINE ) )
 		start.y = size.y / 2 - fontHeight / 2;
 	else
 		start.y = origin.y + startOffset;  // offset a little bit into the entry
+#endif
 
 	// draw the edit text
 	drawTextEntryText( window, instData, textColor, textBorder, compositeColor, compositeBorder,

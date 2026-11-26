@@ -34,8 +34,7 @@
 GameWindow *MessageBoxYesNo(UnicodeString titleString,UnicodeString bodyString,GameWinMsgBoxFunc yesCallback,GameWinMsgBoxFunc noCallback);  ///< convenience function for displaying a Message box with Yes and No buttons
 GameWindow *QuitMessageBoxYesNo(UnicodeString titleString,UnicodeString bodyString,GameWinMsgBoxFunc yesCallback,GameWinMsgBoxFunc noCallback);  ///< convenience function for displaying a Message box with Yes and No buttons
 
-
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
 // Generals Online
 GameWindow* MessageBoxNoButtons(UnicodeString titleString, UnicodeString bodyString, bool bShowLogo);  ///< convenience function for displaying a Message box without any buttons
 #endif

@@ -172,6 +172,9 @@ unsigned							DX8Wrapper::_MainThreadID								= 0;
 bool								DX8Wrapper::CurrentDX8LightEnables[4];
 D3DLIGHT8						DX8Wrapper::CurrentDX8Lights[4];
 bool								DX8Wrapper::IsDeviceLost;
+#if defined(GENONLINE)
+bool								DX8Wrapper::DeviceResetFailed = false;
+#endif
 int								DX8Wrapper::ZBias;
 float								DX8Wrapper::ZNear;
 float								DX8Wrapper::ZFar;
@@ -380,7 +383,14 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 		// Shutdown keeps the library loaded because driver threads still call into it
 		if (D3D8Lib == nullptr)
 		{
+#if defined(GENONLINE)
+#if !defined(BUILD_WITH_D3D9)
+			LoadLibrary("dxwrapper_go.dll");
+#endif
+			D3D8Lib = LoadLibraryEx(DX8_D3D_DLL_NAME, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32); // dont load a local hooked runtime
+#else
 			D3D8Lib = LoadLibrary(DX8_D3D_DLL_NAME);
+#endif
 		}
 
 		if (D3D8Lib == nullptr) return false;	// Return false at this point if init failed
@@ -524,8 +534,13 @@ void DX8Wrapper::Invalidate_Cached_Render_States()
 		}
 		//Need to explicitly set texture to null, otherwise app will not be able to
 		//set it to null because of redundant state checker. MW
+#if defined(GENONLINE)
+		if (_Get_D3D_Device8() && !DeviceResetFailed)
+			_Get_D3D_Device8()->SetTexture(a, nullptr);
+#else
 		if (_Get_D3D_Device8())
 			_Get_D3D_Device8()->SetTexture(a,nullptr);
+#endif
 		if (Textures[a] != nullptr) {
 			Textures[a]->Release();
 		}
@@ -584,10 +599,28 @@ void DX8Wrapper::Do_Onetime_Device_Dependent_Shutdowns()
 
 bool DX8Wrapper::Create_Device()
 {
+#if defined(GENONLINE)
+	WWASSERT(D3DDevice == nullptr);	// for now, once you've created a device, you're stuck with it!
+	DeviceResetFailed = false;
+#else
 	WWASSERT(D3DDevice==nullptr);	// for now, once you've created a device, you're stuck with it!
+#endif
 
 	D3DCAPS8 caps;
 	if
+#if defined(GENONLINE)
+		(
+			FAILED
+			(
+				D3DInterface->GetDeviceCaps
+				(
+					CurRenderDevice,
+					WW3D_DEVTYPE,
+					&caps
+				)
+			)
+			)
+#else
 	(
 		FAILED
 		(
@@ -599,6 +632,7 @@ bool DX8Wrapper::Create_Device()
 			)
 		)
 	)
+#endif
 	{
 		return false;
 	}
@@ -606,6 +640,19 @@ bool DX8Wrapper::Create_Device()
 	::ZeroMemory(&CurrentAdapterIdentifier, sizeof(D3DADAPTER_IDENTIFIER8));
 
 	if
+#if defined(GENONLINE)
+		(
+			FAILED
+			(
+				D3DInterface->GetAdapterIdentifier
+				(
+					CurRenderDevice,
+					D3DENUM_NO_WHQL_LEVEL,
+					&CurrentAdapterIdentifier
+				)
+			)
+			)
+#else
 	(
 		FAILED
 		(
@@ -617,6 +664,7 @@ bool DX8Wrapper::Create_Device()
 			)
 			)
 	)
+#endif
 	{
 		return false;
 	}
@@ -746,11 +794,18 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 
 		// Set_Vertex_Buffer/Set_Index_Buffer are deferred, so unbind on the device itself.
 		// Resources still bound during Reset() crash the runtime in DestroyResource.
+#if defined(GENONLINE)
+		// A device whose Reset() failed only accepts TestCooperativeLevel, Reset and Release.
+		if (!DeviceResetFailed) {
+			Unbind_Device_Buffers();
+		}
+#else
 		for (unsigned i = 0; i < MAX_VERTEX_STREAMS; ++i)
 		{
 			Set_DX8_Stream_Source(i, nullptr, 0, 0);
 		}
 		Set_DX8_Indices(nullptr, 0);
+#endif
 		Invalidate_Cached_Render_States();
 
 		// Rebind the back buffer and release all surface
@@ -768,10 +823,19 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 			DbgHelpGuard dbgHelpGuard;
 			DX8_Assert();
 			hr = Reset_D3D_Device(_PresentParameters);
+#if defined(GENONLINE)
+			Increment_DX8_CallCount();
+			DeviceResetFailed = (hr != D3D_OK);
+			if (DeviceResetFailed) {
+				Non_Fatal_Log_DX8_ErrorCode(hr, __FILE__, __LINE__);
+				return false;	//reset failed.
+			}
+#else
 			DX8_ErrorCode(hr);
 			Increment_DX8_CallCount();
 				if (hr != D3D_OK)
 					return false;	//reset failed.
+#endif
 		}
 		else
 			return false;	//device is lost and can't be reset.
@@ -806,11 +870,35 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 	return false;
 }
 
+#if defined(GENONLINE)
+// Unbinds on the device because Set_Vertex_Buffer and Set_Index_Buffer are deferred.
+void DX8Wrapper::Unbind_Device_Buffers()
+{
+	for (unsigned stream = 0; stream < MAX_VERTEX_STREAMS; ++stream)
+	{
+		Set_DX8_Stream_Source(stream, nullptr, 0, 0);
+	}
+	Set_DX8_Indices(nullptr, 0);
+}
+
+#endif
 void DX8Wrapper::Release_Device()
 {
 	if (D3DDevice) {
 		ShaderDrawCounterClass::Release_Device();
 
+#if defined(GENONLINE)
+		if (!DeviceResetFailed)
+		{
+			for (int a=0;a<MAX_TEXTURE_STAGES;++a)
+			{
+				//release references to any textures that were used in last rendering call
+				DX8CALL(SetTexture(a,nullptr));
+			}
+
+			Unbind_Device_Buffers();
+		}
+#else
 		for (int a=0;a<MAX_TEXTURE_STAGES;++a)
 		{
 			//release references to any textures that were used in last rendering call
@@ -819,6 +907,7 @@ void DX8Wrapper::Release_Device()
 
 		Set_DX8_Stream_Source(0, nullptr, 0, 0);	//release reference count on last rendered vertex buffer
 		Set_DX8_Indices(nullptr, 0);	//release reference count on last rendered index buffer
+#endif
 
 
 		/*
@@ -1054,7 +1143,34 @@ void DX8Wrapper::Resize_And_Position_Window()
 		// Resize the window to fit this resolution
 		if (!IsWindowed)
 		{
+#if defined(GENONLINE)
+#if defined(GENONLINE_WINDOWED_FULLSCREEN)
+            // Assume hwnd is your application?s window handle
+            LONG_PTR style = GetWindowLongPtr(_Hwnd, GWL_STYLE);
+
+            // Remove all overlapped-window styles and add WS_POPUP
+            style &= ~(WS_OVERLAPPEDWINDOW);
+            style |= WS_POPUP;
+
+            // Apply the new style
+            SetWindowLongPtr(_Hwnd, GWL_STYLE, style);
+
+            // Move window to (0,0) with the monitor?s resolution:
+            SetWindowPos(
+                _Hwnd,
+                HWND_TOP,
+                0,
+                0,
+                width,
+                height,
+                SWP_FRAMECHANGED | SWP_NOOWNERZORDER
+            );
+#else
+            ::SetWindowPos(_Hwnd, HWND_TOPMOST, 0, 0, width, height, SWP_NOSIZE | SWP_NOMOVE);
+#endif
+#else
 			::SetWindowPos(_Hwnd, HWND_TOPMOST, 0, 0, width, height, 0);
+#endif
 
 			RENDER_LOG(("Window resized to w:%d h:%d", width, height));
 		}
@@ -1140,7 +1256,15 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 	//I changed this to discard all the time (even when full-screen) since that the most efficient. 07-16-03 MW:
 	_PresentParameters.SwapEffect = D3DSWAPEFFECT_DISCARD;//IsWindowed ? D3DSWAPEFFECT_DISCARD : D3DSWAPEFFECT_FLIP;		// Shouldn't this be D3DSWAPEFFECT_FLIP?
 	_PresentParameters.hDeviceWindow = _Hwnd;
+#if defined(GENONLINE)
+#if defined(GENONLINE_WINDOWED_FULLSCREEN)
+    _PresentParameters.Windowed = TRUE; // always windowed now
+#else
+    _PresentParameters.Windowed = IsWindowed;
+#endif
+#else
 	_PresentParameters.Windowed = IsWindowed;
+#endif
 
 	_PresentParameters.EnableAutoDepthStencil = TRUE;				// Driver will attempt to match Z-buffer depth
 	_PresentParameters.Flags=0;											// We're not going to lock the backbuffer

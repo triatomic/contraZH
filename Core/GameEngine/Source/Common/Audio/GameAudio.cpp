@@ -189,9 +189,18 @@ AudioManager::~AudioManager()
 	AudioEventInfoHashIt it;
 	for (it = m_allAudioEventInfo.begin(); it != m_allAudioEventInfo.end(); ++it) {
 		AudioEventInfo *eventInfo = (*it).second;
+#if defined(GENONLINE)
+		if (eventInfo) {
+			deleteInstance(eventInfo);
+			eventInfo = NULL;
+		}
+#else
 		deleteInstance(eventInfo);
+#endif
 	}
+#if !defined(GENONLINE)
 	m_allAudioEventInfo.clear();
+#endif
 
 	delete m_silentAudioEvent;
 	m_silentAudioEvent = nullptr;
@@ -813,7 +822,13 @@ AudioRequest *AudioManager::allocateAudioRequest()
 //-------------------------------------------------------------------------------------------------
 void AudioManager::releaseAudioRequest( AudioRequest *requestToRelease )
 {
+#if defined(GENONLINE)
+	if (requestToRelease) {
+		deleteInstance(requestToRelease);
+	}
+#else
 	deleteInstance(requestToRelease);
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

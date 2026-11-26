@@ -424,7 +424,11 @@ void W3DProjectedShadowManager::updateRenderTargetTextures()
 	if (!m_shadowList)
 		return;	//there are no shadows to render.
 
+#if defined(GENONLINE)
+	if (!TheGlobalData->drawsShadowDecals())
+#else
 	if (!TheGlobalData->m_useShadowDecals)
+#endif
 		return;
 
 	if (m_numProjectionShadows)
@@ -1521,7 +1525,11 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 
 	const Bool shadowMapActive = IsShadowMapActive();
 
+#if defined(GENONLINE)
+	if (TheGlobalData->drawsShadowDecals())
+#else
 	if (TheGlobalData->m_useShadowDecals)
+#endif
 	{
 		// Render the object
 		TheDX8MeshRenderer.Set_Camera(&rinfo.Camera);

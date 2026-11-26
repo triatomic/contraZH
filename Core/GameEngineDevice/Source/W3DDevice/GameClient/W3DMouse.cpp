@@ -72,6 +72,23 @@ void MouseThreadClass::Thread_Function()
 
 	//poll mouse and update position
 
+#if defined(GENONLINE)
+    while (running)
+    {
+        isThread = TRUE;
+        // Hold the mutex for the TheMouse check AND the draw() call together so
+        // that TheMouse cannot be destroyed between the null-check and the actual
+        // dereference. CriticalSectionClass uses a Windows CRITICAL_SECTION which
+        // is re-entrant per-thread, so the nested acquisition inside draw() is safe.
+        {
+            CriticalSectionClass::LockClass m(mutex);
+            if (TheMouse)
+                TheMouse->draw();
+        }
+        isThread = FALSE;
+        Switch_Thread();
+    }
+#else
 	while (running)
 	{
 		isThread=TRUE;
@@ -86,6 +103,7 @@ void MouseThreadClass::Thread_Function()
 		isThread=FALSE;
 		Switch_Thread();
 	}
+#endif
 }
 
 W3DMouse::W3DMouse()

@@ -32,13 +32,45 @@
 #include <windows.h>
 
 #include "Win32Device/Common/Win32GameEngine.h"
+#if defined(GENONLINE)
+#if defined(RTS_HAS_MODERN_MEDIA)
+#include "OpenALAudioDevice/MediaBackend.h"
+#include "OpenALAudioDevice/OpenALAudioManager.h"
+#endif
+#if defined(RTS_HAS_LEGACY_MEDIA)
+#include "MilesAudioDevice/MilesAudioManager.h"
+#endif
+#endif
 #include "Common/PerfTimer.h"
 #include "GameClient/GameText.h"
+#if defined(GENONLINE)
+#include "Common/FramePacer.h"
+#include "Common/MessageStream.h"
+#include "GameClient/InGameUI.h"
+#include "GameClient/Keyboard.h"
+#include "GameClient/Mouse.h"
+#include "GameClient/SelectionXlat.h"
+#include "GameClient/View.h"
+#endif
 
 #include "GameNetwork/LANAPICallbacks.h"
+#if defined(GENONLINE)
+#include "../GenOnlineInit.h"
 
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/GeneralsOnline/OnlineServices_Init.h"
+AudioManager *Win32GameEngine::createAudioManager(Bool dummy)
+{
+#if defined(RTS_HAS_MODERN_MEDIA)
+	if (isOpenALMediaSelected())
+		return NEW OpenALAudioManager(dummy);
+#endif
+#if defined(RTS_HAS_LEGACY_MEDIA)
+	if (dummy)
+		return NEW MilesAudioManagerDummy;
+	return NEW MilesAudioManager;
+#else
+	return NEW OpenALAudioManager(dummy);
+#endif
+}
 #endif
 
 extern DWORD TheMessageTime;
@@ -48,6 +80,11 @@ extern DWORD TheMessageTime;
 //-------------------------------------------------------------------------------------------------
 Win32GameEngine::Win32GameEngine()
 {
+#if defined(GENONLINE)
+	m_isAtFrameBoundary = FALSE;
+	m_isInModalStep = FALSE;
+
+#endif
 	// Stop blue screen
 	m_previousErrorMode = SetErrorMode( SEM_FAILCRITICALERRORS );
 }
@@ -84,6 +121,91 @@ void Win32GameEngine::reset()
 
 }
 
+#if defined(GENONLINE)
+//-------------------------------------------------------------------------------------------------
+Bool Win32GameEngine::shouldKeepRunningInBackground()
+{
+	if (TheNetwork != nullptr || TheLAN != nullptr)
+	{
+		return TRUE;
+	}
+
+	if (TheGameLogic != nullptr)
+	{
+		if (TheGameLogic->isInMultiplayerGame())
+		{
+			return TRUE;
+		}
+
+		// a single player, skirmish or replay game pauses, also when logged in online
+		if (TheGameLogic->isInGame() && !TheGameLogic->isInShellGame())
+		{
+			return FALSE;
+		}
+	}
+
+	if (GenOnlineServicesManager::GetInstance() != nullptr)
+	{
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Runs one frame from a Windows modal loop, only at the end of the frame message service. */
+//-------------------------------------------------------------------------------------------------
+Bool Win32GameEngine::stepFrameFromModalLoop()
+{
+	if (m_isInModalStep || !m_isAtFrameBoundary || getQuitting() || !shouldKeepRunningInBackground())
+	{
+		return FALSE;
+	}
+
+	m_isInModalStep = TRUE;
+	update();
+	TheFramePacer->update();
+	m_isInModalStep = FALSE;
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Drops buttons, keys, scrolling and area selection that a Windows modal loop leaves stale. */
+//-------------------------------------------------------------------------------------------------
+void Win32GameEngine::releaseInputForModalLoop()
+{
+	if (TheInGameUI != nullptr)
+	{
+		TheInGameUI->setScrolling(FALSE);
+		TheInGameUI->setSelecting(FALSE);
+		TheInGameUI->endAreaSelectHint(nullptr);
+	}
+
+	if (TheSelectionTranslator != nullptr)
+	{
+		TheSelectionTranslator->setLeftMouseButton(FALSE);
+		TheSelectionTranslator->setDragSelecting(FALSE);
+	}
+
+	if (TheTacticalView != nullptr)
+	{
+		TheTacticalView->setMouseLock(FALSE);
+	}
+
+	if (TheMouse != nullptr)
+	{
+		TheMouse->UPDATE();
+		TheMouse->resetButtons();
+	}
+
+	if (TheKeyboard != nullptr && TheMessageStream != nullptr)
+	{
+		TheKeyboard->UPDATE();
+		TheKeyboard->resetKeys();
+	}
+}
+
+#endif
 //-------------------------------------------------------------------------------------------------
 /** Update the game engine by updating the GameClient and
 	* GameLogic singletons. */
@@ -95,6 +217,13 @@ void Win32GameEngine::update()
 	// call the engine normal update
 	GameEngine::update();
 
+#if defined(GENONLINE)
+	if (m_isInModalStep)
+	{
+		return;
+	}
+
+#endif
 	extern HWND ApplicationHWnd;
 	if (ApplicationHWnd && ::IsIconic(ApplicationHWnd)) {
 		while (ApplicationHWnd && ::IsIconic(ApplicationHWnd)) {
@@ -110,26 +239,25 @@ void Win32GameEngine::update()
 				TheLAN->update();
 			}
 
-#if defined(GENERALS_ONLINE)
-			if (NGMP_OnlineServicesManager::GetInstance() != nullptr)
+#if defined(GENONLINE)
+			if (GenOnlineServicesManager::GetInstance() != nullptr)
 			{
-				NGMP_OnlineServicesManager::GetInstance()->Tick();
+				GenOnlineServicesManager::GetInstance()->Tick();
 			}
 
-			// If we are running a multiplayer game, keep running the logic.
-			// GO_CHANGE: If we have an active network session, keep running to prevent disconnecting us from
-			// other players during lobby and loading screen where isInMultiplayerGame() returns false
-			if (TheGameEngine->getQuitting() || TheGameLogic->isInMultiplayerGame() || (TheNetwork != nullptr)) {
-				break; // keep running.
-			}
-#else
+#endif
 			// If we are running a multiplayer game, keep running the logic.
 			// There is code in the client to skip client redraw if we are
 			// iconic.  jba.
+#if defined(GENONLINE)
+			// GO_CHANGE: If we have an active network session, keep running to prevent disconnecting us from
+			// other players during lobby and loading screen where isInMultiplayerGame() returns false
+			if (TheGameEngine->getQuitting() || shouldKeepRunningInBackground()) {
+#else
 			if (TheGameEngine->getQuitting() || TheGameLogic->isInInternetGame() || TheGameLogic->isInLanGame()) {
+#endif
 				break; // keep running.
 			}
-#endif
 		}
 
     // When we are alt-tabbed out... the MilesAudioManager seems to go into a coma sometimes
@@ -140,7 +268,13 @@ void Win32GameEngine::update()
 	}
 
 	// allow windows to perform regular windows maintenance stuff like msgs
+#if defined(GENONLINE)
+	m_isAtFrameBoundary = TRUE;
+#endif
 	serviceWindowsOS();
+#if defined(GENONLINE)
+	m_isAtFrameBoundary = FALSE;
+#endif
 
 }
 
@@ -155,6 +289,14 @@ void Win32GameEngine::serviceWindowsOS()
 	MSG msg;
   Int returnValue;
 
+#if defined(GENONLINE)
+	// The modal loop that runs the frame pumps the messages itself.
+	if (m_isInModalStep)
+	{
+		return;
+	}
+
+#endif
 	//
 	// see if we have any messages to process, a nullptr window handle tells the
 	// OS to look at the main window associated with the calling thread, us!

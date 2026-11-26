@@ -251,7 +251,6 @@ static LadderInfo *parseLadder(AsciiString raw)
 LadderList::LadderList()
 {
 	// TODO_NGMP: Implement ladders again
-#if !defined(GENERALS_ONLINE)
 	//Int profile = TheGameSpyInfo->getLocalProfileID();
 
 	AsciiString rawMotd = TheGameSpyConfig->getLeftoverConfig();
@@ -333,7 +332,6 @@ LadderList::LadderList()
 	loadLocalLadders();
 
 	DEBUG_LOG(("After looking for ladders, we have %d local, %d special && %d normal", m_localLadders.size(), m_specialLadders.size(), m_standardLadders.size()));
-#endif // !defined(GENERALS_ONLINE)
 }
 
 LadderList::~LadderList()

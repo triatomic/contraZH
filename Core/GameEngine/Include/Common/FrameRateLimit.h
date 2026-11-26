@@ -38,6 +38,9 @@ private:
 	Int64 m_start; ///< Scheduled start of the current frame; trails m_last when a frame ran late
 	Int64 m_last; ///< When wait last returned
 	void *m_timer; ///< High resolution timer, null where Windows has none
+#if defined(GENONLINE)
+	UnsignedInt m_previousFps;
+#endif
 };
 
 

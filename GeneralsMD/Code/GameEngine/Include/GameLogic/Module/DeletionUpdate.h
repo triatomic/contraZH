@@ -72,10 +72,10 @@ public:
 	// virtual destructor prototype provided by memory pool declaration
 
 	void setLifetimeRange( UnsignedInt minFrames, UnsignedInt maxFrames );
-	UnsignedInt getDieFrame() { return m_dieFrame; }
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+#if defined(GENONLINE)
 	void restartLifetime();
 #endif
+	UnsignedInt getDieFrame() { return m_dieFrame; }
 
 	virtual UpdateSleepTime update() override;
 

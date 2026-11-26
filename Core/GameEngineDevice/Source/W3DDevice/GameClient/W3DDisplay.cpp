@@ -44,6 +44,9 @@ static void drawFramerateBar();
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "Common/FramePacer.h"
+#if defined(GENONLINE)
+#include "Common/AdaptiveQuality.h"
+#endif
 #include "Common/ThingFactory.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
@@ -146,6 +149,9 @@ static Int theFlashCount = 0;
 #ifdef DUMP_PERF_STATS
 
 #include <cstdarg>
+#if defined(GENONLINE)
+#include "../GenOnlineDefines.h"
+#endif
 
 class StatDumpClass
 {
@@ -394,6 +400,55 @@ inline Int64 getPerformanceCounterFrequency()
 	return tmp;
 }
 
+#if defined(GENONLINE)
+// Startup splash window created by WinMain; the game window stays hidden until handed over here
+HWND ApplicationSplashHWnd = nullptr;
+
+// Show the game window and close the splash
+static void finishStartupSplash()
+{
+	extern HWND ApplicationHWnd;
+	if (ApplicationSplashHWnd == nullptr)
+		return;
+
+	if (ApplicationHWnd != nullptr)
+	{
+		::ShowWindow(ApplicationHWnd, SW_SHOW);
+		::SetForegroundWindow(ApplicationHWnd);
+		::SetFocus(ApplicationHWnd);
+	}
+	::DestroyWindow(ApplicationSplashHWnd);
+	ApplicationSplashHWnd = nullptr;
+}
+
+// Windowed hand-over, once per frame until done: the first frame shows the game window behind the
+// splash without activating it, the next one (after a presented frame) closes the splash
+static void updateStartupSplash()
+{
+	extern HWND ApplicationHWnd;
+	if (ApplicationSplashHWnd == nullptr || ApplicationHWnd == nullptr)
+		return;
+
+	if (!::IsWindowVisible(ApplicationHWnd))
+	{
+		// The game window can still have its creation size at the first frames, so it is shown once it has the requested resolution or after about 10 seconds.
+		static Int s_sizeWaitFrames = 0;
+		RECT client;
+		::GetClientRect(ApplicationHWnd, &client);
+		if (++s_sizeWaitFrames < 600
+			&& (client.right - client.left != (LONG)TheGlobalData->m_xResolution || client.bottom - client.top != (LONG)TheGlobalData->m_yResolution))
+		{
+			return;
+		}
+		::SetWindowPos(ApplicationHWnd, ApplicationSplashHWnd, 0, 0, 0, 0,
+			SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+		return;
+	}
+
+	finishStartupSplash();
+}
+
+#endif
 // W3DDisplay::W3DDisplay =====================================================
 /** */
 //=============================================================================
@@ -1049,10 +1104,35 @@ void W3DDisplay::init()
 			}
 
 			// TheSuperHackers @feature Mauller 13/03/2026 Add native MSAA support, must be set before creating render device
+#if defined(GENONLINE)
+#if !defined(GENONLINE_DISABLE_TEXTURE_FILTERING_AND_AA)
+			WW3D::Set_MSAA_Mode((WW3D::MultiSampleModeEnum)TheWritableGlobalData->m_antiAliasLevel);
+			WW3D::Set_Super_Sampling(TheGlobalData->m_superSampling);
+#else
+			WW3D::Set_MSAA_Mode(WW3D::MultiSampleModeEnum::MULTISAMPLE_MODE_NONE);
+#endif
+			WW3D::Set_VSync_Mode(TheGlobalData->m_vsync);
+			WW3D::Set_Low_Latency(TheGlobalData->m_lowLatency != FALSE);
+
+			// exclusive fullscreen needs the game window visible and in the foreground when the device is
+			// created, and the mode switch blanks the screen anyway, so hand over from the splash now
+			if (!getWindowed())
+			{
+				finishStartupSplash();
+			}
+
+			// exclusive fullscreen needs the game window visible and in the foreground when the device is
+			// created, and the mode switch blanks the screen anyway, so hand over from the splash now
+			if (!getWindowed())
+			{
+				finishStartupSplash();
+			}
+#else
 			WW3D::Set_MSAA_Mode((WW3D::MultiSampleModeEnum)TheWritableGlobalData->m_antiAliasLevel);
 			WW3D::Set_Super_Sampling(TheGlobalData->m_superSampling);
 			WW3D::Set_VSync_Mode(TheGlobalData->m_vsync);
 			WW3D::Set_Low_Latency(TheGlobalData->m_lowLatency != FALSE);
+#endif
 
 			renderDeviceError = WW3D::Set_Render_Device(
 				0,
@@ -1064,6 +1144,7 @@ void W3DDisplay::init()
 
 			// TheSuperHackers @info Update the MSAA mode that was set as some GPU's may not support certain levels
 			// Texture filtering must also be updated after render device initialization
+#if !defined(GENONLINE_DISABLE_TEXTURE_FILTERING_AND_AA)
 			if (renderDeviceError == WW3D_ERROR_OK) {
 				TheWritableGlobalData->m_antiAliasLevel = (UnsignedInt)WW3D::Get_MSAA_Mode();
 				TheWritableGlobalData->m_superSampling = WW3D::Get_Super_Sampling();
@@ -1072,6 +1153,7 @@ void W3DDisplay::init()
 				WW3D::Set_Anisotropy_Level(TheWritableGlobalData->m_textureAnisotropyLevel);
 				TheWritableGlobalData->m_textureAnisotropyLevel = WW3D::Get_Anisotropy_Level();
 			}
+#endif
 
 			++attempt;
 		}
@@ -1761,6 +1843,21 @@ void W3DDisplay::gatherDebugStats()
 			// Network performance stats
 			unibuffer.format(L"Run Ahead: %d, Net FPS: %d, Packet arrival cushion: %d",
 				TheNetwork->getRunAhead(), TheNetwork->getFrameRate(), TheNetwork->getPacketArrivalCushion());
+#if defined(GENONLINE)
+
+			for (Int slot = 0; slot < MAX_SLOTS; ++slot) {
+				const ConnectionStats* stats = TheNetwork->getConnectionStats(slot);
+				if (stats != nullptr && stats->getSampleCount() > 0) {
+					UnicodeString statsstr;
+					if (stats->getLatePercent() > 0.0f) {
+						statsstr.format(L" P%d %.0fms j%.1f l%.0f/%.0f%%", slot, stats->getLatency(), stats->getJitter(), stats->getLossPercent(), stats->getLatePercent());
+					} else {
+						statsstr.format(L" P%d %.0fms j%.1f l%.0f%%", slot, stats->getLatency(), stats->getJitter(), stats->getLossPercent());
+					}
+					unibuffer.concat(statsstr);
+				}
+			}
+#endif
 			m_displayStrings[NetStats]->setText( unibuffer );
 
 			// Client frame rate averages for all players in the game.  This only works right for the packet router.
@@ -2254,10 +2351,16 @@ void W3DDisplay::draw()
 	if (TheGlobalData->m_headless)
 		return;
 
+#if defined(GENONLINE)
+	updateStartupSplash();
+
+#endif
 	// TheSuperHackers @feature bobtista 10/07/2026 Show messages for screenshots finished by the screenshot thread.
 	W3D_UpdateScreenshotMessages();
 
+#if !defined(GENONLINE)
 	updatePerformanceMetrics();
+#endif
 	if (TheGlobalData->m_enableDynamicLOD && TheGameLogic->getShowDynamicLOD())
 	{
 		DynamicGameLODLevel lod=TheGameLODManager->findDynamicLODLevel(m_averageFPS);
@@ -2333,12 +2436,20 @@ AGAIN:
   	//
 	//PredictiveLODOptimizerClass::Optimize_LODs( 5000 );
 
+#if !defined(GENONLINE)
 	Bool freezeTime = TheFramePacer->isTimeFrozen() || TheFramePacer->isGameHalted();
 
+#endif
 	/// @todo: I'm assuming the first view is our main 3D view.
 	W3DView *primaryW3DView=(W3DView *)getFirstView();
 
+#if defined(GENONLINE)
+	const Bool freezeTime = TheFramePacer->isTimeFrozen();
+
+	if ((!freezeTime || TheFramePacer->isGameHalted()) && TheScriptEngine->isTimeFast())
+#else
 	if (!freezeTime && TheScriptEngine->isTimeFast())
+#endif
 	{
 		return;
 	}
@@ -2374,6 +2485,22 @@ AGAIN:
 		// limit the framerate, because while fast time is on, the game logic is running as fast as it can.
 	}
 
+#if defined(GENONLINE)
+	// Never skipped while time is frozen because scripted cameras render in the loop below.
+	const Bool skipRender = !freezeTime && AdaptiveQuality::get().shouldSkipRender();
+
+	// Only rendered frames enter the fps history so skipped frames do not inflate the shown fps.
+	if (!skipRender)
+	{
+		updatePerformanceMetrics();
+	}
+
+	if (skipRender && m_cinematicText != AsciiString::TheEmptyString && m_cinematicTextFrames != 0)
+	{
+		m_cinematicTextFrames--;
+	}
+
+#endif
 	Bool viewsUpdated = TRUE;
 
 	do {
@@ -2406,6 +2533,9 @@ AGAIN:
 
 		// start render block
 	    if ( (TheGameLogic->getFrame() % 30 == 1) || ( ! (!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode && TheFramePacer->isFastForwardAvailable())) )
+#if defined(GENONLINE)
+		if (!skipRender)
+#endif
 		{
 			//USE_PERF_TIMER(BigAssRenderLoop)
 			static Bool couldRender = true;
@@ -2482,6 +2612,10 @@ AGAIN:
 				{
 					// TheSuperHackers @bugfix Mauller 20/07/2025 scale videos based on screen size so they are shown in their original aspect
 					drawScaledVideoBuffer( m_videoBuffer, m_videoStream );
+#if defined(GENONLINE)
+					// GenOnline @bugfix arcticdolphin 21/11/2026 The frame rate, latency and clock are drawn again because the video covers them.
+					TheInGameUI->postWindowDraw();
+#endif
 				}
 
 				// render letter box before debug display so debug info isn't hidden
@@ -2557,8 +2691,17 @@ AGAIN:
 					m_profilerFrameCapture->Capture(getWidth(), getHeight());
 				}
 #endif
+#if defined(GENONLINE)
+				// Sorted geometry is drawn here so that only the Present below is timed as a wait.
+				SortingRendererClass::Flush();
+				AdaptiveQuality::get().notePresentMode(WW3D::Is_Windowed(), WW3D::Get_Ext_Swap_Interval() != (long)D3DPRESENT_INTERVAL_IMMEDIATE);
+				const long long presentStart = AdaptiveQuality::now();
+#endif
 				// render is all done!
 				WW3D::End_Render();
+#if defined(GENONLINE)
+				AdaptiveQuality::get().addPresentWait(AdaptiveQuality::now() - presentStart);
+#endif
 			}
 			else
 			{
@@ -2572,7 +2715,11 @@ AGAIN:
 
 		if (TheScriptEngine->isTimeFrozenDebug() || TheScriptEngine->isTimeFrozenScript() || TheGameLogic->isGamePaused())
 		{
+#if defined(GENONLINE)
+			break; // We're frozen for debug or for pause, and need to break out of the loop.
+#else
 			freezeTime = false; // We're frozen for debug or for pause, and need to continue out of the loop.
+#endif
 		}
 
 	} while (freezeTime && !TheTacticalView->isCameraMovementFinished());
@@ -2666,6 +2813,10 @@ void W3DDisplay::createLightPulse( const Coord3D *pos, const RGBColor *color,
 {
 	if (m_3DScene == nullptr || !TheGlobalData->m_useDynamicLights)
 		return;
+#if defined(GENONLINE)
+	if (AdaptiveQualityLevels::lightPulsesOff(TheGlobalData->m_adaptiveQualityLevel))
+		return;
+#endif
 	if (innerRadius+attenuationWidth<2.0*PATHFIND_CELL_SIZE_F + 1.0f) {
 		return; // it basically won't make any visual difference.  jba.
 	}
@@ -3295,6 +3446,30 @@ void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 	RectClass screen_rect(startX,startY,endX,endY);
 	RectClass uv_rect(uv->lo.x,uv->lo.y,uv->hi.x,uv->hi.y);
 
+#if defined(GENONLINE)
+	const Bool rotated = BitIsSet( image->getStatus(), IMAGE_STATUS_ROTATED_90_CLOCKWISE );
+
+	// A stretched image samples half a texel inside its rect so atlas neighbours do not bleed in.
+	const Int imageWidth = image->getImageWidth();
+	const Int imageHeight = image->getImageHeight();
+	const Bool stretchedX = endX - startX != imageWidth;
+	const Bool stretchedY = endY - startY != imageHeight;
+	const Int texelsU = rotated ? imageHeight : imageWidth;
+	const Int texelsV = rotated ? imageWidth : imageHeight;
+	if ((rotated ? stretchedY : stretchedX) && texelsU > 1)
+	{
+		const Real insetU = 0.5f * uv_rect.Width() / (Real)texelsU;
+		uv_rect.Left += insetU;
+		uv_rect.Right -= insetU;
+	}
+	if ((rotated ? stretchedX : stretchedY) && texelsV > 1)
+	{
+		const Real insetV = 0.5f * uv_rect.Height() / (Real)texelsV;
+		uv_rect.Top += insetV;
+		uv_rect.Bottom -= insetV;
+	}
+
+#endif
 	if (m_isClippedEnabled)
 	{
 		//need to clip this quad to clip rectangle
@@ -3303,7 +3478,11 @@ void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 			RectClass clipped_rect;
 			RectClass clipped_uv_rect;
 
+#if defined(GENONLINE)
+			if( rotated )
+#else
 			if( BitIsSet( image->getStatus(), IMAGE_STATUS_ROTATED_90_CLOCKWISE ) )
+#endif
 			{
 
 
@@ -3371,7 +3550,11 @@ void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 	}
 
 	// if rotated 90 degrees clockwise we have to adjust the uv coords
+#if defined(GENONLINE)
+	if( rotated )
+#else
 	if( BitIsSet( image->getStatus(), IMAGE_STATUS_ROTATED_90_CLOCKWISE ) )
+#endif
 	{
 
 		m_2DRender->Add_Tri( Vector2( screen_rect.Left, screen_rect.Top ),

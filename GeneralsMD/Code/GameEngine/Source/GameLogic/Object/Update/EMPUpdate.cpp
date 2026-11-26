@@ -136,8 +136,9 @@ UpdateSleepTime EMPUpdate::update()
 	Drawable *dr = obj->getDrawable();
 	UnsignedInt now = TheGameLogic->getFrame();
 
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	m_currentScale += ( m_targetScale - m_currentScale ) * ( 0.05f / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER );
+#if defined(GENONLINE)
+	// TODO_GENONLINE: Use a frame time delta here instead of assuming 60 fps
+	m_currentScale += ( m_targetScale - m_currentScale ) * (0.05f / LOGICFRAMES_PER_BASEFRAME);
 #else
 	m_currentScale += ( m_targetScale - m_currentScale ) * 0.05f;
 #endif
@@ -341,14 +342,16 @@ void EMPUpdate::doDisableAttack()
 
 							sys->attachToObject(curVictim);
 							sys->setPosition( &offs );
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-							sys->setSystemLifetime(MAX(0, (data->m_disabledDuration / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER) - 240));
+#if defined(GENONLINE)
+							#if defined(GENONLINE)
+							sys->setSystemLifetime(MAX(0, (data->m_disabledDuration/ LOGICFRAMES_PER_BASEFRAME) - 240));
+							sys->setInitialDelay(GameLogicRandomValue(1, 100) / LOGICFRAMES_PER_BASEFRAME);
+							#else
+							sys->setSystemLifetime(MAX(0, data->m_disabledDuration - 30));
+							sys->setInitialDelay(GameClientRandomValue(1, 100));
+							#endif
 #else
 							sys->setSystemLifetime(MAX(0, data->m_disabledDuration - 30));
-#endif
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-							sys->setInitialDelay(GameClientRandomValue(1,100) / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER);
-#else
 							sys->setInitialDelay(GameClientRandomValue(1,100));
 #endif
 						}

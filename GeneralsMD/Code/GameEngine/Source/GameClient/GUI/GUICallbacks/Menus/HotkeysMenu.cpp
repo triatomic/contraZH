@@ -241,7 +241,7 @@ const BuiltInText BUILT_IN_TEXT[] =
 	{ "GUI:HotkeysCommandCYCLE_HOUSE_COLOR_MODE", L"Cycle house colors" },
 	{ "GUI:HotkeysCommandTAKE_SCREENSHOT_PNG", L"Screenshot as PNG" },
 	{ "GUI:HotkeysCommandSPECIAL_POWER", L"Special power %d" },
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
 	{ "GUI:HotkeysCategoryGO", L"GO" },
 	{ "GUI:HotkeysTabGO", L"GO" },
 	{ "GUI:HotkeysCommandTOGGLE_NETWORK_STATS", L"Network stats" },
@@ -283,7 +283,7 @@ const char *const HIDDEN_COMMANDS[] =
 const Int CATEGORY_ORDER[] =
 {
 	CATEGORY_SELECTION, CATEGORY_TEAM, CATEGORY_CONTROL, CATEGORY_INFORMATION, CATEGORY_INTERFACE, CATEGORY_TAUNT, CATEGORY_MISC,
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
 	CATEGORY_GO,
 #endif
 };

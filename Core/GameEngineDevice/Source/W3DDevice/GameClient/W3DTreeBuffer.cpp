@@ -922,12 +922,24 @@ void W3DTreeBuffer::updateVertexBuffer()
 		}
 		VertexFormatXYZNDUV1 *vb;
 		// Lock the buffers.
+#if defined(GENONLINE)
+#ifdef USE_STATIC
+		DX8VertexBufferClass::WriteLockClass lockVtxBuffer(m_vertexTree[bNdx], 0);
+#else
+		DX8VertexBufferClass::WriteLockClass lockVtxBuffer(m_vertexTree[bNdx], D3DLOCK_DISCARD);
+#endif
+		vb = (VertexFormatXYZNDUV1*)lockVtxBuffer.Get_Vertex_Array();
+		if (!vb) {
+			continue;
+		}
+#else
 	#ifdef USE_STATIC
 		DX8VertexBufferClass::WriteLockClass lockVtxBuffer(m_vertexTree[bNdx], 0);
 	#else
 		DX8VertexBufferClass::WriteLockClass lockVtxBuffer(m_vertexTree[bNdx], D3DLOCK_DISCARD);
 	#endif
 		vb=(VertexFormatXYZNDUV1*)lockVtxBuffer.Get_Vertex_Array();
+#endif
 		if (!vb) {
 			continue;
 		}
@@ -1519,7 +1531,11 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 
 	Int curTree;
 	// Draw tree shadows.
+#if defined(GENONLINE)
+	if (m_shadow && TheW3DProjectedShadowManager && TheGlobalData->drawsShadowDecals() && !mirror) {
+#else
 	if (m_shadow && TheW3DProjectedShadowManager && TheGlobalData->m_useShadowDecals && !mirror) {
+#endif
 		for (curTree=0; curTree<m_numTrees; curTree++) {
 			Int type = m_trees[curTree].treeType;
 			if (type<0) {

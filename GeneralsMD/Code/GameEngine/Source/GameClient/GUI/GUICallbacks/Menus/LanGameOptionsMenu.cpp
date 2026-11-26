@@ -61,6 +61,9 @@
 #include "Common/MultiplayerSettings.h"
 #include "GameClient/GameText.h"
 #include "GameNetwork/GUIUtil.h"
+#if defined(GENONLINE)
+#include "Common/LocalApiLobby.h"
+#endif
 
 
 extern char *LANnextScreen;
@@ -236,14 +239,22 @@ static void playerTooltip(GameWindow *window,
 	if (!myGame)
 		return;
 
+#if defined(GENONLINE)
+	LANGameSlot *slot = myGame->getLANSlot(idx);
+#else
 	LANGameSlot *slot = myGame->getLANSlot(i);
+#endif
 	if (!slot)
 		return;
 
 	LANPlayer *player = slot->getUser();
 	if (!player)
 	{
+#if defined(GENONLINE)
+		DEBUG_ASSERTCRASH(myGame->getIP(idx) == 0, ("No player info in listbox!"));
+#else
 		DEBUG_ASSERTCRASH(myGame->getIP(i) == 0, ("No player info in listbox!"));
+#endif
 		TheMouse->setCursorTooltip( UnicodeString::TheEmptyString );
 		return;
 	}
@@ -366,7 +377,12 @@ void StartPressed()
 	}
 	else
 	{
+#if defined(GENONLINE)
+		// GenOnline @bugfix arcticdolphin 09/11/2026 The map name hides the folders of the user.
+		mapDisplayName = getMapNameFromPath(myGame->getMap());
+#else
 		mapDisplayName.format(L"%hs", myGame->getMap().str());
+#endif
 		willTransfer = WouldMapTransfer(myGame->getMap());
 	}
 	for( i = 0; i < MAX_SLOTS; i++ )
@@ -1052,8 +1068,26 @@ void DeinitLanGameGadgets()
 //-------------------------------------------------------------------------------------------------
 /** Initialize the Lan Game Options Menu */
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+static Bool s_lanGameOptionsMenuOpen = FALSE;
+
+// The LAN game setup has no commands, so a trimmed non-empty line is sent.
+Bool LanGameOptionsMenuSubmitChatLine( UnicodeString text )
+{
+	text.trim();
+	if (!s_lanGameOptionsMenuOpen || TheLAN == nullptr || text.isEmpty())
+		return FALSE;
+
+	TheLAN->RequestChat(text, LANAPIInterface::LANCHAT_NORMAL);
+	return TRUE;
+}
+
+#endif
 void LanGameOptionsMenuInit( WindowLayout *layout, void *userData )
 {
+#if defined(GENONLINE)
+	s_lanGameOptionsMenuOpen = TRUE;
+#endif
 	if (TheLAN->GetMyGame() && TheLAN->GetMyGame()->isGameInProgress())
 	{
 		// If we init while the game is in progress, we are really returning to the menu
@@ -1184,7 +1218,12 @@ void updateGameOptions()
 		}
 		else
 		{
+#if defined(GENONLINE)
+			// GenOnline @tweak arcticdolphin 09/11/2026 The map name without the .map extension.
+			mapDisplayName = getMapNameFromPath(TheLAN->GetMyGame()->getMap());
+#else
 			mapDisplayName.format(L"%hs", getFileName(TheLAN->GetMyGame()->getMap().str()));
+#endif
 		}
 		UnicodeString old = GadgetStaticTextGetText(textEntryMapDisplay);
 		if(old.compare(mapDisplayName) != 0)
@@ -1304,6 +1343,9 @@ static void shutdownComplete( WindowLayout *layout )
 //-------------------------------------------------------------------------------------------------
 void LanGameOptionsMenuShutdown( WindowLayout *layout, void *userData )
 {
+#if defined(GENONLINE)
+	s_lanGameOptionsMenuOpen = FALSE;
+#endif
 	TheMouse->setCursor(Mouse::ARROW);
 	TheMouse->setMouseText(UnicodeString::TheEmptyString,nullptr,nullptr);
 	EnableSlotListUpdates(FALSE);
@@ -1757,3 +1799,38 @@ void PostToLanGameOptions( PostToLanGameType post )
 			return;
 	}
 }
+#if defined(GENONLINE)
+
+static void statsMoveStartPosition(Int slot, Int position)
+{
+	handleStartPositionSelection(slot, position);
+}
+
+Bool LanGameOptionsMenuStatsLobby( StatsLobbyScreen& out )
+{
+	if (!parentLanGameOptions || !TheLAN || !TheLAN->GetMyGame() || !buttonStart)
+		return FALSE;
+
+	out.game = TheLAN->GetMyGame();
+	out.isHost = TheLAN->AmIHost();
+	out.localSlot = out.game->getLocalSlotNum();
+	if (LANbuttonPushed)
+		out.blocked = "the screen is leaving or starting the game";
+	else if (mapSelectLayout)
+		out.blocked = "the map selector is open";
+	else if (!AreSlotListUpdatesEnabled() || s_isIniting)
+		out.blocked = "the screen is still opening";
+	out.comboPlayer = comboBoxPlayer;
+	out.comboColor = comboBoxColor;
+	out.comboTemplate = comboBoxPlayerTemplate;
+	out.comboTeam = comboBoxTeam;
+	out.buttonStartPosition = buttonMapStartPosition;
+	out.comboStartingCash = comboBoxStartingCash;
+	out.checkLimitSuperweapons = checkboxLimitSuperweapons;
+	out.buttonSelectMap = buttonSelectMap;
+	out.buttonStart = buttonStart;
+	out.moveStartPosition = statsMoveStartPosition;
+	out.applyMap = LanMapSelectMenuApplyMap;
+	return TRUE;
+}
+#endif

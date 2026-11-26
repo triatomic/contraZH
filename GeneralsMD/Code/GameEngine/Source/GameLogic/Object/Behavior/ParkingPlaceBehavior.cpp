@@ -154,7 +154,9 @@ void ParkingPlaceBehavior::purgeDead()
 				{
 					it->m_objectInSpace = INVALID_ID;
 					it->m_reservedForExit = false;
+#if !defined(GENONLINE)
 					it->m_postponedRunwayReservationForTakeoff = false;
+#endif
 					if (pu)
 						pu->setHoldDoorOpen(it->m_door, false);
 				}
@@ -490,7 +492,9 @@ void ParkingPlaceBehavior::releaseSpace(ObjectID id)
 		{
 			it->m_objectInSpace = INVALID_ID;
 			it->m_reservedForExit = false;
+#if !defined(GENONLINE)
 			it->m_postponedRunwayReservationForTakeoff = false;
+#endif
 			if (pu)
 				pu->setHoldDoorOpen(it->m_door, false);
 			break;
@@ -549,6 +553,7 @@ void ParkingPlaceBehavior::transferRunwayReservationToNextInLineForTakeoff(Objec
 	}
 }
 
+#if !defined(GENONLINE)
 //-------------------------------------------------------------------------------------------------
 Bool ParkingPlaceBehavior::postponeRunwayReservation(UnsignedInt spaceIndex, Bool forLanding)
 {
@@ -572,6 +577,7 @@ Bool ParkingPlaceBehavior::postponeRunwayReservation(UnsignedInt spaceIndex, Boo
 	return false;
 }
 
+#endif
 //-------------------------------------------------------------------------------------------------
 Bool ParkingPlaceBehavior::reserveRunway(ObjectID id, Bool forLanding)
 {
@@ -579,16 +585,28 @@ Bool ParkingPlaceBehavior::reserveRunway(ObjectID id, Bool forLanding)
 	purgeDead();
 
 	Int runway = -1;
+#if defined(GENONLINE)
+	for (std::vector<ParkingPlaceInfo>::iterator it = m_spaces.begin(); it != m_spaces.end(); ++it)
+#else
 	for (UnsignedInt i = 0; i < m_spaces.size(); ++i)
+#endif
 	{
+#if defined(GENONLINE)
+		if (it->m_objectInSpace == id)
+#else
 		if (m_spaces[i].m_objectInSpace == id)
+#endif
 		{
+#if defined(GENONLINE)
+			runway = it->m_runway;
+#else
 #if !RETAIL_COMPATIBLE_CRC
 			if (postponeRunwayReservation(i, forLanding))
 				return false;
 #endif
 
 			runway = m_spaces[i].m_runway;
+#endif
 			break;
 		}
 	}

@@ -45,11 +45,29 @@ struct DataChunkInfo;
 enum { SUPPLY_TECH_SIZE = 15};
 typedef std::list <ICoord2D> ICoord2DList;
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+// GenOnline @feature arcticdolphin 08/11/2026 Preview marker that carries its icon category.
+struct MapPreviewMarker
+{
+	ICoord2D m_pos; ///< top left of the getMapPreviewMarkerSize() marker, relative to the preview window
+	AsciiString m_category; ///< MapPreviewIcons category name, empty when no rule matched
+	AsciiString m_templateName;
+	Bool m_isTech; ///< KINDOF_TECH_BUILDING, else KINDOF_SUPPLY_SOURCE_ON_PREVIEW
+};
+typedef std::list<MapPreviewMarker> MapPreviewMarkerList;
+#endif
+
+#endif
 class TechAndSupplyImages
 {
 public:
 	ICoord2DList m_techPosList;
 	ICoord2DList m_supplyPosList;
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 08/11/2026 Typed markers. When set, the two position lists above stay empty.
+	MapPreviewMarkerList m_typedMarkers;
+#endif
 };
 
 struct WinTimeStamp
@@ -68,6 +86,31 @@ public:
 
 typedef std::list <Coord3D> Coord3DList;
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+// GenOnline @feature arcticdolphin 08/11/2026 Typed supply and tech objects of a map for the preview icons and mapcache.json.
+struct MapTypedObject
+{
+	AsciiString m_templateName;
+	AsciiString m_category; ///< MapPreviewIcons category name, empty when no rule matched
+	Bool m_isTech; ///< KINDOF_TECH_BUILDING, else KINDOF_SUPPLY_SOURCE_ON_PREVIEW
+	Coord3D m_pos;
+};
+typedef std::vector<MapTypedObject> MapTypedObjectVector;
+
+class MapTypedObjects
+{
+public:
+	MapTypedObjects() : m_isKnown(FALSE) {}
+
+	MapTypedObjectVector m_objects;
+	Bool m_isKnown; ///< TRUE once read from the map or mapcache.json; an empty list then means the map has none
+};
+
+Bool loadMapTypedObjects( const AsciiString &mapPath, MapTypedObjectVector &outObjects );
+#endif
+
+#endif
 class MapMetaData
 {
 public:
@@ -88,6 +131,10 @@ public:
 	Coord3DList m_supplyPositions;
 	Coord3DList m_techPositions;
 	AsciiString m_fileName;
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 08/11/2026 Typed objects for the preview icons, not written to MapCache.ini.
+	MapTypedObjects m_typedObjects;
+#endif
 };
 
 // TheSuperHackers @performance xezon 02/11/2025 Simplifies and improves the implementation of MapCache
@@ -106,7 +153,7 @@ public:
 
 	void updateCache();
 
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
 	AsciiString getMapDir(bool bCustomMapDebug = false) const;
 	AsciiString getUserMapDir(bool bCustomMapDebug = false) const;
 #else
@@ -155,3 +202,6 @@ Bool parseMapPreviewChunk(DataChunkInput &file, DataChunkInfo *info, void *userD
 void findDrawPositions( Int startX, Int startY, Int width, Int height, Region3D extent,
 															 ICoord2D *ul, ICoord2D *lr );
 Bool WouldMapTransfer( const AsciiString& mapName );
+#if defined(GENONLINE)
+UnicodeString getMapNameFromPath( const AsciiString& mapPath ); ///< Map file name without folders or the .map extension
+#endif

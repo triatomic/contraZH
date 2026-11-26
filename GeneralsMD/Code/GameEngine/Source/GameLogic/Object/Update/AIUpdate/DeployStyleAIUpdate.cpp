@@ -121,7 +121,7 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 	// when we have a pending command...
 	Object *self = getObject();
 	Weapon *weapon = self->getCurrentWeapon();
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+#if defined(GENONLINE)
 	UnsignedInt now = TheGameLogic->getFrameLegacy();
 #else
 	UnsignedInt now = TheGameLogic->getFrame();
@@ -282,12 +282,6 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 		case DEPLOY:
 			if( data->m_manualDeployAnimations )
 			{
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-				if (!TheGameLogic->HasLegacyFrameAdvanced())
-				{
-					break;
-				}
-#endif
 				UnsignedInt totalFrames = getPackTime();
 				UnsignedInt framesLeft = m_frameToWaitForDeploy - now;
 				Drawable *draw = self->getDrawable();
@@ -302,12 +296,6 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 		case UNDEPLOY:
 			if( data->m_manualDeployAnimations )
 			{
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-				if (!TheGameLogic->HasLegacyFrameAdvanced())
-				{
-					break;
-				}
-#endif
 				UnsignedInt framesLeft = m_frameToWaitForDeploy - now;
 				Drawable *draw = self->getDrawable();
 				if( draw )
@@ -401,7 +389,7 @@ void DeployStyleAIUpdate::setMyState( DeployStateTypes stateID, Bool reverseDepl
 {
 	m_state = stateID;
 	Object *self = getObject();
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+#if defined(GENONLINE)
 	UnsignedInt now = TheGameLogic->getFrameLegacy();
 #else
 	UnsignedInt now = TheGameLogic->getFrame();

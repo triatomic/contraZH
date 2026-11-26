@@ -59,6 +59,9 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/CommandSequence.h"
 #include "GameLogic/GameLogic.h"
+#if defined(GENONLINE)
+#include "Common/LocalApiLive.h"
+#endif
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -276,6 +279,13 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 		return;
 	}
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	// Every way a match ends (quit, replay left early, disconnect) passes here. A no-op if ENDED already went out.
+	LocalApiLiveGameDataCleared();
+#endif
+
+#endif
 	setClearingGameData( TRUE );
 
 	PathProfile::End_Match();	// TheSuperHackers @feature simonx645 16/11/2026 -pathProfile: the match's summary
@@ -444,6 +454,12 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 
 				if(TheStatsCollector)
 					TheStatsCollector->collectMsgStats(msg);
+#if defined(GENONLINE)
+
+#if defined(GENONLINE)
+				LocalApiLiveCommand(msgPlayer->getPlayerIndex(), msg->getType());
+#endif
+#endif
 			}
 		}
 	}
@@ -1187,6 +1203,23 @@ bool GameLogic::onNewGame(MAYBE_UNUSED GameMessage *msg)
 	return true;
 }
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+void GameLogic::processPendingGameExit()
+{
+	for (GameMessage* msg = TheCommandList->getFirstMessage(); msg != nullptr; msg = msg->next()) {
+		if (msg->getType() == GameMessage::MSG_CLEAR_GAME_DATA) {
+			TheCommandList->removeMessage(msg);
+			deleteInstance(msg);
+			AIGroupPtr selectedGroup = nullptr;
+			onClearGameData(nullptr, selectedGroup);
+			return;
+		}
+	}
+}
+#endif
+
+#endif
 bool GameLogic::onClearGameData(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 #if defined(RTS_DEBUG)
@@ -2823,6 +2856,9 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 		Object *object = TheThingFactory->newObject( thing, msgPlayer->getDefaultTeam() );
 		object->setPosition( &pos );
 		object->setProducer(nullptr);
+#if defined(GENONLINE)
+		LocalApiLiveBeacon(msgPlayer->getPlayerIndex(), &pos);
+#endif
 
 		if (msgPlayer->getRelationship( ThePlayerList->getLocalPlayer()->getDefaultTeam() ) == ALLIES || ThePlayerList->getLocalPlayer()->isPlayerObserver())
 		{
@@ -2983,6 +3019,9 @@ bool GameLogic::onSetBeaconText(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curre
 bool GameLogic::onSelfDestruct(MAYBE_UNUSED GameMessage *msg)
 {
 	Player *msgPlayer = getMessagePlayer(msg);
+#if defined(GENONLINE)
+	LocalApiLivePlayerLeft(msgPlayer->getPlayerIndex(), "self_destruct");
+#endif
 
 	if (msg->getArgument(0)->boolean)
 	{
@@ -3037,6 +3076,9 @@ bool GameLogic::onSetReplayCamera(MAYBE_UNUSED GameMessage *msg)
 			const Real zoom = msg->getArgument( 3 )->real;
 			const Mouse::MouseCursor mouseCursor = static_cast<Mouse::MouseCursor>(msg->getArgument( 4 )->integer);
 			const ICoord2D mousePos = msg->getArgument( 5 )->pixel;
+#if defined(GENONLINE)
+			const UnsignedInt userActionCount = TheTacticalView->getUserActionCount();
+#endif
 
 			// TheSuperHackers @info Definitely call in user mode to ensure the camera operates with auto-zoom
 			// over terrain elevations, because the Replay Camera does not store the absolute camera location,
@@ -3064,6 +3106,11 @@ bool GameLogic::onSetReplayCamera(MAYBE_UNUSED GameMessage *msg)
 				TheTacticalView->set3DCameraLookAt(camPos, camDir, 0.0f);
 			}
 
+#if defined(GENONLINE)
+			// The recorded camera is not the user at this PC: tools that watch for user camera input do not count it.
+			TheTacticalView->restoreUserActionCount( userActionCount );
+
+#endif
 			// TheSuperHackers @fix Lock the new location to avoid user input from changing the camera in this frame.
 			TheTacticalView->lockUserControlUntilFrame( getFrame() + 1 );
 

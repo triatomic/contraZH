@@ -32,6 +32,9 @@
 #include "Common/version.h"
 
 #include "gitinfo.h"
+#if defined(GENONLINE)
+#include "GameNetwork/GenOnline/Realtime/RealtimeRest.h"
+#endif
 
 Version *TheVersion = nullptr;	///< The Version singleton
 
@@ -321,12 +324,23 @@ UnicodeString Version::getUnicodeBuildUserOrGitCommitAuthorName() const
 UnicodeString Version::getUnicodeProductTitle() const
 {
 	// @todo Make configurable
+#if defined(GENONLINE)
+	return L"Generals Online";
+#else
 	return L"Community Patch";
+#endif
 }
 
 UnicodeString Version::getUnicodeProductVersion() const
 {
+#if defined(GENONLINE)
+	// GenOnline @bugfix arcticdolphin 21/11/2026 The version follows the build, it was a fixed string.
+	UnicodeString str;
+	str.format(L"%hs", GenOnlineRealtime::ClientVersionText(GitTag, GitReleaseTag, GitCommitDate, GitHaveInfo ? GitShortSHA1 : "").c_str());
+	return str;
+#else
 	return getUnicodeGitVersion();
+#endif
 }
 
 UnicodeString Version::getUnicodeProductAuthor() const

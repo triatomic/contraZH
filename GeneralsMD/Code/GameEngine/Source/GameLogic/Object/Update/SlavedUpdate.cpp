@@ -109,13 +109,14 @@ void SlavedUpdate::onSlaverDamage( const DamageInfo *info )
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime SlavedUpdate::update()
 {
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+
+#if defined(GENONLINE)
 	if (!TheGameLogic->HasLegacyFrameAdvanced())
 	{
 		return UPDATE_SLEEP_NONE;
 	}
-#endif
 
+#endif
 /// @todo srj use SLEEPY_UPDATE here
 	if( m_framesToWait > 0 )
 	{
@@ -127,7 +128,11 @@ UpdateSleepTime SlavedUpdate::update()
 		{
 			return UPDATE_SLEEP_NONE;
 		}
+#if defined(GENONLINE)
+		m_framesToWait = ConvertFramesToBaseFrames(SLAVED_UPDATE_RATE);
+#else
 		m_framesToWait = SLAVED_UPDATE_RATE;
+#endif
 	}
 
 	if( m_slaver == INVALID_ID )
@@ -548,7 +553,12 @@ void SlavedUpdate::doRepairLogic()
 		if( body )
 		{
 			//Calculate the repair rate per frame.
+#if defined(GENONLINE)
+			// The update runs once per base frame.
+			Real repairAmount = ConvertRatePerSecToPerFrame(data->m_repairRatePerSecond) * LOGICFRAMES_PER_BASEFRAME;
+#else
 			Real repairAmount = data->m_repairRatePerSecond / LOGICFRAMES_PER_SECOND;
+#endif
 
 			DamageInfo healingInfo;
 			healingInfo.in.m_amount = repairAmount;
@@ -566,7 +576,11 @@ void SlavedUpdate::endRepair()
 	{
 		//Remove the state so we can start using the update timer again.
 		m_repairState = REPAIRSTATE_NONE;
+#if defined(GENONLINE)
+		m_framesToWait = ConvertFramesToBaseFrames(SLAVED_UPDATE_RATE);
+#else
 		m_framesToWait = SLAVED_UPDATE_RATE;
+#endif
 		m_repairing = false;
 
 		//Set the packing state and clear any other states (to force the arm to fully retract)
@@ -643,7 +657,11 @@ void SlavedUpdate::setRepairState( RepairStates repairState )
 					break;
 				default:
 					m_repairState = REPAIRSTATE_READY;
+#if defined(GENONLINE)
+					m_framesToWait = ConvertFramesToBaseFrames(GameLogicRandomValue( data->m_minReadyFrames, data->m_maxReadyFrames ));
+#else
 					m_framesToWait = GameLogicRandomValue( data->m_minReadyFrames, data->m_maxReadyFrames );
+#endif
 					break;
 			}
 			break;
@@ -660,7 +678,11 @@ void SlavedUpdate::setRepairState( RepairStates repairState )
 			else
 			{
 				m_repairState = REPAIRSTATE_WELDING;
+#if defined(GENONLINE)
+				m_framesToWait = ConvertFramesToBaseFrames(GameLogicRandomValue( data->m_minWeldFrames, data->m_maxWeldFrames ));
+#else
 				m_framesToWait = GameLogicRandomValue( data->m_minWeldFrames, data->m_maxWeldFrames );
+#endif
 
 				//Make sparks!
 				if( !data->m_weldingSysName.isEmpty() )
@@ -681,8 +703,9 @@ void SlavedUpdate::setRepairState( RepairStates repairState )
 						}
 
 						weldingSys->setPosition( &pos );
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-						Real time = (Real)(m_framesToWait * (LOGICFRAMES_PER_SECOND / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER));
+#if defined(GENONLINE)
+							// NOTE: Don't increase the time just because the logic tick rate increased
+							Real time = (Real)(m_framesToWait * (LOGICFRAMES_PER_SECOND/ LOGICFRAMES_PER_BASEFRAME));
 #else
 						Real time = (Real)(m_framesToWait * LOGICFRAMES_PER_SECOND);
 #endif

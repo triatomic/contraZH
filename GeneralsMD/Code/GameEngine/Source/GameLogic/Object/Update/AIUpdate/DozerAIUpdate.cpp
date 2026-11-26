@@ -1560,7 +1560,12 @@ DozerAIUpdate::~DozerAIUpdate()
 {
 
 	// delete our behavior state machine
+#if defined(GENONLINE)
+	if( m_dozerMachine )
+		deleteInstance(m_dozerMachine);
+#else
 	deleteInstance(m_dozerMachine);
+#endif
 
 	// no orders
 	for( Int i = 0; i < DOZER_NUM_TASKS; i++ )

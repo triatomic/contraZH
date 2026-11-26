@@ -681,6 +681,18 @@ void showNotificationBox( AsciiString nick, UnicodeString message)
 
 }
 
+#if defined(GENONLINE)
+// GenOnline @bugfix arcticdolphin 07/11/2026 A notification was raised only when it appeared, so the next shell screen
+// and its ruler were drawn over it. The shell raises it again after every screen change.
+void raiseNotificationBox()
+{
+	if (noticeLayout != nullptr && !noticeLayout->isHidden())
+	{
+		noticeLayout->bringForward();
+	}
+}
+
+#endif
 void deleteNotificationBox()
 {
 	lastNotificationWasStatus = FALSE;
@@ -1370,15 +1382,7 @@ WindowMsgHandledType WOLBuddyOverlayRCMenuSystem( GameWindow *window, UnsignedIn
 				{
 					DEBUG_LOG(("buttonStatsID was pushed"));
 					GameSpyCloseOverlay(GSOVERLAY_PLAYERINFO);
-#if defined(GENERALS_ONLINE)
-					// SetLookAtPlayer takes the GO user id and display name; this GameSpy
-					// flow is unreachable with GO active, adapt the call so it compiles.
-					UnicodeString uniNick;
-					uniNick.translate(nick);
-					SetLookAtPlayer((int64_t)profileID, uniNick);
-#else
 					SetLookAtPlayer(profileID,nick );
-#endif
 					GameSpyOpenOverlay(GSOVERLAY_PLAYERINFO);
 					PSRequest req;
 					req.requestType = PSRequest::PSREQUEST_READPLAYERSTATS;

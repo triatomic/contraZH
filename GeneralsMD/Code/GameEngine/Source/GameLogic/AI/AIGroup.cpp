@@ -67,6 +67,9 @@
 #include "GameLogic/ObjectIter.h"
 #include "GameLogic/LineFormation.h"
 #include "GameLogic/PartitionManager.h"
+#if defined(GENONLINE)
+#include "Common/LocalApiLive.h"
+#endif
 
 
 /**
@@ -3338,6 +3341,18 @@ void AIGroup::groupEvacuate( Bool isWaypoint, CommandSourceType cmdSource )
 		AIUpdateInterface *ai = (*i)->getAIUpdateInterface();
 		if (ai)
 		{
+#if defined(GENONLINE)
+			ContainModuleInterface *statsContain = (*i)->getContain();
+			// capture the passenger count before the evacuation clears it
+			if( statsContain != nullptr && statsContain->getContainCount() > 0
+				&& (*i)->getControllingPlayer() != nullptr )
+			{
+				LocalApiLiveEvacuate(
+					(*i)->getControllingPlayer()->getPlayerIndex(),
+					(*i)->getTemplate(),
+					statsContain->getContainCount() );
+			}
+#endif
 			const JetAIUpdate *jetAI = ai->getJetAIUpdate();
 			if( (*i)->isKindOf( KINDOF_AIRCRAFT ) && (*i)->isAirborneTarget() &&
 				!(jetAI && jetAI->returnsToBaseAfterUnload()) )
@@ -3400,6 +3415,16 @@ void AIGroup::groupEvacuate( Bool isWaypoint, CommandSourceType cmdSource )
 			ContainModuleInterface *contain = (*i)->getContain();
 			if( contain )
 			{
+#if defined(GENONLINE)
+				// capture the passenger count before the evacuation clears it
+				if( contain->getContainCount() > 0 && (*i)->getControllingPlayer() != nullptr )
+				{
+					LocalApiLiveEvacuate(
+						(*i)->getControllingPlayer()->getPlayerIndex(),
+						(*i)->getTemplate(),
+						contain->getContainCount() );
+				}
+#endif
 				contain->orderAllPassengersToExit( cmdSource, FALSE );
 			}
 		}

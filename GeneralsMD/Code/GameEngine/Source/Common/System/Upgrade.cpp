@@ -163,7 +163,11 @@ Int UpgradeTemplate::calcTimeToBuild( Player *player ) const
 #endif
 
 	///@todo modify this by power state of player
+#if defined(GENONLINE)
+	Int buildTime = ConvertBaseFramesToFrames((Int)ConvertFramesToBaseFramesReal(ConvertDurationFromSecsToFrames(m_buildTime)));
+#else
 	Int buildTime = m_buildTime * LOGICFRAMES_PER_SECOND;
+#endif
 
 	// global per-player build-speed multiplier (ProductionSpeedMultiplier chat command); >1 researches faster
 	Real speedMultiplier = player->getProductionSpeedMultiplier();

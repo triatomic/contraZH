@@ -350,7 +350,12 @@ TurretAI::~TurretAI()
 {
 	stopRotOrPitchSound();
 
+#if defined(GENONLINE)
+	if (m_turretStateMachine)
+		deleteInstance(m_turretStateMachine);
+#else
 	deleteInstance(m_turretStateMachine);
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -509,8 +514,10 @@ Bool TurretAI::friend_turnTowardsAngle(Real desiredAngle, Real rateModifier, Rea
 	Real origAngle = getTurretAngle();
 	Real actualAngle = origAngle;
 	Real turnRate = getTurnRate() * rateModifier;
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	turnRate *= 2.f;
+#if defined(GENONLINE)
+
+	turnRate *= (Real)LOGICFRAMES_PER_BASEFRAME;
+
 #endif
 	// Real angleDiff = normalizeAngle(desiredAngle - actualAngle);
 	Real angleDiff = stdAngleDiffMod(desiredAngle, actualAngle);
@@ -632,9 +639,6 @@ Bool TurretAI::friend_turnTowardsPitch(Real desiredPitch, Real rateModifier)
 	// rotate turret back to zero angle
 	Real actualPitch = getTurretPitch();
 	Real pitchRate = getPitchRate() * rateModifier;
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	pitchRate *= 2.f;
-#endif
 	Real pitchDiff = normalizeAngle(desiredPitch - actualPitch);
 
 	if (WWMath::Fabs(pitchDiff) < pitchRate)
@@ -910,11 +914,12 @@ void TurretAI::friend_notifyStateMachineChanged()
 DECLARE_PERF_TIMER(TurretAI)
 UpdateSleepTime TurretAI::updateTurretAI()
 {
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+#if defined(GENONLINE)
 	if (!TheGameLogic->HasLegacyFrameAdvanced())
 	{
 		return UPDATE_SLEEP_NONE;
 	}
+
 #endif
 
 	USE_PERF_TIMER(TurretAI)
@@ -1557,7 +1562,11 @@ void TurretAIIdleState::loadPostProcess()
 void TurretAIIdleState::resetIdleScan()
 {
 	UnsignedInt now = TheGameLogic->getFrame();
+#if defined(GENONLINE)
+	UnsignedInt delay = GameLogicRandomFramesInBaseFrames(getTurretAI()->getMinIdleScanInterval(), getTurretAI()->getMaxIdleScanInterval());
+#else
 	UnsignedInt delay = GameLogicRandomValue(getTurretAI()->getMinIdleScanInterval(), getTurretAI()->getMaxIdleScanInterval());
+#endif
 	m_nextIdleScan = now + delay;
 }
 
@@ -1659,7 +1668,11 @@ StateReturnType TurretAIIdleScanState::update()
   if( getMachineOwner()->testStatus( OBJECT_STATUS_UNDER_CONSTRUCTION))
     return STATE_CONTINUE;//ML so that under-construction base-defenses do not idle-scan while under construction
 
+#if defined(GENONLINE)
+	Bool angleAligned = getTurretAI()->friend_turnTowardsAngle(getTurretAI()->getNaturalTurretAngle() + m_desiredAngle, 0.5f, 0.5f);
+#else
 	Bool angleAligned = getTurretAI()->friend_turnTowardsAngle(getTurretAI()->getNaturalTurretAngle() + m_desiredAngle, 0.5f, 0.0f);
+#endif
 	Bool pitchAligned = getTurretAI()->friend_turnTowardsPitch(getTurretAI()->getNaturalTurretPitch(), 0.5f);
 
 	if( angleAligned && pitchAligned )

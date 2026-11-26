@@ -104,10 +104,9 @@ public:
 	virtual DeployStyleAIUpdate* getDeployStyleAIUpdate() override { return this; }
 	virtual const DeployStyleAIUpdate* getDeployStyleAIUpdate() const override { return this; }
 
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	// INI pack times are authored in 30 Hz frames.
-	UnsignedInt getUnpackTime()					const { return getDeployStyleAIUpdateModuleData()->m_unpackTime / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER; }
-	UnsignedInt getPackTime()						const { return getDeployStyleAIUpdateModuleData()->m_packTime / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER; }
+#if defined(GENONLINE)
+	UnsignedInt getUnpackTime()					const { return getDeployStyleAIUpdateModuleData()->m_unpackTime/ LOGICFRAMES_PER_BASEFRAME; }
+	UnsignedInt getPackTime()						const { return getDeployStyleAIUpdateModuleData()->m_packTime/ LOGICFRAMES_PER_BASEFRAME; }
 #else
 	UnsignedInt getUnpackTime()					const { return getDeployStyleAIUpdateModuleData()->m_unpackTime; }
 	UnsignedInt getPackTime()						const { return getDeployStyleAIUpdateModuleData()->m_packTime; }

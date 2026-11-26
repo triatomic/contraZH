@@ -116,7 +116,13 @@ public:
 	// Drawing management
 	virtual void setClipRegion( IRegion2D *region ) override;	///< Set clip rectangle for 2D draw operations.
 	virtual Bool	isClippingEnabled() override { return m_isClippedEnabled; }
+#if defined(GENONLINE)
+	virtual void	enableClipping(Bool onoff) override { m_isClippedEnabled = onoff; }
+	// GenOnline @feature arcticdolphin 08/11/2026 Read back the clip rectangle so a draw can restore it.
+	virtual Bool	getClipRegion(IRegion2D* region) override { *region = m_clipRegion; return TRUE; }	///< Fill the clip rectangle.
+#else
 	virtual void	enableClipping( Bool onoff ) override { m_isClippedEnabled = onoff; }
+#endif
 
 	virtual void update() override; ///< Update the client state of the display
 	virtual void step() override; ///< Do one fixed time step

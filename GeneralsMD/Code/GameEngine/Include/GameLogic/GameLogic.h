@@ -39,6 +39,10 @@
 #include "GameLogic/GameMode.h"
 #include "GameLogic/Module/UpdateModule.h"	// needed for DIRECT_UPDATEMODULE_ACCESS
 
+#if defined(GENONLINE)
+#include "../GenOnlineDefines.h"
+
+#endif
 /*
 	At one time, we distinguished between sleepy and nonsleepy
 	update modules, and kept a separate list for each. however,
@@ -128,16 +132,17 @@ public:
 	// virtual so the WorldBuilder editor can supply its own frame clock (WBParticleRuntime)
 	// without standing up the real simulation -- the game keeps the base m_frame implementation.
 	virtual UnsignedInt getFrame();						///< Returns the current simulation frame number
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	// The legacy frame is the 30 Hz frame that frame-count code was written against.
-	UnsignedInt getFrameLegacy() const;
-	Bool HasLegacyFrameAdvanced() const;
-#endif
 	UnsignedInt getCRC( Int mode = CRC_CACHED, AsciiString deepCRCFileName = AsciiString::TheEmptyString );		///< Returns the CRC
 
 	void setObjectIDCounter( ObjectID nextObjID ) { m_nextObjID = nextObjID; }
 	ObjectID getObjectIDCounter() { return m_nextObjID; }
 
+#if defined(GENONLINE)
+	UnsignedInt getFrameLegacy(void);
+	bool HasLegacyFrameAdvanced(void);
+
+
+#endif
 	//-----------------------------------------------------------------------------------------------
 	void setBuildableStatusOverride(const ThingTemplate* tt, BuildableStatus bs);
 	Bool findBuildableStatusOverride(const ThingTemplate* tt, BuildableStatus& bs) const;
@@ -159,6 +164,9 @@ public:
 
 	void updateLoadProgress( Int progress );
 	void deleteLoadScreen();
+#if defined(GENONLINE)
+	void revealFromLoadScreen(Bool loadingSaveGame);	///< Fades the load screen out and deletes it.
+#endif
 
 	//Kris: Cut setGameLoading() and replaced with setLoadingMap() and setLoadingSave() -- reason: nomenclature
 	//void setGameLoading( Bool loading ) { m_loadingScene = loading; }
@@ -207,6 +215,9 @@ public:
 	UnsignedInt getFrameObjectsChangedTriggerAreas() {return m_frameObjectsChangedTriggerAreas;}
 
 	void exitGame();
+#if defined(GENONLINE)
+	void processPendingGameExit();
+#endif
 	void quit(Bool toDesktop);
 	void clearGameData(Bool showScoreScreen = TRUE);														///< Clear the game data
 	void closeWindows();
@@ -229,10 +240,9 @@ public:
 	void initTimeOutValues();
 	UnsignedInt getObjectCount();
 
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
 	bool IsLoadScreenActive() const { return m_loadScreen != nullptr; }
 #endif
-
 	Int getRankLevelLimit() const { return m_rankLevelLimit; }
 	void setRankLevelLimit(Int limit)
 	{
@@ -251,7 +261,7 @@ public:
   Bool isDiplomacyParticipant(const Player *player) const; ///< May this player take or receive a Diplomacy stance
   Bool isFreeRadar() const { return m_freeRadar; } ///< Does every player have radar without a radar source
   Bool isAutoQueue() const { return m_autoQueue; } ///< May players have producers build a unit whenever their queue is empty
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
   void sendPendingLobbyRules(); ///< The Generals Online host turns its rules on once the match runs
 #endif
 
@@ -462,7 +472,12 @@ private:
 
 	ObjectID m_nextObjID;																		///< For allocating object id's
 
+#if defined(GENONLINE)
+	void setDefaults(Bool loadSaveGame);									///< Set default values of class object
+	void processDestroyList(void);												///< Destroy all pending objects on the destroy list
+#else
 	void processDestroyList();												///< Destroy all pending objects on the destroy list
+#endif
 
 	void destroyAllObjectsImmediate();											///< destroy, and process destroy list immediately
 
@@ -479,7 +494,7 @@ private:
   Bool m_freeRadar;
   Bool m_revealMap;
   Bool m_autoQueue;
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
   UnsignedInt m_pendingLobbyRules; ///< LobbyRule bits the host has yet to send
 #endif
 
@@ -496,7 +511,20 @@ private:
 	Bool m_logicTimeScaleEnabledMemory;
 
 	Bool m_progressComplete[MAX_SLOTS];
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	Int m_progressMade[MAX_SLOTS];
+#endif
+
+#if defined(GENONLINE)
+	enum { PROGRESS_COMPLETE_TIMEOUT_PROGRESS_MADE = 30000 };							///< Timeout we wait for when we've completed our Load, if they made SOME progress
+	enum { PROGRESS_COMPLETE_TIMEOUT_ZERO_PROGRESS_MADE = 5000 };							///< Timeout we wait for when we've completed our Load, when they made zero progress
+#else
 	enum { PROGRESS_COMPLETE_TIMEOUT = 60000 };							///< Timeout we wait for when we've completed our Load
+#endif
+#else
+	enum { PROGRESS_COMPLETE_TIMEOUT = 60000 };							///< Timeout we wait for when we've completed our Load
+#endif
 	Int m_progressCompleteTimeout[MAX_SLOTS];
 	void testTimeOut();
 	void lastHeardFrom( Int playerId );
@@ -536,10 +564,6 @@ inline Real GameLogic::getWidth() { return m_width; }
 inline void GameLogic::setHeight( Real height ) { m_height = height; }
 inline Real GameLogic::getHeight() { return m_height; }
 inline UnsignedInt GameLogic::getFrame() { return m_frame; }
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-inline UnsignedInt GameLogic::getFrameLegacy() const { return m_frame / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER; }
-inline Bool GameLogic::HasLegacyFrameAdvanced() const { return (m_frame % GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER) == 0; }
-#endif
 
 inline GameMode GameLogic::getGameMode() { return m_gameMode; }
 inline Bool GameLogic::isInGame() const { return rts::isGame(m_gameMode); }
@@ -550,6 +574,12 @@ inline Bool GameLogic::isInInternetGame() const { return rts::isInternetGame(m_g
 inline Bool GameLogic::isInShellGame() const { return rts::isShellGame(m_gameMode); }
 inline Bool GameLogic::isInMultiplayerGame() const { return rts::isMultiplayerGame(m_gameMode); }
 inline Bool GameLogic::isInInteractiveGame() const { return rts::isInteractiveGame(m_gameMode); }
+#if defined(GENONLINE)
+
+// The base frame derives from the saved logic frame, so it stays correct after loading a save game.
+inline UnsignedInt GameLogic::getFrameLegacy(void) { return m_frame / LOGICFRAMES_PER_BASEFRAME; }
+inline bool GameLogic::HasLegacyFrameAdvanced(void) { return (m_frame % LOGICFRAMES_PER_BASEFRAME) == 0; }
+#endif
 inline UnsignedShort GameLogic::getSuperweaponRestriction() const { return m_superweaponRestriction; }
 
 inline Object* GameLogic::findObjectByID( ObjectID id )
@@ -566,5 +596,13 @@ inline Object* GameLogic::findObjectByID( ObjectID id )
 
 
 
+#if defined(GENONLINE)
+class GameInfo;
+class GameSlot;
+
+// Whether this slot is the local player. The initial camera and the stats exporter use the same test.
+extern Bool GameLogicIsLocalSlot(GameInfo* game, GameSlot* slot);
+
+#endif
 // the singleton
 extern GameLogic *TheGameLogic;

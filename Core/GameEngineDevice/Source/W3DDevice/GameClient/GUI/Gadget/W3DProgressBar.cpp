@@ -289,6 +289,10 @@ void W3DGadgetProgressBarImageDraw( GameWindow *window, WinInstanceData *instDat
 			// backSmallCenter == nullptr ||barLeft == nullptr ||barCenter == nullptr || barSmallCenter == nullptr )
 		return;
 
+#if defined(GENONLINE)
+	TheWindowManager->winDrawThreePieceImage( backLeft, backCenter, nullptr, backRight,
+																						 origin.x + xOffset, origin.y + yOffset, size.x, size.y );
+#else
 	// get image sizes for the ends
 	ICoord2D leftSize, rightSize;
 	leftSize.x = backLeft->getImageWidth();
@@ -377,6 +381,7 @@ void W3DGadgetProgressBarImageDraw( GameWindow *window, WinInstanceData *instDat
 	end.x = start.x + rightSize.x;
 	end.y = start.y + size.y;
 	TheWindowManager->winDrawImage(backRight, start.x, start.y, end.x, end.y);
+#endif
 
 
 	ICoord2D barWindowSize;  // end point of bar from window origin
@@ -384,7 +389,24 @@ void W3DGadgetProgressBarImageDraw( GameWindow *window, WinInstanceData *instDat
 	barWindowSize.x = ((size.x - 20) * progress) / 100;
 	barWindowSize.y = size.y;
 
+#if defined(GENONLINE)
+	Int pieces;
+	Int fillHeight = size.y - 10;
+	Int barCenterWidth = barCenter->getImageWidth();
+	Int barRightWidth = barRight->getImageWidth();
+	if( fillHeight > 0 && barCenter->getImageHeight() > 0 && fillHeight != barCenter->getImageHeight() )
+		barCenterWidth = (barCenterWidth * fillHeight + barCenter->getImageHeight() / 2) / barCenter->getImageHeight();
+	if( fillHeight > 0 && barRight->getImageHeight() > 0 && fillHeight != barRight->getImageHeight() )
+		barRightWidth = (barRightWidth * fillHeight + barRight->getImageHeight() / 2) / barRight->getImageHeight();
+	if( barCenterWidth < 1 )
+		barCenterWidth = 1;
+	if( barRightWidth < 1 )
+		barRightWidth = 1;
+
+	pieces = barWindowSize.x / barCenterWidth;
+#else
 	pieces = barWindowSize.x / barCenter->getImageWidth();
+#endif
  	// draw the pieces
 	start.x = origin.x +10;
 	start.y = origin.y + yOffset +5;
@@ -392,24 +414,48 @@ void W3DGadgetProgressBarImageDraw( GameWindow *window, WinInstanceData *instDat
 	for( i = 0; i < pieces; i++ )
 	{
 
+#if defined(GENONLINE)
+		end.x = start.x + barCenterWidth;
+#else
 		end.x = start.x + barCenter->getImageWidth();
+#endif
 		TheWindowManager->winDrawImage( barCenter,
 																		start.x, start.y,
 																		end.x, end.y );
+#if defined(GENONLINE)
+		start.x += barCenterWidth;
+#else
 		start.x += barCenter->getImageWidth();
+#endif
 
 	}
+#if defined(GENONLINE)
+	start.x = origin.x + 10 + barCenterWidth * pieces;
+#else
 	start.x = origin.x + 10 + barCenter->getImageWidth() * pieces;
+#endif
 	//pieces = (size.x - barWindowSize.x -20) / barRight->getImageWidth();
+#if defined(GENONLINE)
+	pieces = ((size.x - 20) / barCenterWidth) - pieces;
+#else
 	pieces = ((size.x - 20) / barCenter->getImageWidth()) - pieces;
+#endif
 	for( i = 0; i < pieces; i++ )
 	{
 
+#if defined(GENONLINE)
+		end.x = start.x + barRightWidth;
+#else
 		end.x = start.x + barRight->getImageWidth();
+#endif
 		TheWindowManager->winDrawImage( barRight,
 																		start.x, start.y,
 																		end.x, end.y );
+#if defined(GENONLINE)
+		start.x += barRightWidth;
+#else
 		start.x += barRight->getImageWidth();
+#endif
 
 	}
 

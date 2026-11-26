@@ -186,13 +186,19 @@ public:
 	virtual Bool isTimeFrozen(){ return false;}					///< Freezes time during the next camera movement.
 	virtual Int	 getTimeMultiplier() {return 1;};				///< Get the time multiplier.
 	virtual void setTimeMultiplier(Int multiple) {}; ///< Set the time multiplier.
-#if defined(GENERALS_ONLINE)
-	virtual void setDefaultView(Real pitch, Real angle, Real maxHeight, bool bForceDefaultCam = true) {};
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+    virtual void setDefaultView(Real pitch, Real angle, Real maxHeight, bool bForceDefaultCam = true) {};
+#else
+    virtual void setDefaultView(Real pitch, Real angle, Real maxHeight) {};
+#endif
+	virtual void zoomCamera(Real finalZoom, Int milliseconds, Real easeIn = 0.0f, Real easeOut = 0.0f) {};
+	virtual void pitchCamera(Real finalPitch, Int milliseconds, Real easeIn = 0.0f, Real easeOut = 0.0f) {};
 #else
 	virtual void setDefaultView(Real pitch, Real angle, Real maxHeight) {}; // TheSuperHackers @todo Replace with setDefaultPitch(), setMaxHeightScale()
-#endif
 	virtual void zoomCamera( Real finalZoom, Int milliseconds, Real easeIn=0.0f, Real easeOut=0.0f ) {};
 	virtual void pitchCamera( Real finalPitch, Int milliseconds, Real easeIn=0.0f, Real easeOut=0.0f ) {};
+#endif
 
 	virtual Bool isDoingScriptedCamera() = 0;
 	virtual void stopDoingScriptedCamera() = 0;
@@ -255,6 +261,10 @@ public:
 
 	void lockUserControlUntilFrame(UnsignedInt frame) { m_userControlLockedUntilFrame = frame; } ///< Locks the user control over camera until the given frame is reached.
 
+#if defined(GENONLINE)
+	UnsignedInt getUserActionCount() const { return m_userActionCount; } ///< Number of user camera actions so far, scripted camera moves not counted
+	void restoreUserActionCount(UnsignedInt count) { m_userActionCount = count; } ///< Takes back the actions counted since `count` was read, for camera moves the game makes on the user's behalf
+#endif
 	virtual void setUserControlled(Bool value) { m_isUserControlled = value; }
 	Bool isUserControlLocked() const;
 
@@ -319,6 +329,9 @@ private:
 	{
 		if (isUserControlLocked())
 			return false;
+#if defined(GENONLINE)
+		++m_userActionCount;
+#endif
 		stopDoingScriptedCamera();
 		setUserControlled(true);
 		(this->*function)();
@@ -330,6 +343,9 @@ private:
 	{
 		if (isUserControlLocked())
 			return false;
+#if defined(GENONLINE)
+		++m_userActionCount;
+#endif
 		stopDoingScriptedCamera();
 		setUserControlled(true);
 		(this->*function)(arg1);
@@ -344,6 +360,9 @@ protected:
 	static UnsignedInt m_idNext;																///< Used for allocating view ID's for all views
 
 	UnsignedInt m_userControlLockedUntilFrame;									///< Locks the user control over camera until the given frame is reached
+#if defined(GENONLINE)
+	UnsignedInt m_userActionCount;													///< Counts the user camera actions that were accepted, for tools that watch who moves the camera
+#endif
 	Bool m_isUserControlled;																		///< True if the user moved the camera last, false if the scripted camera moved the camera last
 
 	Coord3D m_pos;																							///< Pivot of the camera, in world coordinates
@@ -406,7 +425,11 @@ public:
 		m_pos = pos;
 		m_angle = angle;
 		m_pitch = pitch;
+#if defined(GENONLINE)
+		m_zoom = std::clamp(zoom, 0.f, 1.f);
+#else
 		m_zoom = zoom;
+#endif
 	}
 
 private:

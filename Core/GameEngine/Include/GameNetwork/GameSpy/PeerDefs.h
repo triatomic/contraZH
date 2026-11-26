@@ -27,6 +27,10 @@
 // Author: Matthew D. Campbell, June 2002
 
 #pragma once
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlineLobbyState.h"
+typedef IOnlineLobbyState GameSpyInfoInterface;
+#else
 
 #include "gamespy/peer/peer.h"
 #include "gamespy/gp/gp.h"
@@ -104,12 +108,7 @@ typedef std::map<Int, GameSpyStagingRoom *> StagingRoomMap;
 class PlayerInfo
 {
 public:
-#if defined(GENERALS_ONLINE)
-	PlayerInfo() { m_nameUni = UnicodeString::TheEmptyString; m_name = m_locale = AsciiString::TheEmptyString; m_wins = m_losses = m_rankPoints = m_side = m_preorder = m_profileID = m_flags = 0; }
-	UnicodeString m_nameUni;
-#else
 	PlayerInfo() { m_name = m_locale = AsciiString::TheEmptyString; m_wins = m_losses = m_rankPoints = m_side = m_preorder = m_profileID = m_flags = 0; }
-#endif
 	AsciiString m_name;
 	AsciiString m_locale;
 	Int m_wins;
@@ -300,3 +299,4 @@ extern Int GetAdditionalDisconnectsFromUserFile(Int playerID);
 
 void SetUpGameSpy( const char *motdBuffer, const char *configBuffer );
 void TearDownGameSpy();
+#endif

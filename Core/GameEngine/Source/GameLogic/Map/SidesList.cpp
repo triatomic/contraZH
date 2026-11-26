@@ -90,8 +90,13 @@ void SidesInfo::init(const Dict* d)
 	m_pBuildList = nullptr;
 
 	m_dict.clear();
+#if defined(GENONLINE)
+	if (m_scripts)
+		deleteInstance(m_scripts);
+#else
 
 	deleteInstance(m_scripts);
+#endif
 	m_scripts = nullptr;
 
 	if (d)
@@ -305,7 +310,12 @@ Bool SidesList::ParseSidesDataChunk(DataChunkInput &file, DataChunkInfo *info, v
 	count = ScriptList::getReadScripts(scripts);
 	for (i=0; i<count; i++) {
 		if (i<TheSidesList->getNumSides()) {
+#if defined(GENONLINE)
+			ScriptList *pSL = TheSidesList->getSideInfo(i)->getScriptList();
+			deleteInstance(pSL);
+#else
 			deleteInstance(TheSidesList->getSideInfo(i)->getScriptList());
+#endif
 			TheSidesList->getSideInfo(i)->setScriptList(scripts[i]);
 			scripts[i] = nullptr;
 		} else {
@@ -555,9 +565,18 @@ void SidesList::prepareForMP_or_Skirmish()
 						continue;
 					}
 
+#if defined(GENONLINE)
+					ScriptList *pSL = getSkirmishSideInfo(curSide)->getScriptList();
+#else
 					deleteInstance(getSkirmishSideInfo(curSide)->getScriptList());
+#endif
 					getSkirmishSideInfo(curSide)->setScriptList(scripts[i]);
 					scripts[i] = nullptr;
+#if defined(GENONLINE)
+					if (pSL)
+						deleteInstance(pSL);
+					scripts[i] = NULL;
+#endif
 				}
 				for (i=0; i<MAX_PLAYER_COUNT; i++) {
 					static_readPlayerNames[i].clear();

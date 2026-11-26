@@ -82,6 +82,12 @@ protected:
 
 	FrameRateLimit m_frameRateLimit;
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	Int getSituationCappedFramesPerSecondLimit(Int fps) const; ///< Cap rendering in the menus and on the shell map at 60 fps and without focus at the logic rate.
+#endif
+
+#endif
 	Int m_maxFPS; ///< Maximum frames per second for rendering
 #if RTS_ZEROHOUR
 	Int m_renderFpsLimit;

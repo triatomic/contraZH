@@ -24,7 +24,14 @@
 #include "WW3D2/surfaceclass.h"
 #include "WWLib/mpsc_intrusive_queue.h"
 #include <stb_image_write.h>
+#if defined(GENONLINE)
+// vcpkg's zlib has no Z_PREFIX, so its unsigned char Byte is renamed away from the engine's char Byte
+#define Byte z_Byte
 #include <zlib.h>
+#undef Byte
+#else
+#include <zlib.h>
+#endif
 #include <vector>
 
 struct ScreenshotThreadData

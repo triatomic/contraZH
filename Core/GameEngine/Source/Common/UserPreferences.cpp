@@ -51,13 +51,12 @@
 #include "GameClient/ChallengeGenerals.h"
 #include "GameNetwork/GameSpy/PeerDefs.h"
 
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
-#include "GameNetwork/GeneralsOnline/OnlineServices_Auth.h"
-#include "Common/GlobalData.h"
-#include <filesystem>
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+#include "GameNetwork/GenOnline/GenOnlineInterfaces.h"
 #endif
 
+#endif
 
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
@@ -263,6 +262,21 @@ AsciiString UserPreferences::getAsciiString(AsciiString key, AsciiString default
 	return it->second;
 }
 
+#if defined(GENONLINE)
+UnicodeString UserPreferences::getUnicodeString(AsciiString key, UnicodeString defaultValue) const
+{
+	UserPreferences::const_iterator it = find(key);
+	if (it == end())
+	{
+		return defaultValue;
+	}
+
+	UnicodeString ret;
+	ret.translate(it->second);
+	return ret;
+}
+
+#endif
 void UserPreferences::setBool(AsciiString key, Bool val)
 {
 	(*this)[key] = boolAsStr(val);
@@ -283,6 +297,15 @@ void UserPreferences::setAsciiString(AsciiString key, AsciiString val)
 	(*this)[key] = val;
 }
 
+#if defined(GENONLINE)
+void UserPreferences::setUnicodeString(AsciiString key, UnicodeString val)
+{
+	AsciiString str;
+	str.translate(val);
+	(*this)[key] = str;
+}
+
+#endif
 //-----------------------------------------------------------------------------
 // QuickMatchPreferences base class
 //-----------------------------------------------------------------------------
@@ -291,8 +314,8 @@ QuickMatchPreferences::QuickMatchPreferences()
 {
 	AsciiString userPrefFilename;
 
-#if defined(GENERALS_ONLINE)
-	NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+#if defined(GENONLINE)
+	GenOnlineAuthInterface* pAuthInterface = GenOnlineServicesManager::GetInterface<GenOnlineAuthInterface>();
 
 	int64_t localProfile = pAuthInterface != nullptr ? pAuthInterface->GetUserID() : -1;
 	userPrefFilename.format("GeneralsOnlineData\\QMPref%lld.ini", localProfile);
@@ -480,15 +503,16 @@ Int QuickMatchPreferences::getSide()
 // CustomMatchPreferences base class
 //-----------------------------------------------------------------------------
 
+#if defined(GENONLINE)
+#include <filesystem>
+#endif
 CustomMatchPreferences::CustomMatchPreferences()
 {
 	AsciiString userPrefFilename;
 
-#if defined(GENERALS_ONLINE)
-	// GeneralsOnline port: TheGameSpyInfo is never created when the GO stack is active,
-	// so the profile id comes from the NGMP session instead.
+#if defined(GENONLINE)
 	// NOTE: We need to use a different folder to avoid conflict with GS/Revora
-	NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+	GenOnlineAuthInterface* pAuthInterface = GenOnlineServicesManager::GetInterface<GenOnlineAuthInterface>();
 
 	int64_t user_id = pAuthInterface != nullptr ? pAuthInterface->GetUserID() : -1;
 	userPrefFilename.format("GeneralsOnlineData\\CustomPref%lld.ini", user_id);
@@ -511,26 +535,6 @@ CustomMatchPreferences::~CustomMatchPreferences()
 {
 }
 
-#if defined(GENERALS_ONLINE)
-AsciiString CustomMatchPreferences::getLastLobbyName() const
-{
-	CustomMatchPreferences::const_iterator it = find("LastLobbyName");
-	if (it == end())
-	{
-		return AsciiString::TheEmptyString;
-	}
-
-	AsciiString ret = it->second;
-	ret.trim();
-	return ret;
-}
-
-void CustomMatchPreferences::setLastLobbyName(const AsciiString& name)
-{
-	(*this)["LastLobbyName"] = name;
-}
-#endif
-
 void CustomMatchPreferences::setLastLadder(const AsciiString& addr, UnsignedShort port)
 {
 	AsciiString strVal;
@@ -539,7 +543,23 @@ void CustomMatchPreferences::setLastLadder(const AsciiString& addr, UnsignedShor
 	(*this)["LastLadderPort"] = strVal;
 }
 
+#if defined(GENONLINE)
+UnicodeString CustomMatchPreferences::getLastLobbyName() const
+{
+	UnicodeString ret = getUnicodeString("LastLobbyName", UnicodeString::TheEmptyString);
+	ret.trim();
+	return ret;
+}
+
+void CustomMatchPreferences::setLastLobbyName(const UnicodeString& name)
+{
+	setUnicodeString("LastLobbyName", name);
+}
+
+AsciiString CustomMatchPreferences::getLastLadderAddr( void )
+#else
 AsciiString CustomMatchPreferences::getLastLadderAddr()
+#endif
 {
 	QuickMatchPreferences::const_iterator it = find("LastLadderAddr");
 	if (it == end())
@@ -632,7 +652,12 @@ Int CustomMatchPreferences::getPreferredFaction()
 			// This is also enforced at GUI setup (GUIUtil.cpp and GameLogic.cpp).
 			// @todo: unlock these when something rad happens
 			Bool disallowLockedGenerals = TRUE;
+#if defined(GENONLINE)
+			// GenOnline @bugfix arcticdolphin 21/11/2026 Generals has no challenge generals.
+			const GeneralPersona *general = TheChallengeGenerals ? TheChallengeGenerals->getGeneralByTemplateName(fac->getName()) : nullptr;
+#else
 			const GeneralPersona *general = TheChallengeGenerals->getGeneralByTemplateName(fac->getName());
+#endif
 			Bool startsLocked = general ? !general->isStartingEnabled() : FALSE;
 			if (disallowLockedGenerals && startsLocked)
 				ret = PLAYERTEMPLATE_RANDOM;
@@ -874,8 +899,8 @@ GameSpyMiscPreferences::GameSpyMiscPreferences()
 {
 	AsciiString userPrefFilename;
 
-#if defined(GENERALS_ONLINE)
-	NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+#if defined(GENONLINE)
+	GenOnlineAuthInterface* pAuthInterface = GenOnlineServicesManager::GetInterface<GenOnlineAuthInterface>();
 	int64_t localProfile = pAuthInterface == nullptr ? -1 : pAuthInterface->GetUserID();
 	userPrefFilename.format("GeneralsOnlineData\\GSMiscPref%lld.ini", localProfile);
 #else
@@ -928,8 +953,8 @@ IgnorePreferences::IgnorePreferences()
 	AsciiString userPrefFilename;
 //	if(!TheGameSpyInfo)
 
-#if defined(GENERALS_ONLINE)
-	NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+#if defined(GENONLINE)
+	GenOnlineAuthInterface* pAuthInterface = GenOnlineServicesManager::GetInterface<GenOnlineAuthInterface>();
 	int64_t localProfile = pAuthInterface == nullptr ? -1 : pAuthInterface->GetUserID();
 	userPrefFilename.format("GeneralsOnlineData\\IgnorePref%lld.ini", localProfile);
 #else
@@ -991,7 +1016,17 @@ Bool LadderPreferences::loadProfile( Int profileID )
 	clear();
 	m_ladders.clear();
 	AsciiString userPrefFilename;
+#if defined(GENONLINE)
+
+#if defined(GENONLINE)
+	userPrefFilename.format("GeneralsOnlineData\\Ladders%d.ini", profileID);
+#else
 	userPrefFilename.format("GeneralsOnline\\Ladders%d.ini", profileID);
+#endif
+
+#else
+	userPrefFilename.format("GeneralsOnline\\Ladders%d.ini", profileID);
+#endif
 	Bool success = load(userPrefFilename);
 	if (!success)
 		return success;

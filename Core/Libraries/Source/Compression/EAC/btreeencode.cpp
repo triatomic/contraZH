@@ -350,18 +350,26 @@ static void BTREE_treepack(struct BTreeEncodeContext *EC,
 
 	EC->buf1 =	(unsigned char *) galloc(buf1size);
 	if (!EC->buf1)
+#if defined(GENONLINE)
+        return; /* failure Insufficient memory for work buffer */
+#else
 	{
 		gfree(treebuf);
 		return; /* failure Insufficient memory for work buffer */
 	}
+#endif
 
 	EC->buf2 =	(unsigned char *) galloc(buf2size);
 	if (!EC->buf2)
+#if defined(GENONLINE)
+        return; /* failure Insufficient memory for work buffer */
+#else
 	{
 		gfree(treebuf);
 		gfree(EC->buf1);
 		return; /* failure Insufficient memory for work buffer */
 	}
+#endif
 
     memcpy(EC->buf1, EC->buffer, EC->ulen); /* copy to scratch buffer */
 

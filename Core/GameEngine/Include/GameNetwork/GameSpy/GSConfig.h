@@ -29,9 +29,17 @@
 
 #pragma once
 
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlineConfig.h"
+#else
 #include "Common/AsciiString.h"
 #include "Common/STLTypedefs.h"
+#endif
 
+#if defined(GENONLINE)
+// TheSuperHackers @refactor GenMP Phase 1: The alias keeps code that names GameSpyConfigInterface compiling.
+typedef IOnlineConfig GameSpyConfigInterface;
+#else
 class GameSpyConfigInterface
 {
 public:
@@ -75,3 +83,4 @@ public:
 };
 
 extern GameSpyConfigInterface *TheGameSpyConfig;
+#endif

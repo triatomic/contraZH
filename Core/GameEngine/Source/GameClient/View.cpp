@@ -33,6 +33,9 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/View.h"
+#if defined(GENONLINE)
+#include "GameLogic/GameLogic.h"
+#endif
 
 UnsignedInt View::m_idNext = 1;
 
@@ -43,6 +46,9 @@ View *TheTacticalView = nullptr;
 View::View()
 {
 	m_userControlLockedUntilFrame = 0u;
+#if defined(GENONLINE)
+	m_userActionCount = 0u;
+#endif
 	m_isUserControlled = true;
 	m_currentHeightAboveGround = 0.0f;
 	m_defaultAngle = 0.0f;
@@ -166,7 +172,14 @@ void View::setAngle( Real radians )
 void View::setPitch( Real radians )
 {
 #if CLAMP_VIEW_PITCH
+#if defined(GENONLINE)
+	// Raised floor in matches prevents flat-camera sightlines; relaxed in replays.
+	const Bool inReplay = TheGameLogic != nullptr && TheGameLogic->isInReplayGame();
+	const Real minPitchDegrees = inReplay ? 16.5f : 37.5f;
+	m_pitch = clamp(DEG_TO_RADF(minPitchDegrees), radians, DEG_TO_RADF(89.9f));
+#else
 	m_pitch = clamp(DEG_TO_RADF(0.1f), radians, DEG_TO_RADF(89.9f));
+#endif
 #else
 	m_pitch = WWMath::Normalize_Angle(radians);
 #endif

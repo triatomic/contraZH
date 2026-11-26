@@ -75,7 +75,12 @@ public:
 
 	~ObjectTypesTemp()
 	{
+#if defined(GENONLINE)
+		if (m_types)
+			deleteInstance(m_types);
+#else
 		deleteInstance(m_types);
+#endif
 	}
 };
 
@@ -114,7 +119,12 @@ public:
 //-------------------------------------------------------------------------------------------------
 TransportStatus::~TransportStatus()
 {
+#if defined(GENONLINE)
+	if (m_nextStatus)
+		deleteInstance(m_nextStatus);
+#else
 	deleteInstance(m_nextStatus);
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

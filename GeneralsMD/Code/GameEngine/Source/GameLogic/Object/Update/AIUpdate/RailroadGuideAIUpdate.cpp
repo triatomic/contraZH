@@ -780,12 +780,17 @@ UpdateSleepTime RailroadBehavior::update()
 
 		if ( m_conductorState == COAST )
 		{
+#if defined(GENONLINE)
+			conductorPullInfo.speed *= ConvertBaseFrameFactorToFrameFactor(modData->m_friction);
+#else
 			conductorPullInfo.speed *= modData->m_friction;
+#endif
 			TheAudio->removeAudioEvent( m_runningSound.getPlayingHandle() );
 		}
 
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-		conductorPullInfo.trackDistance += conductorPullInfo.speed * 0.5f;
+#if defined(GENONLINE)
+        // compensate for 60hz update rate so movement matches retail 30hz
+        conductorPullInfo.trackDistance += conductorPullInfo.speed / (Real)LOGICFRAMES_PER_BASEFRAME;
 #else
 		conductorPullInfo.trackDistance += conductorPullInfo.speed ;
 #endif

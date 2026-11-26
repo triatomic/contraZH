@@ -101,11 +101,7 @@ static AnimateWindowManager *theAnimateWindowManager = nullptr;
 WindowMsgHandledType BuddyControlSystem( GameWindow *window, UnsignedInt msg,
 														 WindowMsgData mData1, WindowMsgData mData2);
 void InitBuddyControls(Int type);
-#if defined(GENERALS_ONLINE)
-void updateBuddyInfo(bool bIsAutoRefresh = false, bool bUseCache = false);
-#else
 void updateBuddyInfo();
-#endif
 
 #if RTS_ZEROHOUR
 //-------------------------------------------------------------------------------------------------
@@ -661,7 +657,19 @@ void PopulateInGameDiplomacyPopup()
 			if (staticTextSide[rowNum])
 			{
 				staticTextSide[rowNum]->winSetEnabledTextColors( playerColor, backColor );
+#if defined(GENONLINE)
+
+#if defined(GENONLINE_REVEAL_TEAMS)
+                const PlayerTemplate* pt = ThePlayerTemplateStore->getNthPlayerTemplate(slot->getPlayerTemplate());
+                GadgetStaticTextSetText(staticTextSide[rowNum], pt ? pt->getDisplayName() : slot->getApparentPlayerTemplateDisplayName());
+#else
+				GadgetStaticTextSetText(staticTextSide[rowNum], slot->getApparentPlayerTemplateDisplayName());
+#endif
+
+				
+#else
 				GadgetStaticTextSetText(staticTextSide[rowNum], slot->getApparentPlayerTemplateDisplayName() );
+#endif
 			}
 			if (staticTextTeam[rowNum])
 			{

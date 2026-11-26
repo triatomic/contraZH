@@ -440,7 +440,11 @@ public:
 
 				if ( m_delayDeliveryFramesMax > 0 )
 				{
+#if defined(GENONLINE)
+					transport->setDisabledUntil( DISABLED_DEFAULT, TheGameLogic->getFrame() + GameLogicRandomFramesInBaseFrames(0, m_delayDeliveryFramesMax) );
+#else
 					transport->setDisabledUntil( DISABLED_DEFAULT, TheGameLogic->getFrame() + GameLogicRandomValue(0, m_delayDeliveryFramesMax) );
+#endif
 				}
 			}
 			else
@@ -656,8 +660,8 @@ static void calcRandomForce(Real minMag, Real maxMag, Real minPitch, Real maxPit
 	Real angle = GameLogicRandomValueReal(0, 2*PI);
 	Real pitch = GameLogicRandomValueReal(minPitch, maxPitch);
 	Real mag = GameLogicRandomValueReal(minMag, maxMag);
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	mag /= 2.f;
+#if defined(GENONLINE)
+	mag /= (Real)LOGICFRAMES_PER_BASEFRAME;
 #endif
 
 	Matrix3D mtx(1);
@@ -1288,10 +1292,8 @@ protected:
 				Real yaw = GameLogicRandomValueReal( -yawRate, yawRate );
 				Real roll = GameLogicRandomValueReal( -rollRate, rollRate );
 				Real pitch = GameLogicRandomValueReal( -pitchRate, pitchRate );
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-				yaw /= 2.f;
-				roll /= 2.f;
-				pitch /= 2.f;
+#if defined(GENONLINE)
+				yaw /= (Real)LOGICFRAMES_PER_BASEFRAME; roll /= (Real)LOGICFRAMES_PER_BASEFRAME; pitch /= (Real)LOGICFRAMES_PER_BASEFRAME;
 #endif
 				DUMPREAL(yaw);
 				DUMPREAL(roll);
@@ -1302,9 +1304,8 @@ protected:
 				{
 					Real horizForce = 4.0f * m_dispositionIntensity;		// 2
 					Real vertForce = 3.0f * m_dispositionIntensity;		// 3
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-					horizForce /= 2.f;
-					vertForce /= 2.f;
+#if defined(GENONLINE)
+					horizForce /= (Real)LOGICFRAMES_PER_BASEFRAME; vertForce /= (Real)LOGICFRAMES_PER_BASEFRAME;
 #endif
 					force.x = GameLogicRandomValueReal( -horizForce, horizForce );
 					force.y = GameLogicRandomValueReal( -horizForce, horizForce );
@@ -1317,9 +1318,8 @@ protected:
 				{
 					Real horizForce = 2.0f * m_dispositionIntensity;
 					Real vertForce = 4.0f * m_dispositionIntensity;
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-					horizForce /= 2.f;
-					vertForce /= 2.f;
+#if defined(GENONLINE)
+					horizForce /= (Real)LOGICFRAMES_PER_BASEFRAME; vertForce /= (Real)LOGICFRAMES_PER_BASEFRAME;
 #endif
 
 					force.x = GameLogicRandomValueReal( -horizForce, horizForce );

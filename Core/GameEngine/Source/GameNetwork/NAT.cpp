@@ -33,7 +33,7 @@
 
 #include "GameNetwork/NAT.h"
 #include "GameNetwork/Transport.h"
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
 #include "GameNetwork/UDPTransport.h"
 #endif
 #include "GameNetwork/NetworkDefs.h"
@@ -574,7 +574,9 @@ void NAT::establishConnectionPaths() {
 void NAT::attachSlotList(GameSlot *slotList[], Int localSlot, UnsignedInt localIP) {
 	m_slotList = slotList;
 	m_localIP = localIP;
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
+
+	// Generals Online
 	m_transport = new UDPTransport;
 #else
 	m_transport = new Transport;
@@ -1098,7 +1100,11 @@ void NAT::sendMangledPortNumberToTarget(UnsignedShort mangledPort, GameSlot *tar
 void NAT::processGlobalMessage(Int slotNum, const char *options) {
 	const char *ptr = options;
 	// skip preceding whitespace.
+#if defined(GENONLINE)
+	while (isspace((unsigned char)*ptr)) {
+#else
 	while (isspace(*ptr)) {
+#endif
 		++ptr;
 	}
 	DEBUG_LOG(("NAT::processGlobalMessage - got message from slot %d, message is \"%s\"", slotNum, ptr));

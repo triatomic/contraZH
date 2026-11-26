@@ -46,6 +46,9 @@
 #include "WWLib/RANDOM.h"
 #include "WWMath/v3_rnd.h"
 #include "meshgeometry.h"
+#if defined(GENONLINE)
+#include <algorithm>
+#endif
 
 
 /* We have chunking logic which handles N segments at a time. To simplify the subdivision logic,

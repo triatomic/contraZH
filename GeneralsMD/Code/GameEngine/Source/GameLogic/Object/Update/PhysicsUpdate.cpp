@@ -387,8 +387,8 @@ void PhysicsBehavior::applyShock( const Coord3D *force )
 {
 	Coord3D resistedForce = *force;
 	resistedForce.scale( getShockResistanceScale() );
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	resistedForce.scale( 0.5f );
+#if defined(GENONLINE)
+    resistedForce.scale(1.0f / (Real)LOGICFRAMES_PER_BASEFRAME);
 #endif
 
 	// Apply the processed shock force to the object
@@ -415,23 +415,24 @@ void PhysicsBehavior::applyRandomRotation()
 
 	Real randomModifier;
 
+#if !defined(GENONLINE)
 	randomModifier = GameLogicRandomValue(-1.0f, 1.0f);
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	m_yawRate += getPhysicsBehaviorModuleData()->m_shockMaxYaw / 2.f * randomModifier;
-#else
 	m_yawRate += getPhysicsBehaviorModuleData()->m_shockMaxYaw * randomModifier;
 #endif
 
 	randomModifier = GameLogicRandomValue(-1.0f, 1.0f);
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	m_pitchRate += getPhysicsBehaviorModuleData()->m_shockMaxPitch / 2.f * randomModifier;
+#if defined(GENONLINE)
+	m_yawRate += (getPhysicsBehaviorModuleData()->m_shockMaxYaw / (Real)LOGICFRAMES_PER_BASEFRAME) * randomModifier;
 #else
 	m_pitchRate += getPhysicsBehaviorModuleData()->m_shockMaxPitch * randomModifier;
 #endif
 
 	randomModifier = GameLogicRandomValue(-1.0f, 1.0f);
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	m_rollRate += getPhysicsBehaviorModuleData()->m_shockMaxRoll / 2.f * randomModifier;
+#if defined(GENONLINE)
+	m_pitchRate += (getPhysicsBehaviorModuleData()->m_shockMaxPitch / (Real)LOGICFRAMES_PER_BASEFRAME) * randomModifier;
+
+	randomModifier = GameLogicRandomValue(-1.0f, 1.0f);
+	m_rollRate += (getPhysicsBehaviorModuleData()->m_shockMaxRoll / (Real)LOGICFRAMES_PER_BASEFRAME) * randomModifier;
 #else
 	m_rollRate += getPhysicsBehaviorModuleData()->m_shockMaxRoll * randomModifier;
 #endif
@@ -786,9 +787,9 @@ UpdateSleepTime PhysicsBehavior::update()
 
 		// when vel gets tiny, just clamp to zero
 		const Real THRESH = 0.001f;
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+#if defined(GENONLINE)
 		// Info: At 60Hz, motive acceleration can be smaller than THRESH and must accumulate across frames.
-		if (!isMotive())
+		if (LOGICFRAMES_PER_BASEFRAME == 1 || !isMotive())
 		{
 			if (WWMath::Fabsf(m_vel.x) < THRESH) m_vel.x = 0.0f;
 			if (WWMath::Fabsf(m_vel.y) < THRESH) m_vel.y = 0.0f;
@@ -830,11 +831,19 @@ UpdateSleepTime PhysicsBehavior::update()
 		// Check when to clear the stunned status
 		if (m_tornadoController == INVALID_ID && getIsStunned())
 		{
+#if defined(GENONLINE)
+			const Real stunReliefEpsilon = STUN_RELIEF_EPSILON / (Real)LOGICFRAMES_PER_BASEFRAME;
+			if ( (WWMath::Fabs(m_vel.x) < stunReliefEpsilon &&
+				    WWMath::Fabs(m_vel.y) < stunReliefEpsilon &&
+				    WWMath::Fabs(m_vel.z) < stunReliefEpsilon) ||
+           obj->isSignificantlyAboveTerrain() == FALSE )
+#else
 			if ( (WWMath::Fabs(m_vel.x) < STUN_RELIEF_EPSILON &&
 				    WWMath::Fabs(m_vel.y) < STUN_RELIEF_EPSILON &&
 				    WWMath::Fabs(m_vel.z) < STUN_RELIEF_EPSILON)
           ||
            obj->isSignificantlyAboveTerrain() == FALSE )
+#endif
 			{
 				setStunned(false);
 				getObject()->clearModelConditionState(MODELCONDITION_STUNNED);

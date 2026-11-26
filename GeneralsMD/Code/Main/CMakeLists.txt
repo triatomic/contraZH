@@ -1,4 +1,7 @@
 add_executable(z_generals WIN32)
+if(RTS_BUILD_GENERALS_ONLINE)
+    include(${CMAKE_SOURCE_DIR}/GenOnline/cmake/zerohour-main.cmake)
+endif()
 
 # Use a binary name that doesn't conflict with original game.
 # TheSuperHackers @feature A cheats enabled build gets a _c suffix, so a build that can grant
@@ -8,26 +11,19 @@ if(RTS_DEBUG_CHEATS)
 else()
     set_target_properties(z_generals PROPERTIES OUTPUT_NAME "generalszh${RTS_BUILD_OUTPUT_SUFFIX}")
 endif()
+if(RTS_BUILD_GENERALS_ONLINE)
+    # GenOnline renames the exe in a deferred call, so the fork's name is put back by one deferred after it.
+    get_target_property(_zh_output_name z_generals OUTPUT_NAME)
+    cmake_language(DEFER CALL set_target_properties z_generals PROPERTIES OUTPUT_NAME "${_zh_output_name}")
 
-if(RTS_BUILD_GENERALS_ONLINE AND WIN32)
-    # The Generals Online vendor libraries are import libs; their DLLs must sit
-    # beside the exe. discord-rpc's license ships alongside per its terms.
-    set(GO_VENDOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../GameEngine/Source/GameNetwork/GeneralsOnline/Vendor")
-    add_custom_command(TARGET z_generals POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${GO_VENDOR_DIR}/DiscordRPC/LICENSE.txt"
-            "$<TARGET_FILE_DIR:z_generals>/discord-rpc-LICENSE.txt"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${GO_VENDOR_DIR}/DiscordRPC/discord-rpc.dll"
-            "${GO_VENDOR_DIR}/libcurl/libcurl.dll"
-            "${GO_VENDOR_DIR}/libcurl/libcrypto-3.dll"
-            "${GO_VENDOR_DIR}/libcurl/libssl-3.dll"
-            "${GO_VENDOR_DIR}/libcurl/zlib1.dll"
-            "${GO_VENDOR_DIR}/ValveNetworkingSockets/GameNetworkingSockets.dll"
-            "${GO_VENDOR_DIR}/ValveNetworkingSockets/abseil_dll.dll"
-            "${GO_VENDOR_DIR}/ValveNetworkingSockets/libprotobuf.dll"
-            "$<TARGET_FILE_DIR:z_generals>"
-    )
+    if(NOT GENONLINE_FORK_VCRUNTIME_CHECK)
+        get_target_property(_zh_sources z_generals SOURCES)
+        list(REMOVE_ITEM _zh_sources "${GENONLINE_VCRUNTIME_CHECK_SOURCE}")
+        set_target_properties(z_generals PROPERTIES SOURCES "${_zh_sources}")
+        # The delay loads only serve the runtime check.
+        function(genonline_vcruntime_check_link target)
+        endfunction()
+    endif()
 endif()
 
 target_link_libraries(z_generals PRIVATE

@@ -42,8 +42,13 @@
 #include "GameNetwork/GameSpyOverlay.h"
 //#include "GameNetwork/GameSpy/PeerDefs.h"
 #include "GameNetwork/GameSpy/BuddyThread.h"
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlineGameHooks.h"
+#endif
 
+#if !defined(GENONLINE)
 void deleteNotificationBox();
+#endif
 static void raiseOverlays();
 
 // Message boxes -------------------------------------
@@ -211,19 +216,6 @@ void GSMessageBoxYesNo(UnicodeString title, UnicodeString message, GameWinMsgBox
 	* If the screen transitions underneath the dialog box, we
 	* need to raise it to keep it visible.
 	*/
-#if defined(GENERALS_ONLINE)
-void GSMessageBoxCancel(UnicodeString title, UnicodeString message, GameWinMsgBoxFunc cancelFunc)
-{
-	ClearGSMessageBoxes();
-	messageBoxWindow = MessageBoxCancel(title, message, cancelFunc);
-}
-
-void GSMessageBoxNoButtons(UnicodeString title, UnicodeString message, bool bShowLogo)
-{
-	ClearGSMessageBoxes();
-	messageBoxWindow = MessageBoxNoButtons(title, message, bShowLogo);
-}
-#endif
 
 void RaiseGSMessageBox()
 {
@@ -235,6 +227,20 @@ void RaiseGSMessageBox()
 	messageBoxWindow->winBringToTop();
 }
 
+#if defined(GENONLINE)
+void GSMessageBoxCancel(UnicodeString title, UnicodeString message, GameWinMsgBoxFunc cancelFunc)
+{
+	ClearGSMessageBoxes();
+	messageBoxWindow = MessageBoxCancel(title, message, cancelFunc);
+}
+
+void GSMessageBoxNoButtons(UnicodeString title, UnicodeString message, bool bShowLogo)
+{
+	ClearGSMessageBoxes();
+	messageBoxWindow = MessageBoxNoButtons(title, message, bShowLogo);
+}
+
+#endif
 // Overlay screens -------------------------------------
 
 /**
@@ -279,8 +285,12 @@ void GameSpyOpenOverlay( GSOverlayType overlay )
 {
 	if (overlay == GSOVERLAY_BUDDY)
 	{
-#if !defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
+		// Only the GameSpy services have a buddy queue to check.
+		if (TheGameSpyBuddyMessageQueue != nullptr && !TheGameSpyBuddyMessageQueue->isConnected())
+#else
 		if (!TheGameSpyBuddyMessageQueue->isConnected())
+#endif
 		{
 			// not connected - is it because we were disconnected?
 			if (TheGameSpyBuddyMessageQueue->getLocalProfileID())
@@ -295,7 +305,6 @@ void GameSpyOpenOverlay( GSOverlayType overlay )
 			}
 			return;
 		}
-#endif
 		AudioEventRTS buttonClick("GUICommunicatorOpen");
 
 		if( TheAudio )
@@ -310,7 +319,11 @@ void GameSpyOpenOverlay( GSOverlayType overlay )
 	}
 	else
 	{
+#if defined(GENONLINE)
+		overlayLayouts[overlay] = TheWindowManager->winCreateLayout( AsciiString( GetOnlineGameHooks()->getOverlayLayout( overlay, gsOverlays[overlay] ) ) );
+#else
 		overlayLayouts[overlay] = TheWindowManager->winCreateLayout( AsciiString( gsOverlays[overlay] ) );
+#endif
 		overlayLayouts[overlay]->runInit();
 		overlayLayouts[overlay]->hide( FALSE );
 		overlayLayouts[overlay]->bringForward();
@@ -391,7 +404,11 @@ void GameSpyCloseAllOverlays()
 	}
 
 	// if we're shutting down the rest, chances are we don't want this popping up.
+#if defined(GENONLINE)
+	GetOnlineGameHooks()->onCloseAllOverlays();
+#else
 	deleteNotificationBox();
+#endif
 }
 
 void GameSpyUpdateOverlays()

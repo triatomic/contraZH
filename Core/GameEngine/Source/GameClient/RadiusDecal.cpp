@@ -87,7 +87,11 @@ void RadiusDecalTemplate::createRadiusDecal(const Coord3D& pos, Real radius, con
 	const Bool allied = !own && alliedMode != AlliedDecalMode_Hidden &&
 			localPlayer->getRelationship(owningPlayer->getDefaultTeam()) == ALLIES;
 
+#if defined(GENONLINE)
+	if (!m_onlyVisibleToOwningPlayer || own || allied || localPlayer->isPlayerObserver())
+#else
 	if (!m_onlyVisibleToOwningPlayer || own || allied)
+#endif
 	{
 		Shadow::ShadowTypeInfo decalInfo;
 		decalInfo.allowUpdates = FALSE;										// shadow texture will never update

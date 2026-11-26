@@ -47,6 +47,11 @@
 #include "Common/CriticalSection.h"
 #include "WWLib/utf8.h"
 
+#if defined(GENONLINE)
+#if defined(_WIN32) && !defined(WC_NO_BEST_FIT_CHARS)
+#define WC_NO_BEST_FIT_CHARS 0x00000400
+#endif
+#endif
 
 // -----------------------------------------------------
 
@@ -74,7 +79,11 @@ inline char* skipNonSeps(char* p, const char* seps)
 //-----------------------------------------------------------------------------
 inline char* skipWhitespace(char* p)
 {
+#if defined(GENONLINE)
+	while (*p && isspace((unsigned char)*p))
+#else
 	while (*p && isspace(*p))
+#endif
 		++p;
 	return p;
 }
@@ -82,7 +91,11 @@ inline char* skipWhitespace(char* p)
 //-----------------------------------------------------------------------------
 inline char* skipNonWhitespace(char* p)
 {
+#if defined(GENONLINE)
+	while (*p && !isspace((unsigned char)*p))
+#else
 	while (*p && !isspace(*p))
+#endif
 		++p;
 	return p;
 }
@@ -384,7 +397,11 @@ void AsciiString::trimEnd()
 		// Clip trailing white space from the string.
 		const int len = strlen(peek());
 		int index = len;
+#if defined(GENONLINE)
+		while (index > 0 && isspace((unsigned char)getCharAt(index - 1)))
+#else
 		while (index > 0 && isspace(getCharAt(index - 1)))
+#endif
 		{
 			--index;
 		}

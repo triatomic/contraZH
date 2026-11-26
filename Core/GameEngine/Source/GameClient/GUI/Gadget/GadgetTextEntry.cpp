@@ -232,6 +232,9 @@ WindowMsgHandledType GadgetTextEntryInput( GameWindow *window, UnsignedInt msg,
 						e->text->appendChar( ch );
 						e->sText->appendChar( L'*' );
 						e->charPos++;
+#if defined(GENONLINE)
+						e->completionHint->setText( UnicodeString::TheEmptyString );
+#endif
 						TheWindowManager->winSendSystemMsg( window->winGetOwner(),
 																						GEM_UPDATE_TEXT,
 																						(WindowMsgData)window,
@@ -300,9 +303,28 @@ WindowMsgHandledType GadgetTextEntryInput( GameWindow *window, UnsignedInt msg,
 					return MSG_IGNORED;
 
 				// --------------------------------------------------------------------
+#if defined(GENONLINE)
+				case KEY_TAB:
+
+					if( e->completionEnabled )
+					{
+						if( BitIsSet( mData2, KEY_STATE_DOWN ) )
+						{
+							TheWindowManager->winSendSystemMsg( window->winGetOwner(),
+																									GEM_TAB_COMPLETE,
+																									(WindowMsgData)window,
+																									BitIsSet( mData2, KEY_STATE_SHIFT ) );
+						}
+						break;
+					}
+					FALLTHROUGH;
+
+#endif
 				case KEY_DOWN:
 				case KEY_RIGHT:
+#if !defined(GENONLINE)
 				case KEY_TAB:
+#endif
 
 					if( BitIsSet( mData2, KEY_STATE_DOWN ) )
 					{
@@ -350,6 +372,9 @@ WindowMsgHandledType GadgetTextEntryInput( GameWindow *window, UnsignedInt msg,
 								e->text->removeLastChar();
 								e->sText->removeLastChar();
 								e->charPos--;
+#if defined(GENONLINE)
+								e->completionHint->setText( UnicodeString::TheEmptyString );
+#endif
 								TheWindowManager->winSendSystemMsg( window->winGetOwner(),
 																								GEM_UPDATE_TEXT,
 																								(WindowMsgData)window,
@@ -442,6 +467,9 @@ WindowMsgHandledType GadgetTextEntrySystem( GameWindow *window, UnsignedInt msg,
 			e->charPos = ustr->getLength();
 			e->constructText->setText( UnicodeString::TheEmptyString );
 			e->conCharPos = 0;
+#if defined(GENONLINE)
+			e->completionHint->setText( UnicodeString::TheEmptyString );
+#endif
 
 			// set our secret text string to be filled with '*' the same length
 			e->sText->setText( UnicodeString::TheEmptyString );
@@ -465,6 +493,9 @@ WindowMsgHandledType GadgetTextEntrySystem( GameWindow *window, UnsignedInt msg,
 			TheDisplayStringManager->freeDisplayString( e->text );
 			TheDisplayStringManager->freeDisplayString( e->sText );
 			TheDisplayStringManager->freeDisplayString( e->constructText );
+#if defined(GENONLINE)
+			TheDisplayStringManager->freeDisplayString( e->completionHint );
+#endif
 
 			// delete construct list
 			if( e->constructList )
@@ -703,3 +734,36 @@ void GadgetTextEntrySetMaxLen( GameWindow *g, Short length )
 
 	data->maxTextLen = length;
 }
+#if defined(GENONLINE)
+
+//=============================================================================
+void GadgetTextEntrySetCompletionEnabled( GameWindow *g, Bool enabled )
+{
+	if( g == nullptr )
+		return;
+
+	EntryData *data = static_cast<EntryData *>( g->winGetUserData() );
+	data->completionEnabled = enabled;
+	data->completionHint->setText( UnicodeString::TheEmptyString );
+}
+
+//=============================================================================
+Bool GadgetTextEntryIsCompletionEnabled( GameWindow *g )
+{
+	if( g == nullptr )
+		return FALSE;
+
+	EntryData *data = static_cast<EntryData *>( g->winGetUserData() );
+	return data->completionEnabled;
+}
+
+//=============================================================================
+void GadgetTextEntrySetCompletionHint( GameWindow *g, const UnicodeString &hint )
+{
+	if( g == nullptr )
+		return;
+
+	EntryData *data = static_cast<EntryData *>( g->winGetUserData() );
+	data->completionHint->setText( hint );
+}
+#endif

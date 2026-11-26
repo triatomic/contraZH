@@ -32,6 +32,9 @@
 #include "Common/Thing.h"
 #include "Common/ThingTemplate.h"
 #include "Common/RandomValue.h"
+#if defined(GENONLINE)
+#include "Common/LocalApiLive.h"
+#endif
 #include "Common/Xfer.h"
 
 #include "GameLogic/ExperienceTracker.h"
@@ -117,7 +120,7 @@ NeutronMissileUpdate::NeutronMissileUpdate( Thing *thing, const ModuleData* modu
 	m_vel.zero();
 
 	m_state = PRELAUNCH;
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+#if defined(GENONLINE)
 	m_stateTimestamp = TheGameLogic->getFrameLegacy();
 #else
 	m_stateTimestamp = TheGameLogic->getFrame();
@@ -177,7 +180,7 @@ void NeutronMissileUpdate::projectileFireAtObjectOrPosition( const Object *victi
 	m_exhaustSysTmpl = exhaustSysOverride;
 
 	m_state = LAUNCH;
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+#if defined(GENONLINE)
 	m_stateTimestamp = TheGameLogic->getFrameLegacy();
 #else
 	m_stateTimestamp = TheGameLogic->getFrame();
@@ -199,6 +202,27 @@ void NeutronMissileUpdate::projectileFireAtObjectOrPosition( const Object *victi
 		m_intermedPos.z += getNeutronMissileUpdateModuleData()->m_targetFromDirectlyAbove;
 	}
 
+#if defined(GENONLINE)
+	// Read-only tap for the stats pipe: the flight time that the data of the missile predicts. It flies at the speed where the acceleration balances
+	// the damping, a legacy (30 per second) frame at a time: first the climb, then to the point above the target, then straight down at half speed.
+	{
+		const NeutronMissileUpdateModuleData* d = getNeutronMissileUpdateModuleData();
+		const Real topSpeed = (d->m_forwardDamping > 0.001f) ? d->m_relativeSpeed / d->m_forwardDamping : 0.0f;
+		if (topSpeed > 0.001f)
+		{
+			const Coord3D* from = getObject()->getPosition();
+			const Coord3D* approach = (d->m_targetFromDirectlyAbove != 0.0f) ? &m_intermedPos : &m_targetPos;
+			const Real toApproach = sqrtf(sqr(approach->x - from->x) + sqr(approach->y - from->y) + sqr(approach->z - from->z));
+			Real legacyFrames = (Real)d->m_specialSpeedTime + toApproach / topSpeed;
+			if (d->m_targetFromDirectlyAbove != 0.0f)
+			{
+				legacyFrames += d->m_targetFromDirectlyAbove / (topSpeed * STRAIGHT_DOWN_SLOW_FACTOR);
+			}
+			LocalApiLiveMissileLaunched(getObject(), &m_targetPos, legacyFrames / (Real)BaseFps);
+		}
+	}
+
+#endif
 	m_deliveryDecal.clear();
 	getNeutronMissileUpdateModuleData()->m_deliveryDecalTemplate.createRadiusDecal(m_targetPos,
 		getNeutronMissileUpdateModuleData()->m_deliveryDecalRadius, getObject()->getControllingPlayer(), m_deliveryDecal);
@@ -261,11 +285,7 @@ void NeutronMissileUpdate::doLaunch()
 
 		FXList::doFXObj(getNeutronMissileUpdateModuleData()->m_launchFX, getObject());
 		m_heightAtLaunch = getObject()->getPosition()->z;
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-		m_frameAtLaunch = TheGameLogic->getFrameLegacy();
-#else
 		m_frameAtLaunch = TheGameLogic->getFrame();
-#endif
 
 	}
 
@@ -284,7 +304,7 @@ void NeutronMissileUpdate::doLaunch()
 		TheParticleSystemManager->createAttachedParticleSystemID(m_exhaustSysTmpl, getObject());
 
 	m_state = ATTACK;
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+#if defined(GENONLINE)
 	m_stateTimestamp = TheGameLogic->getFrameLegacy();
 #else
 	m_stateTimestamp = TheGameLogic->getFrame();
@@ -400,11 +420,7 @@ void NeutronMissileUpdate::doAttack()
 	Coord3D pos = *getObject()->getPosition();
 
 	const NeutronMissileUpdateModuleData* d = getNeutronMissileUpdateModuleData();
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	UnsignedInt now = TheGameLogic->getFrameLegacy();
-#else
 	UnsignedInt now = TheGameLogic->getFrame();
-#endif
 	if (d->m_specialSpeedTime > 0 && now <= m_frameAtLaunch + d->m_specialSpeedTime)
 	{
 		getObject()->getDrawable()->setInstanceMatrix(nullptr);
@@ -495,13 +511,14 @@ void NeutronMissileUpdate::detonate()
  */
 UpdateSleepTime NeutronMissileUpdate::update()
 {
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+
+#if defined(GENONLINE)
 	if (!TheGameLogic->HasLegacyFrameAdvanced())
 	{
 		return UPDATE_SLEEP_NONE;
 	}
-#endif
 
+#endif
 	m_deliveryDecal.update();
 
 	if (!m_reachedIntermediatePos)

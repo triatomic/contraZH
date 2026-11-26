@@ -78,6 +78,10 @@
 
 #include "W3DDevice/Common/W3DFunctionLexicon.h"
 #include "W3DDevice/GameClient/W3DGameWindowManager.h"
+#if defined(GENONLINE)
+#include "W3DDevice/GameClient/W3DDisplay.h"
+#include "W3DDevice/GameClient/W3DGameWindowManager.h"
+#endif
 #include "W3DDevice/GameClient/W3DGameFont.h"
 #include "W3DDevice/GameClient/W3DDisplayStringManager.h"
 #include "GameClient/Keyboard.h"

@@ -1373,18 +1373,33 @@ void W3DVolumetricShadow::RenderMeshVolume(Int meshIndex, Int lightIndex, const 
 	W3DBufferManager::W3DVertexBufferSlot *vbSlot=m_shadowVolumeVB[lightIndex][ meshIndex ];
 	if (!vbSlot)
 		return;
+#if defined(GENONLINE)
+
+	// Check if buffer is too small - skip rendering if shadow is too complex
+	if (vbSlot->m_size < numVerts)
+		return;
+
+#endif
 	if (vbSlot->m_VB->m_DX8VertexBuffer->Get_DX8_Vertex_Buffer() != lastActiveVertexBuffer)
 	{	lastActiveVertexBuffer=vbSlot->m_VB->m_DX8VertexBuffer->Get_DX8_Vertex_Buffer();
 		DX8Wrapper::Set_DX8_Stream_Source(0, lastActiveVertexBuffer, 0, vbSlot->m_VB->m_DX8VertexBuffer->FVF_Info().Get_FVF_Size());	//12 bytes per vertex.
 	}
 
+#if !defined(GENONLINE)
 	DEBUG_ASSERTCRASH(vbSlot->m_size >= numVerts,("Overflowing Shadow Vertex Buffer Slot"));
 
+#endif
 	W3DBufferManager::W3DIndexBufferSlot *ibSlot=m_shadowVolumeIB[lightIndex][ meshIndex ];
 	if (!ibSlot)
 		return;
 
+#if defined(GENONLINE)
+	// Check if buffer is too small - skip rendering if shadow is too complex
+	if (ibSlot->m_size < numIndex)
+		return;
+#else
 	DEBUG_ASSERTCRASH(ibSlot->m_size >= numIndex,("Overflowing Shadow Index Buffer Slot"));
+#endif
 
 	DX8Wrapper::Set_DX8_Indices(ibSlot->m_IB->m_DX8IndexBuffer->Get_DX8_Index_Buffer(), vbSlot->m_start);
 
@@ -1783,6 +1798,11 @@ void W3DVolumetricShadow::Update()
 	if( m_geometry == nullptr)
 		return;
 
+#if defined(GENONLINE)
+	if( m_robj == nullptr)
+		return;
+
+#endif
 	//
 	// for now we will just rebuild a shadow volume every so often, this
 	// should be changed to be built only when the light angle sufficiently
@@ -1856,6 +1876,11 @@ void W3DVolumetricShadow::updateVolumes(Real zoffset)
 {
 	Int i,j;
 
+#if defined(GENONLINE)
+	if( m_robj == nullptr)
+		return;
+
+#endif
 	HLodClass *hlod=(HLodClass *)m_robj;
 	MeshClass *mesh;
 	static AABoxClass aaBox;
@@ -3022,7 +3047,11 @@ void W3DVolumetricShadow::constructVolumeVB( Vector3 *lightPosObject,Real shadow
 		DEBUG_ASSERTCRASH(ibSlot->m_size >= (polygonCount*3),("Overflowing Shadow Index Buffer Slot"));
 	}
 
+#if defined(GENONLINE)
+	if (!ibSlot || !vbSlot || vbSlot->m_size < vertexCount || ibSlot->m_size < (polygonCount*3))
+#else
 	if (!ibSlot || !vbSlot)
+#endif
 	{
 		//could not allocate storage to hold buffers
 		if (ibSlot)
@@ -3498,7 +3527,11 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
 	// the stencil that water and occlusion depend on.
 	const Bool shadowMapActive = IsShadowMapActive();
 
+#if defined(GENONLINE)
+	if (m_shadowList && TheGlobalData->drawsShadowVolumes() && !shadowMapActive)
+#else
 	if (m_shadowList && TheGlobalData->m_useShadowVolumes && !shadowMapActive)
+#endif
 	{
 
 		LPDIRECT3DDEVICE8 m_pDev=DX8Wrapper::_Get_D3D_Device8();

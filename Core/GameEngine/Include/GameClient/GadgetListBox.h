@@ -61,22 +61,74 @@ typedef struct _RightClickStruct
 	Int pos;
 } RightClickStruct;
 
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
 enum ListRowAnimMode
 {
-	LIST_ROW_ANIM_ID = 1,      // key by item ID, for lists that change order or have insertions/deletions
-	LIST_ROW_ANIM_SLOT = 2     // key by slot index, for append-only lists that don't change order
+    LIST_ROW_ANIM_ID = 1,      // key by item ID, for lists that change order or have insertions/deletions
+    LIST_ROW_ANIM_SLOT = 2     // key by slot index, for append-only lists that don't change order
 };
 
-extern void SetListBoxRowAnimMode(GameWindow *window, ListRowAnimMode mode);
-extern void ApplyListBoxRowAnimation(GameWindow *window, Int rowIndex, Int rowHeight, Int &drawY);
-#endif
+// GenOnline @feature arcticdolphin 08/11/2026 Kit list scroll bar images, used instead of the retail scroll bar when all exist.
+enum KitScrollImage
+{
+	KIT_SCROLL_TRACK_TOP,
+	KIT_SCROLL_TRACK_CENTER,
+	KIT_SCROLL_TRACK_BOTTOM,
+	KIT_SCROLL_THUMB_TOP,
+	KIT_SCROLL_THUMB_CENTER,
+	KIT_SCROLL_THUMB_BOTTOM,
+	KIT_SCROLL_THUMB_HILITE_TOP,
+	KIT_SCROLL_THUMB_HILITE_CENTER,
+	KIT_SCROLL_THUMB_HILITE_BOTTOM,
+	KIT_SCROLL_THUMB_DISABLED_TOP,
+	KIT_SCROLL_THUMB_DISABLED_CENTER,
+	KIT_SCROLL_THUMB_DISABLED_BOTTOM,
+	KIT_SCROLL_UP,
+	KIT_SCROLL_UP_HILITE,
+	KIT_SCROLL_UP_PUSHED,
+	KIT_SCROLL_UP_DISABLED,
+	KIT_SCROLL_DOWN,
+	KIT_SCROLL_DOWN_HILITE,
+	KIT_SCROLL_DOWN_PUSHED,
+	KIT_SCROLL_DOWN_DISABLED,
+	KIT_SCROLL_LINE,
 
+	KIT_SCROLL_IMAGE_COUNT
+};
+
+// GenOnline @bugfix arcticdolphin 08/11/2026 Spans across a kit scroll column that all centre on one line.
+enum KitScrollSpan
+{
+	KIT_SCROLL_SPAN_CONTENT, ///< the column left of the list frame line
+	KIT_SCROLL_SPAN_PILL, ///< the track channel and the thumb
+	KIT_SCROLL_SPAN_CHEVRON ///< the arrow chevrons
+};
+
+#endif
 ///////////////////////////////////////////////////////////////////////////////
 // INLINING ///////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
+#if defined(GENONLINE)
+extern void SetListBoxRowAnimMode(GameWindow *window, ListRowAnimMode mode);
+extern void ApplyListBoxRowAnimation(GameWindow *window, Int rowIndex, Int rowHeight, Int &drawY);
+#endif
 extern Int GadgetListBoxGetEntryBasedOnXY( GameWindow *listbox, Int x, Int y, Int &row, Int &column);
 extern void GadgetListboxCreateScrollbar( GameWindow *listbox );
+#if defined(GENONLINE)
+extern Bool GadgetListBoxHasKitScrollBar( void ); ///< TRUE when every kit scroll bar image exists
+extern const Image *GadgetListBoxGetKitScrollImage( KitScrollImage which ); ///< nullptr unless GadgetListBoxHasKitScrollBar
+extern Int GadgetListBoxGetKitComboFrame( GameWindow *listbox ); ///< kit combo drop-down frame thickness, 0 for other lists
+extern Int GadgetListBoxGetKitComboRowTrim( GameWindow *listbox ); ///< blank font rows a kit combo drop-down trims off each text row's top, 0 for other lists
+extern Int GadgetListBoxGetKitComboHeight( GameWindow *listbox, Int rows ); ///< kit combo drop-down height for rows, 0 for other lists
+extern Int GadgetListBoxGetKitListFrame( GameWindow *listbox ); ///< kit frame of a colour drawn list: the combo field border for drop-downs, the kit line for bordered lists, else 0
+extern Int GadgetListBoxGetTextInset( GameWindow *listbox ); ///< height the list text drawing loses to its top inset and frame, 0 for kit combo drop-downs
+extern Int GadgetListBoxGetKitScrollLineWidth( void ); ///< kit scroll column separator thickness, 0 without the kit
+extern void GadgetListBoxGetKitScrollSpan( KitScrollSpan which, Int columnX, Int columnWidth, Int *spanX, Int *spanWidth ); ///< a kit scroll column span, centred on the column line
+extern void GadgetListBoxDrawKitLines( Int x, Int y, Int width, Int height,
+																			 Bool left, Bool top, Bool right, Bool bottom ); ///< kit line edges inside a rect
+extern Bool GadgetListBoxGetKitFrameColor( Color layoutBorder, Color *frameColor ); ///< TRUE when a layout border draws as a kit frame
+extern void GadgetListBoxDrawKitFrame( Color color, Int x, Int y, Int width, Int height ); ///< kit weight frame, or a rule for thin windows
+#endif
 extern void GadgetListBoxAddMultiSelect( GameWindow *listbox );
 extern void GadgetListBoxRemoveMultiSelect( GameWindow *listbox );
 extern void GadgetListBoxSetListLength( GameWindow *listbox, Int newLength );

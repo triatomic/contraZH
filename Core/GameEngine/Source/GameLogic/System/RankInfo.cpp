@@ -49,7 +49,14 @@ RankInfoStore::~RankInfoStore()
 	for (level =0; level < getRankLevelCount(); level++)
 	{
 		RankInfo* ri = m_rankInfos[level];
+#if defined(GENONLINE)
+		if (ri)
+		{
+			deleteInstance(ri);
+		}
+#else
 		deleteInstance(ri);
+#endif
 	}
 	m_rankInfos.clear();
 }

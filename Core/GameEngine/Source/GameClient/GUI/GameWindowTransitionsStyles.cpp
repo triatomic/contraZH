@@ -714,47 +714,83 @@ void FadeTransition::draw()
 	{
 		case FADETRANSITION_FADE_IN_1:
 		{
+#if defined(GENONLINE)
+			TheWindowManager->winDrawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 25));
+#else
 			TheDisplay->drawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 25));
+#endif
 		}
 		break;
 		case FADETRANSITION_FADE_IN_2:
 		{
+#if defined(GENONLINE)
+			TheWindowManager->winDrawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 50));
+#else
 			TheDisplay->drawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 50));
+#endif
 		}
 		break;
 		case FADETRANSITION_FADE_IN_3:
 		{
+#if defined(GENONLINE)
+			TheWindowManager->winDrawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 75));
+#else
 			TheDisplay->drawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 75));
+#endif
 		}
 		break;
 		case FADETRANSITION_FADE_IN_4:
 		{
+#if defined(GENONLINE)
+			TheWindowManager->winDrawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 100));
+#else
 			TheDisplay->drawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 100));
+#endif
 		}
 		break;
 		case FADETRANSITION_FADE_IN_5:
 		{
+#if defined(GENONLINE)
+			TheWindowManager->winDrawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 125));
+#else
 			TheDisplay->drawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 125));
+#endif
 		}
 		break;
 		case FADETRANSITION_FADE_IN_6:
 		{
+#if defined(GENONLINE)
+			TheWindowManager->winDrawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 150));
+#else
 			TheDisplay->drawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 150));
+#endif
 		}
 		break;
 		case FADETRANSITION_FADE_IN_7:
 		{
+#if defined(GENONLINE)
+			TheWindowManager->winDrawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 175));
+#else
 			TheDisplay->drawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 175));
+#endif
 		}
 		break;
 		case FADETRANSITION_FADE_IN_8:
 		{
+#if defined(GENONLINE)
+			TheWindowManager->winDrawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 200));
+#else
 			TheDisplay->drawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 200));
+#endif
 		}
 		break;
 		case FADETRANSITION_FADE_IN_9:
 		{
+#if defined(GENONLINE)
+			TheWindowManager->winDrawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 225));
+#else
 			TheDisplay->drawImage(image, m_pos.x, m_pos.y, m_pos.x + m_size.x, m_pos.y + m_size.y, GameMakeColor(255, 255, 255, 225));
+#endif
 		}
 	}
 }
@@ -2081,9 +2117,15 @@ void PushButtonImageDrawThree(GameWindow *window, Int alpha )
 {
 	WinInstanceData *instData = window->winGetInstanceData();
 	const Image *leftImage, *rightImage, *centerImage;
+#if defined(GENONLINE)
+	ICoord2D origin, size;
+#else
 	ICoord2D origin, size, start, end;
+#endif
 	Int xOffset, yOffset;
+#if !defined(GENONLINE)
 	Int i;
+#endif
 	Int color = GameMakeColor(255,255,255,alpha);
 	// get screen position and size
 	window->winGetScreenPosition( &origin.x, &origin.y );
@@ -2102,6 +2144,10 @@ void PushButtonImageDrawThree(GameWindow *window, Int alpha )
 			centerImage == nullptr )
 		return;
 
+#if defined(GENONLINE)
+	TheWindowManager->winDrawThreePieceImage( leftImage, centerImage, nullptr, rightImage,
+																						 origin.x + xOffset, origin.y + yOffset, size.x, size.y, color );
+#else
 	// get image sizes for the ends
 	ICoord2D leftSize, rightSize;
 	leftSize.x = leftImage->getImageWidth();
@@ -2189,6 +2235,7 @@ void PushButtonImageDrawThree(GameWindow *window, Int alpha )
 		end.y = start.y + size.y;
 		TheDisplay->drawImage(rightImage, start.x, start.y, end.x, end.y,color);
 	}
+#endif
 
 }
 

@@ -247,6 +247,9 @@ endif()
 
 add_library(corei_gameenginedevice_private INTERFACE)
 add_library(corei_gameenginedevice_public INTERFACE)
+if(RTS_BUILD_GENERALS_ONLINE)
+    include(${CMAKE_SOURCE_DIR}/GenOnline/cmake/core-gameenginedevice.cmake)
+endif()
 
 target_sources(corei_gameenginedevice_private INTERFACE ${GAMEENGINEDEVICE_SRC})
 

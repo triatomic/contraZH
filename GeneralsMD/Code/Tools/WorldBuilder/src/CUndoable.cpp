@@ -309,7 +309,11 @@ void AddBoundaryUndoable::Undo(void)
 AddObjectUndoable::~AddObjectUndoable()
 {
 	m_pDoc = nullptr;  // not ref counted.
+#if defined(GENONLINE)
+	if (m_objectToAdd && !m_addedToList) {
+#else
 	if (!m_addedToList) {
+#endif
 		deleteInstance(m_objectToAdd);
 		m_objectToAdd=nullptr;
 	}
@@ -984,7 +988,11 @@ void DictItemUndoable::Undo()
 ***************************************************************************/
 DeleteInfo::~DeleteInfo()
 {
+#if defined(GENONLINE)
+	if (m_didDelete && m_objectToDelete) {
+#else
 	if (m_didDelete) {
+#endif
 		deleteInstance(m_objectToDelete);
 	}
 	DeleteInfo *pCur = m_next;

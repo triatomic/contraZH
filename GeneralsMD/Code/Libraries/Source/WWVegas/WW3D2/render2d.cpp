@@ -371,8 +371,33 @@ void	Render2DClass::Internal_Add_Quad_HColors( unsigned long color1, unsigned lo
 }
 
 
+#if defined(GENONLINE)
+static const int QUAD_VERTEX_COUNT = 4;
+static const int QUAD_INDEX_COUNT = 6;
+static const int TRI_VERTEX_COUNT = 3;
+static const int TRI_INDEX_COUNT = 3;
+
+// TheSuperHackers @fix arcticdolphin 12/10/2026 Render and reset when the next primitive would overflow the dynamic buffers.
+void	Render2DClass::Internal_Flush_If_Full( int vertex_count, int index_count )
+#else
 void	Render2DClass::Internal_Add_Quad_Indicies( int start_vert_index, bool backfaced )
+#endif
 {
+#if defined(GENONLINE)
+	if ( Vertices.Count() + vertex_count > DynamicVBAccessClass::MAX_VERTEX_COUNT
+		|| Indices.Count() + index_count > DynamicIBAccessClass::MAX_INDEX_COUNT ) {
+		Render();
+		Render2DClass::Reset();
+	}
+}
+
+void	Render2DClass::Internal_Add_Quad_Indicies( bool backfaced )
+{
+	Internal_Flush_If_Full( QUAD_VERTEX_COUNT, QUAD_INDEX_COUNT );
+
+	int start_vert_index = Vertices.Count();
+
+#endif
 	unsigned short * indices;
 
 	if (backfaced ^ (CoordinateScale.X * CoordinateScale.Y > 0)) {
@@ -410,7 +435,11 @@ void	Render2DClass::Internal_Add_Quad_Indicies( int start_vert_index, bool backf
 
 void	Render2DClass::Add_Quad( const Vector2 & v0, const Vector2 & v1, const Vector2 & v2, const Vector2 & v3, const RectClass & uv, unsigned long color )
 {
+#if defined(GENONLINE)
+	Internal_Add_Quad_Indicies();
+#else
 	Internal_Add_Quad_Indicies( Vertices.Count() );
+#endif
 	Internal_Add_Quad_Vertices( v0, v1, v2, v3 );
 	Internal_Add_Quad_UVs( uv );
 	Internal_Add_Quad_Colors( color );
@@ -418,7 +447,11 @@ void	Render2DClass::Add_Quad( const Vector2 & v0, const Vector2 & v1, const Vect
 
 void	Render2DClass::Add_Quad_Backfaced( const Vector2 & v0, const Vector2 & v1, const Vector2 & v2, const Vector2 & v3, const RectClass & uv, unsigned long color )
 {
+#if defined(GENONLINE)
+	Internal_Add_Quad_Indicies( true );
+#else
 	Internal_Add_Quad_Indicies( Vertices.Count(), true );
+#endif
 	Internal_Add_Quad_Vertices( v0, v1, v2, v3 );
 	Internal_Add_Quad_UVs( uv );
 	Internal_Add_Quad_Colors( color );
@@ -426,7 +459,11 @@ void	Render2DClass::Add_Quad_Backfaced( const Vector2 & v0, const Vector2 & v1, 
 
 void	Render2DClass::Add_Quad_VGradient( const Vector2 & v0, const Vector2 & v1, const Vector2 & v2, const Vector2 & v3, const RectClass & uv, unsigned long top_color, unsigned long bottom_color )
 {
+#if defined(GENONLINE)
+	Internal_Add_Quad_Indicies();
+#else
 	Internal_Add_Quad_Indicies( Vertices.Count() );
+#endif
 	Internal_Add_Quad_Vertices( v0, v1, v2, v3 );
 	Internal_Add_Quad_UVs( uv );
 	Internal_Add_Quad_VColors( top_color, bottom_color );
@@ -434,7 +471,11 @@ void	Render2DClass::Add_Quad_VGradient( const Vector2 & v0, const Vector2 & v1, 
 
 void	Render2DClass::Add_Quad_HGradient( const Vector2 & v0, const Vector2 & v1, const Vector2 & v2, const Vector2 & v3, const RectClass & uv, unsigned long left_color, unsigned long right_color )
 {
+#if defined(GENONLINE)
+	Internal_Add_Quad_Indicies();
+#else
 	Internal_Add_Quad_Indicies( Vertices.Count() );
+#endif
 	Internal_Add_Quad_Vertices( v0, v1, v2, v3 );
 	Internal_Add_Quad_UVs( uv );
 	Internal_Add_Quad_HColors( left_color, right_color );
@@ -443,7 +484,11 @@ void	Render2DClass::Add_Quad_HGradient( const Vector2 & v0, const Vector2 & v1, 
 
 void	Render2DClass::Add_Quad_VGradient( const RectClass & screen, unsigned long top_color, unsigned long bottom_color )
 {
+#if defined(GENONLINE)
+	Internal_Add_Quad_Indicies();
+#else
 	Internal_Add_Quad_Indicies( Vertices.Count() );
+#endif
 	Internal_Add_Quad_Vertices( screen );
 	Internal_Add_Quad_UVs( RectClass( 0,0,1,1 ) );
 	Internal_Add_Quad_VColors( top_color, bottom_color );
@@ -451,7 +496,11 @@ void	Render2DClass::Add_Quad_VGradient( const RectClass & screen, unsigned long 
 
 void	Render2DClass::Add_Quad_HGradient( const RectClass & screen, unsigned long left_color, unsigned long right_color )
 {
+#if defined(GENONLINE)
+	Internal_Add_Quad_Indicies();
+#else
 	Internal_Add_Quad_Indicies( Vertices.Count() );
+#endif
 	Internal_Add_Quad_Vertices( screen );
 	Internal_Add_Quad_UVs( RectClass( 0,0,1,1 ) );
 	Internal_Add_Quad_HColors( left_color, right_color );
@@ -460,7 +509,11 @@ void	Render2DClass::Add_Quad_HGradient( const RectClass & screen, unsigned long 
 
 void	Render2DClass::Add_Quad( const RectClass & screen, const RectClass & uv, unsigned long color )
 {
+#if defined(GENONLINE)
+	Internal_Add_Quad_Indicies();
+#else
 	Internal_Add_Quad_Indicies( Vertices.Count() );
+#endif
 	Internal_Add_Quad_Vertices( screen );
 	Internal_Add_Quad_UVs( uv );
 	Internal_Add_Quad_Colors( color );
@@ -468,7 +521,11 @@ void	Render2DClass::Add_Quad( const RectClass & screen, const RectClass & uv, un
 
 void	Render2DClass::Add_Quad( const Vector2 & v0, const Vector2 & v1, const Vector2 & v2, const Vector2 & v3, unsigned long color )
 {
+#if defined(GENONLINE)
+	Internal_Add_Quad_Indicies();
+#else
 	Internal_Add_Quad_Indicies( Vertices.Count() );
+#endif
 	Internal_Add_Quad_Vertices( v0, v1, v2, v3 );
 	Internal_Add_Quad_UVs( RectClass( 0,0,1,1 ) );
 	Internal_Add_Quad_Colors( color );
@@ -476,7 +533,11 @@ void	Render2DClass::Add_Quad( const Vector2 & v0, const Vector2 & v1, const Vect
 
 void	Render2DClass::Add_Quad( const RectClass & screen, unsigned long color )
 {
+#if defined(GENONLINE)
+	Internal_Add_Quad_Indicies();
+#else
 	Internal_Add_Quad_Indicies( Vertices.Count() );
+#endif
 	Internal_Add_Quad_Vertices( screen );
 	Internal_Add_Quad_UVs( RectClass( 0,0,1,1 ) );
 	Internal_Add_Quad_Colors( color );
@@ -487,6 +548,10 @@ void	Render2DClass::Add_Quad( const RectClass & screen, unsigned long color )
 */
 void	Render2DClass::Add_Tri( const Vector2 & v0, const Vector2 & v1, const Vector2 & v2, const Vector2 & uv0, const Vector2 & uv1, const Vector2 & uv2, unsigned long color )
 {
+#if defined(GENONLINE)
+	Internal_Flush_If_Full( TRI_VERTEX_COUNT, TRI_INDEX_COUNT );
+
+#endif
 	int old_vert_count = Vertices.Count();
 
 	// Add the vertices (translated to new coordinates)
@@ -778,7 +843,11 @@ void	Render2DTextClass::Draw_Char( WCHAR ch, unsigned long color )
 	if ( ch != (WCHAR)' ' && !is_clipped ) {
 		RectClass screen( Cursor.X, Cursor.Y, Cursor.X + Font->Char_Width(ch), Cursor.Y + char_height );
 
+#if defined(GENONLINE)
+		Internal_Add_Quad_Indicies();
+#else
 		Internal_Add_Quad_Indicies( Vertices.Count() );
+#endif
 		Internal_Add_Quad_Vertices( screen );
 		Internal_Add_Quad_UVs( Font->Char_UV( ch ) );
 		Internal_Add_Quad_Colors( color );
@@ -836,7 +905,11 @@ void	Render2DTextClass::Draw_Text( const WCHAR * text, unsigned long color )
 
 void	Render2DTextClass::Draw_Block( const RectClass & screen, unsigned long color )
 {
+#if defined(GENONLINE)
+	Internal_Add_Quad_Indicies();
+#else
 	Internal_Add_Quad_Indicies( Vertices.Count() );
+#endif
 	Internal_Add_Quad_Vertices( screen );
 	Internal_Add_Quad_UVs( BlockUV );
 	Internal_Add_Quad_Colors( color );

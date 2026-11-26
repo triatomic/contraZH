@@ -137,13 +137,15 @@ public:
 	virtual void assignSelectedDrawablesToGroup( Int group );						///< assign all selected drawables to the specified group
 	//---------------------------------------------------------------------------------------
 	virtual UnsignedInt getFrame() { return m_frame; }						///< Returns the current simulation frame number
-#if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
-	// The legacy frame ticks with the logic frame at the retail rate, so client effects age alike on every client.
-	UnsignedInt getFrameLegacy() const { return m_frameLegacy; }
-	Bool HasLegacyFrameAdvanced() const { return m_frameLegacy != m_frameLegacyLast; }
-	Real getLegacyFramePhase() const;
+
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	UnsignedInt getFrameLegacy(void) { return m_frameLegacy; }
+	UnsignedInt getFrameLegacyLast(void) { return m_frameLegacyLast; }
+	bool HasLegacyFrameAdvanced(void) { return m_frameLegacy != m_frameLegacyLast; }
 #endif
 
+#endif
 	//---------------------------------------------------------------------------
 	virtual void setTeamColor( Int red, Int green, Int blue ) = 0;  ///< @todo superhack for demo, remove!!!
 
@@ -174,11 +176,16 @@ protected:
 
 	// @todo Should there be a separate GameClient frame counter?
 	UnsignedInt m_frame;																				///< Simulation frame number from server
-#if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
+
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	int64_t m_LegacyFrameEndLastFrame = 0;
+	int64_t m_legacyFrameMSAccured = 0;
 	UnsignedInt m_frameLegacy;
 	UnsignedInt m_frameLegacyLast;
 #endif
 
+#endif
 	Drawable *m_drawableList;																		///< All of the drawables in the world
 	DrawablePtrHash m_drawableHash;															///< Used for DrawableID lookups
 

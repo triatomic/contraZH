@@ -317,12 +317,6 @@ public:
 	Real getResolutionFontAdjustment();
 
 	Bool getShowMoneyPerMinute() const;
-#if defined(GENERALS_ONLINE)
-	Int getObserverNotificationFontSize() const;
-	Bool getObserverNotificationSpecialPowerUsage() const;
-	Bool getObserverNotificationSpecialPowerPurchase() const;
-	Bool getObserverNotificationMilestone() const;
-#endif
 
 	Bool getSmartSelectionEnabled() const;
 	Bool getSmartSelectionUseMouse() const;

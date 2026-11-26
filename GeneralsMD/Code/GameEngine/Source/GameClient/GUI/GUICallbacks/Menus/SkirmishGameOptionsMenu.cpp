@@ -56,6 +56,10 @@
 #include "GameClient/GadgetSlider.h"
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/MapUtil.h"
+#if defined(GENONLINE)
+#include "GameClient/MapPreviewIcons.h"
+#include "Common/FramePacer.h"
+#endif
 #include "GameClient/Mouse.h"
 #include "GameClient/GameWindowTransitions.h"
 #include "GameNetwork/GameSpy/LobbyUtils.h"
@@ -68,7 +72,13 @@
 #include "GameNetwork/GUIUtil.h"
 #include "GameNetwork/IPEnumeration.h"
 #include "WWDownload/Registry.h"
+#if defined(GENONLINE)
+#include "Common/LocalApiLobby.h"
+#endif
 
+#if defined(GENONLINE)
+UnsignedInt GetTeamUiColor(Int teamNumber);
+#endif
 
 SkirmishGameInfo *TheSkirmishGameInfo = nullptr;
 
@@ -419,12 +429,21 @@ void setFPSTextBox( Int sliderPos )
 		GadgetStaticTextSetText(staticTextGameSpeed, text);
 		return;
 	}
+#if defined(GENONLINE)
+	else if( sliderPos == BaseFps )
+#else
 	else if( sliderPos == TheGlobalData->m_framesPerSecondLimit )
+#endif
 	{
 		// set different color
 		staticTextGameSpeed->winEnable(FALSE);
 	}
+#if defined(GENONLINE)
+	// The slider holds the retail frame rate, so the retail base frame rate is the normal speed.
+	text.format(L"%d%%", (sliderPos * 100 + BaseFps / 2) / BaseFps);
+#else
 	text.format(L"%2d", sliderPos);
+#endif
 	GadgetStaticTextSetText(staticTextGameSpeed, text);
 }
 
@@ -529,6 +548,18 @@ void MapSelectorTooltip(GameWindow *window,
 	Int pixelX, pixelY;
 	window->winGetScreenPosition(&pixelX, &pixelY);
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 08/11/2026 Name the type of the typed marker under the mouse.
+	UnicodeString typedTooltip;
+	if (getMapPreviewMarkerTooltip(x - pixelX, y - pixelY, typedTooltip))
+	{
+		TheMouse->setCursorTooltip( typedTooltip, -1, nullptr);
+		return;
+	}
+#endif
+
+#endif
 	const Image *image = TheMappedImageCollection->findImageByName("TecBuilding");
 	const Image *image2 = TheMappedImageCollection->findImageByName("Cash");
 
@@ -626,6 +657,9 @@ void positionAdditionalImages( MapMetaData *mmd, GameWindow *mapWindow, Bool for
 {
 	TheSupplyAndTechImageLocations.m_supplyPosList.clear();
 	TheSupplyAndTechImageLocations.m_techPosList.clear();
+#if defined(GENONLINE)
+	TheSupplyAndTechImageLocations.m_typedMarkers.clear();
+#endif
 
 	if( !mmd || !mapWindow || mapWindow->winIsHidden())
 		return;
@@ -645,6 +679,14 @@ void positionAdditionalImages( MapMetaData *mmd, GameWindow *mapWindow, Bool for
 	Int smallWidth = lr.x - ul.x;
 	Int smallHeight= lr.y - ul.y;
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 08/11/2026 Use the typed objects so each marker carries its icon category.
+	if (positionTypedPreviewImages(mmd, ul, smallWidth, smallHeight))
+		return;
+#endif
+
+#endif
 	Coord3DList::iterator it = mmd->m_supplyPositions.begin();
 		// loop through and make sure we're not on top of anyone else
 	while( it != mmd->m_supplyPositions.end())
@@ -836,23 +878,71 @@ void updateMapStartSpots( GameInfo *myGame, GameWindow *buttonMapStartPositions[
 		{
 			if(gs->getApparentStartPos() >=0 && gs->getApparentStartPos() < mmd.m_numPlayers && gs->getPlayerTemplate() != PLAYERTEMPLATE_OBSERVER )
 			{
+#if defined(GENONLINE)
+				Int startPos = gs->getApparentStartPos();
+				GameWindow* btn = buttonMapStartPositions[startPos];
+				if (!btn)
+					continue;
+
+				AsciiString displayNumber;
+				displayNumber.format("NUMBER:%d", i + 1);
+				GadgetButtonSetText(btn, TheGameText->fetch(displayNumber));
+
+				UnsignedInt col = (gs->getTeamNumber() >= 0)
+					? GetTeamUiColor(gs->getTeamNumber())
+					: GameMakeColor(255, 255, 255, 255);
+
+				GadgetTextEntrySetTextColor(btn, col);
+#else
 				AsciiString displayNumber;
 				displayNumber.format("NUMBER:%d",i + 1);
 				GadgetButtonSetText(buttonMapStartPositions[gs->getApparentStartPos()], TheGameText->fetch(displayNumber));
+#endif
 			}
 		}
 		else
 		{
 			if(gs->getStartPos() >=0 && gs->getStartPos() < mmd.m_numPlayers && gs->getPlayerTemplate() != PLAYERTEMPLATE_OBSERVER )
 			{
+#if defined(GENONLINE)
+				Int startPos = gs->getStartPos();
+				GameWindow* btn = buttonMapStartPositions[startPos];
+				if (!btn)
+					continue;
+
+#endif
 				AsciiString displayNumber;
+#if defined(GENONLINE)
+				displayNumber.format("NUMBER:%d", i + 1);
+				GadgetButtonSetText(btn, TheGameText->fetch(displayNumber));
+
+#else
 				displayNumber.format("NUMBER:%d",i + 1);
 				GadgetButtonSetText(buttonMapStartPositions[gs->getStartPos()], TheGameText->fetch(displayNumber));
 				//added start position tooltip
 				//Fixed again to show the right number , ie "i + 1"
+#endif
 				UnicodeString temp;
 				temp.format(TheGameText->fetch("TOOLTIP:StartPositionN"), i + 1);
+#if defined(GENONLINE)
+				btn->winSetTooltip(temp);
+
+				Int team = gs->getTeamNumber();
+				UnsignedInt col;
+				if (team >= 0)
+				{
+					col = GetTeamUiColor(team);
+				}
+				else
+				{
+					// No team: default to white
+					col = GameMakeColor(255, 255, 255, 255);
+				}
+                
+				GadgetTextEntrySetTextColor(btn, col);
+#else
 				buttonMapStartPositions[gs->getStartPos()]->winSetTooltip(temp);
+#endif
 			}
 		}
 	}
@@ -1414,7 +1504,12 @@ void SkirmishGameOptionsMenuInit( WindowLayout *layout, void *userData )
 	// set up the game speed slider
 //	NameKeyType sliderGameSpeedID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:SliderGameSpeed" );
 	GameWindow *sliderGameSpeed = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, sliderGameSpeedID );
+#if defined(GENONLINE)
+	// Skirmish.ini holds the retail frame rate, so a missing value is the retail normal speed.
+	Int sliderPos = max(15,min(61,prefs.getInt("FPS", BaseFps)));
+#else
 	Int sliderPos = max(15,min(61,prefs.getInt("FPS", TheGlobalData->m_framesPerSecondLimit)));
+#endif
 	GadgetSliderSetPosition( sliderGameSpeed, sliderPos );
 	GadgetSliderHideValue( sliderGameSpeed, TRUE );
 	setFPSTextBox(sliderPos);
@@ -2228,3 +2323,51 @@ void populateSkirmishBattleHonors()
 			BATTLE_HONOR_OFFICERSCLUB, row, column);
 	}
 }
+#if defined(GENONLINE)
+
+// Stats pipe lobby control: the start position buttons' own handler, then the refresh the click path does.
+static void statsMoveStartPosition(Int slot, Int position)
+{
+	handleStartPositionSelection(slot, position);
+	skirmishUpdateSlotList();
+	sandboxOk = FALSE;
+}
+
+// Stats pipe lobby control: the update of the speed slider.
+static void statsSetGameSpeed(Int fps)
+{
+	GameWindow *sliderGameSpeed = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, sliderGameSpeedID );
+	GadgetSliderSetPosition( sliderGameSpeed, fps );
+	setFPSTextBox( fps );
+}
+
+Bool SkirmishGameOptionsMenuStatsLobby( StatsLobbyScreen& out )
+{
+	if (!parentSkirmishGameOptions || !TheSkirmishGameInfo || !buttonStart)
+		return FALSE;
+
+	out.game = TheSkirmishGameInfo;
+	out.isHost = TRUE;
+	out.localSlot = TheSkirmishGameInfo->getLocalSlotNum();
+	if (buttonPushed)
+		out.blocked = "the Start button was pressed: the screen is leaving";
+	else if (skirmishMapSelectLayout)
+		out.blocked = "the map selector is open";
+	else if (!doUpdateSlotList)
+		out.blocked = "the screen is still opening";
+	out.comboPlayer = comboBoxPlayer;
+	out.comboColor = comboBoxColor;
+	out.comboTemplate = comboBoxPlayerTemplate;
+	out.comboTeam = comboBoxTeam;
+	out.buttonStartPosition = buttonMapStartPosition;
+	out.comboStartingCash = comboBoxStartingCash;
+	out.checkLimitSuperweapons = checkBoxLimitSuperweapons;
+	out.buttonSelectMap = buttonSelectMap;
+	out.buttonStart = buttonStart;
+	out.sliderGameSpeed = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, sliderGameSpeedID );
+	out.moveStartPosition = statsMoveStartPosition;
+	out.applyMap = SkirmishMapSelectMenuApplyMap;
+	out.setGameSpeed = statsSetGameSpeed;
+	return TRUE;
+}
+#endif

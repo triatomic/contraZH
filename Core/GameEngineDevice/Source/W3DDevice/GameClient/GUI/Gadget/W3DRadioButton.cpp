@@ -266,16 +266,24 @@ void W3DGadgetRadioButtonImageDraw( GameWindow *window,
 																	WinInstanceData *instData )
 {
 	const Image *leftImage, *rightImage, *centerImage;
+#if defined(GENONLINE)
+	ICoord2D origin, size;
+#else
 	ICoord2D origin, size, start, end;
+#endif
 	Int xOffset, yOffset;
+#if !defined(GENONLINE)
 	Int i;
+#endif
 
 	// get screen position and size
 	window->winGetScreenPosition( &origin.x, &origin.y );
 	window->winGetSize( &size.x, &size.y );
 
+#if !defined(GENONLINE)
 	IRegion2D clipLeft;
 
+#endif
 	// get image offset
 	xOffset = instData->m_imageOffset.x;
 	yOffset = instData->m_imageOffset.y;
@@ -318,6 +326,10 @@ void W3DGadgetRadioButtonImageDraw( GameWindow *window,
 			rightImage == nullptr )
 		return;
 
+#if defined(GENONLINE)
+	TheWindowManager->winDrawThreePieceImage( leftImage, centerImage, nullptr, rightImage,
+																						 origin.x + xOffset, origin.y + yOffset, size.x, size.y );
+#else
 	// get image sizes for the ends
 	ICoord2D leftSize, rightSize;
 	leftSize.x = leftImage->getImageWidth();
@@ -377,6 +389,7 @@ void W3DGadgetRadioButtonImageDraw( GameWindow *window,
 	end.x = origin.x + size.x;
 	end.y = leftEnd.y;
 	TheWindowManager->winDrawImage(rightImage, start.x, start.y, end.x, end.y);
+#endif
 
 	// draw the text
 	if( instData->getTextLength() )

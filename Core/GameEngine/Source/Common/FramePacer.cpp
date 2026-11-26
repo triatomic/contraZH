@@ -21,6 +21,11 @@
 
 #include "GameClient/View.h"
 
+#if defined(GENONLINE)
+#include "Common/GameEngine.h"
+#include "GameNetwork/GenOnline/GenOnlineForkMatchSettings.h"
+
+#endif
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ScriptEngine.h"
 
@@ -100,12 +105,13 @@ void FramePacer::reset()
 void FramePacer::setFramesPerSecondLimit( Int fps )
 {
 	DEBUG_LOG(("FramePacer::setFramesPerSecondLimit() - setting max fps to %d (TheGlobalData->m_useFpsLimit == %d)", fps, TheGlobalData->m_useFpsLimit));
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	// The render rate must never drop below the logic rate.
-	if (fps < LOGICFRAMES_PER_SECOND)
-	{
-		fps = LOGICFRAMES_PER_SECOND;
-	}
+#if defined(GENONLINE)
+
+	// clamp FPS to at least render at same as logic
+#if defined(GENONLINE)
+	fps = std::max<int>(fps, LOGICFRAMES_PER_SECOND);
+#endif
+
 #endif
 	m_maxFPS = fps;
 }
@@ -173,6 +179,21 @@ Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
 
 Int FramePacer::getActualFramesPerSecondLimit() const
 {
+#if defined(GENONLINE)
+#if RTS_ZEROHOUR
+	if (isActualFramesPerSecondLimitEnabled() && m_renderFpsLimit > 0)
+	{
+		Int logicFps = LOGICFRAMES_PER_SECOND;
+		if (isLogicTimeScaleEnabled() || TheNetwork != nullptr)
+		{
+			logicFps = getActualLogicTimeScaleFps();
+		}
+		return getSituationCappedFramesPerSecondLimit(max(m_renderFpsLimit, logicFps));
+	}
+#endif
+	const Int fps = isActualFramesPerSecondLimitEnabled() ? getFramesPerSecondLimit() : RenderFpsPreset::UncappedFpsValue;
+	return getSituationCappedFramesPerSecondLimit(fps);
+#else
 #if RTS_ZEROHOUR
 	if (isActualFramesPerSecondLimitEnabled() && m_renderFpsLimit > 0)
 	{
@@ -185,8 +206,29 @@ Int FramePacer::getActualFramesPerSecondLimit() const
 	}
 #endif
 	return isActualFramesPerSecondLimitEnabled() ? getFramesPerSecondLimit() : RenderFpsPreset::UncappedFpsValue;
+#endif
 }
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+Int FramePacer::getSituationCappedFramesPerSecondLimit(Int fps) const
+{
+	// GenOnline's focus cap applies in an online match only, elsewhere the fork's own limit rules.
+	if (GenOnlineForkIsOnlineMatch() && TheGameEngine != nullptr && !TheGameEngine->isActive())
+	{
+		fps = std::min<Int>(fps, LOGICFRAMES_PER_SECOND);
+	}
+
+	// Logic is capped by the render frame rate, so never render slower than the logic time scale or the network rate.
+	if (TheNetwork != nullptr || isLogicTimeScaleEnabled())
+	{
+		fps = std::max<Int>(fps, getActualLogicTimeScaleFps(IgnoreFrozenTime | IgnoreHaltedGame));
+	}
+	return fps;
+}
+#endif
+
+#endif
 Real FramePacer::getUpdateTime()  const
 {
 	return m_updateTime;

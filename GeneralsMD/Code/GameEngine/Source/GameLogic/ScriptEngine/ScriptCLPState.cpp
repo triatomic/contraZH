@@ -327,14 +327,6 @@ void ScriptCLPState::update()
 		}
 	}
 
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	// Frame counts in scripts are 30 Hz frames, as authored in the map.
-	if (!TheGameLogic->HasLegacyFrameAdvanced())
-	{
-		return;
-	}
-#endif
-
 	for (TeamTrackMap::iterator it = m_teamTracks.begin(); it != m_teamTracks.end(); )
 	{
 		Team *team = TheTeamFactory->findTeamByID(it->first);

@@ -61,6 +61,16 @@
 #include "GameNetwork/GameInfo.h"
 #include "GameNetwork/NetworkDefs.h"
 
+#if defined(GENONLINE)
+#include "../GenOnlineDefines.h"
+#include "../GenOnlineInterfaces.h"
+
+#if defined(GENONLINE)
+#include "GameClient/MapCacheJson.h"
+#include "GameClient/MapPreviewIcons.h"
+#endif
+
+#endif
 
 //-------------------------------------------------------------------------------
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
@@ -77,6 +87,9 @@ static Dict worldDict = 0;
 static WaypointMap *m_waypoints = nullptr;
 static Coord3DList	m_supplyPositions;
 static Coord3DList	m_techPositions;
+#if defined(GENONLINE)
+static MapTypedObjectVector m_parsedTypedObjects;	///< typed supply and tech objects of the parsed map
+#endif
 
 static Int m_mapDX = 0;
 static Int m_mapDY = 0;
@@ -106,6 +119,21 @@ static UnsignedInt calcCRC( AsciiString fname )
 	return theCRC.get();
 }
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+// GenOnline @feature arcticdolphin 08/11/2026 Records a supply or tech object with its icon category for mapcache.json.
+static void addTypedObject(const ThingTemplate *thingTemplate, const Coord3D &loc, Bool isTech)
+{
+	MapTypedObject obj;
+	obj.m_templateName = thingTemplate->getName();
+	obj.m_category = resolveMapPreviewCategory(obj.m_templateName, thingTemplate);
+	obj.m_isTech = isTech;
+	obj.m_pos = loc;
+	m_parsedTypedObjects.push_back(obj);
+}
+#endif
+
+#endif
 static Bool ParseObjectDataChunk(DataChunkInput &file, DataChunkInfo *info, void *userData)
 {
 	Bool readDict = info->version >= K_OBJECTS_VERSION_2;
@@ -145,10 +173,16 @@ static Bool ParseObjectDataChunk(DataChunkInput &file, DataChunkInfo *info, void
 	else if (pThisOne->getThingTemplate() && pThisOne->getThingTemplate()->isKindOf(KINDOF_TECH_BUILDING))
 	{
 		m_techPositions.push_back(loc);
+#if defined(GENONLINE)
+		addTypedObject(pThisOne->getThingTemplate(), loc, TRUE);
+#endif
 	}
 	else if (pThisOne->getThingTemplate() && pThisOne->getThingTemplate()->isKindOf(KINDOF_SUPPLY_SOURCE_ON_PREVIEW))
 	{
 		m_supplyPositions.push_back(loc);
+#if defined(GENONLINE)
+		addTypedObject(pThisOne->getThingTemplate(), loc, FALSE);
+#endif
 	}
 
 	deleteInstance(pThisOne);
@@ -253,6 +287,9 @@ static void resetMap()
 
 	m_techPositions.clear();
 	m_supplyPositions.clear();
+#if defined(GENONLINE)
+	m_parsedTypedObjects.clear();
+#endif
 }
 
 static void getExtent( Region3D *extent )
@@ -312,31 +349,31 @@ void WaypointMap::update()
 
 const char *const MapCache::m_mapCacheName = "MapCache.ini";
 
-#if defined(GENERALS_ONLINE)
+#if defined(GENONLINE)
 AsciiString MapCache::getMapDir(bool bCustomMapDebug) const
-{
-	return "Maps";
-}
-
-AsciiString MapCache::getUserMapDir(bool bCustomMapDebug) const
-{
-	AsciiString tmp = TheGlobalData->getPath_UserData();
-	tmp.concat(getMapDir(bCustomMapDebug));
-	return tmp;
-}
 #else
 AsciiString MapCache::getMapDir() const
+#endif
 {
 	return "Maps";
 }
 
+#if defined(GENONLINE)
+
+AsciiString MapCache::getUserMapDir(bool bCustomMapDebug) const
+#else
 AsciiString MapCache::getUserMapDir() const
+#endif
 {
 	AsciiString tmp = TheGlobalData->getPath_UserData();
+#if defined(GENONLINE)
+
+	tmp.concat(getMapDir(bCustomMapDebug));
+#else
 	tmp.concat(getMapDir());
+#endif
 	return tmp;
 }
-#endif
 
 AsciiString MapCache::getMapExtension() const
 {
@@ -493,6 +530,13 @@ void MapCache::updateCache()
 		loadMapsFromMapCacheINI(mapDir);
 		m_doLoadStandardMapCacheINI = FALSE;
 	}
+#if defined(GENONLINE)
+
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 08/11/2026 Restore typed objects the INI loads dropped and save new ones to mapcache.json.
+	syncMapCacheJson(*this);
+#endif
+#endif
 }
 
 void MapCache::prepareUnseenMaps( const AsciiString &mapDir )
@@ -639,9 +683,14 @@ Bool MapCache::addMap(
 			if (md.m_nameLookupTag.isEmpty())
 			{
 				// unofficial maps or maps without names
+#if defined(GENONLINE)
+				// GenOnline @tweak arcticdolphin 09/11/2026 Without the .map extension.
+				(*this)[lowerFname].m_displayName = getMapNameFromPath(fname);
+#else
 				AsciiString tempdisplayname;
 				tempdisplayname = getFileName(fname.str());
 				(*this)[lowerFname].m_displayName.translate(tempdisplayname);
+#endif
 				if (md.m_numPlayers >= 2)
 				{
 					UnicodeString extension;
@@ -707,6 +756,10 @@ Bool MapCache::addMap(
 	md.m_timestamp.m_lowTimeStamp = fileInfo.timestampLow;
 	md.m_supplyPositions = m_supplyPositions;
 	md.m_techPositions = m_techPositions;
+#if defined(GENONLINE)
+	md.m_typedObjects.m_objects = m_parsedTypedObjects;
+	md.m_typedObjects.m_isKnown = TRUE;
+#endif
 	md.m_CRC = mapCRC;
 
 	Bool exists = false;
@@ -716,9 +769,14 @@ Bool MapCache::addMap(
 	if (!exists || nameLookupTag.isEmpty())
 	{
 		DEBUG_LOG(("Missing TheKey_mapName!"));
+#if defined(GENONLINE)
+		// GenOnline @tweak arcticdolphin 09/11/2026 Without the .map extension.
+		md.m_displayName = getMapNameFromPath(fname);
+#else
 		AsciiString tempdisplayname;
 		tempdisplayname = getFileName(fname.str());
 		md.m_displayName.translate(tempdisplayname);
+#endif
 		if (md.m_numPlayers >= 2)
 		{
 			UnicodeString extension;
@@ -779,16 +837,62 @@ MapCache *TheMapCache = nullptr;
 
 // PUBLIC FUNCTIONS //////////////////////////////////////////////////////////////////////////////
 
+#if defined(GENONLINE)
+// GenOnline @bugfix arcticdolphin 09/11/2026 The map name is the file name without folders or the .map extension.
+UnicodeString getMapNameFromPath( const AsciiString& mapPath )
+{
+	AsciiString name = getFileName(mapPath.str());
+	if (name.endsWithNoCase(".map"))
+	{
+		name.truncateBy(4);
+	}
+	UnicodeString result;
+	result.translate(name);
+	return result;
+}
+#if defined(GENONLINE)
+// GenOnline @feature arcticdolphin 08/11/2026 Parses a map for its typed objects only, for maps cached before mapcache.json had them.
+Bool loadMapTypedObjects( const AsciiString &mapPath, MapTypedObjectVector &outObjects )
+{
+	Bool loaded = FALSE;
+	try
+	{
+		loaded = loadMap(mapPath);
+	}
+	catch (...)
+	{
+		loaded = FALSE;
+	}
+
+	if (loaded)
+	{
+		outObjects = m_parsedTypedObjects;
+	}
+	resetMap();
+	return loaded;
+}
+#endif
+
+#endif
 Bool WouldMapTransfer( const AsciiString& mapName )
 {
 	return mapName.startsWithNoCase(TheMapCache->getUserMapDir());
 }
 
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+// Maps that share a display name each keep their own row.
+typedef std::multimap<UnicodeString, AsciiString, rts::less_than_nocase<UnicodeString> > MapDisplayToFileNameList;
+#else
 typedef std::set<UnicodeString, rts::less_than_nocase<UnicodeString>/**/> MapNameList;
 typedef std::map<UnicodeString, AsciiString> MapDisplayToFileNameList;
+#endif
 
+#if defined(GENONLINE)
+static void buildMapListForNumPlayers(MapDisplayToFileNameList &outFileNames, Int numPlayers)
+#else
 static void buildMapListForNumPlayers(MapNameList &outMapNames, MapDisplayToFileNameList &outFileNames, Int numPlayers)
+#endif
 {
 	MapCache::iterator it = TheMapCache->begin();
 
@@ -797,8 +901,12 @@ static void buildMapListForNumPlayers(MapNameList &outMapNames, MapDisplayToFile
 		const MapMetaData &mapData = it->second;
 		if (mapData.m_numPlayers == numPlayers)
 		{
+#if defined(GENONLINE)
+			outFileNames.insert(MapDisplayToFileNameList::value_type(it->second.m_displayName, it->first));
+#else
 			outMapNames.insert(it->second.m_displayName);
 			outFileNames[it->second.m_displayName] = it->first;
+#endif
 		}
 	}
 }
@@ -939,19 +1047,36 @@ static Bool addMapToMapListbox(
 }
 
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+static Bool addMapCollectionToMapListbox(
+	MapListBoxData& lbData,
+	const AsciiString& mapDir,
+	const MapDisplayToFileNameList& fileNames)
+#else
 static Bool addMapCollectionToMapListbox(
 	MapListBoxData& lbData,
 	const AsciiString& mapDir,
 	const MapNameList& mapNames,
 	const MapDisplayToFileNameList& fileNames)
+#endif
 {
+#if defined(GENONLINE)
+	MapDisplayToFileNameList::const_iterator fileNameIt = fileNames.begin();
+#else
 	MapNameList::const_iterator mapNameIt = mapNames.begin();
+#endif
 
+#if defined(GENONLINE)
+	for (; fileNameIt != fileNames.end(); ++fileNameIt)
+#else
 	for (; mapNameIt != mapNames.end(); ++mapNameIt)
+#endif
 	{
+#if !defined(GENONLINE)
 		MapDisplayToFileNameList::const_iterator fileNameIt = fileNames.find(*mapNameIt);
 		DEBUG_ASSERTCRASH(fileNameIt != fileNames.end(), ("Map '%s' not found in file names map", mapNameIt->str()));
 
+#endif
 		const AsciiString& asciiMapName = fileNameIt->second;
 
 #if RTS_ZEROHOUR
@@ -964,7 +1089,11 @@ static Bool addMapCollectionToMapListbox(
 #endif
 
 		MapCache::iterator mapCacheIt = TheMapCache->find(asciiMapName);
+#if defined(GENONLINE)
+		DEBUG_ASSERTCRASH(mapCacheIt != TheMapCache->end(), ("Map '%s' not found in map cache.", asciiMapName.str()));
+#else
 		DEBUG_ASSERTCRASH(mapCacheIt != TheMapCache->end(), ("Map '%s' not found in map cache.", mapNameIt->str()));
+#endif
 		/*
 		if (it != TheMapCache->end())
 		{
@@ -1027,17 +1156,29 @@ Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isM
 	}
 	mapDir.toLower();
 
+#if !defined(GENONLINE)
 	MapNameList mapNames;
+#endif
 	MapDisplayToFileNameList fileNames;
 	Int curNumPlayersInMap = 1;
 
 	for (; curNumPlayersInMap <= MAX_SLOTS; ++curNumPlayersInMap)
 	{
+#if defined(GENONLINE)
+		buildMapListForNumPlayers(fileNames, curNumPlayersInMap);
+#else
 		buildMapListForNumPlayers(mapNames, fileNames, curNumPlayersInMap);
+#endif
 
+#if defined(GENONLINE)
+		const Bool ok = addMapCollectionToMapListbox(lbData, mapDir, fileNames);
+#else
 		const Bool ok = addMapCollectionToMapListbox(lbData, mapDir, mapNames, fileNames);
+#endif
 
+#if !defined(GENONLINE)
 		mapNames.clear();
+#endif
 		fileNames.clear();
 
 		if (!ok)

@@ -30,6 +30,10 @@
 
 #include "Common/GameCommon.h"
 
+#if defined(GENONLINE)
+#include "WWMath/wwmath.h"
+
+#endif
 const char *const TheVeterancyNames[] =
 {
 	"REGULAR",
@@ -82,3 +86,36 @@ extern Real stdAngleDiffMod(Real a1, Real a2) {
 	return WWMath::Normalize_Angle(nmod(a1 - a2, TWO_PI));
 	//return normalizeAngle(nmod(a1 - a2, 2 * PI));
 }
+#if defined(GENONLINE)
+//-------------------------------------------------------------------------------------------------
+Real ConvertDurationFromMsecsToFramesRoundedUp(Real msec)
+{
+	const Real baseFrames = ConvertFramesToBaseFramesReal(ConvertDurationFromMsecsToFrames(msec));
+	return WWMath::Ceilf(baseFrames) * (Real)LOGICFRAMES_PER_BASEFRAME;
+}
+
+//-------------------------------------------------------------------------------------------------
+Int DivideFramesInBaseFrames(Int frames, Real divisor)
+{
+	const Int baseFrames = ConvertFramesToBaseFrames(frames);
+	return ConvertBaseFramesToFrames(REAL_TO_INT_FLOOR(baseFrames / divisor));
+}
+
+//-------------------------------------------------------------------------------------------------
+Int MultiplyFramesInBaseFrames(Int frames, Real factor)
+{
+	const Int baseFrames = ConvertFramesToBaseFrames(frames);
+	return ConvertBaseFramesToFrames((Int)(baseFrames * factor));
+}
+
+//-------------------------------------------------------------------------------------------------
+Real ConvertBaseFrameFactorToFrameFactor(Real factorPerBaseFrame)
+{
+	// A root of a factor that is not positive has no real value, so the factor stays unchanged.
+	if (LOGICFRAMES_PER_BASEFRAME == 1 || factorPerBaseFrame <= 0.0f)
+		return factorPerBaseFrame;
+
+	return WWMath::Powf(factorPerBaseFrame, 1.0f / (Real)LOGICFRAMES_PER_BASEFRAME);
+}
+
+#endif

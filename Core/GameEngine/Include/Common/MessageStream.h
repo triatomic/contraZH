@@ -252,6 +252,13 @@ public:
 		MSG_META_CYCLE_HEALTH_BAR_MODE,							///< TheSuperHackers @feature Cycle HealthBarDisplayMode in game
 		MSG_META_CYCLE_HOUSE_COLOR_MODE,						///< TheSuperHackers @feature Cycle HouseColorMode in game
 
+#if defined(GENONLINE)
+		MSG_META_INCREASE_OBSERVER_STATS_FONT,                ///< Generals Online @feature Increase observer overlay size
+		MSG_META_DECREASE_OBSERVER_STATS_FONT,                ///< Generals Online @feature Decrease observer overlay size
+		MSG_META_INCREASE_OBSERVER_NOTIFICATION_FONT,         ///< Generals Online @feature Increase observer notification size
+		MSG_META_DECREASE_OBSERVER_NOTIFICATION_FONT,         ///< Generals Online @feature Decrease observer notification size
+
+#endif
 		MSG_META_BEGIN_PATH_BUILD,									///< enter path-building mode
 		MSG_META_END_PATH_BUILD,										///< exit path-building mode
 		MSG_META_BEGIN_FORCEATTACK,									///< enter force-attack mode
@@ -279,7 +286,21 @@ public:
 		MSG_META_END_CAMERA_ZOOM_IN,
 		MSG_META_BEGIN_CAMERA_ZOOM_OUT,
 		MSG_META_END_CAMERA_ZOOM_OUT,
+#if defined(GENONLINE)
+		MSG_META_BEGIN_CAMERA_PITCH_UP,
+		MSG_META_END_CAMERA_PITCH_UP,
+		MSG_META_ALT_BEGIN_CAMERA_PITCH_UP,
+		MSG_META_ALT_END_CAMERA_PITCH_UP,
+		MSG_META_BEGIN_CAMERA_PITCH_DOWN,
+		MSG_META_END_CAMERA_PITCH_DOWN,
+		MSG_META_ALT_BEGIN_CAMERA_PITCH_DOWN,
+		MSG_META_ALT_END_CAMERA_PITCH_DOWN,
+#endif
 		MSG_META_CAMERA_RESET,
+#if defined(GENONLINE)
+		MSG_META_CAMERA_PITCH_RESET,
+		MSG_META_ALT_CAMERA_PITCH_RESET,
+#endif
     MSG_META_TOGGLE_CAMERA_TRACKING_DRAWABLE, // Added in Zero Hour
 		MSG_META_TOGGLE_FAST_FORWARD_REPLAY,				///< Toggle the fast forward feature, // Added in Zero Hour
 		MSG_META_TOGGLE_PAUSE,											///< TheSuperHackers @feature Toggle game pause
@@ -504,13 +525,13 @@ public:
 		MSG_META_SPECIAL_POWER_16,
 #endif
 
-#if defined(GENERALS_ONLINE)
-		MSG_META_TOGGLE_NETWORK_STATS,							///< GO's per connection network stats overlay
-		MSG_META_TAKE_SCREENSHOT_ALT,								///< GO's second key for the JPEG screenshot
-		MSG_META_TOGGLE_BUDDY_OVERLAY,							///< open or close the buddy overlay
+#if defined(GENONLINE)
+		MSG_META_TOGGLE_NETWORK_STATS,							///< GenOnline's network overlay, off then basic then detailed
+		MSG_META_TAKE_SCREENSHOT_ALT,								///< second key for the JPEG screenshot
+		MSG_META_TOGGLE_BUDDY_OVERLAY,							///< open or close GenOnline's buddy overlay
 		MSG_META_TOGGLE_BUDDY_OVERLAY_ALT,					///< second key for the buddy overlay
-#endif
 
+#endif
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 
 		MSG_MOUSEOVER_DRAWABLE_HINT,								///< (drawableid) the given drawable is under the mouse, regardless of button states

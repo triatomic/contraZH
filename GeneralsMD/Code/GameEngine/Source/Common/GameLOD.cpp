@@ -34,6 +34,9 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/GameLOD.h"
+#if defined(GENONLINE)
+#include "AdaptiveQualityLevels.h"
+#endif
 #include "GameClient/TerrainVisual.h"
 #include "GameClient/GameClient.h"
 #include "Common/OptionPreferences.h"
@@ -41,6 +44,9 @@
 #define DEFINE_PARTICLE_SYSTEM_NAMES
 #include "GameClient/ParticleSys.h"
 #include "WW3D2/ww3d.h"
+#if defined(GENONLINE)
+#include "GameLogic/GameLogic.h"
+#endif
 
 
 #define PROFILE_ERROR_LIMIT	0.94f	//fraction of profiled result needed to get a match.  Allows some room for error/fluctuation.
@@ -224,6 +230,14 @@ GameLODManager::GameLODManager()
 	m_idealDetailLevel = STATIC_GAME_LOD_UNKNOWN;
 	m_videoChipType = DC_MAX;
 	m_numRAM=0;
+#if defined(GENONLINE)
+	m_adaptiveParticleSkipMask = 0;
+	m_adaptiveMinParticlePriority = PARTICLE_PRIORITY_LOWEST;
+	m_adaptiveMinParticleSkipPriority = PARTICLE_PRIORITY_LOWEST;
+	m_effectiveParticleSkipMask = 0;
+	m_effectiveMinParticlePriority = PARTICLE_PRIORITY_LOWEST;
+	m_effectiveMinParticleSkipPriority = PARTICLE_PRIORITY_LOWEST;
+#endif
 
 	for (Int i=0; i<STATIC_GAME_LOD_CUSTOM; i++)
 		m_numLevelPresets[i]=0;
@@ -666,6 +680,48 @@ void GameLODManager::applyDynamicLODLevel(DynamicGameLODLevel level)
 	m_slowDeathScale=m_dynamicGameLODInfo[level].m_slowDeathScale;
 	m_minDynamicParticlePriority=m_dynamicGameLODInfo[level].m_minDynamicParticlePriority;
 	m_minDynamicParticleSkipPriority=m_dynamicGameLODInfo[level].m_minDynamicParticleSkipPriority;
+#if defined(GENONLINE)
+
+	applyEffectiveParticleLOD();
+}
+
+/**Combine the dynamic LOD with the adaptive quality: skip more, drop more priorities.*/
+void GameLODManager::applyEffectiveParticleLOD()
+{
+	m_effectiveParticleSkipMask = m_dynamicParticleSkipMask | m_adaptiveParticleSkipMask;
+	m_effectiveMinParticlePriority = max(m_minDynamicParticlePriority, m_adaptiveMinParticlePriority);
+	m_effectiveMinParticleSkipPriority = max(m_minDynamicParticleSkipPriority, m_adaptiveMinParticleSkipPriority);
+}
+
+void GameLODManager::setAdaptiveParticleLevel(Int adaptiveQualityLevel)
+{
+	DynamicGameLODLevel source = DYNAMIC_GAME_LOD_UNKNOWN;
+	const Int particleLod = AdaptiveQualityLevels::level(adaptiveQualityLevel).particleLod;
+	if (particleLod == AdaptiveQualityLevels::PARTICLE_LOD_LOW)
+	{
+		source = DYNAMIC_GAME_LOD_LOW;
+	}
+	else if (particleLod == AdaptiveQualityLevels::PARTICLE_LOD_MEDIUM)
+	{
+		source = DYNAMIC_GAME_LOD_MEDIUM;
+	}
+
+	if (source == DYNAMIC_GAME_LOD_UNKNOWN)
+	{
+		m_adaptiveParticleSkipMask = 0;
+		m_adaptiveMinParticlePriority = PARTICLE_PRIORITY_LOWEST;
+		m_adaptiveMinParticleSkipPriority = PARTICLE_PRIORITY_LOWEST;
+	}
+	else
+	{
+		m_adaptiveParticleSkipMask = m_dynamicGameLODInfo[source].m_dynamicParticleSkipMask;
+		m_adaptiveMinParticlePriority = m_dynamicGameLODInfo[source].m_minDynamicParticlePriority;
+		m_adaptiveMinParticleSkipPriority = m_dynamicGameLODInfo[source].m_minDynamicParticleSkipPriority;
+	}
+
+	m_numParticleGenerations = 0;
+	applyEffectiveParticleLOD();
+#endif
 }
 
 Int GameLODManager::getRecommendedTextureReduction()

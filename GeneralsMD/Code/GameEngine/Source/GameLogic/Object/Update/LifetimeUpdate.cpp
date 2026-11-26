@@ -86,7 +86,11 @@ void LifetimeUpdate::resetLifetime(void)
 //-------------------------------------------------------------------------------------------------
 UnsignedInt LifetimeUpdate::calcSleepDelay(UnsignedInt minFrames, UnsignedInt maxFrames)
 {
+#if defined(GENONLINE)
+	UnsignedInt delay = GameLogicRandomFramesInBaseFrames( minFrames, maxFrames );
+#else
 	UnsignedInt delay = GameLogicRandomValue( minFrames, maxFrames );
+#endif
 	if (delay < 1) delay = 1;
 	m_startDieFrame = TheGameLogic->getFrame();
 	m_dieFrame = m_startDieFrame + delay;

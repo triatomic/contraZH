@@ -39,10 +39,13 @@
 #include "GameNetwork/User.h"
 #include "GameNetwork/Transport.h"
 #include "GameNetwork/NetPacket.h"
-
-#if defined(GENERALS_ONLINE)
-#define CONNECTION_LATENCY_HISTORY_LENGTH 10
+#if defined(GENONLINE)
+#include "GameNetwork/ConnectionStats.h"
+#if defined(GENONLINE)
+#include "GameNetwork/NetworkSettings.h"
+#endif
 #else
+
 #define CONNECTION_LATENCY_HISTORY_LENGTH 200
 #endif
 
@@ -66,7 +69,17 @@ public:
 	void setUser(User *user);
 	User *getUser();
 	void setFrameGrouping(time_t frameGrouping);
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	void setNetworkSettings(const NetworkSettings &settings, Bool unreliableTransport) { m_networkSettings = settings; m_unreliableTransport = unreliableTransport; }
+#endif
+	void setSlot(Int slot) { m_slot = slot; }
+	void setShortGrouping(Bool shortGrouping);	///< Send at one frame while the run ahead is close to its floor.
+	Int getRedundancyDepth() const { return m_redundancyDepth; }
+	time_t getFrameGrouping() const { return m_frameGrouping; }	///< The send interval in use, shorter than the configured one while redundancy is on.
+#else
 	void updateRetryTime();
+#endif
 
 	void sendNetCommandMsg(NetCommandMsg *msg, UnsignedByte relay);
 
@@ -81,13 +94,34 @@ public:
 	void setQuitting();
 	Bool isQuitting() { return m_isQuitting; }
 
+#if defined(GENONLINE)
+	const ConnectionStats& getStats() const { return m_stats; }
+
+#endif
 #if defined(RTS_DEBUG)
 	void debugPrintCommands();
 #endif
 
 protected:
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	NetworkSettings m_networkSettings;
+	Bool m_unreliableTransport;
+#endif
+
+	void resetRedundancy();
+	void updateRedundancy(time_t curtime, Bool &active, time_t &window, Int &depth);
+	Bool hasLossEvidence();	///< A packet was lost in either direction lately, or nothing says otherwise
+	Bool getOutgoingLoss(float &lossPercent, Int &longestRun);	///< FALSE when the peer sent no packet feedback
+	void noteLossEvent(time_t now, Bool burst);
+	void setRedundancyDepth(Int depth, Int cap, time_t now);
+	Bool isQueueBuilding(time_t now);	///< Round trip at 2x its low while packets are lost: a full queue
+	void applyFrameGrouping();
+	void addRedundantCommands(NetPacket *packet, time_t curtime, time_t window, Int depth);
+#else
 	void doRetryMetrics();
 	void markCommandsSent(const std::vector<NetCommandRef *> &commands, time_t curtime);
+#endif
 
 	Bool m_isQuitting;
 	UnsignedInt m_quitTime;
@@ -97,15 +131,32 @@ protected:
 
 	NetCommandList *m_netCommandList;
 	time_t m_retryTime;						///< The time between sending retry packets for this connection.  Time is in milliseconds.
+#if defined(GENONLINE)
+	ConnectionStats m_stats;			///< Latency, jitter and loss of this connection.
+#else
 	Real m_averageLatency;			///< The average time between sending a command and receiving an ACK.
 	Real m_latencies[CONNECTION_LATENCY_HISTORY_LENGTH];	///< List of the last 100 latencies.
 	Int m_latencySampleCount;		///< How many of m_latencies hold a measured value, capped at the history length.
+#endif
 
+#if defined(GENONLINE)
+	Int m_redundancyDepth;					///< How many later packets each un-acked command is repeated in, 0 on a clean connection.
+	Int m_redundancyCap;						///< The deepest depth, from the longest burst to repair and the send interval.
+	time_t m_lastLossEventTime;			///< What the decay counts from.
+	time_t m_lastDepthChangeTime;		///< A burst needs a round trip to show whether the new depth helped.
+	Bool m_queueSuspected;				///< A full queue on the path, redundancy steps down instead of up.
+	Int m_slot;
+
+	Bool m_shortGrouping;
+	time_t m_configuredFrameGrouping;
+#endif
 	time_t m_frameGrouping;				///< The minimum time between packet sends.
 	time_t m_lastTimeSent;				///< The time of the last packet send.
+#if !defined(GENONLINE)
 	Int m_numRetries;							///< The number of retries for the last second.
 	time_t m_retryMetricsTime;		///< The start time of the current retry metrics thing.
 
 	Int m_wrapperWindow;					///< How many wrapper commands may be unacked at once. An ack grows it, a resend halves it.
 	time_t m_lastWrapperWindowCut;	///< The time of the last halving, so one burst of losses halves the window once.
+#endif
 };

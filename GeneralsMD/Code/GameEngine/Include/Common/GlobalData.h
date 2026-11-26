@@ -29,6 +29,9 @@
 
 #pragma once
 
+#if defined(GENONLINE)
+#include "AdaptiveQualityLevels.h"
+#endif
 #include "Common/GameCommon.h"	// ensure we get DUMP_PERF_STATS, or not
 #include "Common/AsciiString.h"
 #include "Common/GameType.h"
@@ -141,7 +144,18 @@ public:
 	static void parseGameDataDefinition( INI* ini );
 	static double scanExperienceBonus(const char* token);
 	static void reloadEditedIni();		///< picks up render tuning keys from GameData.ini saved while the game runs, in cheat builds
+#if defined(GENONLINE)
+
+	// the options with the adaptive quality reduction applied, for the renderers
+	Bool drawsHeatEffects() const { return m_useHeatEffects && !AdaptiveQualityLevels::heatEffectsOff(m_adaptiveQualityLevel); }
+	Bool drawsShadowVolumes() const { return m_useShadowVolumes && !AdaptiveQualityLevels::shadowVolumesOff(m_adaptiveQualityLevel); }
+	Bool drawsShadowDecals() const { return m_useShadowDecals && !AdaptiveQualityLevels::shadowDecalsOff(m_adaptiveQualityLevel); }
+	Int getEffectiveMaxParticleCount() const { return AdaptiveQualityLevels::particleCap(m_maxParticleCount, m_adaptiveQualityLevel); }
+#endif
 	void parseCustomDefinition();
+#if defined(GENONLINE)
+	void applyGenOnlineClientSettings();
+#endif
 
 	//-----------------------------------------------------------------------------------------------
 	struct TerrainLighting
@@ -163,6 +177,9 @@ public:
 	Bool m_useTreeSway;
 	Bool m_useDrawModuleLOD;
 	Bool m_useHeatEffects;
+#if defined(GENONLINE)
+	Int m_adaptiveQualityLevel;	///< client only reduction on top of the options below, set by the adaptive quality and never saved.
+#endif
 	Bool m_useFpsLimit;
 	Bool m_dumpAssetUsage;
 	Int m_framesPerSecondLimit;
@@ -172,6 +189,14 @@ public:
 	// Run game without graphics, input or audio.
 	Bool m_headless;
 
+#if defined(GENONLINE)
+	// Export game stats as JSON alongside replay file.
+	Bool m_exportStats;
+
+	// URL to POST compressed stats JSON after export.
+	AsciiString m_statsUrl;
+
+#endif
 	Bool m_windowed;
 
 	// Frameless window at the chosen resolution; runs the device windowed even without -win
@@ -587,10 +612,6 @@ public:
 
 	std::vector<AsciiString> m_simulateReplays; ///< If not empty, simulate this list of replays and exit.
 	Int m_simulateReplayJobs; ///< Maximum number of processes to use for simulation, or SIMULATE_REPLAYS_SEQUENTIAL for sequential simulation
-#if defined(GENERALS_ONLINE)
-	Bool m_exportStats; ///< Write game stats JSON next to each simulated replay
-	AsciiString m_statsUrl; ///< If not empty, POST the compressed stats JSON here
-#endif
 
 	Int m_maxParticleCount;						///< maximum number of particles that can exist
 	Int m_maxFieldParticleCount;			///< maximum number of field-type particles that can exist (roughly)
@@ -638,8 +659,16 @@ public:
 
 	UnsignedInt m_antiAliasLevel;          ///< value of selected antialias level in the game options
 	Int m_superSampling;                   ///< Options.ini SuperSampling: the world's render size as a percent of the screen's, 100 to 200; 16K lives here for one run and is never saved
+#if defined(GENONLINE)
+
+#if !defined(GENONLINE_DISABLE_TEXTURE_FILTERING_AND_AA)
 	UnsignedInt m_textureFilteringMode;       ///< value related to TextureFilterClass::TextureFilterModeEnum
 	UnsignedInt m_textureAnisotropyLevel;     ///< value related to TextureFilterClass::AnisotropicFilterMode
+#endif
+#else
+	UnsignedInt m_textureFilteringMode;       ///< value related to TextureFilterClass::TextureFilterModeEnum
+	UnsignedInt m_textureAnisotropyLevel;     ///< value related to TextureFilterClass::AnisotropicFilterMode
+#endif
 
 	Bool m_languageFilterPref;        ///< Bool if user wants to filter language
 	Bool m_loadScreenDemo;						///< Bool if true, run the loadscreen demo movie
@@ -665,17 +694,19 @@ public:
 	Bool m_showMoneyPerMinute;
 	Bool m_allowMoneyPerMinuteForPlayer;
 
-#if defined(GENERALS_ONLINE)
-	// Observer notification feed; a font size of zero disables it
+	// TheSuperHackers @feature bobtista 28/06/2026 user-configurable speed multiplier for game window transitions
+	Real m_gameWindowTransitionSpeedMultiplier;
+
+#if defined(GENONLINE)
+	// Generals Online @feature 11/01/2026 allow the observer stats font size to be set, a size of zero disables it
+	Int m_observerStatsFontSize;
+
+	// Generals Online @feature 16/1/2025 allow the observer notification font size to be set, a size of zero disables it
 	Int m_observerNotificationFontSize;
 	Bool m_observerNotificationSpecialPowerUsage;
 	Bool m_observerNotificationSpecialPowerPurchase;
 	Bool m_observerNotificationMilestone;
 #endif
-
-	// TheSuperHackers @feature bobtista 28/06/2026 user-configurable speed multiplier for game window transitions
-	Real m_gameWindowTransitionSpeedMultiplier;
-
 	Real m_shakeSubtleIntensity;			///< Intensity for shaking a camera with SHAKE_SUBTLE
 	Real m_shakeNormalIntensity;			///< Intensity for shaking a camera with SHAKE_NORMAL
 	Real m_shakeStrongIntensity;			///< Intensity for shaking a camera with SHAKE_STRONG
@@ -744,6 +775,11 @@ public:
 	UnsignedInt	m_networkDisconnectScreenNotifyTime;  ///< The number of milliseconds between when the disconnect screen comes up and when the other players are notified that we are on the disconnect screen.
 
 	Real				m_keyboardCameraRotateSpeed;    ///< How fast the camera rotates when rotated via keyboard controls.
+#if defined(GENONLINE)
+	Real				m_cameraRotateFactor;           ///< User scale for keyboard camera rotate speed, camera.rotate_factor of settings.client.json / 100.
+	Real				m_cameraPitchFactor;            ///< User scale for keyboard camera pitch speed, camera.pitch_factor of settings.client.json / 100.
+	Real				m_cameraZoomFactor;             ///< User scale for keyboard and mouse wheel zoom speed, camera.zoom_factor of settings.client.json / 100.
+#endif
   Int					m_playStats;									///< Int whether we want to log play stats or not, if <= 0 then we don't log
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)

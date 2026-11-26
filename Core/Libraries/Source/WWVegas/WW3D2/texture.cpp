@@ -901,12 +901,16 @@ void TextureClass::Apply_New_Surface
 	bool disable_auto_invalidation
 )
 {
+#if defined(GENONLINE)
+	Set_D3D_Base_Texture(d3d_texture);
+#else
 	IDirect3DBaseTexture8* d3d_tex=Peek_D3D_Base_Texture();
 
 	if (d3d_tex) d3d_tex->Release();
 
 	Poke_Texture(d3d_texture);//TextureLoadTask->Peek_D3D_Texture();
 	d3d_texture->AddRef();
+#endif
 
 	if (initialized) Initialized=true;
 	if (disable_auto_invalidation) InactivationTime = 0;
@@ -1290,12 +1294,16 @@ void ZTextureClass::Apply_New_Surface
 	bool disable_auto_invalidation
 )
 {
+#if defined(GENONLINE)
+	Set_D3D_Base_Texture(d3d_texture);
+#else
 	IDirect3DBaseTexture8* d3d_tex=Peek_D3D_Base_Texture();
 
 	if (d3d_tex) d3d_tex->Release();
 
 	Poke_Texture(d3d_texture);//TextureLoadTask->Peek_D3D_Texture();
 	d3d_texture->AddRef();
+#endif
 
 	if (initialized) Initialized=true;
 	if (disable_auto_invalidation) InactivationTime = 0;
@@ -1609,12 +1617,16 @@ void CubeTextureClass::Apply_New_Surface
 	bool disable_auto_invalidation
 )
 {
+#if defined(GENONLINE)
+	Set_D3D_Base_Texture(d3d_texture);
+#else
 	IDirect3DBaseTexture8* d3d_tex=Peek_D3D_Base_Texture();
 
 	if (d3d_tex) d3d_tex->Release();
 
 	Poke_Texture(d3d_texture);//TextureLoadTask->Peek_D3D_Texture();
 	d3d_texture->AddRef();
+#endif
 
 	if (initialized) Initialized=true;
 	if (disable_auto_invalidation) InactivationTime = 0;
@@ -1897,12 +1909,16 @@ void VolumeTextureClass::Apply_New_Surface
 	bool disable_auto_invalidation
 )
 {
+#if defined(GENONLINE)
+	Set_D3D_Base_Texture(d3d_texture);
+#else
 	IDirect3DBaseTexture8* d3d_tex=Peek_D3D_Base_Texture();
 
 	if (d3d_tex) d3d_tex->Release();
 
 	Poke_Texture(d3d_texture);//TextureLoadTask->Peek_D3D_Texture();
 	d3d_texture->AddRef();
+#endif
 
 	if (initialized) Initialized=true;
 	if (disable_auto_invalidation) InactivationTime = 0;

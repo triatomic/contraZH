@@ -91,6 +91,10 @@ SupplyTruckAIUpdate::SupplyTruckAIUpdate( Thing *thing, const ModuleData* module
 //-------------------------------------------------------------------------------------------------
 SupplyTruckAIUpdate::~SupplyTruckAIUpdate()
 {
+#if defined(GENONLINE)
+	if (m_supplyTruckStateMachine)
+		m_supplyTruckStateMachine->halt();
+#endif
 	deleteInstance(m_supplyTruckStateMachine);
 }
 

@@ -68,6 +68,9 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/JumpjetMissileAIUpdate.h"
 #include "GameLogic/ScriptCLP.h"
+#if defined(GENONLINE)
+#include "Common/LocalApiLive.h"
+#endif
 
 
 
@@ -865,7 +868,11 @@ void SpecialAbilityUpdate::startPacking(Bool success)
   const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
   m_packingState = STATE_PACKING;
   Real variation = GameLogicRandomValueReal( 1.0f - data->m_packUnpackVariationFactor, 1.0f + data->m_packUnpackVariationFactor );
+#if defined(GENONLINE)
+  m_animFrames = data->m_unpackTime * variation;
+#else
   m_animFrames = data->m_packTime * variation;
+#endif
 
   //Set the animation state
   getObject()->clearAndSetModelConditionFlags(
@@ -1386,8 +1393,8 @@ Bool SpecialAbilityUpdate::continuePreparation()
 
           Real denominator = MAX(1, calcPreparationFrames());
           Real increment = 1.0f - ((Real)m_prepFrames / denominator );
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-          m_captureFlashPhase += increment / (3.0f * GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER);
+#if defined(GENONLINE)
+          m_captureFlashPhase += increment / (3.0f * LOGICFRAMES_PER_BASEFRAME);
 #else
           m_captureFlashPhase += increment / 3.0f;
 #endif
@@ -1660,6 +1667,17 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
       }
 
       object->getControllingPlayer()->getAcademyStats()->recordBuildingCapture();
+#if defined(GENONLINE)
+
+      // success point for building-capture powers, excluded from SpecialPowerModule::triggerSpecialPower()
+      LocalApiLiveAbilityUse(
+        object->getControllingPlayer()->getPlayerIndex(),
+        spTemplate,
+        object->getTemplate(),
+        target->getTemplate(),
+        nullptr,
+        nullptr );
+#endif
       break;
     }
     case SPECIAL_BLACKLOTUS_STEAL_CASH_HACK:

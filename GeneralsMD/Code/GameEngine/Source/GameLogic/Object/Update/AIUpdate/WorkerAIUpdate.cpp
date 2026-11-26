@@ -123,9 +123,20 @@ WorkerAIUpdate::~WorkerAIUpdate()
 {
 
 	// delete our behavior state machine
+#if defined(GENONLINE)
+	if( m_dozerMachine )
+		deleteInstance(m_dozerMachine);
+
+	if( m_supplyTruckStateMachine )
+		deleteInstance(m_supplyTruckStateMachine);
+
+	if( m_workerMachine )
+		deleteInstance(m_workerMachine);
+#else
 	deleteInstance(m_dozerMachine);
 	deleteInstance(m_supplyTruckStateMachine);
 	deleteInstance(m_workerMachine);
+#endif
 
 }
 

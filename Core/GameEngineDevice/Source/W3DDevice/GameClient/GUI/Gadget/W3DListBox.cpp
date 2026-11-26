@@ -48,9 +48,19 @@
 #include <stdlib.h>
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
+#if defined(GENONLINE)
+#include "Common/GOUIColors.h"
+#endif
 #include "GameClient/GameWindowGlobal.h"
 #include "GameClient/GameWindowManager.h"
+#if defined(GENONLINE)
+#include "GameClient/GadgetComboBox.h"
+#endif
 #include "GameClient/GadgetListBox.h"
+#if defined(GENONLINE)
+#include "GameClient/GadgetTextEntry.h"
+#include "GameClient/Mouse.h"
+#endif
 #include "W3DDevice/GameClient/W3DGadget.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 
@@ -64,10 +74,83 @@
 
 // PRIVATE PROTOTYPES /////////////////////////////////////////////////////////
 
+#if defined(GENONLINE)
+extern void W3DGadgetVerticalSliderKitTrackDraw( GameWindow *window, WinInstanceData *instData );
+extern void W3DGadgetVerticalSliderKitThumbDraw( GameWindow *window, WinInstanceData *instData );
+extern void W3DGadgetPushButtonKitScrollArrowDraw( GameWindow *window, WinInstanceData *instData );
+
+#endif
 ///////////////////////////////////////////////////////////////////////////////
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
+#if defined(GENONLINE)
+// GenOnline @feature arcticdolphin 08/11/2026 Give the list scroll bar the kit draws when the GO kit scroll images exist.
+static void assignKitScrollBarDraws( ListboxData *list )
+{
+	// only scroll bars still on their default draws, so custom draws stay
+	if( list == nullptr || list->slider == nullptr || list->slider->winGetDrawFunc() != W3DGadgetVerticalSliderDraw )
+		return;
+	if( GadgetListBoxHasKitScrollBar() == FALSE )
+		return;
+
+	list->slider->winSetDrawFunc( W3DGadgetVerticalSliderKitTrackDraw );
+
+	GameWindow *thumb = list->slider->winGetChild();
+	if( thumb && thumb->winGetDrawFunc() == W3DGadgetPushButtonImageDraw )
+		thumb->winSetDrawFunc( W3DGadgetVerticalSliderKitThumbDraw );
+	if( list->upButton && list->upButton->winGetDrawFunc() == W3DGadgetPushButtonImageDraw )
+		list->upButton->winSetDrawFunc( W3DGadgetPushButtonKitScrollArrowDraw );
+	if( list->downButton && list->downButton->winGetDrawFunc() == W3DGadgetPushButtonImageDraw )
+		list->downButton->winSetDrawFunc( W3DGadgetPushButtonKitScrollArrowDraw );
+}
+
+// GenOnline @feature arcticdolphin 08/11/2026 Kit combo drop-down lists line up with and frame like their combo field.
+// Kit combo drop-down rows start where the combo field text starts, other rows keep their margin, x is already inside the frame
+static Int getListTextOffsetX( GameWindow *window )
+{
+	Int frame = GadgetListBoxGetKitListFrame( window );
+	if( frame <= 0 )
+		return GameWindowManager::winScaleLayoutSize( TEXT_X_OFFSET );
+	if( GadgetListBoxGetKitComboFrame( window ) <= 0 )
+		return GameWindowManager::winScaleLayoutSize( TEXT_X_OFFSET ) - frame;
+
+	GameWindow *editBox = GadgetComboBoxGetEditBox( window->winGetParent() );
+	EntryData *e = editBox ? (EntryData *)editBox->winGetUserData() : nullptr;
+	Int offset = GameWindowManager::winScaleLayoutSize( 5 );
+	if( e && e->drawTextFromStart )
+		offset += GameWindowManager::winScaleLayoutSize( 5 );
+	else
+		offset += GameWindowManager::winScaleLayoutSize( 2 );
+	return offset - frame;
+}
+
+static void drawKitComboFrame( GameWindow *window, Int x, Int y, Int width, Int height )
+{
+	GameWindow *editBox = GadgetComboBoxGetEditBox( window->winGetParent() );
+	if( editBox == nullptr )
+		return;
+
+	const Image *left = GadgetTextEntryGetEnabledImageLeft( editBox );
+	const Image *center = GadgetTextEntryGetEnabledImageCenter( editBox );
+	const Image *smallCenter = GadgetTextEntryGetEnabledImageSmallCenter( editBox );
+	const Image *right = GadgetTextEntryGetEnabledImageRight( editBox );
+	if( BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED ) == FALSE &&
+			GadgetTextEntryGetDisabledImageLeft( editBox ) && GadgetTextEntryGetDisabledImageCenter( editBox ) &&
+			GadgetTextEntryGetDisabledImageRight( editBox ) )
+	{
+		left = GadgetTextEntryGetDisabledImageLeft( editBox );
+		center = GadgetTextEntryGetDisabledImageCenter( editBox );
+		smallCenter = GadgetTextEntryGetDisabledImageSmallCenter( editBox );
+		right = GadgetTextEntryGetDisabledImageRight( editBox );
+	}
+
+	// GenOnline @bugfix arcticdolphin 08/11/2026 An open drop-down hides the controls under it, the kit field fill is translucent.
+	TheDisplay->drawFillRect( x, y, width, height, GOUIColor( GOUICOLOR_FIELD_FILL, GameMakeColor( 5, 7, 15, 255 ) ) );
+	TheWindowManager->winDrawThreePieceImage( left, center, smallCenter, right, x, y, width, height );
+}
+
+#endif
 // drawHiliteBar ==============================================================
 /** Draw image for the hilite bar */
 //=============================================================================
@@ -78,9 +161,11 @@ static void drawHiliteBar( const Image *left, const Image *right,
 {
 	ICoord2D barWindowSize;  // end point of bar from window origin
 	Int xOffset = 0, yOffset = 0;  // incase we want this functionality later
+#if !defined(GENONLINE)
 	ICoord2D start, end;
 	Int i;
 	IRegion2D clipRegion;
+#endif
 
 
 
@@ -94,6 +179,10 @@ static void drawHiliteBar( const Image *left, const Image *right,
 	if( barWindowSize.x < left->getImageWidth() + right->getImageWidth() )
 		barWindowSize.x = left->getImageWidth() + right->getImageWidth();
 
+#if defined(GENONLINE)
+	TheWindowManager->winDrawThreePieceImage( left, center, smallCenter, right,
+																						 startX + xOffset, startY + yOffset, barWindowSize.x, barWindowSize.y );
+#else
 	// get image sizes for the ends
 	ICoord2D leftSize, rightSize;
 	leftSize.x = left->getImageWidth();
@@ -175,6 +264,7 @@ static void drawHiliteBar( const Image *left, const Image *right,
 	end.x = start.x + rightSize.x;
 	end.y = start.y + barWindowSize.y;
 	TheWindowManager->winDrawImage(right, start.x, start.y, end.x, end.y);
+#endif
 
 }
 
@@ -211,6 +301,22 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 	clipRegion.hi.y = y + height - 1;
 
 	drawY = y - list->displayPos;
+#if defined(GENONLINE)
+	// GenOnline @tweak arcticdolphin 08/11/2026 Compact kit combo drop-down rows draw their text from above the row by the trimmed blank top.
+	const Int textTrim = GadgetListBoxGetKitComboRowTrim( window );
+
+	// GenOnline @feature arcticdolphin 08/11/2026 An open kit combo drop-down highlights the row a click would pick, else its selection.
+	Int hoverRow = -1;
+	if( TheMouse != nullptr && GadgetListBoxGetKitComboFrame( window ) > 0 )
+	{
+		const MouseIO *mouse = TheMouse->getMouseStatus();
+		if( mouse->pos.x >= x && mouse->pos.x < x + width && mouse->pos.y >= y && mouse->pos.y < y + height )
+		{
+			Int column;
+			GadgetListBoxGetEntryBasedOnXY( window, mouse->pos.x, mouse->pos.y, hoverRow, column );
+		}
+	}
+#endif
 
 	for( i = 0; ; i++ )
 	{
@@ -231,18 +337,20 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 
 		listLineHeight = list->listData[i].height + 1;
 
-#if defined(GENERALS_ONLINE)
-		Int rowDrawY = drawY;
-		ApplyListBoxRowAnimation(window, i, listLineHeight, rowDrawY);
-#else
-		// rowDrawY is a plain alias here so the drawing code below is shared
-		// with the GeneralsOnline row-entry animation
+#if !defined(GENONLINE)
 		const Int rowDrawY = drawY;
 #endif
 		//textColor =  list->listData[i].textColor;
 		selected = FALSE;
 
+#if defined(GENONLINE)
+		int rowDrawY = drawY;
+		ApplyListBoxRowAnimation(window, i, listLineHeight, rowDrawY);
+
+		if (list->multiSelect)
+#else
 		if( list->multiSelect )
+#endif
 		{
 			Int j = 0;
 
@@ -257,6 +365,13 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 				j++;
 			}
 		}
+#if defined(GENONLINE)
+		else if( hoverRow >= 0 )
+		{
+			if( i == hoverRow )
+				selected = TRUE;
+		}
+#endif
 		else
 		{
 			if( i == list->selectPos )
@@ -393,6 +508,10 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 
 		Color dropColor = TheWindowManager->winMakeColor( 0, 0, 0, 255 );
 		DisplayString *string;
+#if defined(GENONLINE)
+		// GenOnline @tweak arcticdolphin 08/11/2026 The text margin scales with the screen height.
+		const Int textOffsetX = getListTextOffsetX( window );
+#endif
 
 		ListEntryCell *cells = list->listData[i].cell;
 		Int columnX = x;
@@ -405,7 +524,11 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 				// setup the Clip Region size
 
 				columnRegion.lo.x = columnX;
+#if defined(GENONLINE)
+				columnRegion.lo.y = rowDrawY - textTrim;
+#else
 				columnRegion.lo.y = rowDrawY;
+#endif
 				if(list->columns == 1 && list->slider && list->slider->winIsHidden())
 					columnRegion.hi.x = columnX + width-3;
 				else
@@ -430,10 +553,17 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 
 						// draw this text after setting the clip region for it
 						string->setClipRegion( &columnRegion );
+#if defined(GENONLINE)
+						string->draw( columnX + textOffsetX,
+													rowDrawY - textTrim,
+													textColor,
+													dropColor );
+#else
 						string->draw( columnX + TEXT_X_OFFSET,
 													rowDrawY,
 													textColor,
 													dropColor );
+#endif
 
 					}
 					else
@@ -445,10 +575,17 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 
 						// set clip region and draw
 						string->setClipRegion( &columnRegion );
+#if defined(GENONLINE)
+						string->draw( columnX + textOffsetX,
+													rowDrawY - textTrim,
+													textColor,
+													dropColor );
+#else
 						string->draw( columnX + TEXT_X_OFFSET,
 													rowDrawY,
 													textColor,
 													dropColor );
+#endif
 					}
 				}
 				else if(cells[j].cellType == LISTBOX_IMAGE && cells[j].data)
@@ -516,6 +653,10 @@ void W3DGadgetListBoxDraw( GameWindow *window, WinInstanceData *instData )
 	window->winGetScreenPosition( &x, &y );
 	window->winGetSize( &size.x, &size.y );
 
+#if defined(GENONLINE)
+	assignKitScrollBarDraws( list );
+
+#endif
 	// get font height
 	fontHeight = TheWindowManager->winFontHeight( instData->getFont() );
 
@@ -562,6 +703,23 @@ void W3DGadgetListBoxDraw( GameWindow *window, WinInstanceData *instData )
 
 	}
 
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 08/11/2026 Kit combo drop-down lists wear the combo field frame, joined to the field.
+	const Int comboFrame = GadgetListBoxGetKitComboFrame( window );
+	if( comboFrame > 0 )
+	{
+		drawKitComboFrame( window, x, y, width, height );
+		border = WIN_COLOR_UNDEFINED;
+		background = WIN_COLOR_UNDEFINED;
+	}
+
+	// GenOnline @tweak arcticdolphin 08/11/2026 Other kit lists keep their background and draw their border at the kit line weight.
+	const Int listFrame = GadgetListBoxGetKitListFrame( window );
+	const Bool kitBorder = comboFrame <= 0 && listFrame > 0;
+	if( kitBorder )
+		border = WIN_COLOR_UNDEFINED;
+
+#endif
 	// draw the back border
 	if( border != WIN_COLOR_UNDEFINED )
 		TheWindowManager->winOpenRect( border, WIN_DRAW_LINE_WIDTH,
@@ -573,18 +731,42 @@ void W3DGadgetListBoxDraw( GameWindow *window, WinInstanceData *instData )
 																	 x + 1, y + 1,
 																	 x + width - 1, y + height - 1 );
 
+#if defined(GENONLINE)
+	if( kitBorder )
+		GadgetListBoxDrawKitLines( x, y, width, height, TRUE, TRUE, TRUE, TRUE );
+
+#endif
 	// If ScrollBar was requested ... adjust width.
 	if( list->slider  && !list->slider->winIsHidden())
 	{
 		ICoord2D sliderSize;
 
 		list->slider->winGetSize( &sliderSize.x, &sliderSize.y );
+#if defined(GENONLINE)
+		// GenOnline @tweak arcticdolphin 08/11/2026 Keep the text clear of the scaled scroll bar.
+		width -= (sliderSize.x + GameWindowManager::winScaleLayoutSize( 3 ));
+#else
 		width -= (sliderSize.x +3);
+#endif
 
 	}
 
+#if defined(GENONLINE)
+	if( listFrame > 0 )
+	{
+		x += listFrame;
+		width -= listFrame;
+		if( list->slider == nullptr || list->slider->winIsHidden() )
+			width -= listFrame;
+	}
+
+#endif
 	// draw the text
+#if defined(GENONLINE)
+	drawListBoxText( window, instData, x, y + 4 , width, height-4-listFrame, TRUE );
+#else
 	drawListBoxText( window, instData, x, y + 4 , width, height-4, TRUE );
+#endif
 
 
 
@@ -610,6 +792,10 @@ void W3DGadgetListBoxImageDraw( GameWindow *window, WinInstanceData *instData )
 	width = size.x;
 	height = size.y;
 
+#if defined(GENONLINE)
+	assignKitScrollBarDraws( list );
+
+#endif
 	// If ScrollBar was requested ... adjust width.
 	if( list->slider )
 	{

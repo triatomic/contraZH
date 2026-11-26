@@ -25,7 +25,9 @@
 // GameClient/Eva.cpp /////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#if !defined(GENONLINE)
 #include "GameClient/ControlBar.h"
+#endif
 #include "GameClient/Eva.h"
 
 #include "Common/IniNameRegistry.h"
@@ -548,7 +550,12 @@ Eva::~Eva()
 {
 	EvaCheckInfoPtrVecIt it;
 	for (it = m_allCheckInfos.begin(); it != m_allCheckInfos.end(); ++it) {
+#if defined(GENONLINE)
+		if (*it)
+			deleteInstance(*it);
+#else
 		deleteInstance(*it);
+#endif
 	}
 }
 
