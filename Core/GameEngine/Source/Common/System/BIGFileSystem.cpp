@@ -350,8 +350,7 @@ Bool BIGFileSystem::loadArchiveFilesFromDirectory(AsciiString dir, AsciiString f
 		if (archiveFile != nullptr) {
 			DEBUG_LOG(("BIGFileSystem::loadArchiveFilesFromDirectory - loading %s into the directory tree.", (*it).str()));
 #if defined(GENONLINE)
-			loadIntoDirectoryTree(archiveFile, priority);
-			m_archiveFileMap[(*it)] = archiveFile;
+			mountArchiveFile(*it, archiveFile, priority);
 #else
 			mountArchiveFile(*it, archiveFile, overwrite);
 #endif
@@ -392,8 +391,7 @@ void BIGFileSystem::loadMods()
 		if (archiveFile != nullptr) {
 			DEBUG_LOG(("BIGFileSystem::loadMods - loading %s into the directory tree.", TheGlobalData->m_modBIG.str()));
 #if defined(GENONLINE)
-			loadIntoDirectoryTree(archiveFile, getNextModPriority());
-			m_archiveFileMap[TheGlobalData->m_modBIG] = archiveFile;
+			mountArchiveFile(TheGlobalData->m_modBIG, archiveFile, getNextModPriority());
 #else
 			mountArchiveFile(TheGlobalData->m_modBIG, archiveFile, TRUE);
 #endif

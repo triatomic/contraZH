@@ -525,8 +525,7 @@ void ArchiveFileSystem::mountListedArchive(const ArchiveMountEntry& entry, Int p
 			NetworkLog(ELogVerbosity::LOG_RELEASE, "Archive %s could not be opened", bigPath.c_str());
 			continue;
 		}
-		loadIntoDirectoryTree(archiveFile, priority);
-		m_archiveFileMap[AsciiString(bigPath.c_str())] = archiveFile;
+		mountArchiveFile(AsciiString(bigPath.c_str()), archiveFile, priority);
 		if (genOnline && genOnlineArchives != nullptr)
 			genOnlineArchives->push_back(AsciiString(bigPath.c_str()));
 		++mountedCount;
@@ -586,10 +585,9 @@ void ArchiveFileSystem::mountGenOnlineMenus(const std::vector<AsciiString>& genO
 			NetworkLog(ELogVerbosity::LOG_RELEASE, "GO menu layouts of %s could not be opened", archivePath.str());
 			continue;
 		}
-		loadIntoDirectoryTree(guiArchive, ARCHIVE_PRIORITY_GENONLINE_GUI);
 		AsciiString mapName;
 		mapName.format("%s|menus", archivePath.str());
-		m_archiveFileMap[mapName] = guiArchive;
+		mountArchiveFile(mapName, guiArchive, ARCHIVE_PRIORITY_GENONLINE_GUI);
 		FilenameList guiFiles;
 		guiArchive->getFileListInDirectory("", "", "*", guiFiles, TRUE);
 		NetworkLog(ELogVerbosity::LOG_RELEASE, "GO menu layouts of %s at priority %d: %d files", archivePath.str(), (Int)ARCHIVE_PRIORITY_GENONLINE_GUI, (Int)guiFiles.size());
@@ -795,6 +793,14 @@ void ArchiveFileSystem::applyDataExcludes(const std::vector<std::string>& exclud
 		NetworkLog(ELogVerbosity::LOG_RELEASE, "Archive %s is excluded by data.exclude", gameFolderArchive->str());
 		unmounted.push_back(mounted->second);
 		m_unmountedArchives.push_back(mounted->second);
+		for (MountedArchiveList::iterator mountIt = m_mountedArchives.begin(); mountIt != m_mountedArchives.end(); ++mountIt)
+		{
+			if (mountIt->archiveFile == mounted->second)
+			{
+				m_mountedArchives.erase(mountIt);
+				break;
+			}
+		}
 		m_archiveFileMap.erase(mounted);
 		gameFolderArchive = m_gameFolderArchives.erase(gameFolderArchive);
 	}
@@ -871,8 +877,7 @@ void ArchiveFileSystem::mountPackFolderFiles(const std::string& folder, Int prio
 
 	if (folderArchive != nullptr)
 	{
-		loadIntoDirectoryTree(folderArchive, priority);
-		m_archiveFileMap[root] = folderArchive;
+		mountArchiveFile(root, folderArchive, priority);
 		m_packFolderArchives[folderArchive] = root;
 	}
 	NetworkLog(ELogVerbosity::LOG_RELEASE, "Data pack folder %s: %d loose files at priority %d", folder.c_str(), count, priority);
@@ -1108,19 +1113,31 @@ void ArchiveFileSystem::setInterfaceStyle(Int style)
 	}
 }
 
+#if defined(GENONLINE)
+void ArchiveFileSystem::mountArchiveFile(const AsciiString& name, ArchiveFile *archiveFile, Int priority)
+#else
 void ArchiveFileSystem::mountArchiveFile(const AsciiString& name, ArchiveFile *archiveFile, Bool overwrite)
+#endif
 {
 	m_archiveFileMap[name] = archiveFile;
 
 	MountedArchive archive;
 	archive.archiveFile = archiveFile;
+#if defined(GENONLINE)
+	archive.priority = priority;
+#else
 	archive.overwrite = overwrite;
+#endif
 	archive.pack = getArchivePack(name);
 	m_mountedArchives.push_back(archive);
 
 	if (isArchiveEnabled(archive))
 	{
+#if defined(GENONLINE)
+		loadIntoDirectoryTree(archiveFile, priority);
+#else
 		loadIntoDirectoryTree(archiveFile, overwrite);
+#endif
 	}
 	else
 	{
@@ -1130,13 +1147,25 @@ void ArchiveFileSystem::mountArchiveFile(const AsciiString& name, ArchiveFile *a
 
 void ArchiveFileSystem::rebuildDirectoryTree()
 {
+#if defined(GENONLINE)
+	if (m_mountedArchives.empty())
+	{
+		DEBUG_LOG(("ArchiveFileSystem::rebuildDirectoryTree - no archive is registered, the tree stays as it is"));
+		return;
+	}
+
+#endif
 	m_rootDirectory = ArchivedDirectoryInfo();
 
 	for (MountedArchiveList::const_iterator it = m_mountedArchives.begin(); it != m_mountedArchives.end(); ++it)
 	{
 		if (isArchiveEnabled(*it))
 		{
+#if defined(GENONLINE)
+			loadIntoDirectoryTree(it->archiveFile, it->priority);
+#else
 			loadIntoDirectoryTree(it->archiveFile, it->overwrite);
+#endif
 		}
 	}
 }

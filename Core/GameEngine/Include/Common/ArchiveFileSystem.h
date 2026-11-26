@@ -273,14 +273,22 @@ protected:
 	struct MountedArchive
 	{
 		ArchiveFile *archiveFile;
+#if defined(GENONLINE)
+		Int priority;
+#else
 		Bool overwrite;
+#endif
 		ArchivePack pack;
 	};
 	typedef std::vector<MountedArchive> MountedArchiveList;
 
 	static ArchivePack getArchivePack(const AsciiString& name);	///< the pack an archive belongs to, judged by its file name
 	Bool isArchiveEnabled(const MountedArchive& archive) const;
+#if defined(GENONLINE)
+	void mountArchiveFile(const AsciiString& name, ArchiveFile *archiveFile, Int priority);	///< register the archive at its lookup priority and load it into the tree if its pack is enabled
+#else
 	void mountArchiveFile(const AsciiString& name, ArchiveFile *archiveFile, Bool overwrite);	///< register the archive and load it into the tree if its pack is enabled
+#endif
 	void rebuildDirectoryTree();	///< reload the tree from the enabled archives in mount order
 
 	ArchiveFileMap m_archiveFileMap;
