@@ -1175,15 +1175,6 @@ bool GameLogic::onNewGame(MAYBE_UNUSED GameMessage *msg)
 		TheWritableGlobalData->m_useFpsLimit = true;
 	}
 
-#if defined(GENONLINE)
-	// The engine sets the render limit every frame, so the skirmish game speed runs through the logic time scale.
-	// Only the skirmish menu and the restart of its game keep the game speed, every other game plays at normal speed.
-	if ( msg->getArgumentCount() < 4 || (gameMode != GAME_SKIRMISH && gameMode != GAME_SINGLE_PLAYER) )
-	{
-		TheFramePacer->resetGameSpeed();
-	}
-	TheFramePacer->beginGameSpeed();
-#else
 	// Offline games and the shell map step logic at their own speed and render faster, so none leaks from the last game.
 	if (gameMode == GAME_SINGLE_PLAYER || gameMode == GAME_SKIRMISH || gameMode == GAME_REPLAY || gameMode == GAME_SHELL)
 	{
@@ -1208,7 +1199,6 @@ bool GameLogic::onNewGame(MAYBE_UNUSED GameMessage *msg)
 	{
 		TheFramePacer->enableLogicTimeScale(FALSE);
 	}
-#endif
 
 	// prepare for new game
 	prepareNewGame( gameMode, diff, rankPoints );
