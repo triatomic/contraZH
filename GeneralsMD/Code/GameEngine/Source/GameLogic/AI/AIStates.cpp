@@ -906,7 +906,14 @@ AIStateMachine::AIStateMachine( Object *obj, AsciiString name ) : StateMachine( 
 //----------------------------------------------------------------------------------------------------------
 AIStateMachine::~AIStateMachine()
 {
+#if defined(GENONLINE)
+	if (m_goalSquad)
+	{
+		deleteInstance(m_goalSquad);
+	}
+#else
 	deleteInstance(m_goalSquad);
+#endif
 }
 
 
@@ -6197,6 +6204,16 @@ StateReturnType AIAttackFireWeaponState::onEnter()
 			obj->preFireCurrentWeapon(victim);
 		}
 	}
+#if defined(GENONLINE)
+
+	// Each step of the aim and fire states takes one base frame, so the weapon is checked every two base frames at every logic frame rate.
+	if (LOGICFRAMES_PER_BASEFRAME > 1)
+	{
+		m_actFrame = TheGameLogic->getFrame() + LOGICFRAMES_PER_BASEFRAME;
+		if (m_actFrame < m_exitFrame + 2 * LOGICFRAMES_PER_BASEFRAME)
+			m_actFrame = m_exitFrame + 2 * LOGICFRAMES_PER_BASEFRAME;
+	}
+#endif
 	return STATE_CONTINUE;
 }
 
@@ -6209,6 +6226,11 @@ StateReturnType AIAttackFireWeaponState::update()
 {
 	// contained by AIAttackState, so no separate timer
 
+#if defined(GENONLINE)
+	if (LOGICFRAMES_PER_BASEFRAME > 1 && TheGameLogic->getFrame() < m_actFrame)
+		return STATE_CONTINUE;
+
+#endif
 	Object *obj = getMachineOwner();
 	Object* victim = getMachineGoalObject();
 
@@ -6399,6 +6421,26 @@ StateReturnType AIAttackFireWeaponState::update()
 	return STATE_SUCCESS;
 }
 
+#if defined(GENONLINE)
+// ------------------------------------------------------------------------------------------------
+/** Xfer method */
+// ------------------------------------------------------------------------------------------------
+void AIAttackFireWeaponState::xfer( Xfer *xfer )
+{
+  // version
+  const XferVersion currentVersion = 2;
+  XferVersion version = currentVersion;
+  xfer->xferVersion( &version, currentVersion );
+
+	// Version 2 keeps the fire gate frames, so a loaded game gates the next shot like a running game.
+	if (version >= 2)
+	{
+		xfer->xferUnsignedInt(&m_exitFrame);
+		xfer->xferUnsignedInt(&m_actFrame);
+	}
+}
+
+#endif
 //----------------------------------------------------------------------------------------------------------
 /**
 	Stop firing.
@@ -6406,6 +6448,9 @@ StateReturnType AIAttackFireWeaponState::update()
 void AIAttackFireWeaponState::onExit( StateExitType status )
 {
 	// contained by AIAttackState, so no separate timer
+#if defined(GENONLINE)
+	m_exitFrame = TheGameLogic->getFrame();
+#endif
 	Object *obj = getMachineOwner();
 	obj->clearStatus( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_IS_FIRING_WEAPON, OBJECT_STATUS_IGNORING_STEALTH ) );
 

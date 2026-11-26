@@ -36,6 +36,10 @@
 #include "Common/GameAudio.h"
 #include "Common/GameMemory.h"
 #include "Common/LocalFileSystem.h"
+#if defined(GENONLINE)
+#include "../GenOnlineInclude.h"
+#include "../GenOnlineInit.h"
+#endif
 
 #if RTS_ZEROHOUR
 #include "Common/Registry.h"
@@ -90,6 +94,14 @@ void BIGFileSystem::init() {
 
 #if RTS_ZEROHOUR
     // load original Generals assets
+#if defined(GENONLINE)
+    // The Steam install ships them in ZH_Generals, which the scan above already mounted. Mounting the Generals install as well would only add its mods.
+    if (TheLocalFileSystem->doesFileExist("ZH_Generals\\INI.big")) {
+      m_generalsBaseSource = "ZH_Generals folder";
+      return;
+    }
+
+#endif
     AsciiString installPath;
     GetStringFromGeneralsRegistry("", "InstallPath", installPath );
     // Self-contained folders (mods, repacks) carry the Generals archives in a subfolder, which the
@@ -105,8 +117,15 @@ void BIGFileSystem::init() {
     }
     //@todo this will need to be ramped up to a crash for release
     DEBUG_ASSERTCRASH(!installPath.isEmpty() || hasGeneralsArchives, ("Be 1337! Go install Generals!"));
+#if defined(GENONLINE)
+    if (!installPath.isEmpty()) {
+      m_generalsBaseSource.format("Generals install folder %s", installPath.str());
+      loadArchiveFilesFromDirectory(installPath, "*.big");
+    }
+#else
     if (!installPath.isEmpty())
       loadArchiveFilesFromDirectory(installPath, "*.big");
+#endif
 #endif
 }
 
@@ -119,7 +138,11 @@ void BIGFileSystem::update() {
 void BIGFileSystem::postProcessLoad() {
 }
 
+#if defined(GENONLINE)
+ArchiveFile * BIGFileSystem::openArchiveFile(const Char *filename, ArchivePathFilter includePath) {
+#else
 ArchiveFile * BIGFileSystem::openArchiveFile(const Char *filename) {
+#endif
 	File *fp = TheLocalFileSystem->openFile(filename, File::READ | File::BINARY);
 	AsciiString archiveFileName;
 	archiveFileName = filename;
@@ -181,6 +204,12 @@ ArchiveFile * BIGFileSystem::openArchiveFile(const Char *filename) {
 			break;
 		}
 
+#if defined(GENONLINE)
+		if (includePath != nullptr && !includePath(buffer)) {
+			continue;
+		}
+
+#endif
 		char *leafName = getFileName(buffer);
 
 		fileInfo.m_filename = leafName;
@@ -302,11 +331,30 @@ Bool BIGFileSystem::loadArchiveFilesFromDirectory(AsciiString dir, AsciiString f
 		}
 #endif
 
+#if defined(GENONLINE)
+#if RTS_ZEROHOUR
+		const Bool zeroHour = TRUE;
+#else
+		const Bool zeroHour = FALSE;
+#endif
+		// The first scan is the game folder, the second one the Generals install: the retail archives are the bottom of the lookup
+		const Int priority = overwrite ? getNextModPriority() : getGameFolderArchivePriority((*it), dir.isNotEmpty(), zeroHour);
+		if (priority == ARCHIVE_PRIORITY_EXCLUDED) {
+			it++;
+			continue;
+		}
+
+#endif
 		ArchiveFile *archiveFile = openArchiveFile((*it).str());
 
 		if (archiveFile != nullptr) {
 			DEBUG_LOG(("BIGFileSystem::loadArchiveFilesFromDirectory - loading %s into the directory tree.", (*it).str()));
+#if defined(GENONLINE)
+			loadIntoDirectoryTree(archiveFile, priority);
+			m_archiveFileMap[(*it)] = archiveFile;
+#else
 			mountArchiveFile(*it, archiveFile, overwrite);
+#endif
 			DEBUG_LOG(("BIGFileSystem::loadArchiveFilesFromDirectory - %s inserted into the archive file map.", (*it).str()));
 			actuallyAdded = TRUE;
 		}
@@ -319,13 +367,36 @@ Bool BIGFileSystem::loadArchiveFilesFromDirectory(AsciiString dir, AsciiString f
 
 void BIGFileSystem::loadMods()
 {
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	const GenOnlineSettings& settings = GenOnlineServicesManager::Settings;
+	// The excludes take effect here and not at settings load, so the reads before loadMods, like GameData.ini, see the game folder and the retail archives in full.
+	applyDataExcludes(settings.Data_ExcludePaths());
+
+	// Order, highest first: loose files of the game folder, the GO menu layouts of the genonline_ data packs, -mod and -modDir, the BIGs of the game folders that are not retail (data.exclude removes some),
+	// the data packs of data.include or the baseline pack, the retail archives. The BIGs of the game folders were mounted by init().
+	NetworkLog(ELogVerbosity::LOG_RELEASE, "Generals data: %s", m_generalsBaseSource.isEmpty() ? "none" : m_generalsBaseSource.str());
+	NetworkLog(ELogVerbosity::LOG_RELEASE, "Game folder archives above the data packs: %d", static_cast<int>(m_gameFolderArchives.size()));
+	for (const AsciiString& gameFolderArchive : m_gameFolderArchives)
+		NetworkLog(ELogVerbosity::LOG_RELEASE, "  %s", gameFolderArchive.str());
+
+	setInterfaceStyle(AsciiString(settings.UI_Style().c_str()));
+	mountDataPacks(settings.Data_HasInclude() ? &settings.Data_Include() : nullptr);
+#endif
+
+#endif
 	if (TheGlobalData->m_modBIG.isNotEmpty())
 	{
 		ArchiveFile *archiveFile = openArchiveFile(TheGlobalData->m_modBIG.str());
 
 		if (archiveFile != nullptr) {
 			DEBUG_LOG(("BIGFileSystem::loadMods - loading %s into the directory tree.", TheGlobalData->m_modBIG.str()));
+#if defined(GENONLINE)
+			loadIntoDirectoryTree(archiveFile, getNextModPriority());
+			m_archiveFileMap[TheGlobalData->m_modBIG] = archiveFile;
+#else
 			mountArchiveFile(TheGlobalData->m_modBIG, archiveFile, TRUE);
+#endif
 			DEBUG_LOG(("BIGFileSystem::loadMods - %s inserted into the archive file map.", TheGlobalData->m_modBIG.str()));
 		}
 		else

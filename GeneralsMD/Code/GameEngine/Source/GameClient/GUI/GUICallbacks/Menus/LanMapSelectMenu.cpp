@@ -43,6 +43,9 @@
 #include "GameClient/GadgetTextEntry.h"
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameClient/MapUtil.h"
+#if defined(GENONLINE)
+#include "GameClient/MapSelectList.h"
+#endif
 #include "GameNetwork/GUIUtil.h"
 
 
@@ -56,8 +59,14 @@ static GameWindow *mapList = nullptr;
 static GameWindow *mapFilter = nullptr;
 static Bool showingSystemMaps = TRUE;
 static GameWindow *winMapPreview = nullptr;
+#if defined(GENONLINE)
+// GenOnline @feature arcticdolphin 08/11/2026 Search, filters and favourites replace the system and user map tabs.
+static MapSelectList mapSelectList;
+static MapSelectFilter mapSelectFilter;
+#else
 static NameKeyType radioButtonSystemMapsID = NAMEKEY_INVALID;
 static NameKeyType radioButtonUserMapsID = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *buttonMapStartPosition[MAX_SLOTS] = {0};
 static NameKeyType buttonMapStartPositionID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
@@ -74,21 +83,25 @@ static const char *gadgetsToHide[] =
 {
 	"MapWindow",
 	//"StaticTextTitle",
+#if !defined(GENONLINE)
 	"StaticTextTeam",
 	"StaticTextFaction",
 	"StaticTextColor",
 	"TextEntryMapDisplay",
 	"ButtonSelectMap",
 	"ButtonStart",
+#endif
 	"StaticTextMapPreview",
 
 	nullptr
 };
 static const char *perPlayerGadgetsToHide[] =
 {
+#if !defined(GENONLINE)
 	"ComboBoxTeam",
 	"ComboBoxColor",
 	"ComboBoxPlayerTemplate",
+#endif
 	nullptr
 };
 
@@ -106,6 +119,9 @@ static void NullifyControls()
 	parent = nullptr;
 	mapList = nullptr;
 	mapFilter = nullptr;
+#if defined(GENONLINE)
+	mapSelectList.shutdown();
+#endif
 	if (winMapPreview)
 	{
 		winMapPreview->winSetUserData(nullptr);
@@ -136,6 +152,7 @@ void LanMapSelectMenuInit( WindowLayout *layout, void *userData )
 
 	TheWindowManager->winSetFocus( parent );
 
+#if !defined(GENONLINE)
 	LANPreferences pref;
 	Bool usesSystemMapDir = pref.usesSystemMapDir();
 
@@ -146,20 +163,25 @@ void LanMapSelectMenuInit( WindowLayout *layout, void *userData )
 	}
 
 
+#endif
 	buttonBack = TheNameKeyGenerator->nameToKey( "LanMapSelectMenu.wnd:ButtonBack" );
 	buttonOK = TheNameKeyGenerator->nameToKey( "LanMapSelectMenu.wnd:ButtonOK" );
 	listboxMap = TheNameKeyGenerator->nameToKey( "LanMapSelectMenu.wnd:ListboxMap" );
 	winMapPreviewID = TheNameKeyGenerator->nameToKey( "LanMapSelectMenu.wnd:WinMapPreview" );
 
+#if !defined(GENONLINE)
 	radioButtonSystemMapsID = TheNameKeyGenerator->nameToKey( "LanMapSelectMenu.wnd:RadioButtonSystemMaps" );
 	radioButtonUserMapsID = TheNameKeyGenerator->nameToKey( "LanMapSelectMenu.wnd:RadioButtonUserMaps" );
 	GameWindow *radioButtonSystemMaps = TheWindowManager->winGetWindowFromId( parent, radioButtonSystemMapsID );
 	GameWindow *radioButtonUserMaps = TheWindowManager->winGetWindowFromId( parent, radioButtonUserMapsID );
+#endif
 	winMapPreview = TheWindowManager->winGetWindowFromId(parent, winMapPreviewID);
+#if !defined(GENONLINE)
 	if (usesSystemMapDir)
 		GadgetRadioSetSelection( radioButtonSystemMaps, FALSE );
 	else
 		GadgetRadioSetSelection( radioButtonUserMaps, FALSE );
+#endif
 
 	AsciiString tmpString;
 	for (Int i = 0; i < MAX_SLOTS; i++)
@@ -186,7 +208,11 @@ void LanMapSelectMenuInit( WindowLayout *layout, void *userData )
 
 		if (TheMapCache)
 			TheMapCache->updateCache();
+#if defined(GENONLINE)
+		mapSelectList.init( parent, "LanMapSelectMenu.wnd", MapSelectOptions(), &mapSelectFilter, TheLAN->GetMyGame()->getMap() );
+#else
 		populateLanMapList( usesSystemMapDir, TheLAN->GetMyGame()->getMap() );
+#endif
 	}
 }
 
@@ -265,6 +291,32 @@ WindowMsgHandledType LanMapSelectMenuInput( GameWindow *window, UnsignedInt msg,
 
 }
 
+#if defined(GENONLINE)
+// The effect of the OK path on the lobby: the map, its checksum and size, and the start spots and slots adjusting to it.
+static void applySelectedMap( AsciiString asciiMap )
+{
+	TheLAN->GetMyGame()->setMap( asciiMap );
+	asciiMap.toLower();
+	std::map<AsciiString, MapMetaData>::iterator it = TheMapCache->find(asciiMap);
+	if (it != TheMapCache->end())
+	{
+		TheLAN->GetMyGame()->getSlot(0)->setMapAvailability(true);
+		TheLAN->GetMyGame()->setMapCRC( it->second.m_CRC );
+		TheLAN->GetMyGame()->setMapSize( it->second.m_filesize );
+
+		TheLAN->GetMyGame()->resetStartSpots();
+		TheLAN->GetMyGame()->adjustSlotsForMap(); // BGC- adjust the slots for the new map.
+	}
+}
+
+// The same without the selector window, for the stats pipe.
+void LanMapSelectMenuApplyMap( const AsciiString& map )
+{
+	applySelectedMap( map );
+	PostToLanGameOptions( SEND_GAME_OPTS );
+}
+
+#endif
 //-------------------------------------------------------------------------------------------------
 /** MapSelect menu window system callback */
 //-------------------------------------------------------------------------------------------------
@@ -277,6 +329,23 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 		mapWindow = TheWindowManager->winGetWindowFromId( parent, listboxMap );
 	}
 
+#if defined(GENONLINE)
+	const MapSelectMsgResult filterResult = mapSelectList.handleSystemMessage( msg, mData1, mData2 );
+	if (filterResult == MAP_SELECT_MSG_SOURCE_CHANGED)
+	{
+		// the single player map menu shares this preference
+		const MapSelectSource source = mapSelectFilter.m_source;
+		if (source == MAP_SOURCE_OFFICIAL || source == MAP_SOURCE_USER)
+		{
+			LANPreferences pref;
+			pref["UseSystemMapDir"] = (source == MAP_SOURCE_OFFICIAL) ? "yes" : "no";
+			pref.write();
+		}
+	}
+	if (filterResult != MAP_SELECT_MSG_IGNORED)
+		return MSG_HANDLED;
+
+#endif
 	switch( msg )
 	{
 
@@ -348,6 +417,9 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 			GameWindow *control = (GameWindow *)mData1;
 			Int controlID = control->winGetWindowId();
 
+#if defined(GENONLINE)
+			if ( controlID == buttonBack )
+#else
 			if ( controlID == radioButtonSystemMapsID )
 			{
 				if (TheMapCache)
@@ -367,6 +439,7 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 				pref.write();
 			}
 			else if ( controlID == buttonBack )
+#endif
 			{
 
 				if (mapSelectLayout)
@@ -405,6 +478,9 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 						asciiMap = mapFname;
 					else
 						asciiMap.translate( map );
+#if defined(GENONLINE)
+					applySelectedMap( asciiMap );
+#else
 					TheLAN->GetMyGame()->setMap( asciiMap );
 					asciiMap.toLower();
 					std::map<AsciiString, MapMetaData>::iterator it = TheMapCache->find(asciiMap);
@@ -418,6 +494,7 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 						TheLAN->GetMyGame()->adjustSlotsForMap(); // BGC- adjust the slots for the new map.
 					}
 
+#endif
 
 					if (mapSelectLayout)
 					{
@@ -452,6 +529,9 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 						positionStartSpots( AsciiString::TheEmptyString, buttonMapStartPosition, winMapPreview);
 						winMapPreview->winSetUserData(nullptr);
 						winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
+#if defined(GENONLINE)
+						mapSelectList.refreshLegend( AsciiString::TheEmptyString );
+#endif
 						break;
 					}
 					winMapPreview->winSetStatus(WIN_STATUS_IMAGE);
@@ -479,6 +559,9 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 						winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
 					}
 					positionStartSpots( asciiMap, buttonMapStartPosition, winMapPreview);
+#if defined(GENONLINE)
+					mapSelectList.refreshLegend( asciiMap );
+#endif
 				}
 				break;
 			}

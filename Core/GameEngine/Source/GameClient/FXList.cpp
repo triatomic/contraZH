@@ -1208,6 +1208,10 @@ protected:
 					if (delayInMsec >= 0.0f)
 					{
 						Real delayInFrames = ConvertDurationFromMsecsToFrames(delayInMsec);
+#if defined(GENONLINE)
+						// Info: Particle systems update on legacy frames, so their delays must use the same cadence at 60Hz.
+						delayInFrames /= LOGICFRAMES_PER_BASEFRAME;
+#endif
 						sys->setInitialDelay(REAL_TO_INT_CEIL(delayInFrames));
 					}
 

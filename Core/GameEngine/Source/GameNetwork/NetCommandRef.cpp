@@ -50,6 +50,12 @@ NetCommandRef::NetCommandRef(NetCommandMsg *msg)
 	m_relay = 0;
 	m_timeLastSent = -1;
 	m_wasResent = FALSE;
+#if defined(GENONLINE)
+	m_timeFirstSent = -1;
+	m_redundantCopies = 0;
+	m_timeFirstRedundant = -1;
+	m_retried = FALSE;
+#endif
 
 #ifdef DEBUG_NETCOMMANDREF
 	m_id = ++refNum;

@@ -43,6 +43,9 @@
 #include "GameClient/Mouse.h"
 #include "GameClient/RadiusDecal.h"
 #include "GameClient/View.h"
+#if defined(GENONLINE)
+#include "GameNetwork/NetworkDefs.h"
+#endif
 
 // FORWARD DECLARATIONS ///////////////////////////////////////////////////////////////////////////
 class Drawable;
@@ -510,6 +513,14 @@ public:  // ********************************************************************
 	InGameUI();
 	virtual ~InGameUI() override;
 
+#if defined(GENONLINE)
+	// Toggle visibility of the observer stats overlay and notifications
+	void toggleObserverStats() {
+		m_observerStatsHidden = !m_observerStatsHidden;
+		m_observerNotificationsHidden = !m_observerNotificationsHidden;
+	}
+
+#endif
 	// Inherited from subsystem interface -----------------------------------------------------------
 	virtual	void init() override;															///< Initialize the in-game user interface
 	virtual void update() override;														///< Update the UI by calling preDraw(), draw(), and postDraw()
@@ -525,11 +536,23 @@ public:  // ********************************************************************
 
 	// interface for messages to the user
 	// srj sez: passing as const-ref screws up varargs for some reason. dunno why. just pass by value.
+#if defined(GENONLINE)
+	#if defined(GENONLINE)
+	virtual void messageColor(bool bIsChatMsg, const RGBColor *rgbColor, UnicodeString format, ... );	///< display a colored message to the user
+#else
+	virtual void messageColor(const RGBColor* rgbColor, UnicodeString format, ...);	///< display a colored message to the user
+#endif
+	virtual void messageNoFormat(const UnicodeString& message); ///< display a message to the user
+	virtual void messageNoFormat(const RGBColor* rgbColor, const UnicodeString& message); ///< display a colored message to the user
+	virtual void message(UnicodeString format, ...);				  ///< display a message to the user
+	virtual void message(AsciiString stringManagerLabel, ...);///< display a message to the user
+#else
 	virtual void messageColor( const RGBColor *rgbColor, UnicodeString format, ... );	///< display a colored message to the user
 	virtual void messageNoFormat( const UnicodeString& message ); ///< display a message to the user
 	virtual void messageNoFormat( const RGBColor *rgbColor, const UnicodeString& message ); ///< display a colored message to the user
 	virtual void message( UnicodeString format, ... );				  ///< display a message to the user
 	virtual void message( AsciiString stringManagerLabel, ... );///< display a message to the user
+#endif
 	virtual void toggleMessages() { m_messagesOn = 1 - m_messagesOn; }	///< toggle messages on/off
 	virtual Bool isMessagesOn() { return m_messagesOn; }	///< are the display messages on
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
@@ -773,20 +796,44 @@ public:  // ********************************************************************
 	Bool isInReverseMoveToMode() const	{ return m_armedMoveMode == ARMED_MOVE_REVERSE; }
 	void clearArmedMoveMode()						{ m_armedMoveMode = ARMED_MOVE_NONE; }
 
+#if defined(GENONLINE)
+	void setCameraRotateLeft(Bool set) { m_cameraRotatingLeft = set; }
+	void setCameraRotateRight(Bool set) { m_cameraRotatingRight = set; }
+	void setCameraZoomIn(Bool set) { m_cameraZoomingIn = set; }
+	void setCameraZoomOut(Bool set) { m_cameraZoomingOut = set; }
+	void setCameraPitchUp(Bool set) { m_cameraPitchingUp = set; }
+	void setCameraPitchDown(Bool set) { m_cameraPitchingDown = set; }
+	void setCameraTrackingDrawable(Bool set) { m_cameraTrackingDrawable = set; }
+#else
 	void setCameraRotateLeft( Bool set )		{ m_cameraRotatingLeft = set; }
 	void setCameraRotateRight( Bool set )		{ m_cameraRotatingRight = set; }
 	void setCameraZoomIn( Bool set )				{ m_cameraZoomingIn = set; }
 	void setCameraZoomOut( Bool set )				{ m_cameraZoomingOut = set; }
   void setCameraTrackingDrawable( Bool set ) { m_cameraTrackingDrawable = set; }
+#endif
 	Bool isCameraRotatingLeft() const { return m_cameraRotatingLeft; }
 	Bool isCameraRotatingRight() const { return m_cameraRotatingRight; }
 	Bool isCameraZoomingIn() const { return m_cameraZoomingIn; }
 	Bool isCameraZoomingOut() const { return m_cameraZoomingOut; }
+#if defined(GENONLINE)
+	Bool isCameraPitchingUp() const { return m_cameraPitchingUp; }
+	Bool isCameraPitchingDown() const { return m_cameraPitchingDown; }
+	Bool isCameraTrackingDrawable() const { return m_cameraTrackingDrawable; }
+#else
   Bool isCameraTrackingDrawable() const { return m_cameraTrackingDrawable; }
+#endif
 	void resetCamera();
 
+#if defined(GENONLINE)
+		void initObserverOverlay();
+	void cleanupObserverOverlay();
+
+	virtual void addIdleWorker(Object* obj);
+	virtual void removeIdleWorker(Object* obj, Int playerNumber);
+#else
 	virtual void addIdleWorker( Object *obj );
 	virtual void removeIdleWorker( Object *obj, Int playerNumber );
+#endif
 	virtual void selectNextIdleWorker();
 	static std::vector<Object*> getUniqueIdleWorkers(const ObjectList& idleWorkers);
 	virtual Int getIdleWorkerCount();
@@ -851,6 +898,10 @@ private:
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	void drawWindowNameOverlay();
 #endif
+#if defined(GENONLINE)
+	void drawObserverStats(Int &x, Int &y);
+	Bool m_observerStatsHidden = false;   // hide/show observer overlay
+#endif
 
 public:
 	void registerWindowLayout(WindowLayout *layout); // register a layout for updates
@@ -867,6 +918,16 @@ public:
   Bool hasQueuedQuickCast( void ) const { return m_queuedCastCommandName.isNotEmpty(); }
   void updateQueuedQuickCast( void );
 
+#if defined(GENONLINE)
+  void drawObserverNotifications(Int& x, Int& y);
+  void checkObserverMilestones(UnsignedInt currentFrame);
+  void addObserverNotification(const UnicodeString& playerName, const wchar_t* message, Color playerColor);
+  void addObserverNotificationRaw(const UnicodeString& message, Color color);
+  void notifyGeneralPromotion(Player* player, ScienceType science);
+  void notifySpecialPowerUsed(Player* player, const SpecialPowerTemplate* powerTemplate);
+  void refreshObserverNotificationResources(void);
+  Bool m_observerNotificationsHidden;   // hide/show observer notifications
+#endif
 
 public:
 	// World 2D animation methods
@@ -917,6 +978,40 @@ protected:
 	};
 
 	enum { MAX_MOVE_HINTS = 256 };
+#if defined(GENONLINE)
+
+	struct ObserverNotification {
+		UnicodeString message;
+		Color color;
+		UnsignedInt createdRenderMs;
+		Bool active;
+	};
+
+	struct ObserverMilestone {
+		Bool reachedLevel3;
+		Bool reachedLevel5;
+		Bool reached10kCPM;
+		Bool stolenPower;
+		Bool gotHunted;
+	};
+
+	struct PlayerData {
+		UnicodeString name;
+		UnicodeString faction;
+		Int team;
+		UnsignedInt money;
+		UnsignedInt cpm;
+		Int xp;
+        Int rank;
+		Real kd;
+		Int sp;
+		Int powerValue;
+		Bool showPower;
+		Bool lowPower;
+		Color color;
+	};
+
+#endif
 	struct MoveHintStruct
 	{
 		Coord3D pos;						///< World coords of destination point
@@ -930,6 +1025,12 @@ protected:
 		DisplayString *displayString;						///< display string used to render the message
 		UnsignedInt timestamp;									///< logic frame message was created on
 		Color color;														///< color to render this in
+#if defined(GENONLINE)
+
+#if defined(GENONLINE)
+		bool isChat;
+#endif
+#endif
 	};
 	enum { MAX_UI_MESSAGES = 6 };
 
@@ -977,7 +1078,14 @@ protected:
 	void setMouseCursor(Mouse::MouseCursor c);
 
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	void addMessageText( const UnicodeString& formattedMessage, const RGBColor *rgbColor = nullptr, bool bIsChatMsg = false );  ///< internal workhorse for adding plain text for messages
+#else	void addMessageText( const UnicodeString& formattedMessage, const RGBColor *rgbColor = nullptr );  ///< internal workhorse for adding plain text for messages
+#endif
+#else
 	void addMessageText( const UnicodeString& formattedMessage, const RGBColor *rgbColor = nullptr );  ///< internal workhorse for adding plain text for messages
+#endif
 	void removeMessageAtIndex( Int i );				///< remove the message at index i
 
 	void updateActionLines();							///< read where each selected unit is headed
@@ -1067,6 +1175,9 @@ protected:
 	Color												m_networkLatencyColor;
 	Color												m_networkLatencyDropColor;
 	UnsignedInt									m_lastNetworkLatencyFrames;
+#if defined(GENONLINE)
+	UnsignedInt									m_lastNetworkLogicRate;
+#endif
 
 	// Render FPS Counter
 	DisplayString *							m_renderFpsString;
@@ -1105,6 +1216,27 @@ protected:
 	Color												m_gameTimeColor;
 	Color												m_gameTimeDropColor;
 
+#if defined(GENONLINE)
+		// Observer Stats Overlay
+	DisplayString* m_observerStatsString;
+	AsciiString m_observerStatsFont;
+	Int m_observerStatsPointSize;
+	Bool m_observerStatsBold;
+	Coord2D m_observerStatsPosition;
+	Int m_observerStatsLineStep;
+
+	// Observer notifications
+	std::vector<ObserverNotification> m_observerNotifications;
+	std::vector<ObserverMilestone> m_observerMilestones;
+	DisplayString* m_observerNotificationString;
+	Int m_observerNotificationPointSize;
+
+#if defined(GENONLINE)
+	Color												m_colorGood;
+	Color												m_colorBad;
+#endif
+
+#endif
 	struct PlayerInfoList
 	{
 		PlayerInfoList();
@@ -1121,6 +1253,10 @@ protected:
 
 			LabelType_Count
 		};
+		#if defined(GENONLINE)
+			Color												m_colorGood;
+			Color												m_colorBad;
+		#endif
 
 		enum ValueType
 		{
@@ -1277,11 +1413,44 @@ protected:
 	Bool 												m_cameraZoomingIn;
 	Bool 												m_cameraTrackingDrawable;
 	Bool 												m_cameraZoomingOut;
+#if defined(GENONLINE)
+	Bool 												m_cameraPitchingUp;
+	Bool 												m_cameraPitchingDown;
+#endif
 
 	Bool												m_drawRMBScrollAnchor;
 	Bool												m_moveRMBScrollAnchor;
 	Bool												m_clientQuiet;         ///< When the user clicks exit,restart, etc. this is set true
+#if defined(GENONLINE)
+	///< to skip some client sounds/fx during shutdown
+
+	// Obs overlay
+    static const Int numCols = 8;
+    const wchar_t* headers[numCols] = {
+        L"(T) Player", L"Army", L"Cash", L"Cash/m", L"(R) XP", L"SP", L"K/D", L"Power"
+    };
+
+	struct ObsOverlayPlayerData
+	{
+		bool isPresent = false;
+		PlayerData playerData;
+		DisplayString* playerCellStrings[numCols];
+	};
+
+	ObsOverlayPlayerData m_mapOverlayPlayerData[MAX_SLOTS];
+
+    UnsignedInt lastUpdateFrame = 0;
+    Int lastFontSize = -1;
+
+    std::vector<DisplayString*> m_headerStrings;
+    
+    Int colWidths[numCols] = { 0 };
+    Int totalWidth = 0;
+    Int totalHeight = 0;
+    bool isUpdating = false;
+#else
 																												///< to skip some client sounds/fx during shutdown
+#endif
 
 	GameWindow *m_controlBarWindow;
 	std::list<GameWindow *> m_controlBarRoots;	///< every top level window of ControlBar.wnd, the first being m_controlBarWindow

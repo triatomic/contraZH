@@ -59,6 +59,9 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/CommandSequence.h"
 #include "GameLogic/GameLogic.h"
+#if defined(GENONLINE)
+#include "Common/LocalApiLive.h"
+#endif
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -276,6 +279,13 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 		return;
 	}
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	// Every way a match ends (quit, replay left early, disconnect) passes here. A no-op if ENDED already went out.
+	LocalApiLiveGameDataCleared();
+#endif
+
+#endif
 	setClearingGameData( TRUE );
 
 	PathProfile::End_Match();	// TheSuperHackers @feature simonx645 16/11/2026 -pathProfile: the match's summary
@@ -314,6 +324,10 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 
 	// Map overrides disappear during reset, including the next map selected by the menu.
 	const AsciiString pendingFile = TheGlobalData->m_pendingFile;
+#if defined(GENONLINE)
+	// The menus and the next game start from the logic time scale of the player.
+	TheFramePacer->endGameSpeed();
+#endif
 	TheGameEngine->reset();
 	TheWritableGlobalData->m_pendingFile = pendingFile;
 	setGameMode(GAME_NONE);
@@ -444,6 +458,12 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 
 				if(TheStatsCollector)
 					TheStatsCollector->collectMsgStats(msg);
+#if defined(GENONLINE)
+
+#if defined(GENONLINE)
+				LocalApiLiveCommand(msgPlayer->getPlayerIndex(), msg->getType());
+#endif
+#endif
 			}
 		}
 	}
@@ -1145,14 +1165,25 @@ bool GameLogic::onNewGame(MAYBE_UNUSED GameMessage *msg)
 
 	if ( msg->getArgumentCount() >= 4 )
 	{
+#if !defined(GENONLINE)
 		Int maxFPS = msg->getArgument( 3 )->integer;
 		if (maxFPS < 1 || maxFPS > 1000)
 			maxFPS = TheGlobalData->m_framesPerSecondLimit;
 		DEBUG_LOG(("Setting max FPS limit to %d FPS", maxFPS));
 		TheFramePacer->setFramesPerSecondLimit(maxFPS);
+#endif
 		TheWritableGlobalData->m_useFpsLimit = true;
 	}
 
+#if defined(GENONLINE)
+	// The engine sets the render limit every frame, so the skirmish game speed runs through the logic time scale.
+	// Only the skirmish menu and the restart of its game keep the game speed, every other game plays at normal speed.
+	if ( msg->getArgumentCount() < 4 || (gameMode != GAME_SKIRMISH && gameMode != GAME_SINGLE_PLAYER) )
+	{
+		TheFramePacer->resetGameSpeed();
+	}
+	TheFramePacer->beginGameSpeed();
+#else
 	// Offline games and the shell map step logic at their own speed and render faster, so none leaks from the last game.
 	if (gameMode == GAME_SINGLE_PLAYER || gameMode == GAME_SKIRMISH || gameMode == GAME_REPLAY || gameMode == GAME_SHELL)
 	{
@@ -1177,6 +1208,7 @@ bool GameLogic::onNewGame(MAYBE_UNUSED GameMessage *msg)
 	{
 		TheFramePacer->enableLogicTimeScale(FALSE);
 	}
+#endif
 
 	// prepare for new game
 	prepareNewGame( gameMode, diff, rankPoints );
@@ -1187,6 +1219,23 @@ bool GameLogic::onNewGame(MAYBE_UNUSED GameMessage *msg)
 	return true;
 }
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+void GameLogic::processPendingGameExit()
+{
+	for (GameMessage* msg = TheCommandList->getFirstMessage(); msg != nullptr; msg = msg->next()) {
+		if (msg->getType() == GameMessage::MSG_CLEAR_GAME_DATA) {
+			TheCommandList->removeMessage(msg);
+			deleteInstance(msg);
+			AIGroupPtr selectedGroup = nullptr;
+			onClearGameData(nullptr, selectedGroup);
+			return;
+		}
+	}
+}
+#endif
+
+#endif
 bool GameLogic::onClearGameData(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 #if defined(RTS_DEBUG)
@@ -2823,6 +2872,9 @@ bool GameLogic::onPlaceBeacon(MAYBE_UNUSED GameMessage *msg)
 		Object *object = TheThingFactory->newObject( thing, msgPlayer->getDefaultTeam() );
 		object->setPosition( &pos );
 		object->setProducer(nullptr);
+#if defined(GENONLINE)
+		LocalApiLiveBeacon(msgPlayer->getPlayerIndex(), &pos);
+#endif
 
 		if (msgPlayer->getRelationship( ThePlayerList->getLocalPlayer()->getDefaultTeam() ) == ALLIES || ThePlayerList->getLocalPlayer()->isPlayerObserver())
 		{
@@ -2983,6 +3035,9 @@ bool GameLogic::onSetBeaconText(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curre
 bool GameLogic::onSelfDestruct(MAYBE_UNUSED GameMessage *msg)
 {
 	Player *msgPlayer = getMessagePlayer(msg);
+#if defined(GENONLINE)
+	LocalApiLivePlayerLeft(msgPlayer->getPlayerIndex(), "self_destruct");
+#endif
 
 	if (msg->getArgument(0)->boolean)
 	{
@@ -3037,6 +3092,9 @@ bool GameLogic::onSetReplayCamera(MAYBE_UNUSED GameMessage *msg)
 			const Real zoom = msg->getArgument( 3 )->real;
 			const Mouse::MouseCursor mouseCursor = static_cast<Mouse::MouseCursor>(msg->getArgument( 4 )->integer);
 			const ICoord2D mousePos = msg->getArgument( 5 )->pixel;
+#if defined(GENONLINE)
+			const UnsignedInt userActionCount = TheTacticalView->getUserActionCount();
+#endif
 
 			// TheSuperHackers @info Definitely call in user mode to ensure the camera operates with auto-zoom
 			// over terrain elevations, because the Replay Camera does not store the absolute camera location,
@@ -3064,6 +3122,11 @@ bool GameLogic::onSetReplayCamera(MAYBE_UNUSED GameMessage *msg)
 				TheTacticalView->set3DCameraLookAt(camPos, camDir, 0.0f);
 			}
 
+#if defined(GENONLINE)
+			// The recorded camera is not the user at this PC: tools that watch for user camera input do not count it.
+			TheTacticalView->restoreUserActionCount( userActionCount );
+
+#endif
 			// TheSuperHackers @fix Lock the new location to avoid user input from changing the camera in this frame.
 			TheTacticalView->lockUserControlUntilFrame( getFrame() + 1 );
 

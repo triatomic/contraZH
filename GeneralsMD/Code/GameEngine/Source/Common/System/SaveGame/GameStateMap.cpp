@@ -341,7 +341,11 @@ void GameStateMap::xfer( Xfer *xfer )
 		if (version >= 2)
 		{
 			// save the game mode.
+#if defined(GENONLINE)
+			Int gameMode = TheGameLogic->getGameMode();
+#else
 			Int gameMode = (Int)TheGameLogic->getGameMode();
+#endif
 			xfer->xferInt( &gameMode);
 		}
 

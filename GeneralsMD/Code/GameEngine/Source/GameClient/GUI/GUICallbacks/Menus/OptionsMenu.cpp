@@ -71,6 +71,9 @@
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/GlobalLanguage.h"
 #include "GameNetwork/FirewallHelper.h"
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlineGameHooks.h"
+#endif
 #include "GameNetwork/IPEnumeration.h"
 #include "GameNetwork/GameSpyOverlay.h"
 #include "GameNetwork/GameSpy/PeerDefs.h"
@@ -89,6 +92,10 @@
 
 #include "OptionsMenuTabs.inl"
 
+#if defined(GENONLINE)
+#include "../GenOnlineInit.h"
+
+#endif
 // This is for non-RC builds only!!!
 #define VERBOSE_VERSION L"Release"
 
@@ -1170,6 +1177,7 @@ static void saveOptions()
 		(*pref)["AntiAliasing"] = prefString;
   }
 
+#if !defined(GENONLINE_DISABLE_TEXTURE_FILTERING_AND_AA)
 	//-------------------------------------------------------------------------------------------------
 	// texture filter mode
 	val = getComboPos( comboBoxTextureFilter, pref->getTextureFilterMode() );
@@ -1198,6 +1206,7 @@ static void saveOptions()
 		prefString.format("%d", val);
 		(*pref)["AnisotropyLevel"] = prefString;
 	}
+#endif
 
 	//-------------------------------------------------------------------------------------------------
 	// mouse mode
@@ -1656,6 +1665,13 @@ static void saveOptions()
 		TheWritableGlobalData->m_jpegQuality = quality;
 	}
 
+#if defined(GENONLINE)
+	// The observer stats font size lives in settings.client.json so the overlay is set up again with it.
+	TheInGameUI->initObserverOverlay();
+
+	//-------------------------------------------------------------------------------------------------
+
+#endif
 	//-------------------------------------------------------------------------------------------------
 	// Interface style
 	Bool styleChanged = FALSE;
@@ -1768,6 +1784,10 @@ static void showAdvancedOptions()
 		return;
 	}
 	WinAdvancedDisplay->winHide(FALSE);
+#if defined(GENONLINE)
+	// GenOnline @bugfix arcticdolphin 22/11/2026 An opened combo box raises its panel, so the dialog raises itself to draw above it.
+	WinAdvancedDisplay->winBringToTop();
+#endif
 }
 
 static Bool isCustomDetailControl( GameWindow *control )
@@ -2561,6 +2581,14 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 		}
 	}
 
+#if defined(GENONLINE)
+	if (comboBoxLANIP)
+		GadgetComboBoxSetText(comboBoxLANIP, L"***.***.***.***");
+
+	if (comboBoxOnlineIP)
+		GadgetComboBoxSetText(comboBoxOnlineIP, L"***.***.***.***");
+
+#endif
 #if ENABLE_GUI_HACKS
 	// TheSuperHackers @tweak 26/07/2026 The http proxy feature was obsoleted because it did nothing for the UDP game traffic or match sockets.
 	// Hide the relevant obsoleted UI elements accordingly.
@@ -2825,7 +2853,11 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	GameWindow *parent = TheWindowManager->winGetWindowFromId( nullptr, parentID );
 	TheWindowManager->winSetFocus( parent );
 
+#if defined(GENONLINE)
+	if( (TheGameLogic->isInGame() && TheGameLogic->getGameMode() != GAME_SHELL) || GetOnlineGameHooks()->isLoggedIn() )
+#else
 	if( (TheGameLogic->isInGame() && TheGameLogic->getGameMode() != GAME_SHELL) || TheGameSpyInfo )
+#endif
 	{
 		// disable controls that you can't change the options for in game
 		comboBoxLANIP->winEnable(FALSE);
@@ -2833,7 +2865,12 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 		if (comboBoxOnlineIP)
 			comboBoxOnlineIP->winEnable(FALSE);
 
+#if defined(GENONLINE)
+		if (buttonFirewallRefresh)
+			buttonFirewallRefresh->winEnable(FALSE);
+#else
 		buttonFirewallRefresh->winEnable(FALSE);
+#endif
 
 		// Trees are placed and draw modules chosen as the map loads, so these wait for the next one
 		if (TheGameLogic->isInGame() && TheGameLogic->getGameMode() != GAME_SHELL)
@@ -2870,6 +2907,9 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 
 	OptionsTabs::start();
 
+#if defined(GENONLINE)
+	GetOnlineGameHooks()->onOptionsMenuInit((TheGameLogic->isInGame() && TheGameLogic->getGameMode() != GAME_SHELL) || GetOnlineGameHooks()->isLoggedIn());
+#endif
 	TheWindowManager->winSetModal(parent);
 	ignoreSelected = FALSE;
 }
@@ -3046,6 +3086,12 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 
 					showAdvancedOptions();
 				}
+#if defined(GENONLINE)
+				else
+				{
+					GetOnlineGameHooks()->onOptionsMenuComboSelected(control);
+				}
+#endif
 			break;
 		}
 
@@ -3086,6 +3132,11 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			else if (controlID == buttonAccept )
 			{
 				const Bool quitMenuWasVisible = TheInGameUI->isQuitMenuVisible();
+#if defined(GENONLINE)
+				// Changed connection settings are tested first so a rejected address keeps the menu open.
+				if (!GetOnlineGameHooks()->onOptionsMenuAccept())
+					break;
+#endif
 				saveOptions();
 
 				if (pref)
@@ -3124,6 +3175,12 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			else if (controlID == buttonDefaults )
 			{
 				setDefaults();
+#if defined(GENONLINE)
+				GetOnlineGameHooks()->onOptionsMenuDefaults();
+			}
+			else if (GetOnlineGameHooks()->onOptionsMenuButtonSelected(control))
+			{
+#endif
 			}
 			else if (controlID == ButtonGameOptionsID )
 			{

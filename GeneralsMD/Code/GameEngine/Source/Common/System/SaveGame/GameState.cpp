@@ -460,7 +460,11 @@ AsciiString GameState::findNextSaveFilename( UnicodeString desc )
 	for (i = 0; i < desc.getLength(); ++i)
 	{
 		char c = (char)desc.getCharAt(i);
+#if defined(GENONLINE)
+		if (isalnum((unsigned char)c))
+#else
 		if (isalnum(c))
+#endif
 			adesc.concat(c);
 		else
 			adesc.concat('_');

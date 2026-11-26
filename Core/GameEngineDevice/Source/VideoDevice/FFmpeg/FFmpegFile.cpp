@@ -27,6 +27,9 @@
 /////////////////////////////////////////////////
 
 #include "VideoDevice/FFmpeg/FFmpegFile.h"
+#if defined(GENONLINE)
+#include <limits>
+#endif
 #include "Common/File.h"
 
 extern "C" {
@@ -35,6 +38,17 @@ extern "C" {
 }
 
 
+#if defined(GENONLINE)
+void FFmpegFile::logError(const char *operation, Int error)
+{
+    if (!m_errorLogging)
+        return;
+    char message[AV_ERROR_MAX_STRING_SIZE];
+    av_strerror(error, message, sizeof(message));
+    DEBUG_LOG(("FFmpeg %s failed: %s\n", operation, message));
+}
+
+#endif
 FFmpegFile::FFmpegFile() {}
 
 FFmpegFile::FFmpegFile(File *file)
@@ -49,6 +63,11 @@ FFmpegFile::~FFmpegFile()
 
 Bool FFmpegFile::open(File *file)
 {
+#if defined(GENONLINE)
+	if (file != nullptr && file == m_file)
+		return false;
+	close();
+#else
 	DEBUG_ASSERTCRASH(m_file == nullptr, ("already open"));
 	DEBUG_ASSERTCRASH(file != nullptr, ("null file pointer"));
 #if LOGGING_LEVEL != LOGLEVEL_NONE
@@ -60,61 +79,125 @@ Bool FFmpegFile::open(File *file)
 	av_register_all();
 #endif
 
+#endif
 	m_file = file;
+#if defined(GENONLINE)
+	if (m_file == nullptr)
+		return false;
+#endif
 
 	// FFmpeg setup
 	m_fmtCtx = avformat_alloc_context();
+#if defined(GENONLINE)
+	if (m_fmtCtx == nullptr) {
+#else
 	if (!m_fmtCtx) {
 		DEBUG_LOG(("Failed to alloc AVFormatContext"));
+#endif
 		close();
 		return false;
 	}
+#if defined(GENONLINE)
+	const Int bufferSize = 0x10000;
+	UnsignedByte *buffer = static_cast<UnsignedByte *>(av_malloc(bufferSize));
+#else
 
 	constexpr size_t avio_ctx_buffer_size = 0x10000;
 	uint8_t *buffer = static_cast<uint8_t *>(av_malloc(avio_ctx_buffer_size));
+#endif
 	if (buffer == nullptr) {
+#if !defined(GENONLINE)
 		DEBUG_LOG(("Failed to alloc AVIOContextBuffer"));
+#endif
 		close();
 		return false;
 	}
+#if defined(GENONLINE)
+	m_avioCtx = avio_alloc_context(buffer, bufferSize, 0, file, &readPacket, nullptr, &seekPacket);
+#else
 
 	m_avioCtx = avio_alloc_context(buffer, avio_ctx_buffer_size, 0, file, &readPacket, nullptr, nullptr);
+#endif
 	if (m_avioCtx == nullptr) {
+#if defined(GENONLINE)
+		av_free(buffer);
+#else
 		DEBUG_LOG(("Failed to alloc AVIOContext"));
+#endif
 		close();
 		return false;
 	}
 
 	m_fmtCtx->pb = m_avioCtx;
 	m_fmtCtx->flags |= AVFMT_FLAG_CUSTOM_IO;
+#if defined(GENONLINE)
+	Int result = avformat_open_input(&m_fmtCtx, nullptr, nullptr, nullptr);
+#else
 
 	int result = avformat_open_input(&m_fmtCtx, nullptr, nullptr, nullptr);
+#endif
 	if (result < 0) {
+#if defined(GENONLINE)
+		logError("open input", result);
+#else
 		char error_buffer[1024];
 		av_strerror(result, error_buffer, sizeof(error_buffer));
 		DEBUG_LOG(("Failed 'avformat_open_input': %s", error_buffer));
+#endif
 		close();
 		return false;
 	}
 
 	result = avformat_find_stream_info(m_fmtCtx, nullptr);
 	if (result < 0) {
+#if defined(GENONLINE)
+		logError("read stream metadata", result);
+#else
 		char error_buffer[1024];
 		av_strerror(result, error_buffer, sizeof(error_buffer));
 		DEBUG_LOG(("Failed 'avformat_find_stream_info': %s", error_buffer));
+#endif
 		close();
 		return false;
 	}
 
 	m_streams.resize(m_fmtCtx->nb_streams);
+#if defined(GENONLINE)
+	for (unsigned int i = 0; i < m_fmtCtx->nb_streams; ++i) {
+		AVStream *input = m_fmtCtx->streams[i];
+		FFmpegStream &stream = m_streams[i];
+		stream.codec = avcodec_find_decoder(input->codecpar->codec_id);
+		if (stream.codec == nullptr) {
+			// Streams that are never selected, like cover art, may lack a decoder.
+			const AVMediaType type = input->codecpar->codec_type;
+			if ((type == AVMEDIA_TYPE_AUDIO || type == AVMEDIA_TYPE_VIDEO) &&
+				(input->disposition & AV_DISPOSITION_ATTACHED_PIC) == 0 && findMatch(type) == nullptr) {
+				logError("find decoder", AVERROR_DECODER_NOT_FOUND);
+				close();
+				return false;
+			}
+			input->discard = AVDISCARD_ALL;
+			continue;
+		}
+		stream.codec_ctx = avcodec_alloc_context3(stream.codec);
+		stream.frame = av_frame_alloc();
+		if (stream.codec_ctx == nullptr || stream.frame == nullptr) {
+			logError("allocate decoder", AVERROR(ENOMEM));
+#else
 	for (unsigned int stream_idx = 0; stream_idx < m_fmtCtx->nb_streams; stream_idx++) {
 		AVStream *av_stream = m_fmtCtx->streams[stream_idx];
 		const AVCodec *input_codec = avcodec_find_decoder(av_stream->codecpar->codec_id);
 		if (input_codec == nullptr) {
 			DEBUG_LOG(("Codec not supported: '%s'", avcodec_get_name(av_stream->codecpar->codec_id)));
+#endif
 			close();
 			return false;
 		}
+#if defined(GENONLINE)
+		result = avcodec_parameters_to_context(stream.codec_ctx, input->codecpar);
+		if (result >= 0)
+			result = avcodec_open2(stream.codec_ctx, stream.codec, nullptr);
+#else
 
 		AVCodecContext *codec_ctx = avcodec_alloc_context3(input_codec);
 		if (codec_ctx == nullptr) {
@@ -124,13 +207,22 @@ Bool FFmpegFile::open(File *file)
 		}
 
 		result = avcodec_parameters_to_context(codec_ctx, av_stream->codecpar);
+#endif
 		if (result < 0) {
+#if defined(GENONLINE)
+			logError("initialize decoder", result);
+#else
 			char error_buffer[1024];
 			av_strerror(result, error_buffer, sizeof(error_buffer));
 			DEBUG_LOG(("Failed 'avcodec_parameters_to_context': %s", error_buffer));
+#endif
 			close();
 			return false;
 		}
+#if defined(GENONLINE)
+		stream.stream_type = stream.codec->type;
+		stream.stream_idx = i;
+#else
 
 		result = avcodec_open2(codec_ctx, input_codec, nullptr);
 		if (result < 0) {
@@ -147,19 +239,66 @@ Bool FFmpegFile::open(File *file)
 		output_stream.stream_type = input_codec->type;
 		output_stream.stream_idx = stream_idx;
 		output_stream.frame = av_frame_alloc();
+#endif
 	}
 
 	m_packet = av_packet_alloc();
+#if defined(GENONLINE)
+	if (m_packet == nullptr) {
+		close();
+		return false;
+	}
+#else
 
+#endif
 	return true;
 }
 
+#if defined(GENONLINE)
+Int FFmpegFile::readPacket(void *opaque, UnsignedByte *buffer, Int size)
+{
+	const Int count = static_cast<File *>(opaque)->read(buffer, size);
+	if (count < 0)
+		return AVERROR(EIO);
+	if (count == 0)
+		return AVERROR_EOF;
+	return count;
+}
+
+Int64 FFmpegFile::seekPacket(void *opaque, Int64 offset, Int whence)
+#else
 /**
  * Read an FFmpeg packet from file
  */
 int FFmpegFile::readPacket(void *opaque, uint8_t *buf, int buf_size)
+#endif
 {
 	File *file = static_cast<File *>(opaque);
+#if defined(GENONLINE)
+	const Int size = file->size();
+	if (size < 0)
+		return AVERROR(EIO);
+	if (whence == AVSEEK_SIZE)
+		return size;
+	whence &= ~AVSEEK_FORCE;
+	Int64 origin = 0;
+	if (whence == SEEK_CUR) {
+		origin = file->position();
+		if (origin < 0)
+			return AVERROR(EIO);
+	} else if (whence == SEEK_END) {
+		origin = size;
+	} else if (whence != SEEK_SET) {
+		return AVERROR(EINVAL);
+	}
+	// File uses signed 32-bit offsets, so the offset is validated before narrowing or adding.
+	if (offset < -origin || offset > static_cast<Int64>(size) - origin)
+		return AVERROR(EINVAL);
+	const Int position = static_cast<Int>(origin + offset);
+	if (file->seek(position, File::START) != position)
+		return AVERROR(EIO);
+	return position;
+#else
 	const int read = file->read(buf, buf_size);
 
 	// Streaming protocol requires us to return real errors - when we read less equal 0 we're at EOF
@@ -167,6 +306,7 @@ int FFmpegFile::readPacket(void *opaque, uint8_t *buf, int buf_size)
 		return AVERROR_EOF;
 
 	return read;
+#endif
 }
 
 /**
@@ -174,15 +314,24 @@ int FFmpegFile::readPacket(void *opaque, uint8_t *buf, int buf_size)
  */
 void FFmpegFile::close()
 {
+#if defined(GENONLINE)
+	avformat_close_input(&m_fmtCtx);
+#else
 	if (m_fmtCtx != nullptr) {
 		avformat_close_input(&m_fmtCtx);
 	}
 
+#endif
 	for (auto &stream : m_streams) {
+#if defined(GENONLINE)
+		avcodec_free_context(&stream.codec_ctx);
+		av_frame_free(&stream.frame);
+#else
 		if (stream.codec_ctx != nullptr) {
 			avcodec_free_context(&stream.codec_ctx);
 			av_frame_free(&stream.frame);
 		}
+#endif
 	}
 	m_streams.clear();
 
@@ -190,25 +339,79 @@ void FFmpegFile::close()
 		av_freep(&m_avioCtx->buffer);
 		avio_context_free(&m_avioCtx);
 	}
+#if defined(GENONLINE)
+	av_packet_free(&m_packet);
+#else
 
 	if (m_packet != nullptr) {
 		av_packet_free(&m_packet);
 	}
 
+#endif
 	if (m_file != nullptr) {
 		m_file->close();
 		m_file = nullptr;
 	}
+#if defined(GENONLINE)
+	m_endOfInput = false;
+	m_decodeFailed = false;
+}
+
+Bool FFmpegFile::receiveFrames(FFmpegStream &stream, Bool &produced)
+{
+	for (;;) {
+		const Int result = avcodec_receive_frame(stream.codec_ctx, stream.frame);
+		if (result == AVERROR(EAGAIN) || result == AVERROR_EOF)
+			return true;
+		// Handle any other errors
+		if (result < 0) {
+			logError("receive frame", result);
+			return false;
+		}
+		produced = true;
+		if (m_frameCallback != nullptr)
+			m_frameCallback(stream.frame, stream.stream_idx, stream.stream_type, m_userData);
+		av_frame_unref(stream.frame);
+	}
+}
+
+Bool FFmpegFile::submitPacket(FFmpegStream &stream, const AVPacket *packet, Bool &produced)
+{
+	if (stream.codec_ctx == nullptr)
+		return true;
+	Int result = avcodec_send_packet(stream.codec_ctx, packet);
+	if (result == AVERROR(EAGAIN)) {
+		if (!receiveFrames(stream, produced))
+			return false;
+		result = avcodec_send_packet(stream.codec_ctx, packet);
+	}
+	if (result < 0) {
+		logError("submit packet or drain", result);
+		return false;
+	}
+	return receiveFrames(stream, produced);
+#endif
 }
 
 Bool FFmpegFile::decodePacket()
 {
+#if defined(GENONLINE)
+	if (m_fmtCtx == nullptr || m_packet == nullptr || m_endOfInput || m_decodeFailed)
+#else
 	DEBUG_ASSERTCRASH(m_fmtCtx != nullptr, ("null format context"));
 	DEBUG_ASSERTCRASH(m_packet != nullptr, ("null packet pointer"));
 
 	int result = av_read_frame(m_fmtCtx, m_packet);
 	if (result == AVERROR_EOF)
+#endif
 		return false;
+#if defined(GENONLINE)
+	Bool produced = false;
+	Int result = av_read_frame(m_fmtCtx, m_packet);
+	if (result == AVERROR_EOF && m_avioCtx->error < 0 && m_avioCtx->error != AVERROR_EOF) {
+		logError("read input", m_avioCtx->error);
+		m_decodeFailed = true;
+#else
 
 	const int stream_idx = m_packet->stream_index;
 	if (stream_idx < 0 || (size_t)stream_idx >= m_streams.size()) {
@@ -236,9 +439,37 @@ Bool FFmpegFile::decodePacket()
 		av_strerror(result, error_buffer, sizeof(error_buffer));
 		DEBUG_LOG(("Failed 'avcodec_send_packet': %s", error_buffer));
 		av_packet_unref(m_packet);
+#endif
 		return false;
 	}
+#if defined(GENONLINE)
+	if (result == AVERROR_EOF) {
+		m_endOfInput = true;
+		for (auto &stream : m_streams) {
+			if (!submitPacket(stream, nullptr, produced)) {
+				m_decodeFailed = true;
+				return false;
+			}
+		}
+		return produced;
+	}
+	if (result < 0 || m_packet->stream_index < 0 ||
+		static_cast<size_t>(m_packet->stream_index) >= m_streams.size()) {
+		if (result >= 0)
+			result = AVERROR_INVALIDDATA;
+		logError("read packet", result);
+		av_packet_unref(m_packet);
+		m_decodeFailed = true;
+		return false;
+	}
+	FFmpegStream &stream = m_streams[m_packet->stream_index];
+	m_decodeFailed = !submitPacket(stream, m_packet, produced);
+#endif
 	av_packet_unref(m_packet);
+#if defined(GENONLINE)
+	if (m_decodeFailed)
+		return false;
+#else
 
 	// Get all frames in this packet
 	while (result >= 0) {
@@ -266,11 +497,24 @@ Bool FFmpegFile::decodePacket()
 		}
 	}
 
+#endif
 	return true;
 }
 
+#if defined(GENONLINE)
+Bool FFmpegFile::seek(Int streamIndex, Int64 timestamp)
+#else
 void FFmpegFile::seekFrame(int frame_idx)
+#endif
 {
+#if defined(GENONLINE)
+	if (m_fmtCtx == nullptr)
+		return false;
+	const Int result = av_seek_frame(m_fmtCtx, streamIndex, timestamp, AVSEEK_FLAG_BACKWARD);
+	if (result < 0) {
+		logError("seek", result);
+		return false;
+#else
 	// Note: not tested, since not used ingame
 	for (const auto &stream : m_streams) {
 		Int64 timestamp = av_q2d(m_fmtCtx->streams[stream.stream_idx]->time_base) * frame_idx
@@ -281,7 +525,75 @@ void FFmpegFile::seekFrame(int frame_idx)
 			av_strerror(result, error_buffer, sizeof(error_buffer));
 			DEBUG_LOG(("Failed 'av_seek_frame': %s", error_buffer));
 		}
+#endif
 	}
+#if defined(GENONLINE)
+	m_avioCtx->error = 0;
+	av_packet_unref(m_packet);
+	for (auto &stream : m_streams) {
+		if (stream.codec_ctx == nullptr)
+			continue;
+		avcodec_flush_buffers(stream.codec_ctx);
+		av_frame_unref(stream.frame);
+	}
+	m_endOfInput = false;
+	m_decodeFailed = false;
+	return true;
+}
+
+Bool FFmpegFile::rewind()
+{
+	return seek(-1, 0);
+}
+
+Bool FFmpegFile::seekFrame(Int frameIndex)
+{
+	const FFmpegStream *stream = findMatch(AVMEDIA_TYPE_VIDEO);
+	if (stream == nullptr || frameIndex < 0)
+		return false;
+	AVStream *video = m_fmtCtx->streams[stream->stream_idx];
+	if (video->avg_frame_rate.num <= 0 || video->avg_frame_rate.den <= 0)
+		return false;
+	return seek(stream->stream_idx, av_rescale_q(frameIndex, av_inv_q(video->avg_frame_rate), video->time_base));
+}
+
+Int FFmpegFile::getAudioStreamIndex() const
+{
+	const FFmpegStream *stream = findMatch(AVMEDIA_TYPE_AUDIO);
+	if (stream == nullptr)
+		return -1;
+	return stream->stream_idx;
+}
+
+Int FFmpegFile::getVideoStreamIndex() const
+{
+    const FFmpegStream *stream = findMatch(AVMEDIA_TYPE_VIDEO);
+    if (stream == nullptr)
+        return -1;
+    return stream->stream_idx;
+}
+
+Int64 FFmpegFile::getFrameTimestampUS(const AVFrame *frame, Int stream) const
+{
+    if (m_fmtCtx == nullptr || frame == nullptr || stream < 0 ||
+        static_cast<unsigned>(stream) >= m_fmtCtx->nb_streams || frame->best_effort_timestamp == AV_NOPTS_VALUE)
+        return -1;
+    Int64 origin = m_fmtCtx->start_time;
+    if (origin == AV_NOPTS_VALUE)
+        origin = 0;
+    return av_rescale_q(frame->best_effort_timestamp, m_fmtCtx->streams[stream]->time_base, AV_TIME_BASE_Q) - origin;
+}
+
+Int64 FFmpegFile::getVideoFrameTimeUS(Int index) const
+{
+    const FFmpegStream *stream = findMatch(AVMEDIA_TYPE_VIDEO);
+    if (stream == nullptr || index < 0)
+        return 0;
+    const AVRational rate = m_fmtCtx->streams[stream->stream_idx]->avg_frame_rate;
+    if (rate.num <= 0 || rate.den <= 0)
+        return 0;
+    return av_rescale_q(index, av_inv_q(rate), AV_TIME_BASE_Q);
+#endif
 }
 
 Bool FFmpegFile::hasAudio() const
@@ -360,7 +672,19 @@ Int FFmpegFile::getNumFrames() const
 	if (m_fmtCtx == nullptr || stream == nullptr || m_fmtCtx->streams[stream->stream_idx] == nullptr)
 		return 0;
 
+#if defined(GENONLINE)
+	const AVStream *video = m_fmtCtx->streams[stream->stream_idx];
+    if (video->nb_frames > 0 && video->nb_frames <= std::numeric_limits<Int>::max())
+        return static_cast<Int>(video->nb_frames);
+    if (m_fmtCtx->duration <= 0 || video->avg_frame_rate.num <= 0 || video->avg_frame_rate.den <= 0)
+        return 0;
+    const Int64 count = av_rescale_q(m_fmtCtx->duration, AV_TIME_BASE_Q, av_inv_q(video->avg_frame_rate));
+    if (count <= 0 || count > std::numeric_limits<Int>::max())
+        return 0;
+    return static_cast<Int>(count);
+#else
 	return (m_fmtCtx->duration / (double)AV_TIME_BASE) * av_q2d(m_fmtCtx->streams[stream->stream_idx]->avg_frame_rate);
+#endif
 }
 
 Int FFmpegFile::getCurrentFrame() const

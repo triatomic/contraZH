@@ -49,6 +49,13 @@ void GSMessageBoxYesNo(UnicodeString title, UnicodeString message, GameWinMsgBox
 
 void RaiseGSMessageBox();		///< Bring GS message box to the foreground (if we transition screens while a message box is up)
 
+#if defined(GENONLINE)
+
+// GeneralsOnline
+void GSMessageBoxCancel(UnicodeString title, UnicodeString message, GameWinMsgBoxFunc cancelFunc);	///< Display a Message box with Ok/Cancel buttons and track it
+void GSMessageBoxNoButtons(UnicodeString title, UnicodeString message, bool bShowLogo);
+
+#endif
 enum GSOverlayType CPP_11(: Int)
 {
 	GSOVERLAY_PLAYERINFO,

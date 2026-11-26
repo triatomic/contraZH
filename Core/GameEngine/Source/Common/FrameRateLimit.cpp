@@ -33,6 +33,9 @@ FrameRateLimit::FrameRateLimit()
 	m_freq = freq.QuadPart;
 	m_start = start.QuadPart;
 	m_last = start.QuadPart;
+#if defined(GENONLINE)
+	m_previousFps = 0;
+#endif
 
 	// Fails before Windows 10 1803, which leaves wait on Sleep.
 	m_timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
@@ -51,6 +54,13 @@ Real FrameRateLimit::wait(UnsignedInt maxFps)
 	PROFILER_SECTION;
 	LARGE_INTEGER tick;
 	QueryPerformanceCounter(&tick);
+#if defined(GENONLINE)
+	if (m_previousFps != maxFps)
+	{
+		m_start = m_last;
+	}
+	m_previousFps = maxFps;
+#endif
 
 	// The deadline always lies past the last return, so the returned time is never zero.
 	const Int64 period = m_freq / maxFps;
@@ -121,8 +131,10 @@ void FrameRateLimit::reset()
 const UnsignedInt RenderFpsPreset::s_fpsValues[] = {
 	30, 50, 56, 60, 65, 70, 72, 75, 80, 85, 90, 100, 110, 120, 144, 240, 480, UncappedFpsValue };
 
+#if !defined(GENONLINE)
 static_assert(LOGICFRAMES_PER_SECOND <= 30, "Min FPS values need to be revisited!");
 
+#endif
 UnsignedInt RenderFpsPreset::getNextFpsValue(UnsignedInt value)
 {
 	const Int first = 0;
@@ -156,9 +168,20 @@ UnsignedInt RenderFpsPreset::changeFpsValue(UnsignedInt value, FpsValueChange ch
 	switch (change)
 	{
 	default:
+#if defined(GENONLINE)
+	case FpsValueChange_Increase: value = getNextFpsValue(value); break;
+	case FpsValueChange_Decrease: value = getPrevFpsValue(value); break;
+#else
 	case FpsValueChange_Increase: return getNextFpsValue(value);
 	case FpsValueChange_Decrease: return getPrevFpsValue(value);
+#endif
 	}
+#if defined(GENONLINE)
+	// The render rate never goes below the logic rate.
+	if (value < (UnsignedInt)LOGICFRAMES_PER_SECOND)
+		value = LOGICFRAMES_PER_SECOND;
+	return value;
+#endif
 }
 
 
@@ -184,7 +207,18 @@ UnsignedInt LogicTimeScaleFpsPreset::changeFpsValue(UnsignedInt value, FpsValueC
 	switch (change)
 	{
 	default:
+#if defined(GENONLINE)
+	case FpsValueChange_Increase: value = getNextFpsValue(value); break;
+	case FpsValueChange_Decrease: value = getPrevFpsValue(value); break;
+#else
 	case FpsValueChange_Increase: return getNextFpsValue(value);
 	case FpsValueChange_Decrease: return getPrevFpsValue(value);
+#endif
 	}
+#if defined(GENONLINE)
+	// The render rate never goes below the logic rate.
+	if (value < (UnsignedInt)LOGICFRAMES_PER_SECOND)
+		value = LOGICFRAMES_PER_SECOND;
+	return value;
+#endif
 }

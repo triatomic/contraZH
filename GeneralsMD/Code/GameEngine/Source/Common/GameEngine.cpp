@@ -73,6 +73,9 @@
 #include "Common/Xfer.h"
 #include "Common/XferCRC.h"
 #include "Common/GameLOD.h"
+#if defined(GENONLINE)
+#include "Common/AdaptiveQuality.h"
+#endif
 #include "Common/Registry.h"
 #include "Common/GameCommon.h"	// FOR THE ALLOW_DEBUG_CHEATS_IN_RELEASE #define
 #include "Common/MapData.h"
@@ -113,11 +116,30 @@
 #include "GameLogic/PathScenario.h"
 #include "Common/GameMcp.h"
 #include "GameNetwork/NetworkInterface.h"
+#if defined(GENONLINE)
+#include "GameNetwork/ConnectionManager.h"
+#endif
 #include "GameNetwork/LANAPI.h"
 #include "GameNetwork/GameSpy/GameResultsThread.h"
+#if defined(GENONLINE)
+#include "GameNetwork/Online/OnlineProviderFactory.h"
+#include "GameNetwork/Online/IOnlineGameHooks.h"
+#if defined(GENONLINE)
+#include "GameNetwork/GenOnline/GenOnlineInit.h"
+#include "GameNetwork/GenOnline/Provider/GenOnlinePluginHost.h"
+#endif
+#endif
 
 #include "Common/version.h"
 
+#if defined(GENONLINE)
+#include "../GenOnlineDefines.h"
+
+#include "Common/LocalApiReaders.h"
+#include "Common/LocalApiLive.h"
+#include <chrono>
+#include "WW3D2/ww3d.h"
+#endif
 
 //-------------------------------------------------------------------------------------------------
 
@@ -277,6 +299,15 @@ GameEngine::GameEngine()
 GameEngine::~GameEngine()
 {
 
+#if defined(GENONLINE)
+	// stop the stats readers feed before the state it samples is torn down
+	LocalApiReadersShutdown();
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 21/11/2026 The caster plugin unloads after the sink stopped using it
+	GenOnlinePluginHost::UnloadToolPlugin();
+#endif
+
+#endif
 	//extern std::vector<std::string>	preloadTextureNamesGlobalHack;
 	//preloadTextureNamesGlobalHack.clear();
 
@@ -324,13 +355,22 @@ GameEngine::~GameEngine()
 
 	delete TheGameLODManager;
 	TheGameLODManager = nullptr;
+#if defined(GENONLINE)
+	// GENERALS ONLINE
+	GetOnlineGameHooks()->onEngineShutdown();
+#else
 
+#endif
 	Drawable::killStaticImages();
 
 #ifdef PERF_TIMERS
 	PerfGather::termPerfDump();
 #endif
 
+#if defined(GENONLINE)
+	// Kill sentry
+	GetOnlineGameHooks()->onEngineExit();
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -465,6 +505,11 @@ void GameEngine::init()
 	#endif/////////////////////////////////////////////////////////////////////////////////////////////
 
 
+#if defined(GENONLINE)
+		// GenOnline @feature arcticdolphin 21/11/2026 Settings load before the archives are mounted because they read data.include and data.exclude, and they need TheGlobalData for the user data path.
+		GetOnlineGameHooks()->loadSettings();
+
+#endif
 		initSubsystem(TheArchiveFileSystem, "TheArchiveFileSystem", createArchiveFileSystem(), nullptr); // this MUST come after TheLocalFileSystem creation
 
     	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
@@ -481,6 +526,16 @@ void GameEngine::init()
 
 		setStartupStage("Subsystem initialization");
 		initSubsystem(TheWriteableMapData, "TheWriteableMapData", MapData::createMapDataSystem(), &xferCRC);
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+		TheWritableGlobalData->applyGenOnlineClientSettings();
+		// GenOnline @feature arcticdolphin 21/11/2026 The caster plugin loads before the first stats call and also in headless runs for -exportStats
+		GenOnlinePluginHost::LoadToolPlugin();
+#endif
+
+		// Init sentry ASAP to catch early crashes
+		GetOnlineGameHooks()->onGlobalDataLoaded();
+#endif
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
 	GetPrecisionTimer(&endTime64);//////////////////////////////////////////////////////////////////
@@ -638,6 +693,10 @@ void GameEngine::init()
 		initSubsystem(TheUpgradeCenter,"TheUpgradeCenter", MSGNEW("GameEngineSubsystem") UpgradeCenter, &xferCRC, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
 		initSubsystem(TheGameClient,"TheGameClient", createGameClient(), nullptr);
 
+#if defined(GENONLINE)
+		GetOnlineGameHooks()->onDisplayCreated();
+
+#endif
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
 	GetPrecisionTimer(&endTime64);//////////////////////////////////////////////////////////////////
@@ -690,8 +749,19 @@ void GameEngine::init()
 		initSubsystem(TheGameStateMap,"TheGameStateMap", MSGNEW("GameEngineSubsystem") GameStateMap, nullptr );
 		initSubsystem(TheGameState,"TheGameState", MSGNEW("GameEngineSubsystem") GameState, nullptr );
 
+#if defined(GENONLINE)
+		// The subsystem list owns this instance for the engine lifetime and Online never replaces it.
+		OnlineProviderFactory *resultsFactory = nullptr;
+		IOnlineResults *results = CreateOnlineResults(&resultsFactory);
+		if (results == nullptr)
+			RELEASE_CRASH(("Unable to create the selected online results provider."));
+		initSubsystem(TheGameResultsQueue,"TheGameResultsQueue", results, nullptr);
+		if (!BindOnlineResultsProvider(resultsFactory))
+			RELEASE_CRASH(("Unable to bind the selected online results provider."));
+#else
 		// Create the interface for sending game results
 		initSubsystem(TheGameResultsQueue,"TheGameResultsQueue", GameResultsInterface::createNewGameResultsInterface(), nullptr);
+#endif
 
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
@@ -858,6 +928,9 @@ void GameEngine::init()
 
 	HideControlBar();
 
+#if defined(GENONLINE)
+	GetOnlineGameHooks()->onEngineInitialized();
+#endif
 	DEBUG_LOG(("STARTUP: [%8.1f ms] engine initialization completed", getStartupElapsedMs()));
 }
 
@@ -956,9 +1029,22 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 
 	// Without a running game the logic only handles messages, such as starting the next game, which must not wait.
 	const Bool noGameRunning = !TheGameLogic->isInGame() || TheGameLogic->isStartingNewGame();
+#if defined(GENONLINE)
+	// GenOnline @bugfix arcticdolphin 21/11/2026 A logic rate at or above the render limit stays in lock step, so every drawn frame steps the logic once and
+	// the draw modules and particles keep an even rhythm. Only a drawn frame that took longer than a logic frame hands the missed frames to the catch-up loop.
+	const Int catchUpFrames = getCatchUpFrames();
+#endif
 
 	if (useFastMode || noGameRunning || logicTimeScaleFps >= maxRenderFps)
 	{
+#if defined(GENONLINE)
+		if (catchUpFrames > 1 && logicTimeScaleFps < (Int)RenderFpsPreset::UncappedFpsValue)
+		{
+			const Real targetFrameTime = 1.0f / logicTimeScaleFps;
+			const Real owed = TheFramePacer->getUpdateTime() - targetFrameTime;
+			m_logicTimeAccumulator = owed >= targetFrameTime ? min(owed, targetFrameTime * (catchUpFrames - 1)) : 0.0f;
+		}
+#endif
 		// Logic time scale is uncapped or larger equal Render FPS. Update straight away.
 		m_logicFrameProgress = 1.0f;
 		return true;
@@ -968,7 +1054,14 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 		// TheSuperHackers @tweak xezon 06/08/2025
 		// The logic time step is now decoupled from the render update.
 		const Real targetFrameTime = 1.0f / logicTimeScaleFps;
+#if defined(GENONLINE)
+		// one drawn frame credits up to the catch-up frames of the quality level and the catch-up loop spends the rest
+		// the bound only holds a backlog the loop could not spend and never applies at 1
+		const Real maxCredit = targetFrameTime * catchUpFrames;
+		m_logicTimeAccumulator = min(m_logicTimeAccumulator + min(TheFramePacer->getUpdateTime(), maxCredit), maxCredit + targetFrameTime);
+#else
 		m_logicTimeAccumulator += min(TheFramePacer->getUpdateTime(), targetFrameTime);
+#endif
 
 		Bool step = false;
 		if (m_logicTimeAccumulator >= targetFrameTime)
@@ -988,6 +1081,51 @@ Real GameEngine::getLogicFrameProgress() const
 	return m_logicFrameProgress;
 }
 
+#if defined(GENONLINE)
+/// -----------------------------------------------------------------------------------------------
+Bool GameEngine::canUpdateGameLogicFromBacklog()
+{
+	// GenOnline @bugfix arcticdolphin 21/11/2026 The logic already stepped in this drawn frame and preUpdate clears hasUpdated, which the W3D sync and the frame pacer read, so preUpdate only runs before a frame that is due.
+	TheFramePacer->setTimeFrozen(isTimeFrozen());
+	TheFramePacer->setGameHalted(isGameHalted());
+	Bool due = FALSE;
+	if (TheNetwork != nullptr)
+	{
+		due = canUpdateNetworkGameLogic();
+	}
+	else
+	{
+		// offline: spend time the drawn frame already credited, never credit it again
+		const Int logicTimeScaleFps = TheFramePacer->getActualLogicTimeScaleFps(FramePacer::IgnoreFrozenTime);
+		if (logicTimeScaleFps > 0 && logicTimeScaleFps < (Int)RenderFpsPreset::UncappedFpsValue)
+		{
+			const Real targetFrameTime = 1.0f / logicTimeScaleFps;
+			if (m_logicTimeAccumulator >= targetFrameTime)
+			{
+				m_logicTimeAccumulator -= targetFrameTime;
+				due = TRUE;
+			}
+		}
+	}
+	if (!due)
+	{
+		return false;
+	}
+	TheGameLogic->preUpdate();
+	return !isGameHalted();
+}
+
+/// -----------------------------------------------------------------------------------------------
+Int GameEngine::getCatchUpFrames() const
+{
+	if (TheGameLogic == nullptr || !TheGameLogic->isInGame() || TheGameLogic->isInShellGame() || TheGameLogic->isInReplayGame())
+	{
+		return 1;
+	}
+	return AdaptiveQuality::get().catchUpFrames();
+}
+
+#endif
 /// -----------------------------------------------------------------------------------------------
 DECLARE_PERF_TIMER(GameEngine_update)
 
@@ -998,25 +1136,79 @@ void GameEngine::update()
 {
 	USE_PERF_TIMER(GameEngine_update)
 	{
+#if defined(GENONLINE)
+		// keeps the stats readers feed up so a reader can connect from the shell
+		LocalApiReadersStart();
+#if defined(GENONLINE)
+		// GenOnline @feature arcticdolphin 21/11/2026 Runs the caster plugin once per frame
+		GenOnlinePluginHost::TickToolPlugin();
+#endif
+		LocalApiLiveTick();
+
+#endif
 		{
 			// VERIFY CRC needs to be in this code block.  Please to not pull TheGameLogic->update() inside this block.
 			VERIFY_CRC
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+			// GENONLINE_NOTE: Lock the shellmap to 30fps until its issues are fixed
+			Int matchFpsLimit = 0;
+			if (GetOnlineGameHooks()->getMatchFrameRateLimit(matchFpsLimit) && TheGameLogic->isInGame() && !TheShell->isShellActive())
+			{
+				TheFramePacer->setFramesPerSecondLimit(matchFpsLimit);
+				TheWritableGlobalData->m_useFpsLimit = matchFpsLimit;
+			}
+			else
+			{
+				TheFramePacer->setFramesPerSecondLimit(LOGICFRAMES_PER_SECOND);
+			}
+#endif
+			
+				TheRadar->UPDATE();
+#else
 			TheRadar->UPDATE();
+#endif
 
 			/// @todo Move audio init, update, etc, into GameClient update
 
 			TheAudio->UPDATE();
+#if defined(GENONLINE)
+			{
+				const long long aqClientStart = AdaptiveQuality::now();
+				TheGameClient->UPDATE();
+				AdaptiveQuality::get().addOwn(AdaptiveQuality::now() - aqClientStart);
+			}
+			LocalApiLiveCamera();
+#else
 			TheGameClient->UPDATE();
+#endif
 			TheMessageStream->propagateMessages();
 
+#if defined(GENONLINE)
+            if (TheNetwork != nullptr)
+            {
+                TheNetwork->UPDATE();
+            }
+
+			GetOnlineGameHooks()->onEngineUpdate();
+#else
 			if (TheNetwork != nullptr)
 			{
 				TheNetwork->UPDATE();
 			}
 
+#endif
 		}
 
+#if defined(GENONLINE)
+		if (TheNetwork != nullptr && TheNetwork->isGameExitPending()) {
+			// Teardown can delete Network and must not run another gameplay update.
+			TheGameLogic->processPendingGameExit();
+			return;
+		}
+
+#endif
 #ifdef RTS_GAME_MCP
 		// Between the client and the logic, outside of the CRC check above because commands may change
 		// the game; orders from the bridge go out with this logic frame.
@@ -1029,12 +1221,70 @@ void GameEngine::update()
 		// TheSuperHackers @info Ignores frozen time because the script engine needs updating in the logic update regardless.
 		if (canUpdateGameLogic(FramePacer::IgnoreFrozenTime))
 		{
+#if defined(GENONLINE)
+			const long long aqLogicStart = AdaptiveQuality::now();
+#endif
 			TheGameLogic->UPDATE();
 
 			if (!TheFramePacer->isTimeFrozen())
 			{
 				TheGameClient->step();
 			}
+#if defined(GENONLINE)
+
+			const long long aqCatchUpStart = AdaptiveQuality::now();
+			Int caughtUp = 0;
+			const Int catchUpFrames = getCatchUpFrames();
+			static LARGE_INTEGER s_catchUpFrequency = {};
+			if (s_catchUpFrequency.QuadPart == 0)
+			{
+				QueryPerformanceFrequency(&s_catchUpFrequency);
+			}
+			for (Int i = 1; i < catchUpFrames; ++i)
+			{
+				// frame 1 runs from the main step, whose frame tick lets the network leave pregame
+				if (TheGameLogic->getFrame() <= 1)
+				{
+					break;
+				}
+				// later catch-up frames only run while the logic of this drawn frame has time left, so a slow machine still draws
+				if (i >= 2)
+				{
+					const double logicMs = (double)(AdaptiveQuality::now() - aqLogicStart) * 1000.0 / (double)s_catchUpFrequency.QuadPart;
+					if (logicMs >= AdaptiveQuality::get().catchUpBudgetMs())
+					{
+						break;
+					}
+				}
+				// hands on what the last logic frame queued (its CRC), so it reaches the same frame as without catch-up
+				TheMessageStream->propagateMessages();
+				if (TheNetwork != nullptr)
+				{
+					TheNetwork->UPDATE();
+					if (TheNetwork->isGameExitPending())
+					{
+						TheGameLogic->processPendingGameExit();
+						return;
+					}
+				}
+				if (!canUpdateGameLogicFromBacklog())
+				{
+					break;
+				}
+				TheGameLogic->UPDATE();
+				if (!TheFramePacer->isTimeFrozen())
+				{
+					TheGameClient->step();
+				}
+				++caughtUp;
+			}
+			AdaptiveQuality::get().addOwn(aqCatchUpStart - aqLogicStart);
+			AdaptiveQuality::get().addCatchUp(AdaptiveQuality::now() - aqCatchUpStart, caughtUp);
+		}
+		else if (TheNetwork != nullptr && TheNetwork->isStalling())
+		{
+			AdaptiveQuality::get().noteNetworkWait();
+#endif
 		}
 	}
 }
@@ -1103,6 +1353,9 @@ void GameEngine::execute()
 #endif
 
 			{
+#if defined(GENONLINE)
+				AdaptiveQuality::get().frameBegin();
+#endif
 				try
 				{
 					// compute a frame
@@ -1131,6 +1384,9 @@ void GameEngine::execute()
 			}
 
 			TheFramePacer->update();
+#if defined(GENONLINE)
+			AdaptiveQuality::get().frameEnd();
+#endif
 		}
 
 #ifdef PERF_TIMERS

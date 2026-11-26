@@ -50,6 +50,10 @@
 
 #include "Common/ActionManager.h"
 #include "Common/BuildAssistant.h"
+#if defined(GENONLINE)
+#include "Common/StatsExporter.h"
+#include "Common/LocalApiLive.h"
+#endif
 #include "Common/CRCDebug.h"
 #include "Common/DisabledTypes.h"
 #include "Common/GameState.h"
@@ -1616,6 +1620,14 @@ void Player::onUnitCreated( Object *factory, Object *unit )
 
 	// increment our scorekeeper
 	m_scoreKeeper.addObjectBuilt(unit);
+#if defined(GENONLINE)
+	const Int unitCost = unit->getTemplate()->calcCostToBuild(this);
+	m_scoreKeeper.addMoneySpent(unitCost);
+	LocalApiLiveSpend(getPlayerIndex(), LOCAL_API_SPEND_UNITS, unitCost);
+
+	// GenOnline @feature arcticdolphin 21/11/2026 The exporter gates itself on an active recording
+	StatsExporterRecordBuild(factory, unit);
+#endif
 
 	if( factory )
 	{
@@ -1735,7 +1747,15 @@ void Player::onStructureConstructionComplete(Object* builder, Object* structure,
 	// increment our scorekeeper
 	if (isRebuild == FALSE) {
 		m_scoreKeeper.addObjectBuilt(structure);
+#if defined(GENONLINE)
+		const Int structureCost = structure->getTemplate()->calcCostToBuild(this);
+		m_scoreKeeper.addMoneySpent(structureCost);
+		LocalApiLiveSpend(getPlayerIndex(), LOCAL_API_SPEND_STRUCTURES, structureCost);
+		// GenOnline @feature arcticdolphin 21/11/2026 The exporter gates itself on an active recording
+		StatsExporterRecordBuild(builder, structure);
+#else
 		m_scoreKeeper.addMoneySpent(structure->getTemplate()->calcCostToBuild(this));
+#endif
 	}
 
 	structure->friend_adjustPowerForPlayer(TRUE);
@@ -2452,7 +2472,12 @@ void Player::transferAssetsFromThat(Player *that)
 	std::list<Object *> objsToTransfer;
 
 	// let's not transfer beacons
+#if defined(GENONLINE)
+	const PlayerTemplate *thatPlayerTemplate = that->getPlayerTemplate();
+	const ThingTemplate *beaconTemplate = thatPlayerTemplate ? TheThingFactory->findTemplate( thatPlayerTemplate->getBeaconTemplate() ) : nullptr;
+#else
 	const ThingTemplate *beaconTemplate = TheThingFactory->findTemplate( that->getPlayerTemplate()->getBeaconTemplate() );
+#endif
 
 	// transfer all his units.
 	for (PlayerTeamList::iterator it = that->m_playerTeamPrototypes.begin();
@@ -2997,7 +3022,18 @@ Bool Player::attemptToPurchaseScience(ScienceType science, Bool playerAction/* =
 
 	Int cost = TheScienceStore->getSciencePurchaseCost(science);
 	addSciencePurchasePoints(-cost);
+#if defined(GENONLINE)
+	LocalApiLiveSpend(getPlayerIndex(), LOCAL_API_SPEND_SCIENCES, cost);
+	if (addScience(science, playerAction))
+	{
+		// only purchases are events, rank grants and setup grants go through addScience too
+		LocalApiLiveScienceAcquired(
+			getPlayerIndex(), getRankLevel(), getSciencePurchasePoints(),
+			TheScienceStore->getInternalNameForScience(science).str());
+	}
+#else
 	addScience(science, playerAction);
+#endif
 
 	getAcademyStats()->recordGeneralsPointsSpent( cost );
 
@@ -3006,6 +3042,12 @@ Bool Player::attemptToPurchaseScience(ScienceType science, Bool playerAction/* =
 		TheControlBar->markUIDirty();
 	}
 
+#if defined(GENONLINE)
+	if (TheInGameUI) {
+		TheInGameUI->notifyGeneralPromotion(this, science);
+	}
+
+#endif
 	return true;
 }
 
@@ -3428,6 +3470,9 @@ Bool Player::hasUpgradeInProduction( const UpgradeTemplate *upgradeTemplate )
 Upgrade *Player::addUpgrade( const UpgradeTemplate *upgradeTemplate, UpgradeStatusType status )
 {
 	Upgrade *u = findUpgrade( upgradeTemplate );
+#if defined(GENONLINE)
+	const Bool wasComplete = ( u != nullptr && u->getStatus() == UPGRADE_STATUS_COMPLETE );
+#endif
 
 	// if no upgrade instance found, make a new one
 	if( u == nullptr )
@@ -3459,6 +3504,12 @@ Upgrade *Player::addUpgrade( const UpgradeTemplate *upgradeTemplate, UpgradeStat
 		m_upgradesInProgress.clear( newMask );
 		m_upgradesCompleted.set( newMask );
 		onUpgradeCompleted( upgradeTemplate );
+#if defined(GENONLINE)
+		if( !wasComplete )
+		{
+			LocalApiLiveUpgradeComplete( getPlayerIndex(), upgradeTemplate->getUpgradeName().str(), upgradeTemplate->calcCostToBuild( this ), FALSE );
+		}
+#endif
 	}
 
 	if( ThePlayerList->getLocalPlayer() == this )
@@ -3559,6 +3610,9 @@ Bool Player::okToPlayRadarEdgeSound()
 void Player::addRadar( Bool disableProof )
 {
 	Bool hadRadar = hasRadar();
+#if defined(GENONLINE)
+	const Int radarStateBefore = getRadarStateForStats();
+#endif
 
 	// increment count
 	++m_radarCount;
@@ -3573,6 +3627,10 @@ void Player::addRadar( Bool disableProof )
 		soundToPlay.setPlayerIndex(getPlayerIndex());
 		TheAudio->addAudioEvent(&soundToPlay);
 	}
+#if defined(GENONLINE)
+
+	LocalApiLiveRadarChanged(getPlayerIndex(), radarStateBefore, getRadarStateForStats());
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3581,6 +3639,9 @@ void Player::addRadar( Bool disableProof )
 void Player::removeRadar( Bool disableProof )
 {
 	Bool hadRadar = hasRadar();
+#if defined(GENONLINE)
+	const Int radarStateBefore = getRadarStateForStats();
+#endif
 
 	// decrement count
 	DEBUG_ASSERTCRASH( m_radarCount > 0, ("removeRadar: An Object is taking its radar away, but the player radar count says they don't have radar!") );
@@ -3596,12 +3657,19 @@ void Player::removeRadar( Bool disableProof )
 		soundToPlay.setPlayerIndex(getPlayerIndex());
 		TheAudio->addAudioEvent(&soundToPlay);
 	}
+#if defined(GENONLINE)
+
+	LocalApiLiveRadarChanged(getPlayerIndex(), radarStateBefore, getRadarStateForStats());
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
 void Player::disableRadar()
 {
 	Bool hadRadar = hasRadar();
+#if defined(GENONLINE)
+	const Int radarStateBefore = getRadarStateForStats();
+#endif
 	m_radarDisabled = TRUE;
 
 	if( hadRadar &&
@@ -3612,12 +3680,19 @@ void Player::disableRadar()
 		soundToPlay.setPlayerIndex(getPlayerIndex());
 		TheAudio->addAudioEvent(&soundToPlay);
 	}
+#if defined(GENONLINE)
+
+	LocalApiLiveRadarChanged(getPlayerIndex(), radarStateBefore, getRadarStateForStats());
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
 void Player::enableRadar()
 {
 	Bool hadRadar = hasRadar();
+#if defined(GENONLINE)
+	const Int radarStateBefore = getRadarStateForStats();
+#endif
 	m_radarDisabled = FALSE;
 
 	if( !hadRadar && hasRadar() && okToPlayRadarEdgeSound() )
@@ -3627,6 +3702,10 @@ void Player::enableRadar()
 		soundToPlay.setPlayerIndex(getPlayerIndex());
 		TheAudio->addAudioEvent(&soundToPlay);
 	}
+#if defined(GENONLINE)
+
+	LocalApiLiveRadarChanged(getPlayerIndex(), radarStateBefore, getRadarStateForStats());
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3646,6 +3725,36 @@ Bool Player::hasRadar() const
 	return m_radarCount > 0;
 }
 
+#if defined(GENONLINE)
+//-------------------------------------------------------------------------------------------------
+Int Player::getRadarStateForStats() const
+{
+	if( m_radarCount <= 0 )
+	{
+		return 0;
+	}
+	return hasRadar() ? 2 : 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+Int Player::getActiveBattlePlan() const
+{
+	if( m_bombardBattlePlans > 0 )
+	{
+		return PLANSTATUS_BOMBARDMENT;
+	}
+	if( m_holdTheLineBattlePlans > 0 )
+	{
+		return PLANSTATUS_HOLDTHELINE;
+	}
+	if( m_searchAndDestroyBattlePlans > 0 )
+	{
+		return PLANSTATUS_SEARCHANDDESTROY;
+	}
+	return PLANSTATUS_NONE;
+}
+
+#endif
 //-------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------
 static Bool templateTakesOverPowerDisable( const ThingTemplate *tt )
@@ -3860,6 +3969,9 @@ Bool Player::doesObjectQualifyForBattlePlan( Object *obj ) const
 //-------------------------------------------------------------------------------------------------
 void Player::changeBattlePlan( BattlePlanStatus plan, Int delta, const BattlePlanBonusesData *bonus )
 {
+#if defined(GENONLINE)
+	const Int battlePlanBefore = getActiveBattlePlan();
+#endif
 	DUMPBATTLEPLANBONUSES(bonus, this, nullptr);
 	Bool addBonus = false;
 	Bool removeBonus = false;
@@ -3936,6 +4048,10 @@ void Player::changeBattlePlan( BattlePlanStatus plan, Int delta, const BattlePla
 
 		applyBattlePlanBonusesForPlayerObjects(&invertedBonus);
 	}
+#if defined(GENONLINE)
+
+	LocalApiLiveBattlePlanChanged(getPlayerIndex(), battlePlanBefore, getActiveBattlePlan());
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

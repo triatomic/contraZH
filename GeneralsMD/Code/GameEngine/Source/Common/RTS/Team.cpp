@@ -366,11 +366,17 @@ Team *TeamFactory::createInactiveTeam(const AsciiString& name)
 // ------------------------------------------------------------------------
 Team *TeamFactory::createTeam(const AsciiString& name)
 {
+#if defined(GENONLINE)
+	Team *t = NULL;
+	t = createInactiveTeam(name);
+	t->setActive();
+#else
 	Team *t = createInactiveTeam(name);
 
 	if (t)
 		t->setActive();
 
+#endif
 	return t;
 }
 

@@ -26,11 +26,19 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#if defined(GENONLINE)
+#include <algorithm>
+#endif
 #include <numeric>
 
 #include "GameNetwork/FrameMetrics.h"
 #include "GameClient/Display.h"
 #include "GameNetwork/networkutil.h"
+#if defined(GENONLINE)
+#include "../GenOnlineInclude.h"
+#include "../NetworkMesh.h"
+#include "../GenOnlineInterfaces.h"
+#endif
 
 FrameMetrics::FrameMetrics()
 {
@@ -57,11 +65,19 @@ FrameMetrics::FrameMetrics()
 	m_latencyList = NEW Real[TheGlobalData->m_networkLatencyHistoryLength];
 #endif
 	m_fpsList = NEW Real[TheGlobalData->m_networkFPSHistoryLength];
+#if defined(GENONLINE)
+	m_fpsListLength = TheGlobalData->m_networkFPSHistoryLength;
+#endif
 }
 
 FrameMetrics::~FrameMetrics() {
+#if defined(GENONLINE)
+	delete[] m_fpsList;
+	m_fpsList = NULL;
+#else
 	delete m_fpsList;
 	m_fpsList = nullptr;
+#endif
 
 #if defined(USE_NEW_FRAMEMETRIC_LOGIC)
 	m_mapLatenciesLookup.clear();
@@ -78,15 +94,75 @@ FrameMetrics::~FrameMetrics() {
 }
 
 void FrameMetrics::init() {
+#if defined(GENONLINE)
+	m_averageFps = LOGICFRAMES_PER_SECOND;
+
+#if defined(GENONLINE)
+	// GENONLINE_NOTE: Connections now form earlier, so latency data is available from the start.
+
+	NetworkMesh* pMesh = GenOnlineServicesManager::GetNetworkMesh();
+	if (TheGenOnlineGame != nullptr && pMesh != nullptr)
+	{
+		// average ping of the connections that have one, else the retail 200 ms
+		int totalLatency = 0;
+		int latencyCount = 0;
+		std::map<int64_t, PlayerConnection>& connections = pMesh->GetAllConnections();
+		for (auto& kvPair : connections)
+		{
+			const int latency = kvPair.second.GetLatency();
+			if (latency >= 0)
+			{
+				totalLatency += latency;
+				++latencyCount;
+			}
+		}
+
+		m_averageLatency = (latencyCount > 0) ? (Real)totalLatency / 1000.f / (Real)latencyCount : (Real)0.2;
+	}
+	else
+	{
+		m_averageLatency = (Real)0.2;
+	}
+#else
+	m_averageLatency = (Real)0.2;
+#endif
+#else
 	m_averageFps = 30;
 	m_averageLatency = (Real)0.2;
+#endif
 	m_minimumCushion = -1;
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	// the game network settings can change the history length after construction
+	if (m_fpsListLength != TheGlobalData->m_networkFPSHistoryLength) {
+		delete[] m_fpsList;
+		m_fpsList = NEW Real[TheGlobalData->m_networkFPSHistoryLength];
+		m_fpsListLength = TheGlobalData->m_networkFPSHistoryLength;
+	}
+#endif
+
+#endif
 	UnsignedInt i = 0;
 	for (; i < TheGlobalData->m_networkFPSHistoryLength; ++i) {
+#if defined(GENONLINE)
+		m_fpsList[i] = LOGICFRAMES_PER_SECOND;
+#else
 		m_fpsList[i] = 30.0;
+#endif
 	}
 	m_fpsListIndex = 0;
+#if defined(GENONLINE)
+	for (i = 0; i < TheGlobalData->m_networkLatencyHistoryLength; ++i)
+	{
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+		m_mapLatenciesLookup[i] = 0.2;
+		m_mapLatenciesSorted[i] = 0.2;
+#else
+		m_latencyList[i] = (Real)0.2;
+#endif
+	}
+#else
 	// The history holds measured round trips only; the average above stands in until the first one arrives
 	m_latencySampleCount = 0;
 	m_latencyDeviation = 0.0f;
@@ -94,6 +170,7 @@ void FrameMetrics::init() {
 	for (i = 0; i < TheGlobalData->m_networkLatencyHistoryLength; ++i) {
 		m_latencyList[i] = 0.0f;
 	}
+#endif
 #endif
 	m_cushionIndex = 0;
 }
@@ -119,6 +196,35 @@ void FrameMetrics::doPerFrameMetrics(UnsignedInt frame) {
 		m_lastFpsTimeThing = curTime;
 	}
 
+#if defined(GENONLINE)
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+	m_mapPendingLatenciesSorted[frame] = curTime;
+	m_mapPendingLatenciesLookup[frame] = curTime;
+	//NetworkLog(ELogVerbosity::LOG_DEBUG, "doPerFrameMetrics for frame %d, index %d", frame, pendingLatenciesIndex);
+
+	// initialize
+	if (oldestPendingLatencyInMap == -1)
+	{
+		oldestPendingLatencyInMap = frame;
+	}
+
+	// beyond size limit? remove the oldest
+	//NetworkLog(ELogVerbosity::LOG_DEBUG, "SIZE of pending latencies: %ld and %ld", m_mapPendingLatenciesSorted.size(), m_mapPendingLatenciesLookup.size());
+	// the table holds the frame infos in the air, which is independent of how many samples are averaged
+	const UnsignedInt pendingCapacity = (std::max)(TheGlobalData->m_networkLatencyHistoryLength, (UnsignedInt)(MAX_FRAMES_AHEAD * 2));
+	if (m_mapPendingLatenciesSorted.size() > pendingCapacity)
+	{
+        // remove oldest frame
+        UnsignedInt oldestFrame = m_mapPendingLatenciesSorted.begin()->first;
+		m_mapPendingLatenciesSorted.erase(m_mapPendingLatenciesSorted.begin());
+		m_mapPendingLatenciesLookup.erase(oldestFrame);
+		//NetworkLog(ELogVerbosity::LOG_DEBUG, "Removed one pending latency for frame %ld", oldestFrame);
+	}
+#else
+	Int pendingLatenciesIndex = frame % MAX_FRAMES_AHEAD;
+	m_pendingLatencies[pendingLatenciesIndex] = curTime;
+#endif
+#else
 #if defined(USE_NEW_FRAMEMETRIC_LOGIC)
 	m_mapPendingLatenciesSorted[frame] = curTime;
 	m_mapPendingLatenciesLookup[frame] = curTime;
@@ -142,8 +248,79 @@ void FrameMetrics::doPerFrameMetrics(UnsignedInt frame) {
 	m_pendingLatencies[pendingLatenciesIndex] = curTime;
 #endif
 
+#endif
 }
 
+#if defined(GENONLINE)
+void FrameMetrics::processLatencyResponse(UnsignedInt frame)
+{
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+	if (!m_mapPendingLatenciesLookup.contains(frame))
+	{
+		NetworkLog(ELogVerbosity::LOG_DEBUG, "WARNING: Frame hasn't been requested yet, frame %ld", frame);
+		return;
+	}
+#endif
+
+	time_t curTime = timeGetTime();
+
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+    //NetworkLog(ELogVerbosity::LOG_DEBUG, "processLatencyResponse for frame %d, pending index is %d", frame, currentLatencyMapIndex);
+    time_t timeDiff = curTime - m_mapPendingLatenciesLookup[frame];
+
+    // initialize
+    if (oldestLatencyInMap == -1)
+    {
+		oldestLatencyInMap = frame;
+    }
+
+    // beyond size limit? remove the oldest
+    //NetworkLog(ELogVerbosity::LOG_DEBUG, "SIZE of actual latencies: %ld and %ld/%ld", m_mapLatenciesLookup.size(), m_mapLatenciesSorted.size(), TheGlobalData->m_networkLatencyHistoryLength);
+    while (!m_mapLatenciesSorted.empty() && m_mapLatenciesLookup.size() > TheGlobalData->m_networkLatencyHistoryLength) // more than one when the window shrank
+    {
+        // remove oldest frame
+        UnsignedInt oldestFrame = m_mapLatenciesSorted.begin()->first;
+		m_mapLatenciesSorted.erase(m_mapLatenciesSorted.begin());
+		m_mapLatenciesLookup.erase(oldestFrame);
+        //NetworkLog(ELogVerbosity::LOG_DEBUG, "Removed one actual latency for frame %ld", oldestFrame);
+    }
+
+	m_mapLatenciesLookup[frame] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
+	m_mapLatenciesSorted[frame] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
+
+
+    // calculate average
+    m_averageLatency = 0.0f;
+    for (auto kvPaAir : m_mapLatenciesLookup)
+    {
+        m_averageLatency += kvPaAir.second;
+    }
+    m_averageLatency /= m_mapLatenciesLookup.size();
+	NetworkLog(ELogVerbosity::LOG_DEBUG, "Avg latency is: %f over %d samples", m_averageLatency, (int)m_mapLatenciesLookup.size());
+
+
+    if (timeDiff > 1000)
+    {
+        NetworkLog(ELogVerbosity::LOG_DEBUG, "WARNING: HIGH processLatencyResponse");
+    }
+
+    NetworkLog(ELogVerbosity::LOG_DEBUG, "processLatencyResponse timediff was %lld which is %f ms latency for frame %ld", timeDiff, (Real)timeDiff / (Real)1000, frame);
+#else
+    Int pendingIndex = frame % MAX_FRAMES_AHEAD;
+    time_t timeDiff = curTime - m_pendingLatencies[pendingIndex];
+
+    Int latencyListIndex = frame % TheGlobalData->m_networkLatencyHistoryLength;
+    m_averageLatency -= m_latencyList[latencyListIndex] / TheGlobalData->m_networkLatencyHistoryLength;
+    m_latencyList[latencyListIndex] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
+    NetworkLog(ELogVerbosity::LOG_DEBUG, "processLatencyResponse timediff was %lld which is %f ms latency", timeDiff, (Real)timeDiff / (Real)1000);
+    m_averageLatency += m_latencyList[latencyListIndex] / TheGlobalData->m_networkLatencyHistoryLength;
+#endif
+
+	if (frame % 16 == 0) {
+//		DEBUG_LOG(("ConnectionManager::processFrameInfoAck - average latency = %f", m_averageLatency));
+	}
+}
+#else
 void FrameMetrics::processLatencyResponse(UnsignedInt frame) {
 #if defined(USE_NEW_FRAMEMETRIC_LOGIC)
 	if (!m_mapPendingLatenciesLookup.contains(frame))
@@ -213,6 +390,7 @@ void FrameMetrics::processLatencyResponse(UnsignedInt frame) {
 //		DEBUG_LOG(("ConnectionManager::processFrameInfoAck - average latency = %f", m_averageLatency));
 	}
 }
+#endif
 
 void FrameMetrics::addCushion(Int cushion) {
 	++m_cushionIndex;
@@ -226,7 +404,25 @@ void FrameMetrics::addCushion(Int cushion) {
 }
 
 Int FrameMetrics::getAverageFPS() {
+#if defined(GENONLINE)
+	enum { MAX_MEDIAN_SAMPLES = 128 };
+	Real sorted[MAX_MEDIAN_SAMPLES];
+	UnsignedInt count = TheGlobalData->m_networkFPSHistoryLength;
+	if (count > MAX_MEDIAN_SAMPLES) {
+		count = MAX_MEDIAN_SAMPLES;
+	}
+	if (count == 0) {
+		return (Int)m_averageFps;
+	}
+
+	for (UnsignedInt i = 0; i < count; ++i) {
+		sorted[i] = m_fpsList[i];
+	}
+	std::nth_element(sorted, sorted + count / 2, sorted + count);
+	return (Int)sorted[count / 2];
+#else
 	return (Int)m_averageFps;
+#endif
 }
 
 Real FrameMetrics::getAverageLatency() {
@@ -239,7 +435,32 @@ Real FrameMetrics::getRunAheadLatency()
 	return m_averageLatency + 2.0f * m_latencyDeviation;
 }
 
+#if defined(GENONLINE)
+Bool FrameMetrics::isPending(UnsignedInt frame) {
+	return m_mapPendingLatenciesLookup.find(frame) != m_mapPendingLatenciesLookup.end();
+}
+
+#endif
 Int FrameMetrics::getMinimumCushion() {
 	return m_minimumCushion;
 }
 
+#if defined(GENONLINE)
+void FrameMetrics::SeedLatencyData(int latency)
+{
+	m_averageFps = LOGICFRAMES_PER_SECOND;
+	m_averageLatency = latency / 1000.f;
+
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+	// the next response recomputes the average from these maps, so they must carry the seed too
+	for (std::unordered_map<UnsignedInt, Real>::iterator it = m_mapLatenciesLookup.begin(); it != m_mapLatenciesLookup.end(); ++it)
+	{
+		it->second = m_averageLatency;
+	}
+	for (std::map<UnsignedInt, Real>::iterator it = m_mapLatenciesSorted.begin(); it != m_mapLatenciesSorted.end(); ++it)
+	{
+		it->second = m_averageLatency;
+	}
+#endif
+}
+#endif

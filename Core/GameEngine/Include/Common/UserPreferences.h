@@ -60,11 +60,17 @@ public:
 	Real getReal(AsciiString key, Real defaultValue) const;
 	Int getInt(AsciiString key, Int defaultValue) const;
 	AsciiString getAsciiString(AsciiString key, AsciiString defaultValue) const;
+#if defined(GENONLINE)
+	UnicodeString getUnicodeString(AsciiString key, UnicodeString defaultValue) const;
+#endif
 
 	void setBool(AsciiString key, Bool val);
 	void setReal(AsciiString key, Real val);
 	void setInt(AsciiString key, Int val);
 	void setAsciiString(AsciiString key, AsciiString val);
+#if defined(GENONLINE)
+	void setUnicodeString(AsciiString key, UnicodeString val);
+#endif
 
 protected:
 	AsciiString m_filename;

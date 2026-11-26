@@ -45,6 +45,9 @@
 #include "GameClient/GadgetTextEntry.h"
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameClient/MapUtil.h"
+#if defined(GENONLINE)
+#include "GameClient/MapSelectList.h"
+#endif
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 static NameKeyType buttonBack = NAMEKEY_INVALID;
@@ -55,8 +58,14 @@ static GameWindow *mapList = nullptr;
 static GameWindow *mapFilter = nullptr;
 static Bool showingSystemMaps = TRUE;
 
+#if defined(GENONLINE)
+// GenOnline @feature arcticdolphin 08/11/2026 Search, filters and favourites replace the system and user map tabs.
+static MapSelectList mapSelectList;
+static MapSelectFilter mapSelectFilter;
+#else
 static NameKeyType radioButtonSystemMapsID = NAMEKEY_INVALID;
 static NameKeyType radioButtonUserMapsID = NAMEKEY_INVALID;
+#endif
 
 static GameWindow *buttonMapStartPosition[MAX_SLOTS] = {0};
 static NameKeyType buttonMapStartPositionID[MAX_SLOTS] = { NAMEKEY_INVALID,NAMEKEY_INVALID,
@@ -72,6 +81,9 @@ static void NullifyControls()
 	parent = nullptr;
 	mapList = nullptr;
 	mapFilter = nullptr;
+#if defined(GENONLINE)
+	mapSelectList.shutdown();
+#endif
 	if (winMapPreview)
 	{
 		winMapPreview->winSetUserData(nullptr);
@@ -157,6 +169,10 @@ void showSkirmishGameOptionsUnderlyingGUIElements( Bool show )
 	GameWindow *win;
 
 	win	= TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey("SkirmishGameOptionsMenu.wnd:MapWindow") );
+#if defined(GENONLINE)
+	if (win)
+		win->winHide( !show );
+#else
 	win->winHide( !show );
 
 	//win	= TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey("SkirmishGameOptionsMenu.wnd:StaticTextTitle") );
@@ -251,15 +267,31 @@ void showSkirmishGameOptionsUnderlyingGUIElements( Bool show )
 
 	win	= TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey("SkirmishGameOptionsMenu.wnd:ButtonStart") );
 	win->winHide( !show );
+#endif
 
 	win	= TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey("SkirmishGameOptionsMenu.wnd:StaticTextMapPreview") );
+#if defined(GENONLINE)
+	if (win)
+		win->winHide( !show );
+#else
 	win->winHide( !show );
+#endif
 
 	win	= TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey("SkirmishGameOptionsMenu.wnd:ButtonReset") );
+#if defined(GENONLINE)
+	if (win)
+		win->winEnable( show );
+#else
 	win->winEnable( show );
+#endif
 
 	win	= TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey("SkirmishGameOptionsMenu.wnd:ButtonBack") );
+#if defined(GENONLINE)
+	if (win)
+		win->winEnable( show );
+#else
 	win->winEnable( show );
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -269,11 +301,17 @@ void SkirmishMapSelectMenuInit( WindowLayout *layout, void *userData )
 {
 
 	// set keyboard focus to main parent
+#if defined(GENONLINE)
+	// GenOnline @bugfix arcticdolphin 08/11/2026 Find the parent by its layout name so the dialog takes keyboard focus.
+	NameKeyType parentID = TheNameKeyGenerator->nameToKey( "SkirmishMapSelectMenu.wnd:SkirmishMapSelectMenuParent" );
+#else
 	NameKeyType parentID = TheNameKeyGenerator->nameToKey( "SkirmishMapSelectMenu.wnd:SkrimishMapSelectMenuParent" );
+#endif
 	parent = TheWindowManager->winGetWindowFromId( nullptr, parentID );
 
 	TheWindowManager->winSetFocus( parent );
 
+#if !defined(GENONLINE)
 	LANPreferences pref;
 	Bool usesSystemMapDir = pref.usesSystemMapDir();
 
@@ -283,6 +321,7 @@ void SkirmishMapSelectMenuInit( WindowLayout *layout, void *userData )
 		usesSystemMapDir = mmd->m_isOfficial;
 	}
 
+#endif
 	winMapPreviewID = TheNameKeyGenerator->nameToKey( "SkirmishMapSelectMenu.wnd:WinMapPreview" );
 	winMapPreview = TheWindowManager->winGetWindowFromId(parent, winMapPreviewID);
 
@@ -291,6 +330,7 @@ void SkirmishMapSelectMenuInit( WindowLayout *layout, void *userData )
 	buttonOK = TheNameKeyGenerator->nameToKey( "SkirmishMapSelectMenu.wnd:ButtonOK" );
 	listboxMap = TheNameKeyGenerator->nameToKey( "SkirmishMapSelectMenu.wnd:ListboxMap" );
 
+#if !defined(GENONLINE)
 	radioButtonSystemMapsID = TheNameKeyGenerator->nameToKey( "SkirmishMapSelectMenu.wnd:RadioButtonSystemMaps" );
 	radioButtonUserMapsID = TheNameKeyGenerator->nameToKey( "SkirmishMapSelectMenu.wnd:RadioButtonUserMaps" );
 	GameWindow *radioButtonSystemMaps = TheWindowManager->winGetWindowFromId( parent, radioButtonSystemMapsID );
@@ -300,6 +340,7 @@ void SkirmishMapSelectMenuInit( WindowLayout *layout, void *userData )
 	else
 		GadgetRadioSetSelection( radioButtonUserMaps, FALSE );
 
+#endif
 	AsciiString tmpString;
 	for (Int i = 0; i < MAX_SLOTS; i++)
 	{
@@ -318,6 +359,14 @@ void SkirmishMapSelectMenuInit( WindowLayout *layout, void *userData )
 	mapList = TheWindowManager->winGetWindowFromId( parent, mapListID );
 	if( mapList )
 	{
+#if defined(GENONLINE)
+		if (TheMapCache)
+			TheMapCache->updateCache();
+		MapSelectOptions options;
+		options.m_includeSoloUserMaps = TRUE;
+		options.m_showMedals = TRUE;
+		mapSelectList.init( parent, "SkirmishMapSelectMenu.wnd", options, &mapSelectFilter, TheSkirmishGameInfo->getMap() );
+#else
 		GameWindow *nameEntry = TheWindowManager->winGetWindowFromId( nullptr, TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:TextEntryPlayerName" ) );
 		mapFilter = createMapListFilter( mapList, nameEntry );
 		if (mapFilter)
@@ -328,6 +377,7 @@ void SkirmishMapSelectMenuInit( WindowLayout *layout, void *userData )
 		if (TheMapCache)
 			TheMapCache->updateCache();
 		populateSkirmishMapList( usesSystemMapDir, TheSkirmishGameInfo->getMap() );
+#endif
 		mapList->winSetTooltipFunc(mapListTooltipFunc);
 	}
 
@@ -409,12 +459,48 @@ WindowMsgHandledType SkirmishMapSelectMenuInput( GameWindow *window, UnsignedInt
 
 }
 
+#if defined(GENONLINE)
+// The effect of the OK path on the lobby: the map, its checksum and size, and the start positions starting over.
+static void applySelectedMap( const AsciiString& asciiMap )
+{
+	TheSkirmishGameInfo->setMap( asciiMap );
+
+	const MapMetaData *md = TheMapCache->findMap(asciiMap);
+	if (!md)
+	{
+		TheSkirmishGameInfo->setMapCRC(0);
+		TheSkirmishGameInfo->setMapSize(0);
+	}
+	else
+	{
+		TheSkirmishGameInfo->setMapCRC(md->m_CRC);
+		TheSkirmishGameInfo->setMapSize(md->m_filesize);
+	}
+
+	// reset the start positions
+	for(Int i = 0; i < MAX_SLOTS; ++i)
+		TheSkirmishGameInfo->getSlot(i)->setStartPos(-1);
+}
+
+// The same without the selector window, for the stats pipe.
+void SkirmishMapSelectMenuApplyMap( const AsciiString& map )
+{
+	applySelectedMap( map );
+	skirmishPositionStartSpots();
+	skirmishUpdateSlotList();
+}
+
+#endif
 //-------------------------------------------------------------------------------------------------
 /** MapSelect menu window system callback */
 //-------------------------------------------------------------------------------------------------
 WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedInt msg,
 																				  WindowMsgData mData1, WindowMsgData mData2 )
 {
+#if defined(GENONLINE)
+	if (mapSelectList.handleSystemMessage( msg, mData1, mData2 ) != MAP_SELECT_MSG_IGNORED)
+		return MSG_HANDLED;
+#endif
 
 	switch( msg )
 	{
@@ -492,6 +578,9 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 					if( rowSelected < 0 )
 					{
 						positionStartSpots( AsciiString::TheEmptyString, buttonMapStartPosition, winMapPreview);
+#if defined(GENONLINE)
+						mapSelectList.refreshLegend( AsciiString::TheEmptyString );
+#endif
 						winMapPreview->winSetUserData(nullptr);
 						winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
 						break;
@@ -521,6 +610,9 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 						winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
 					}
 					positionStartSpots( asciiMap, buttonMapStartPosition, winMapPreview);
+#if defined(GENONLINE)
+					mapSelectList.refreshLegend( asciiMap );
+#endif
 				}
 				break;
 			}
@@ -532,6 +624,9 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 			GameWindow *control = (GameWindow *)mData1;
 			Int controlID = control->winGetWindowId();
 
+#if defined(GENONLINE)
+			if ( controlID == buttonBack )
+#else
 			if ( controlID == radioButtonSystemMapsID )
 			{
 				if (TheMapCache)
@@ -551,6 +646,7 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 				//pref.write();
 			}
 			else if ( controlID == buttonBack )
+#endif
 			{
 				showSkirmishGameOptionsUnderlyingGUIElements(TRUE);
 
@@ -587,9 +683,14 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 						asciiMap = mapFname;
 					else
 						asciiMap.translate( map );
+#if defined(GENONLINE)
+					applySelectedMap( asciiMap );
+#else
 					TheSkirmishGameInfo->setMap( asciiMap );
+#endif
 
 					const MapMetaData *md = TheMapCache->findMap(asciiMap);
+#if !defined(GENONLINE)
 					if (!md)
 					{
 						TheSkirmishGameInfo->setMapCRC(0);
@@ -604,8 +705,13 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 					// reset the start positions
 					for(Int i = 0; i < MAX_SLOTS; ++i)
 						TheSkirmishGameInfo->getSlot(i)->setStartPos(-1);
+#endif
 					GameWindow *win;
+#if defined(GENONLINE)
+					win	= TheWindowManager->winGetWindowFromId( nullptr, TheNameKeyGenerator->nameToKey("SkirmishGameOptionsMenu.wnd:TextEntryMapDisplay") );
+#else
 					win	= TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey("SkirmishGameOptionsMenu.wnd:TextEntryMapDisplay") );
+#endif
 					if(win)
 					{
 				    if (md)

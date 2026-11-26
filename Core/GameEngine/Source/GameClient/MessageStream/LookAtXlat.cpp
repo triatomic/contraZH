@@ -65,6 +65,7 @@ enum
 
 static Bool scrollDir[4] = { false, false, false, false };
 
+#if !defined(GENONLINE)
 // TheSuperHackers @tweak Introduces the SCROLL_MULTIPLIER for all scrolling to
 //
 //  1. bring the RMB scroll speed back to how it was at 30 FPS in the retail game version
@@ -75,6 +76,7 @@ static Bool scrollDir[4] = { false, false, false, false };
 // and because the default Scroll Factor is/was 0.5, it needs to be doubled to get to a neutral 1x multiplier.
 
 constexpr const Real SCROLL_MULTIPLIER = 2.0f;
+#endif
 constexpr const Real SCROLL_AMT = 100.0f * SCROLL_MULTIPLIER;
 
 static const Int edgeScrollSize = 3;
@@ -493,7 +495,11 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			}
 #endif
 
+#if defined(GENONLINE)
+			const Real zoom = -spin * View::ZoomHeightPerSecond * SCROLL_MULTIPLIER * TheGlobalData->m_cameraZoomFactor;
+#else
 			const Real zoom = -spin * View::ZoomHeightPerSecond;
+#endif
 			TheTacticalView->userZoom(zoom);
 
 			break;
@@ -542,6 +548,12 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				// TheSuperHackers @bugfix Mauller 07/06/2025 The camera scrolling is now decoupled from the render update.
 				const Real fpsRatio = TheFramePacer->getBaseOverUpdateFpsRatio();
 
+#if defined(GENONLINE)
+				// GenOnline @bugfix arcticdolphin 18/11/2026 One speed factor now serves both axes, so the camera scrolls
+				// equally fast in X and Y. The faster retail vertical factor only made up for the smaller vertical room of 4:3 screens.
+				const Real speedFactor = TheGlobalData->m_horizontalScrollSpeedFactor;
+
+#endif
 				switch (m_scrollType)
 				{
 				case SCROLL_RMB:
@@ -569,27 +581,48 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 						// TheSuperHackers @info calculate the length of the vector to obtain the movement speed before the vector is normalized
 						float vecLength = vec.length();
 						vec.normalize();
+#if defined(GENONLINE)
+						offset.x = speedFactor * fpsRatio * vecLength * vec.x * SCROLL_MULTIPLIER * TheGlobalData->m_keyboardScrollFactor;
+						offset.y = speedFactor * fpsRatio * vecLength * vec.y * SCROLL_MULTIPLIER * TheGlobalData->m_keyboardScrollFactor;
+#else
 						offset.x = TheGlobalData->m_horizontalScrollSpeedFactor * fpsRatio * vecLength * vec.x * SCROLL_MULTIPLIER * TheGlobalData->m_keyboardScrollFactor;
 						offset.y = TheGlobalData->m_verticalScrollSpeedFactor * fpsRatio * vecLength * vec.y * SCROLL_MULTIPLIER * TheGlobalData->m_keyboardScrollFactor;
+#endif
 					}
 					break;
 				case SCROLL_KEY:
 					{
 						if (scrollDir[DIR_UP])
 						{
+#if defined(GENONLINE)
+							offset.y -= speedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#else
 							offset.y -= TheGlobalData->m_verticalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#endif
 						}
 						if (scrollDir[DIR_DOWN])
 						{
+#if defined(GENONLINE)
+							offset.y += speedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#else
 							offset.y += TheGlobalData->m_verticalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#endif
 						}
 						if (scrollDir[DIR_LEFT])
 						{
+#if defined(GENONLINE)
+							offset.x -= speedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#else
 							offset.x -= TheGlobalData->m_horizontalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#endif
 						}
 						if (scrollDir[DIR_RIGHT])
 						{
+#if defined(GENONLINE)
+							offset.x += speedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#else
 							offset.x += TheGlobalData->m_horizontalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#endif
 						}
 					}
 					break;
@@ -599,24 +632,60 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 						UnsignedInt width  = TheDisplay->getWidth();
 						if (m_currentPos.y < edgeScrollSize)
 						{
+#if defined(GENONLINE)
+							offset.y -= speedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#else
 							offset.y -= TheGlobalData->m_verticalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#endif
 						}
 						if (m_currentPos.y >= height-edgeScrollSize)
 						{
+#if defined(GENONLINE)
+							offset.y += speedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#else
 							offset.y += TheGlobalData->m_verticalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#endif
 						}
 						if (m_currentPos.x < edgeScrollSize)
 						{
+#if defined(GENONLINE)
+							offset.x -= speedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#else
 							offset.x -= TheGlobalData->m_horizontalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#endif
 						}
 						if (m_currentPos.x >= width-edgeScrollSize)
 						{
+#if defined(GENONLINE)
+							offset.x += speedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#else
 							offset.x += TheGlobalData->m_horizontalScrollSpeedFactor * fpsRatio * SCROLL_AMT * TheGlobalData->m_keyboardScrollFactor;
+#endif
 						}
 					}
 					break;
 				}
 
+#if defined(GENONLINE)
+				// GenOnline @tweak arcticdolphin 18/11/2026 Scrolling now moves the same share of the view at any zoom.
+				// The speed scales with the camera height over the default camera height of GameData.ini, so the retail speed
+				// holds at the default height, a higher camera scrolls faster and a lower camera scrolls slower. This also
+				// covers the higher camera that wide screens allow.
+				// GenOnline @bugfix arcticdolphin 22/11/2026 The scale uses the zoom height the player chose, because the measured
+				// height above the terrain changes every frame over hills and at the map border and made the speed uneven.
+				if (TheGlobalData->m_cameraHeight > 0.0f)
+				{
+					Real height = TheTacticalView->getHeightAboveGround();
+					if (height < 1.0f)
+					{
+						height = 1.0f;
+					}
+					const Real heightScale = height / TheGlobalData->m_cameraHeight;
+					offset.x *= heightScale;
+					offset.y *= heightScale;
+				}
+
+#endif
 				TheInGameUI->setScrollAmount(offset);
 				TheTacticalView->userScrollBy( &offset );
 			}

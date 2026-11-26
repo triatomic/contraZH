@@ -39,6 +39,9 @@
 #include "Common/ChatCommand.h"
 #include "Common/DrawModule.h"
 #include "Common/FramePacer.h"
+#if defined(GENONLINE)
+#include "Common/AdaptiveQuality.h"
+#endif
 #include "Common/GameAudio.h"
 #include "Common/GameType.h"
 #include "Common/GameUtility.h"
@@ -112,10 +115,22 @@
 
 #include "GameNetwork/GameInfo.h"
 #include "GameNetwork/NetworkInterface.h"
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlineGameHooks.h"
+#endif
 
 #include "Common/UnitTimings.h" //Contains the DO_UNIT_TIMINGS define jba.
 #include "Common/Geometry.h"
 
+#if defined(GENONLINE)
+#include "../GenOnlineInterfaces.h"
+#include "../GenOnlineInit.h"
+#include "../NetworkMesh.h"
+#include "GameNetwork/NetworkDefs.h"
+#include "GameNetwork/NetworkInterface.h"
+extern NetworkInterface * TheNetwork;
+#include <steam/isteamnetworkingsockets.h>
+#endif
 
 
 // ------------------------------------------------------------------------------------------------
@@ -2754,6 +2769,9 @@ InGameUI::InGameUI()
 		m_uiMessages[ i ].timestamp = 0;
 		m_uiMessages[ i ].color = 0;
 
+#if defined(GENONLINE)
+		m_uiMessages[i].isChat = false;
+#endif
 	}
 
 	m_controlBarWindow = nullptr;
@@ -2783,6 +2801,9 @@ InGameUI::InGameUI()
 	m_networkLatencyColor = GameMakeColor( 173, 216, 255, 255 );
 	m_networkLatencyDropColor = GameMakeColor( 0, 0, 0, 255 );
 	m_lastNetworkLatencyFrames = ~0u;
+#if defined(GENONLINE)
+	m_lastNetworkLogicRate = ~0u;
+#endif
 
 	m_renderFpsString = nullptr;
 	m_renderFpsLowString = nullptr;
@@ -2831,6 +2852,25 @@ InGameUI::InGameUI()
 	m_playerInfoListDropColor = GameMakeColor(0, 0, 0, 255);
 	m_playerInfoListBackgroundAlpha = 170;
 
+#if defined(GENONLINE)
+	// Observer Stats Overlay
+	m_observerStatsString = nullptr;
+	m_observerStatsFont = "Tahoma";
+	m_observerStatsPointSize = 10;
+	m_observerStatsBold = TRUE;
+	m_observerStatsPosition.x = kHudAnchorX;
+	m_observerStatsPosition.y = kHudAnchorY;
+
+	// Observer notification overlay
+	m_observerNotificationString = nullptr;
+	m_observerNotificationPointSize = TheGlobalData->m_observerNotificationFontSize;
+	m_observerNotificationsHidden = false;
+
+#if defined(GENONLINE)
+	m_colorGood = GameMakeColor(0, 255, 0, 150);
+	m_colorBad = GameMakeColor(255, 0, 0, 150);
+#endif
+#endif
 	m_superweaponPosition.x = 0.7f;
 	m_superweaponPosition.y = 0.7f;
 	m_superweaponFlashDuration = 1.0f;
@@ -2927,6 +2967,14 @@ InGameUI::~InGameUI()
 	clearWorldAnimations();
 	resetIdleWorker();
 
+#if defined(GENONLINE)
+	// Clean up notification resources
+	TheDisplayStringManager->freeDisplayString(m_observerNotificationString);
+	m_observerNotificationString = nullptr;
+
+	// clean up obs overlay
+	cleanupObserverOverlay();
+#endif
 	destroyReplayControl();
 	destroyControlBar();
 }
@@ -3755,13 +3803,23 @@ void InGameUI::update()
 		if ( m_videoStream->isFrameReady())
 		{
 			m_videoStream->frameDecompress();
+#if defined(GENONLINE)
+			m_videoStream->frameRender(m_videoBuffer);
+			if (!m_videoStream->isPlaybackComplete())
+				m_videoStream->frameNext();
+#else
 			m_videoStream->frameRender( m_videoBuffer );
 			m_videoStream->frameNext();
 			if ( m_videoStream->frameIndex() == 0 )
 			{
 				stopMovie();
 			}
+#endif
 		}
+#if defined(GENONLINE)
+		if (m_videoStream->isPlaybackComplete())
+			stopMovie();
+#endif
 	}
 
 	if ( m_cameoVideoStream && m_cameoVideoBuffer )
@@ -3769,13 +3827,27 @@ void InGameUI::update()
 		if ( m_cameoVideoStream->isFrameReady())
 		{
 			m_cameoVideoStream->frameDecompress();
+#if defined(GENONLINE)
+			m_cameoVideoStream->frameRender(m_cameoVideoBuffer);
+			if (!m_cameoVideoStream->isPlaybackComplete())
+				m_cameoVideoStream->frameNext();
+			//			if ( m_cameoVideoStream->frameIndex() == 0 )
+			//			{
+			//				stopMovie();
+			//			}
+#else
 			m_cameoVideoStream->frameRender( m_cameoVideoBuffer );
 			m_cameoVideoStream->frameNext();
 //			if ( m_cameoVideoStream->frameIndex() == 0 )
 //			{
 //				stopMovie();
 //			}
+#endif
 		}
+#if defined(GENONLINE)
+		if (m_cameoVideoStream->isPlaybackComplete())
+			m_cameoVideoStream->frameGoto(0);
+#endif
 	}
 
 	//
@@ -3785,14 +3857,34 @@ void InGameUI::update()
 	// frame
 	//
 	UnsignedInt currLogicFrame = TheGameLogic->getFrame();
+#if defined(GENONLINE)
+
+	// GeneralsOnline NOTE: Increasing this, it's short + we increased framerate which is tied into the calc elsewhere
+#if defined(GENONLINE)
+	const int messageTimeoutChat = GetOnlineGameHooks()->getChatMessageLifeSeconds() * LOGICFRAMES_PER_SECOND;
+	const int messageTimeoutStandard = (m_messageDelayMS / LOGICFRAMES_PER_SECOND / MSEC_PER_SECOND) * LOGICFRAMES_PER_BASEFRAME;
+#else
 	// TheSuperHackers @bugfix bobtista 13/08/2026 Convert milliseconds to logic frames
 	const int messageTimeout = REAL_TO_INT_CEIL( ConvertDurationFromMsecsToFrames( (Real)m_messageDelayMS ) );
+#endif
+#else
+	// TheSuperHackers @bugfix bobtista 13/08/2026 Convert milliseconds to logic frames
+	const int messageTimeout = REAL_TO_INT_CEIL( ConvertDurationFromMsecsToFrames( (Real)m_messageDelayMS ) );
+#endif
 	UnsignedByte r, g, b, a;
 	Int amount;
 	for( i = MAX_UI_MESSAGES - 1; i >= 0; i-- )
 	{
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+		// determine which timeout to apply
+		const int messageTimeout = (m_uiMessages[i].isChat && messageTimeoutChat >= 0) ? messageTimeoutChat : messageTimeoutStandard;
+#endif
+		if (currLogicFrame - m_uiMessages[i].timestamp > messageTimeout)
+#else
 		if( currLogicFrame - m_uiMessages[ i ].timestamp > messageTimeout )
+#endif
 		{
 
 			// get the current color of this text
@@ -4013,12 +4105,25 @@ void InGameUI::update()
 		layout->runUpdate();
 	}
 
+#if defined(GENONLINE)
+	if (m_cameraRotatingLeft || m_cameraRotatingRight || m_cameraZoomingIn || m_cameraZoomingOut
+		|| m_cameraPitchingUp || m_cameraPitchingDown)
+#else
 	if (m_cameraRotatingLeft || m_cameraRotatingRight || m_cameraZoomingIn || m_cameraZoomingOut)
+#endif
 	{
 		// TheSuperHackers @tweak The camera rotation and zoom are now decoupled from the render update.
 		const Real fpsRatio = TheFramePacer->getBaseOverUpdateFpsRatio();
+#if defined(GENONLINE)
+		// Pitch at half speed feels alike: shorter range, larger view change per degree.
+		const Real turnAngle = TheGlobalData->m_keyboardCameraRotateSpeed * 0.6f * fpsRatio;
+		const Real rotateAngle = turnAngle * SCROLL_MULTIPLIER * TheGlobalData->m_cameraRotateFactor;
+		const Real pitchAngle = turnAngle * 0.5f * SCROLL_MULTIPLIER * TheGlobalData->m_cameraPitchFactor;
+		const Real zoomHeight = (Real)View::ZoomHeightPerSecond * fpsRatio * SCROLL_MULTIPLIER * TheGlobalData->m_cameraZoomFactor;
+#else
 		const Real rotateAngle = TheGlobalData->m_keyboardCameraRotateSpeed * fpsRatio;
 		const Real zoomHeight = (Real)View::ZoomHeightPerSecond * fpsRatio;
+#endif
 
 		if( m_cameraRotatingLeft && !m_cameraRotatingRight )
 		{
@@ -4035,7 +4140,20 @@ void InGameUI::update()
 		}
 		else if( m_cameraZoomingOut && !m_cameraZoomingIn )
 		{
+#if defined(GENONLINE)
+			TheTacticalView->userZoom(+zoomHeight);
+		}
+
+		if (m_cameraPitchingUp && !m_cameraPitchingDown)
+		{
+			TheTacticalView->userSetPitch(TheTacticalView->getPitch() + pitchAngle);
+		}
+		else if (m_cameraPitchingDown && !m_cameraPitchingUp)
+		{
+			TheTacticalView->userSetPitch(TheTacticalView->getPitch() - pitchAngle);
+#else
 			TheTacticalView->userZoom( +zoomHeight );
+#endif
 		}
 	}
 
@@ -4157,10 +4275,20 @@ void InGameUI::reset()
 	setCameraRotateRight(false);
 	setCameraZoomIn(false);
 	setCameraZoomOut(false);
+#if defined(GENONLINE)
+	setCameraPitchUp(false);
+	setCameraPitchDown(false);
+#endif
 	setCameraTrackingDrawable(false);
 
 	m_windowLayouts.clear();
 
+#if defined(GENONLINE)
+	m_observerStatsHidden = false;
+	m_observerNotifications.clear();
+	m_observerMilestones.clear();
+
+#endif
 	m_tooltipsDisabledUntil = 0;
 
 	UpdateDiplomacyBriefingText(AsciiString::TheEmptyString, TRUE);
@@ -4197,6 +4325,9 @@ void InGameUI::freeCustomUiResources()
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	destroyShaderDebugPanel();
 #endif
+#if defined(GENONLINE)
+	GetOnlineGameHooks()->releaseNetworkOverlay();
+#endif
 	TheDisplayStringManager->freeDisplayString(m_networkLatencyString);
 	m_networkLatencyString = nullptr;
 	TheDisplayStringManager->freeDisplayString(m_renderFpsString);
@@ -4216,6 +4347,11 @@ void InGameUI::freeCustomUiResources()
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	TheDisplayStringManager->freeDisplayString(m_windowNameString);
 	m_windowNameString = nullptr;
+#endif
+#if defined(GENONLINE)
+
+	TheDisplayStringManager->freeDisplayString(m_observerStatsString);
+	m_observerStatsString = nullptr;
 #endif
 }
 
@@ -4296,7 +4432,16 @@ void InGameUI::message( UnicodeString format, ... )
 /** Interface for display text messages to the user */
 //-------------------------------------------------------------------------------------------------
 // srj sez: passing as const-ref screws up varargs for some reason. dunno why. just pass by value.
+#if defined(GENONLINE)
+
+#if defined(GENONLINE)
+void InGameUI::messageColor(bool bIsChatMsg, const RGBColor * rgbColor, UnicodeString format, ...)
+#else
+void InGameUI::messageColor(const RGBColor * rgbColor, UnicodeString format, ...)
+#endif
+#else
 void InGameUI::messageColor( const RGBColor *rgbColor, UnicodeString format, ... )
+#endif
 {
 	UnicodeString formattedMessage;
 
@@ -4311,7 +4456,15 @@ void InGameUI::messageColor( const RGBColor *rgbColor, UnicodeString format, ...
 	{
 		formattedMessage.set( buf );
 		// add the text to the ui
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+		addMessageText(formattedMessage, rgbColor, bIsChatMsg);
+#else
+		addMessageText(formattedMessage, rgbColor);
+#endif
+#else
 		addMessageText( formattedMessage, rgbColor );
+#endif
 	}
 	else
 	{
@@ -4321,7 +4474,15 @@ void InGameUI::messageColor( const RGBColor *rgbColor, UnicodeString format, ...
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+void InGameUI::addMessageText(const UnicodeString & formattedMessage, const RGBColor * rgbColor, bool bIsChatMsg)
+#else
+void InGameUI::addMessageText(const UnicodeString & formattedMessage, const RGBColor * rgbColor)
+#endif
+#else
 void InGameUI::addMessageText( const UnicodeString& formattedMessage, const RGBColor *rgbColor )
+#endif
 {
 	Int i;
 	Color color1 = m_messageColor1;
@@ -4349,12 +4510,24 @@ void InGameUI::addMessageText( const UnicodeString& formattedMessage, const RGBC
 	// we do not need to free the one that is already there because it has been moved
 	// "up" an index
 	//
+#if defined(GENONLINE)
+	m_uiMessages[0].fullText = formattedMessage;
+#if defined(GENONLINE)
+	m_uiMessages[0].isChat = bIsChatMsg;
+#endif
+	m_uiMessages[0].timestamp = TheGameLogic->getFrame();
+	m_uiMessages[0].displayString = TheDisplayStringManager->newDisplayString();
+	m_uiMessages[0].displayString->setFont(TheFontLibrary->getFont(m_messageFont,
+		TheGlobalLanguageData->adjustFontSize(m_messagePointSize), m_messageBold));
+	m_uiMessages[0].displayString->setText(m_uiMessages[0].fullText);
+#else
 	m_uiMessages[ 0 ].fullText = formattedMessage;
 	m_uiMessages[ 0 ].timestamp = TheGameLogic->getFrame();
 	m_uiMessages[ 0 ].displayString = TheDisplayStringManager->newDisplayString();
 	m_uiMessages[ 0 ].displayString->setFont( TheFontLibrary->getFont( m_messageFont,
 																						TheGlobalLanguageData->adjustFontSize(m_messagePointSize), m_messageBold ) );
 	m_uiMessages[ 0 ].displayString->setText( m_uiMessages[ 0 ].fullText );
+#endif
 
 	//
 	// assign a color for this string instance that will stay with it no matter what
@@ -4960,6 +5133,74 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 					case GameMessage::MSG_DEFECTOR_HINT:
 						setMouseCursor( Mouse::DEFECTOR );
 						break;
+#if defined(GENONLINE)
+#ifdef ALLOW_SURRENDER
+		case GameMessage::MSG_PICK_UP_PRISONER_HINT:
+			setMouseCursor(Mouse::PICK_UP_PRISONER);
+			break;
+#endif
+		case GameMessage::MSG_CAPTUREBUILDING_HINT:
+			setMouseCursor(Mouse::CAPTUREBUILDING);
+			break;
+		case GameMessage::MSG_HACK_HINT:
+			setMouseCursor(Mouse::HACK);
+			break;
+		case GameMessage::MSG_IMPOSSIBLE_ATTACK_HINT:
+			setMouseCursor(Mouse::GENERIC_INVALID);
+			break;
+		case GameMessage::MSG_SET_RALLY_POINT_HINT:
+			if (!drawSelectable)
+				setMouseCursor(Mouse::SET_RALLY_POINT);
+			else
+				setMouseCursor(Mouse::SELECTING);
+			break;
+		case GameMessage::MSG_DO_SPECIAL_POWER_OVERRIDE_DESTINATION_HINT:
+			setMouseCursor(Mouse::PARTICLE_UPLINK_CANNON);
+			break;
+		case GameMessage::MSG_DO_SALVAGE_HINT:
+			setMouseCursor(Mouse::MOVETO);
+			break;
+		case GameMessage::MSG_DO_INVALID_HINT:
+			setMouseCursor(Mouse::GENERIC_INVALID);
+			break;
+		}
+	}
+	break;
+	case MOUSEMODE_BUILD_PLACE:
+	{
+		if (underWindow)
+		{
+			setMouseCursor(Mouse::ARROW);
+			return;
+		}
+		switch (t)
+		{
+		case GameMessage::MSG_DO_MOVETO_HINT:
+		case GameMessage::MSG_DO_ATTACKMOVETO_HINT:
+		case GameMessage::MSG_ADD_WAYPOINT:
+			setMouseCursor(Mouse::BUILD_PLACEMENT);
+			break;
+		case GameMessage::MSG_DO_ATTACK_OBJECT_HINT:
+		case GameMessage::MSG_DO_ATTACK_OBJECT_AFTER_MOVING_HINT:
+			setMouseCursor(Mouse::INVALID_BUILD_PLACEMENT);
+			break;
+		}
+	}
+	break;
+	case MOUSEMODE_GUI_COMMAND:
+	{
+		if (underWindow)
+		{
+			setMouseCursor(Mouse::ARROW);
+			return;
+		}
+		// set the mouse cursor for commands that need a targeting or to normal with no command
+		if (m_pendingGUICommand)
+		{
+			if (m_pendingGUICommand->isContextCommand() ||
+				m_pendingGUICommand->getCommandType() == GUI_COMMAND_SPECIAL_POWER ||
+				m_pendingGUICommand->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT)
+#else
 #ifdef ALLOW_SURRENDER
 					case GameMessage::MSG_PICK_UP_PRISONER_HINT:
 						setMouseCursor( Mouse::PICK_UP_PRISONER );
@@ -4993,14 +5234,32 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 			}
 			break;
 		case MOUSEMODE_BUILD_PLACE:
+#endif
 			{
+#if defined(GENONLINE)
+				//Here is the hook for when we are in a context sensitive command mode. We can
+				//either do the specified command mode command or nothing! Whether or not the
+				//command is valid or not was determined in evaluateContextCommand which is
+				//called first, and posts the appropriate message.
+				AsciiString cursorName;	// empty by default
+#else
 				if (underWindow)
 				{
 					setMouseCursor(Mouse::ARROW);
 					return;
 				}
+#endif
 				switch (t)
 				{
+#if defined(GENONLINE)
+				case GameMessage::MSG_VALID_GUICOMMAND_HINT:
+					cursorName = m_pendingGUICommand->getCursorName();
+					break;
+				case GameMessage::MSG_INVALID_GUICOMMAND_HINT:
+				default:
+					cursorName = m_pendingGUICommand->getInvalidCursorName();
+					break;
+#else
 					case GameMessage::MSG_DO_MOVETO_HINT:
 					case GameMessage::MSG_DO_ATTACKMOVETO_HINT:
 					case GameMessage::MSG_DO_REVERSE_MOVETO_HINT:
@@ -5011,7 +5270,9 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 					case GameMessage::MSG_DO_ATTACK_OBJECT_AFTER_MOVING_HINT:
 						setMouseCursor(Mouse::INVALID_BUILD_PLACEMENT);
 						break;
+#endif
 				}
+#if !defined(GENONLINE)
 			}
 			break;
 		case MOUSEMODE_GUI_COMMAND:
@@ -5048,7 +5309,14 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 								cursorName = m_pendingGUICommand->getInvalidCursorName();
 								break;
 						}
+#endif
 
+#if defined(GENONLINE)
+				Int index = TheMouse->getCursorIndex(cursorName);
+				if (index != Mouse::INVALID_MOUSE_CURSOR)
+				{
+					setMouseCursor((Mouse::MouseCursor)index);
+#else
 						Int index = TheMouse->getCursorIndex(cursorName);
 						if( index != Mouse::INVALID_MOUSE_CURSOR )
 						{
@@ -5089,9 +5357,40 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 					{
 						setRadiusCursorNone();
 					}
+#endif
 				}
+#if defined(GENONLINE)
+				else
+				{
+					setMouseCursor(Mouse::CROSS);
+				}
+				setRadiusCursor(m_pendingGUICommand->getRadiusCursorType(), //*****************************************************************
+					m_pendingGUICommand->getSpecialPowerTemplate(),
+					m_pendingGUICommand->getWeaponSlot());
+#endif
 			}
+#if defined(GENONLINE)
+			else if (BitIsSet(m_pendingGUICommand->getOptions(), COMMAND_OPTION_NEED_TARGET))
+			{
+				Int index = TheMouse->getCursorIndex(m_pendingGUICommand->getCursorName());
+				if (index != Mouse::INVALID_MOUSE_CURSOR)
+					setMouseCursor((Mouse::MouseCursor)index);
+				else
+					setMouseCursor(Mouse::CROSS);
+				setRadiusCursor(m_pendingGUICommand->getRadiusCursorType(), //*****************************************************************
+					m_pendingGUICommand->getSpecialPowerTemplate(),
+					m_pendingGUICommand->getWeaponSlot());
+			}
+			else
+			{
+				setRadiusCursorNone();
+			}
+		}
+	}
+	break;
+#else
 			break;
+#endif
 	}
 }
 
@@ -6574,6 +6873,17 @@ void InGameUI::drawWindowNameOverlay()
 		m_windowNameString->draw( boxX + padding, lineY, color, GameMakeColor( 0, 0, 0, 255 ) );
 		lineY += lineHeight;
 	}
+#if defined(GENONLINE)
+
+	hudOffsetX = 0;
+	hudOffsetY += 250;
+
+	if (m_observerStatsPointSize > 0)
+		drawObserverStats(hudOffsetX, hudOffsetY);
+
+	if (m_observerNotificationPointSize > 0)
+		drawObserverNotifications(hudOffsetX, hudOffsetY);
+#endif
 }
 
 #endif
@@ -6930,8 +7240,14 @@ void InGameUI::postDraw()
 				UnsignedInt readyFrame = TheGameLogic->getFrame();
 				if (framesLeft > 0)
 					readyFrame += framesLeft;
+#if defined(GENONLINE)
+
+				Int readySecs = (Int)(SECONDS_PER_LOGICFRAME_REAL * LOGICFRAMES_PER_BASEFRAME * (readyFrame - TheGameLogic->getFrame()));
+				if ((info->isCountdown && readySecs != info->timestamp) || (!info->isCountdown && framesLeft != info->timestamp))
+#else
 				Int readySecs = (Int)(SECONDS_PER_LOGICFRAME_REAL * (readyFrame - TheGameLogic->getFrame()));
 				if ( (info->isCountdown && readySecs != info->timestamp) || (!info->isCountdown && framesLeft != info->timestamp) )
+#endif
 				{
 					if (!readySecs && info->isCountdown)
 					{
@@ -7331,8 +7647,19 @@ void InGameUI::militarySubtitle( const AsciiString& label, Int duration )
 
 	// calculate where this screen position should be since the position being passed in is based off 8x6
 	Coord2D multiplier;
+#if defined(GENONLINE)
+#if !defined(GENONLINE_WIDESCREEN)
+	multiplier.x = (float)TheDisplay->getWidth() / 800.0f;
+	multiplier.y = (float)TheDisplay->getHeight() / 600.0f;
+
+#else
+	multiplier.x = (float)TheDisplay->getWidth() / GENONLINE_WIDESCREEN_X_SCALE;
+	multiplier.y = (float)TheDisplay->getHeight() / GENONLINE_WIDESCREEN_Y_SCALE;
+#endif
+#else
 	multiplier.x = (Real)TheDisplay->getWidth() / (Real)DEFAULT_DISPLAY_WIDTH;
 	multiplier.y = (Real)TheDisplay->getHeight() / (Real)DEFAULT_DISPLAY_HEIGHT;
+#endif
 
 	// lets bring out the data structure!
 	m_militarySubtitle = NEW MilitarySubtitleData;
@@ -7413,6 +7740,93 @@ void InGameUI::resetCamera()
 	TheTacticalView->userSetZoomToDefault();
 }
 
+#if defined(GENONLINE)
+void InGameUI::initObserverOverlay()
+{
+	if (TheWindowManager == nullptr)
+	{
+		return;
+	}
+
+	cleanupObserverOverlay();
+
+	if (m_observerStatsString == nullptr)
+	{
+		m_observerStatsString = TheDisplayStringManager->newDisplayString();
+	}
+
+    m_observerStatsPointSize = TheGlobalData->m_observerStatsFontSize;
+    if (m_observerStatsPointSize <= 0)
+        return;
+
+    Int adjustedFontSize = TheGlobalLanguageData->adjustFontSize(m_observerStatsPointSize);
+    GameFont* statsFont = TheWindowManager->winFindFont(m_observerStatsFont, adjustedFontSize, m_observerStatsBold);
+    m_observerStatsString->setFont(statsFont);
+    m_observerStatsLineStep = statsFont ? statsFont->height + 2 : adjustedFontSize + 2; // Line spacing based on real font height
+
+	// Create Display Strings
+	for (Int i = 0; i < numCols; ++i)
+	{
+		DisplayString* ds = TheDisplayStringManager->newDisplayString();
+		ds->setFont(m_observerStatsString->getFont());
+		ds->setText(headers[i]);
+
+
+		m_headerStrings.push_back(ds);
+	}
+
+	// create per-player strings
+	for (int plrIndex = 0; plrIndex < MAX_SLOTS; ++plrIndex)
+	{
+		// for each column
+		for (int col = 0; col < numCols; ++col)
+		{
+			DisplayString* ds = TheDisplayStringManager->newDisplayString();
+			ds->setFont(m_observerStatsString->getFont());
+
+			m_mapOverlayPlayerData[plrIndex].playerCellStrings[col] = ds;
+		}
+	}
+}
+
+void InGameUI::cleanupObserverOverlay()
+{
+	if (TheDisplayStringManager == nullptr)
+	{
+		return;
+	}
+
+	for (DisplayString* ds : m_headerStrings)
+	{
+		if (ds != nullptr)
+		{
+			TheDisplayStringManager->freeDisplayString(ds);
+		}
+	}
+	m_headerStrings.clear();
+
+	for (int plrIndex = 0; plrIndex < MAX_SLOTS; ++plrIndex)
+	{
+		// for each column
+		for (int col = 0; col < numCols; ++col)
+		{
+			DisplayString* ds = m_mapOverlayPlayerData[plrIndex].playerCellStrings[col];
+			if (ds != nullptr)
+			{
+				TheDisplayStringManager->freeDisplayString(ds);
+				m_mapOverlayPlayerData[plrIndex].playerCellStrings[col] = nullptr;
+			}
+		}
+	}
+
+	if (m_observerStatsString != nullptr)
+	{
+		TheDisplayStringManager->freeDisplayString(m_observerStatsString);
+		m_observerStatsString = nullptr;
+	}
+}
+
+#endif
 //------------------------------------------------------------------------------
 //Checks to see if an object can interact with an object in a non-hostile manner. This is currently used by the selection
 //translator to determine whether to do something to an object or select it instead based on the context of what is currently
@@ -7465,8 +7879,22 @@ CanAttackResult InGameUI::getCanSelectedObjectsAttack( ActionType action, const 
 
 		switch( action )
 		{
+#if defined(GENONLINE)
+		case ACTIONTYPE_ATTACK_OBJECT:
+		{
+			//additionalChecking is TRUE only if force attack mode is on.
+			CanAttackResult result = TheActionManager->getCanAttackObject(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER,
+				additionalChecking ? ATTACK_NEW_TARGET_FORCED : ATTACK_NEW_TARGET);
+
+			if (result > bestResult)
+#else
 			case ACTIONTYPE_ATTACK_OBJECT:
+#endif
 			{
+#if defined(GENONLINE)
+				//Best result is used for the rule: SELECTION_ANY
+				bestResult = result;
+#else
 				//additionalChecking is TRUE only if force attack mode is on.
 				CanAttackResult result = 	TheActionManager->getCanAttackObject( other->getObject(), objectToInteractWith, CMD_FROM_PLAYER,
 									additionalChecking ? ATTACK_NEW_TARGET_FORCED : ATTACK_NEW_TARGET );
@@ -7482,7 +7910,17 @@ CanAttackResult InGameUI::getCanSelectedObjectsAttack( ActionType action, const 
 					worstResult = result;
 				}
 				break;
+#endif
 			}
+#if defined(GENONLINE)
+			if (result < worstResult)
+			{
+				//Worst result is used for the rule: SELECTION_ALL
+				worstResult = result;
+			}
+			break;
+		}
+#endif
 
 			case ACTIONTYPE_NONE:
 			case ACTIONTYPE_GET_REPAIRED_AT:
@@ -7582,6 +8020,24 @@ Bool InGameUI::canSelectedObjectsDoAction( ActionType action, const Object *obje
 
 		switch( action )
 		{
+#if defined(GENONLINE)
+		case ACTIONTYPE_NONE:
+			//However strange this might be, it is always possible to do "nothing"
+			//although I can't think of why this would be needed...
+			return TRUE;
+		case ACTIONTYPE_GET_REPAIRED_AT:
+			success = TheActionManager->canGetRepairedAt(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+		case ACTIONTYPE_DOCK_AT:
+			success = TheActionManager->canDockAt(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+		case ACTIONTYPE_GET_HEALED_AT:
+			success = TheActionManager->canGetHealedAt(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			if (success)
+			{
+				ContainModuleInterface* contain = objectToInteractWith->getContain();
+				if (contain && contain->isHealContain())
+#else
 			case ACTIONTYPE_NONE:
 				//However strange this might be, it is always possible to do "nothing"
 				//although I can't think of why this would be needed...
@@ -7595,7 +8051,12 @@ Bool InGameUI::canSelectedObjectsDoAction( ActionType action, const Object *obje
 			case ACTIONTYPE_GET_HEALED_AT:
 				success = TheActionManager->canGetHealedAt( other->getObject(), objectToInteractWith, CMD_FROM_PLAYER );
 				if( success )
+#endif
 				{
+#if defined(GENONLINE)
+					//This container is only used for the purposes of healing and we cannot
+					//enter it normally -- this is NOT a transport!
+#else
 					ContainModuleInterface *contain = objectToInteractWith->getContain();
 					if( contain && contain->isHealContain() )
 					{
@@ -7662,12 +8123,83 @@ Bool InGameUI::canSelectedObjectsDoAction( ActionType action, const Object *obje
 			{
 				Object *obj = other->getObject();
 				if (!obj) {
+#endif
 					success = false;
+#if !defined(GENONLINE)
 					break;
+#endif
 				}
+#if defined(GENONLINE)
+			}
+			break;
+		case ACTIONTYPE_REPAIR_OBJECT:
+		{
+			ObjectID currentRepairer = objectToInteractWith->getSoleHealingBenefactor();
+			success = (TheActionManager->canRepairObject(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER)
+				&& (currentRepairer == INVALID_ID || currentRepairer == other->getObject()->getID()));
+			// unless someone else is already healing it...
+			// please note that this add'l test is left out of canRepairObject() since canRepairObject
+			// gets called from within the Dozer/WorkerAIUpdates' stateMachines as they continue the repair process.
+			// This remains true.
+			break;
+		}
+		case ACTIONTYPE_RESUME_CONSTRUCTION:
+			success = TheActionManager->canResumeConstructionOf(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+		case ACTIONTYPE_COMBATDROP_INTO:
+			success = TheActionManager->canEnterObject(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER, COMBATDROP_INTO);
+			break;
+		case ACTIONTYPE_ENTER_OBJECT:
+			//additionalChecking is TRUE only if we want to check if transport is full first.
+			success = TheActionManager->canEnterObject(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER, additionalChecking ? CHECK_CAPACITY : DONT_CHECK_CAPACITY);
+			break;
+		case ACTIONTYPE_ATTACK_OBJECT:
+			DEBUG_CRASH(("Called InGameUI::canSelectedObjectsDoAction() with ACTIONTYPE_ATTACK_OBJECT. You must use InGameUI::getCanSelectedObjectsAttack() instead."));
+			return FALSE;
+		case ACTIONTYPE_HIJACK_VEHICLE:
+			success = TheActionManager->canHijackVehicle(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+		case ACTIONTYPE_SABOTAGE_BUILDING:
+			success = TheActionManager->canSabotageBuilding(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+		case ACTIONTYPE_CONVERT_OBJECT_TO_CARBOMB:
+			success = TheActionManager->canConvertObjectToCarBomb(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+		case ACTIONTYPE_CAPTURE_BUILDING:
+			success = TheActionManager->canCaptureBuilding(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+		case ACTIONTYPE_DISABLE_VEHICLE_VIA_HACKING:
+			success = TheActionManager->canDisableVehicleViaHacking(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+#ifdef ALLOW_SURRENDER
+		case ACTIONTYPE_PICK_UP_PRISONER:
+			success = TheActionManager->canPickUpPrisoner(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+#endif
+		case ACTIONTYPE_STEAL_CASH_VIA_HACKING:
+			success = TheActionManager->canStealCashViaHacking(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+		case ACTIONTYPE_DISABLE_BUILDING_VIA_HACKING:
+			success = TheActionManager->canDisableBuildingViaHacking(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+		case ACTIONTYPE_MAKE_DEFECTOR:
+			success = TheActionManager->canMakeObjectDefector(other->getObject(), objectToInteractWith, CMD_FROM_PLAYER);
+			break;
+		case ACTIONTYPE_SET_RALLY_POINT:
+		{
+			Object* obj = other->getObject();
+			if (!obj) {
+				success = false;
+#else
 				success = (obj->isKindOf(KINDOF_AUTO_RALLYPOINT) && obj->isLocallyControlled());
+#endif
 				break;
 			}
+#if defined(GENONLINE)
+			success = (obj->isKindOf(KINDOF_AUTO_RALLYPOINT) && obj->isLocallyControlled());
+			break;
+		}
+#endif
 		}
 
 		if( success )
@@ -9060,13 +9592,678 @@ void InGameUI::reloadInterfaceStyle()
 	TheControlBar->markUIDirty();
 }
 
+#if defined(GENONLINE)
+// ======================================================================================
+// Observer Notification
+// ======================================================================================
+const Int MAX_NOTIFICATIONS = 8;		// Maximum number of notifs to show at once on screen
+const UnsignedInt SLIDE_IN_MS = 300;
+const UnsignedInt VISIBLE_MS = 3000;
+const UnsignedInt SLIDE_OUT_MS = 300;
+const UnsignedInt TOTAL_LIFETIME_MS = SLIDE_IN_MS + VISIBLE_MS + SLIDE_OUT_MS;
+const Real BRIGHTNESS_BOOST = 0.4f;		// Apply a slight brightness to make darker colors more visible
+
+// Layout for notifications
+const Int NOTIF_LEFT_MARGIN = 7;
+const Int NOTIF_VERTICAL_OFFSET = 300;  // Offset from center of screen
+const Int NOTIF_PADDING_X = 15;
+const Int NOTIF_PADDING_Y = 10;
+const Int NOTIF_BOX_SPACING = 5;		// Vertical spacing between notification boxes
+
+// Compute animation progress from elapsed render time (0 = sliding in, 1 = visible, 2 = expired)
+static Real computeSlideProgress(UnsignedInt ageMs)
+{
+	if (ageMs < SLIDE_IN_MS) return (Real)ageMs / SLIDE_IN_MS;
+	if (ageMs < SLIDE_IN_MS + VISIBLE_MS) return 1.0f;
+	if (ageMs < TOTAL_LIFETIME_MS) return 1.0f + (Real)(ageMs - SLIDE_IN_MS - VISIBLE_MS) / SLIDE_OUT_MS;
+	return 2.0f;
+}
+
+// Apply easing curve to slide animation
+static Real applyEasing(Real progress)
+{
+	Real t = (progress < 1.0f) ? progress : (progress - 1.0f);
+	return (progress < 1.0f) ? (1.0f - (1.0f - t) * (1.0f - t)) : (t * t);
+}
+
+// Map internal support power names
+static UnicodeString formatPowerAction(const AsciiString& powerNameAscii)
+{
+	struct Entry {
+		const char* key;
+		const wchar_t* value;
+	};
+
+	static const Entry table[] = {
+		{"SuperweaponScudStorm",						L"launched a Scud Storm"},
+		{"SuperweaponNeutronMissile",					L"launched a Nuke Missile"},
+		{"SuperweaponParticleUplinkCannon",				L"fired a Particle Cannon"},
+		{"SuperweaponAnthraxBomb",						L"dropped an Anthrax Bomb"},
+		{"SuperweaponRebelAmbush",						L"called in a Rebel Ambush"},
+		{"SuperweaponArtilleryBarrage",					L"called in an Artillery Barrage"},
+		{"SuperweaponEMPPulse",							L"called in an EMP Bomb"},
+		{"SuperweaponCIAIntelligence",					L"activated the Intelligence"},
+		{"SuperweaponSneakAttack",						L"opened a Sneak Attack"},
+
+		{"SuperweaponDaisyCutter",						L"called in a MOAB"},
+		{"AirF_SuperweaponDaisyCutter",					L"called in a MOAB"},
+
+		{"SuperweaponClusterMines",						L"called in a Mine Drop"},
+		{"Nuke_SuperweaponClusterMines",				L"called in a Mine Drop"},
+
+		{"AirF_SuperweaponA10ThunderboltMissileStrike", L"called in an A10 Strike"},
+		{"SuperweaponA10ThunderboltMissileStrike",		L"called in an A10 Strike"},
+
+		{"AirF_SuperweaponSpectreGunship",				L"called in a Spectre Gunship"},
+		{"SuperweaponSpectreGunship",					L"called in a Spectre Gunship"},
+
+		{"AirF_SuperweaponCarpetBomb",					L"called in a Carpet Bomb"},
+		{"Nuke_SuperweaponChinaCarpetBomb",				L"called in a Carpet Bomb"},
+		{"Early_SuperweaponChinaCarpetBomb",			L"called in a Carpet Bomb"},
+		{"SuperweaponChinaCarpetBomb",					L"called in a Carpet Bomb"},
+
+		{"SuperweaponLeafletDrop",						L"called in a Leaflet Drop"},
+		{"Early_SuperweaponLeafletDrop",				L"called in a Leaflet Drop"},
+	};
+
+	for (const Entry& entry : table)
+		if (powerNameAscii == entry.key)
+			return UnicodeString(entry.value);
+	return UnicodeString(); // not in table, suppress notification
+}
+
+void InGameUI::drawObserverNotifications(Int& x, Int& y)
+{
+	if (!TheGameLogic || !TheInGameUI->getInputEnabled() || TheGameLogic->isIntroMoviePlaying() || TheGameLogic->isLoadingMap() ||
+		TheInGameUI->isQuitMenuVisible() || TheGameLogic->getFrame() <= 1 || m_observerNotificationsHidden)
+		return;
+
+	Player* localPlayer = ThePlayerList->getLocalPlayer();
+	if (!localPlayer || !localPlayer->isPlayerObserver())
+		return;
+
+	if ((TheGameLogic->getFrame() % LOGICFRAMES_PER_SECOND) == 0)
+		checkObserverMilestones(TheGameLogic->getFrame());
+
+	if (m_observerNotifications.empty())
+		return;
+
+	// Ensure font resources initialized
+	if (!m_observerNotificationString)
+		refreshObserverNotificationResources();
+
+	if (!m_observerNotificationString || m_observerNotificationPointSize <= 0)
+		return;
+
+	GameFont* notifFont = m_observerNotificationString->getFont();
+	Int fontHeight = notifFont ? notifFont->height : m_observerNotificationPointSize;
+
+	// Layout calculations
+	Int screenW = TheDisplay->getWidth();
+	Int screenH = TheDisplay->getHeight();
+	Real scale = (Real)screenW / 1920.0f;
+	scale = (scale < 0.7f) ? 0.7f : (scale > 2.0f) ? 2.0f : scale;
+
+	Int baseX = Int(NOTIF_LEFT_MARGIN * scale);
+	Int baseY = (screenH / 2) - Int(NOTIF_VERTICAL_OFFSET * scale);
+	Int padX = Int(NOTIF_PADDING_X * scale);
+	Int padY = Int(NOTIF_PADDING_Y * scale);
+	Int boxSpacing = Int(NOTIF_BOX_SPACING * scale);
+
+	Color bgColor = TheWindowManager->winMakeColor(0, 0, 0, 90);
+	Color borderColor = TheWindowManager->winMakeColor(255, 255, 255, 90);
+
+	UnsignedInt nowMs = timeGetTime();
+
+	// Render active notifications in their fixed slots
+	for (size_t slot = 0; slot < m_observerNotifications.size(); ++slot) {
+		ObserverNotification& notif = m_observerNotifications[slot];
+		if (!notif.active)
+			continue;
+
+		// Compute animation state from render time
+		UnsignedInt ageMs = nowMs - notif.createdRenderMs;
+		Real progress = computeSlideProgress(ageMs);
+
+		// Expire notification if animation complete
+		if (progress >= 2.0f) {
+			notif.active = false;
+			continue;
+		}
+
+		// Compute slide position with easing
+		Real eased = applyEasing(progress);
+		m_observerNotificationString->setText(notif.message);
+		Int bgW = m_observerNotificationString->getWidth() + (padX * 2);
+		Int bgH = fontHeight + (padY * 2);
+		Int slotY = baseY + (slot * (bgH + boxSpacing));
+		Int slideX = baseX - Int((bgW + baseX) * ((progress < 1.0f) ? (1.0f - eased) : eased));
+
+		// Draw background and border
+		TheWindowManager->winFillRect(bgColor, 1, slideX, slotY, slideX + bgW, slotY + bgH);
+		TheWindowManager->winFillRect(borderColor, 1, slideX, slotY, slideX + bgW, slotY + 1);
+		TheWindowManager->winFillRect(borderColor, 1, slideX, slotY + bgH - 1, slideX + bgW, slotY + bgH);
+		TheWindowManager->winFillRect(borderColor, 1, slideX, slotY, slideX + 1, slotY + bgH);
+		TheWindowManager->winFillRect(borderColor, 1, slideX + bgW - 1, slotY, slideX + bgW, slotY + bgH);
+
+		// Brighten player color for readability
+		UnsignedInt r = (notif.color >> 16) & 0xFF;
+		UnsignedInt g = (notif.color >> 8) & 0xFF;
+		UnsignedInt b = notif.color & 0xFF;
+		UnsignedInt lr = r + UnsignedInt((255 - r) * BRIGHTNESS_BOOST);
+		UnsignedInt lg = g + UnsignedInt((255 - g) * BRIGHTNESS_BOOST);
+		UnsignedInt lb = b + UnsignedInt((255 - b) * BRIGHTNESS_BOOST);
+
+		Color textColor = TheWindowManager->winMakeColor(lr, lg, lb, 255);
+		Color shadowColor = TheWindowManager->winMakeColor(0, 0, 0, 255);
+		m_observerNotificationString->draw(slideX + padX, slotY + padY, textColor, shadowColor);
+	}
+}
+
+void InGameUI::checkObserverMilestones(UnsignedInt currentFrame)
+{
+	if (!TheGlobalData->m_observerNotificationMilestone)
+		return;
+
+	if (m_observerMilestones.size() < (size_t)MAX_SLOTS)
+		m_observerMilestones.resize(MAX_SLOTS);
+
+	if (!ThePlayerList || !TheNameKeyGenerator)
+		return;
+
+	for (Int slotIndex = 0; slotIndex < MAX_SLOTS; ++slotIndex) {
+		const GameSlot* slot = TheGameInfo ? TheGameInfo->getConstSlot(slotIndex) : nullptr;
+		if (!slot || !slot->isOccupied())
+			continue;
+
+		AsciiString nameKeyStr;
+		nameKeyStr.format("player%d", slotIndex);
+
+		Player* p = ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey(nameKeyStr));
+
+		if (!p || !p->isPlayerActive() || p->isPlayerObserver())
+			continue;
+
+		UnicodeString name = p->getPlayerDisplayName();
+		if (name.isEmpty())
+			continue;
+
+		ObserverMilestone& milestone = m_observerMilestones[slotIndex];
+		Color playerColor = p->getPlayerColor();
+
+		// Check rank milestones
+		Bool earlyGame = currentFrame < LOGICFRAMES_PER_SECOND * 10; // skip milestone notifications early game for modded maps that start with high rank or income
+		Int rank = p->getRankLevel();
+		if (rank >= 3 && !milestone.reachedLevel3) {
+			milestone.reachedLevel3 = true;
+			if (!earlyGame) addObserverNotification(name, L" reached Rank 3", playerColor);
+		}
+		if (rank >= 5 && !milestone.reachedLevel5) {
+			milestone.reachedLevel5 = true;
+			if (!earlyGame) addObserverNotification(name, L" reached Rank 5", playerColor);
+		}
+
+		Money* money = p->getMoney();
+		if (!money)
+			continue;
+
+		UnsignedInt cpm = money->getCashPerMinute();
+		if (cpm >= 10000 && !milestone.reached10kCPM) {
+			milestone.reached10kCPM = true;
+			if (!earlyGame) addObserverNotification(name, L" reached 10k/min income", playerColor);
+		}
+
+		const Energy* energy = p->getEnergy();
+		AsciiString side = p->getSide();
+		Bool isGLA = side == "GLA" || side == "GLAStealthGeneral" || side == "GLAToxinGeneral" || side == "GLADemolitionGeneral";
+		Bool hasPower = energy && energy->getProduction() > 0;
+		if (isGLA && hasPower && !milestone.stolenPower) {
+			milestone.stolenPower = true;
+			addObserverNotification(name, L" now has power", playerColor);
+		}
+
+		if (!milestone.gotHunted && !isGLA)
+		{
+			Bool hasBuilder = false;
+			for (Object* obj = TheGameLogic->getFirstObject(); obj && !(hasBuilder); obj = obj->getNextObject()) {
+				if (obj->getControllingPlayer() != p || obj->isEffectivelyDead())
+					continue;
+
+				hasBuilder = obj->isKindOf(KINDOF_DOZER) || (!obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) && obj->isKindOf(KINDOF_COMMANDCENTER));
+			}
+
+			if (!hasBuilder) {
+				milestone.gotHunted = true;
+				addObserverNotification(name, L" got dozer hunted", playerColor);
+			}
+		}
+	}
+}
+
+void InGameUI::addObserverNotification(const UnicodeString& playerName, const wchar_t* message, Color playerColor)
+{
+	UnicodeString fullMsg;
+	fullMsg.format(L"%ls%ls", playerName.str(), message);
+	addObserverNotificationRaw(fullMsg, playerColor);
+}
+
+void InGameUI::addObserverNotificationRaw(const UnicodeString& message, Color color)
+{
+	UnsignedInt nowMs = timeGetTime();
+
+	// Reuse first inactive slot
+	for (ObserverNotification& notif : m_observerNotifications)
+		if (!notif.active) {
+			notif = { message, color, nowMs, true };
+			return;
+		}
+
+	if (m_observerNotifications.size() < MAX_NOTIFICATIONS) {
+		m_observerNotifications.push_back({ message, color, nowMs, true });
+		return;
+	}
+}
+
+void InGameUI::notifyGeneralPromotion(Player* player, ScienceType science)
+{
+	if (!player || !player->isPlayerActive() || player->isPlayerObserver())
+		return;
+
+	if (!TheGlobalData->m_observerNotificationSpecialPowerPurchase)
+		return;
+
+	UnicodeString scienceName, description;
+	if (!TheScienceStore->getNameAndDescription(science, scienceName, description))
+		return;
+
+	UnicodeString msg;
+	msg.format(L"%ls purchased %ls", player->getPlayerDisplayName().str(), scienceName.str());
+	addObserverNotificationRaw(msg, player->getPlayerColor());
+}
+
+void InGameUI::notifySpecialPowerUsed(Player* player, const SpecialPowerTemplate* powerTemplate)
+{
+	if (!player || !player->isPlayerActive() || !powerTemplate || player->isPlayerObserver())
+		return;
+
+	if (!TheGlobalData->m_observerNotificationSpecialPowerUsage)
+		return;
+
+	UnicodeString action = formatPowerAction(powerTemplate->getName());
+	if (action.isEmpty())
+		return;
+
+	UnicodeString msg;
+	msg.format(L"%ls %ls", player->getPlayerDisplayName().str(), action.str());
+	addObserverNotificationRaw(msg, player->getPlayerColor());
+}
+
+void InGameUI::drawObserverStats(Int & x, Int & y)
+{
+	// do we need to re-create our fonts?
+	if (m_observerStatsPointSize != TheGlobalData->m_observerStatsFontSize)
+	{
+		cleanupObserverOverlay();
+		initObserverOverlay();
+	}
+
+	// game state checks
+	GameWindow* moneyWin = TheWindowManager->winGetWindowFromId(NULL,
+		TheNameKeyGenerator->nameToKey("ControlBar.wnd:MoneyDisplay"));
+	if (moneyWin && !moneyWin->winIsHidden())
+		return;
+
+	if (!TheInGameUI->getInputEnabled() || TheGameLogic->isIntroMoviePlaying() ||
+		TheGameLogic->isLoadingMap() || TheInGameUI->isQuitMenuVisible())
+		return;
+
+	Player* localPlayer = ThePlayerList->getLocalPlayer();
+	if (!localPlayer || (TheGameLogic && TheGameLogic->getFrame() <= 1))
+		return;
+
+	if (!localPlayer->isPlayerObserver() && !localPlayer->isPlayerDead())
+		return;
+
+	if (!isAtHudAnchorPos(m_observerStatsPosition) || m_observerStatsHidden)
+		return;
+
+	// couldn't allocate memory, early out
+	if (m_observerStatsString == nullptr)
+	{
+		return;
+	}
+
+	// Screen info
+	Int screenW = TheDisplay->getWidth();
+	Int screenH = TheDisplay->getHeight();
+	Real scale = (Real)screenW / 1920.0f;
+	scale = (scale < 0.7f) ? 0.7f : (scale > 2.0f) ? 2.0f : scale;
+
+	//     auto freeDisplayStrings = [](std::vector<DisplayString*>& strings) {
+	// 	for (DisplayString* ds : strings) {
+	// 		if (ds) {
+	// 			TheDisplayStringManager->freeDisplayString(ds);
+	// 		}
+	// 	}
+	// 	 strings.clear();
+	// 	};
+
+	if (isUpdating)
+		return;
+
+	UnsignedInt currentFrame = TheGameLogic ? TheGameLogic->getFrame() : 0;
+	Bool needUpdate = (lastUpdateFrame == 0) ||
+		(currentFrame - lastUpdateFrame >= LOGICFRAMES_PER_SECOND) ||
+		(lastFontSize != TheWritableGlobalData->m_observerStatsFontSize);
+
+	int actualNumPlayers = 0;
+
+	// ====================================================================
+	// UPDATE: gather data, format strings, measure layout
+	// ====================================================================
+	if (needUpdate)
+	{
+		isUpdating = true;
+		lastUpdateFrame = currentFrame;
+		lastFontSize = TheWritableGlobalData->m_observerStatsFontSize;
+
+		// Gather player data
+		std::set<int> setTeams;
+
+		for (Int slotIndex = 0; slotIndex < MAX_SLOTS; ++slotIndex)
+		{
+			const GameSlot* slot = TheGameInfo ? TheGameInfo->getConstSlot(slotIndex) : nullptr;
+			if (!slot || !slot->isOccupied())
+			{
+				m_mapOverlayPlayerData[slotIndex].isPresent = false;
+				continue;
+			}
+
+			AsciiString nameKeyStr;
+			nameKeyStr.format("player%d", slotIndex);
+			const NameKeyType key = TheNameKeyGenerator->nameToKey(nameKeyStr);
+			Player* p = ThePlayerList->findPlayerWithNameKey(key);
+			if (!p || !p->isPlayerActive())
+			{
+				m_mapOverlayPlayerData[slotIndex].isPresent = false;
+				continue;
+			}
+
+			if (p->isPlayerObserver())
+			{
+				m_mapOverlayPlayerData[slotIndex].isPresent = false;
+				continue;
+			}
+
+			UnicodeString name = p->getPlayerDisplayName();
+			if (name.isEmpty())
+			{
+				m_mapOverlayPlayerData[slotIndex].isPresent = false;
+				continue;
+			}
+
+			// Truncate long names
+			if (name.getLength() > 12) {
+				UnicodeString tmp;
+				tmp.format(L"%.*ls.", 12, name.str());
+				name = tmp;
+			}
+
+			Int team = slot->getTeamNumber();
+
+			// Gather stats
+			Money* money = p->getMoney();
+			ScoreKeeper* sk = p->getScoreKeeper();
+			const Energy* energy = p->getEnergy();
+			Int kills = sk ? sk->getTotalUnitsDestroyed() : 0;
+			Int deaths = sk ? sk->getTotalUnitsLost() : 0;
+			Real kd = deaths > 0 ? (Real)kills / deaths : (Real)kills;
+			Int rank = p->getRankLevel();
+
+			// Faction abbreviations, we don't want to show full army names like that
+			AsciiString side = p->getSide();
+			UnicodeString faction;
+			if (side == "AmericaAirForceGeneral") faction = L"AFG";
+			else if (side == "ChinaTankGeneral") faction = L"Tank";
+			else if (side == "GLAStealthGeneral") faction = L"Stealth";
+			else if (side == "America") faction = L"USA";
+			else if (side == "GLAToxinGeneral") faction = L"Tox";
+			else if (side == "GLADemolitionGeneral") faction = L"Demo";
+			else if (side == "ChinaInfantryGeneral") faction = L"Inf";
+			else if (side == "ChinaNukeGeneral") faction = L"Nuke";
+			else if (side == "AmericaSuperWeaponGeneral") faction = L"SWG";
+			else if (side == "AmericaLaserGeneral") faction = L"Laser";
+			else faction.translate(side);
+
+			Bool hasPower = energy && (energy->getProduction() > 0 || energy->getConsumption() > 0);
+			Int powerDelta = energy ? (energy->getProduction() - energy->getConsumption()) : 0;
+
+			m_mapOverlayPlayerData[slotIndex].isPresent = true;
+			m_mapOverlayPlayerData[slotIndex].playerData = PlayerData
+			{
+				name, faction, team,
+					money ? money->countMoney() : 0,
+					money ? money->getCashPerMinute() : 0,
+					p->getSkillPoints(), rank, kd,
+					p->getSciencePurchasePoints(),
+					powerDelta, hasPower,
+					energy && !energy->hasSufficientPower(),
+					p->getPlayerColor()
+			};
+
+			setTeams.insert(team);
+		}
+
+		// Format cash and cash/m with commas
+		auto formatNum = [](UnsignedInt v) -> UnicodeString {
+			std::wstring s = std::to_wstring(v);
+			int pos = int(s.length()) - 3;
+			while (pos > 0) {
+				s.insert(pos, L",");
+				pos -= 3;
+			}
+			UnicodeString out;
+			out.format(L"%ls", s.c_str());
+			return out;
+			};
+
+
+		// render by team
+		// TODO_GENONLINE: Using a sort would be quicker, this has poor time complexity
+		for (int team : setTeams)
+		{
+            for (Int slotIndex = 0; slotIndex < MAX_SLOTS; ++slotIndex)
+            {
+                if (m_mapOverlayPlayerData[slotIndex].isPresent)
+                {
+					if (m_mapOverlayPlayerData[slotIndex].playerData.team == team)
+					{
+                        const PlayerData& pd = m_mapOverlayPlayerData[slotIndex].playerData;
+
+                        UnicodeString cells[numCols];
+                        cells[0].format(L"(%d) %ls", pd.team + 1, pd.name.str());
+                        cells[1] = pd.faction;
+                        cells[2] = formatNum(pd.money);
+                        cells[3].format(L"+%ls", formatNum(pd.cpm).str());
+                        cells[4].format(L"(%d) %d", pd.rank, pd.xp);
+                        cells[5].format(L"%d", pd.sp);
+                        cells[6].format(L"%.1f", pd.kd);
+                        if (pd.showPower) {
+                            cells[7].format(pd.lowPower ? L"OFF (%d)" : L"ON (%d)", pd.powerValue);
+                        }
+                        else {
+                            cells[7] = L"-";
+                        }
+
+                        for (Int i = 0; i < numCols; ++i)
+                        {
+                            DisplayString* ds = m_mapOverlayPlayerData[slotIndex].playerCellStrings[i];
+                            ds->setText(cells[i]);
+                        }
+					}
+                }
+            }
+		}
+
+		isUpdating = false;
+	}
+
+    // calculate num players outside of the above if, because its only when updating
+    for (Int slotIndex = 0; slotIndex < MAX_SLOTS; ++slotIndex)
+    {
+        if (m_mapOverlayPlayerData[slotIndex].isPresent)
+        {
+            ++actualNumPlayers;
+        }
+    }
+
+    // Measure column widths
+    Int colSpacing = 16 * scale;
+    for (Int i = 0; i < numCols; ++i)
+        colWidths[i] = m_headerStrings[i]->getWidth();
+
+    for (Int slotIndex = 0; slotIndex < MAX_SLOTS; ++slotIndex)
+    {
+        if (m_mapOverlayPlayerData[slotIndex].isPresent)
+        {
+            for (Int col = 0; col < numCols; ++col)
+            {
+                //DisplayString* ds = m_mapOverlayPlayerData[slotIndex].playerCellStrings[col];
+                Int w = m_mapOverlayPlayerData[slotIndex].playerCellStrings[col]->getWidth();
+                if (w > colWidths[col])
+                {
+                    colWidths[col] = w;
+                }
+            }
+        }
+    }
+
+    for (Int i = 0; i < numCols; ++i)
+        colWidths[i] += colSpacing;
+
+    // Calculate dimensions
+    totalWidth = 0;
+    for (Int i = 0; i < numCols; ++i)
+        totalWidth += colWidths[i];
+
+    Int lineHeight = (m_observerStatsLineStep > 0) ? m_observerStatsLineStep : Int(16 * scale);
+    Int rowSpacing = Int(2 * scale);
+
+    totalHeight = (lineHeight + rowSpacing) * (1 + Int(actualNumPlayers));
+
+	if (actualNumPlayers == 0)
+		return;
+
+	//     if (cellStrings.size() != players.size() * numCols)
+	// 	    return;
+
+		// ====================================================================
+		// DRAWINGS
+		// ====================================================================
+	Int totalRowHeight = lineHeight + rowSpacing;
+
+	Int padX = Int(10 * scale);
+	Int padY = Int(6 * scale);
+
+	Int bgW = totalWidth + padX * 2;
+	Int bgH = totalHeight + padY * 2;
+
+	Int baseX = (screenW - bgW) / 2;    // center overlay horizantally
+	Int baseY = screenH - bgH;          // stick to bottom edge
+
+	if (baseX < 0) baseX = 0;
+	if (baseY < 0) baseY = 0;
+
+	Int contentX = baseX + padX;
+	Int contentY = baseY + padY;
+
+	// Draw background
+	TheWindowManager->winFillRect(TheWindowManager->winMakeColor(0, 0, 0, 150), 1, baseX, baseY, baseX + bgW, baseY + bgH);
+
+	// Draw border
+	Color border = TheWindowManager->winMakeColor(255, 255, 255, 110);
+	TheWindowManager->winFillRect(border, 1, baseX, baseY, baseX + bgW, baseY + 1);
+	TheWindowManager->winFillRect(border, 1, baseX, baseY + bgH - 1, baseX + bgW, baseY + bgH);
+	TheWindowManager->winFillRect(border, 1, baseX, baseY, baseX + 1, baseY + bgH);
+	TheWindowManager->winFillRect(border, 1, baseX + bgW - 1, baseY, baseX + bgW, baseY + bgH);
+
+	// Draw separators
+	Int headerSepY = contentY + totalRowHeight - (rowSpacing / 2);
+	TheWindowManager->winFillRect(border, 1, baseX + 1, headerSepY, baseX + bgW - 1, headerSepY + 1);
+
+	Int colX = contentX;
+	for (Int i = 0; i < numCols - 1; ++i) {
+		colX += colWidths[i];
+		TheWindowManager->winFillRect(border, 1, colX - (colSpacing / 2), baseY + 1,
+			colX - (colSpacing / 2) + 1, baseY + bgH - 1);
+	}
+
+	// Draw text
+	Color headerColor = TheWindowManager->winMakeColor(255, 255, 255, 255);
+	Color dropShadow = TheWindowManager->winMakeColor(0, 0, 0, 220);
+
+	Int drawX = contentX;
+	Int drawY = contentY;
+	for (Int i = 0; i < numCols; ++i) {
+		m_headerStrings[i]->draw(drawX, drawY, headerColor, dropShadow);
+		drawX += colWidths[i];
+	}
+
+	drawY += totalRowHeight;
+
+	Real brightnessBoost = 0.3f;
+	for (int i = 0; i < MAX_SLOTS; ++i)
+	{
+		if (m_mapOverlayPlayerData[i].isPresent)
+		{
+			Color raw = m_mapOverlayPlayerData[i].playerData.color;
+			UnsignedInt r = (raw >> 16) & 0xFF;
+			UnsignedInt g = (raw >> 8) & 0xFF;
+			UnsignedInt b = raw & 0xFF;
+			UnsignedInt lr = r + UnsignedInt((255 - r) * brightnessBoost);
+			UnsignedInt lg = g + UnsignedInt((255 - g) * brightnessBoost);
+			UnsignedInt lb = b + UnsignedInt((255 - b) * brightnessBoost);
+
+			Color boostedColor = TheWindowManager->winMakeColor(lr, lg, lb, 255);
+			drawX = contentX;
+			for (Int col = 0; col < numCols; ++col) {
+				m_mapOverlayPlayerData[i].playerCellStrings[col]->draw(drawX, drawY, boostedColor, dropShadow);
+				drawX += colWidths[col];
+			}
+			drawY += totalRowHeight;
+		}
+	}
+}
+
+void InGameUI::refreshObserverNotificationResources(void)
+{
+	if (!m_observerNotificationString)
+		m_observerNotificationString = TheDisplayStringManager->newDisplayString();
+
+	m_observerNotificationPointSize = TheGlobalData->m_observerNotificationFontSize;
+	if (m_observerNotificationPointSize <= 0)
+		return;
+
+	Int adjustedFontSize = TheGlobalLanguageData->adjustFontSize(m_observerNotificationPointSize);
+	m_observerNotificationString->setFont(TheWindowManager->winFindFont("Tahoma", adjustedFontSize, true));
+}
+
+void InGameUI::refreshCustomUiResources(void)
+#else
 void InGameUI::refreshCustomUiResources()
+#endif
 {
 	refreshNetworkLatencyResources();
 	refreshRenderFpsResources();
 	refreshSystemTimeResources();
+#if defined(GENONLINE)
+    refreshGameTimeResources();
+    initObserverOverlay();
+	refreshObserverNotificationResources();
+#else
 	refreshGameTimeResources();
 	refreshPlayerInfoListResources();
+#endif
 }
 
 void InGameUI::refreshNetworkLatencyResources()
@@ -9075,7 +10272,12 @@ void InGameUI::refreshNetworkLatencyResources()
 	{
 		m_networkLatencyString = TheDisplayStringManager->newDisplayString();
 		m_lastNetworkLatencyFrames = ~0u;
+#if defined(GENONLINE)
+		m_lastNetworkLogicRate = ~0u;
+		}
+#else
 	}
+#endif
 
 	m_networkLatencyPointSize = TheGlobalData->m_networkLatencyFontSize;
 	Int adjustedNetworkLatencyFontSize = TheGlobalLanguageData->adjustFontSize(m_networkLatencyPointSize);
@@ -9179,14 +10381,38 @@ WindowMsgHandledType IdleWorkerSystem( GameWindow *window, UnsignedInt msg,
 	switch( msg )
 	{
 		//---------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+	case GWM_INPUT_FOCUS:
+	{
+		// if we're givin the opportunity to take the keyboard focus we must say we don't want it
+		if (mData1 == TRUE)
+			*(Bool*)mData2 = FALSE;
+		break;
+
+	}
+	//---------------------------------------------------------------------------------------------
+	case GBM_SELECTED:
+	{
+		GameWindow* control = (GameWindow*)mData1;
+		static NameKeyType buttonSelectID = NAMEKEY("IdleWorker.wnd:ButtonSelectNextIdleWorker");
+		if (control && control->winGetWindowId() == buttonSelectID)
+#else
 		case GWM_INPUT_FOCUS:
+#endif
 		{
+#if defined(GENONLINE)
+			TheInGameUI->selectNextIdleWorker();
+#else
 			// if we're givin the opportunity to take the keyboard focus we must say we don't want it
 			if( mData1 == TRUE )
 				*(Bool *)mData2 = FALSE;
 			break;
 
+#endif
 		}
+#if defined(GENONLINE)
+		break;
+#else
 		//---------------------------------------------------------------------------------------------
 		case GBM_SELECTED:
 		{
@@ -9197,6 +10423,7 @@ WindowMsgHandledType IdleWorkerSystem( GameWindow *window, UnsignedInt msg,
 				TheInGameUI->selectNextIdleWorker();
 			}
 			break;
+#endif
 
 		}
 
@@ -9286,6 +10513,19 @@ void InGameUI::updateRenderFpsString()
 
 void InGameUI::drawNetworkLatency(Int &x, Int &y)
 {
+#if defined(GENONLINE)
+	const UnsignedInt networkLatencyFrames = TheNetwork->getRunAhead();
+	const UnsignedInt logicRate = TheNetwork->getMeasuredLogicRate();
+
+	if (networkLatencyFrames != m_lastNetworkLatencyFrames || logicRate != m_lastNetworkLogicRate)
+	{
+		UnicodeString latencyStr;
+		latencyStr.format(L"%u [%ums] [L%u]", networkLatencyFrames, (networkLatencyFrames * 1000 + LOGICFRAMES_PER_SECOND / 2) / LOGICFRAMES_PER_SECOND, logicRate);
+		m_networkLatencyString->setText(latencyStr);
+		m_lastNetworkLatencyFrames = networkLatencyFrames;
+		m_lastNetworkLogicRate = logicRate;
+	}
+#else
 	const UnsignedInt networkLatencyFrames = TheNetwork->getRunAhead();
 
 	if (networkLatencyFrames != m_lastNetworkLatencyFrames)
@@ -9295,6 +10535,7 @@ void InGameUI::drawNetworkLatency(Int &x, Int &y)
 		m_networkLatencyString->setText(latencyStr);
 		m_lastNetworkLatencyFrames = networkLatencyFrames;
 	}
+#endif
 
 	// TheSuperHackers @info at the HUD anchor this draws inline and advances x otherwise uses configured position
 	if (isAtHudAnchorPos(m_networkLatencyPosition))
@@ -9419,6 +10660,11 @@ Int InGameUI::getHudAnchorBottom() const
 void InGameUI::drawGameTime()
 {
 
+#if defined(GENONLINE)
+	// draw connections
+	GetOnlineGameHooks()->drawNetworkOverlay(m_gameTimeString, m_gameTimeDropColor);
+
+#endif
 	Int currentFrame = TheGameLogic->getFrame();
 	Int gameSeconds = (Int) (SECONDS_PER_LOGICFRAME_REAL * currentFrame );
 	Int hours = gameSeconds / 60 / 60;
@@ -9444,6 +10690,9 @@ void InGameUI::drawGameTime()
 
 void InGameUI::drawPlayerInfoList()
 {
+#if defined(GENONLINE)
+	return;
+#endif
 	const Int baseX = (Int)(m_playerInfoListPosition.x * TheDisplay->getWidth());
 	const Int baseY = (Int)(m_playerInfoListPosition.y * TheDisplay->getHeight());
 	const Int lineH = m_playerInfoList.labels[PlayerInfoList::LabelType_Team]->getFont()->height;

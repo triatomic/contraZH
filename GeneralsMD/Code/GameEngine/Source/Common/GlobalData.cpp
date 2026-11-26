@@ -65,6 +65,9 @@
 #include "GameClient/TintStatus.h"
 
 #include "GameNetwork/FirewallHelper.h"
+#if defined(GENONLINE)
+#include "GameNetwork/GenOnline/GenOnlineInit.h"
+#endif
 
 #include <float.h>
 #include <stdlib.h>
@@ -221,6 +224,51 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 }
 
 
+#if defined(GENONLINE)
+#ifndef WC_NO_BEST_FIT_CHARS
+#define WC_NO_BEST_FIT_CHARS 0x00000400
+#endif
+
+//-------------------------------------------------------------------------------------------------
+// Converts to the process code page that every char* file API uses; fails instead of mangling characters it can't represent
+static Bool wideToProcessCodePage(const wchar_t* widePath, AsciiString& out)
+{
+	const Bool isUtf8 = GetACP() == CP_UTF8;
+	const UINT codePage = isUtf8 ? CP_UTF8 : CP_ACP;
+	const DWORD flags = isUtf8 ? 0 : WC_NO_BEST_FIT_CHARS;
+	BOOL usedDefaultChar = FALSE;
+	BOOL* pUsedDefaultChar = isUtf8 ? nullptr : &usedDefaultChar;
+
+	const int len = WideCharToMultiByte(codePage, flags, widePath, -1, nullptr, 0, nullptr, pUsedDefaultChar);
+	if (len <= 0 || usedDefaultChar)
+		return FALSE;
+
+	char* buffer = new char[len];
+	const int written = WideCharToMultiByte(codePage, flags, widePath, -1, buffer, len, nullptr, pUsedDefaultChar);
+	if (written > 0 && !usedDefaultChar)
+		out = buffer;
+	delete[] buffer;
+	return written > 0 && !usedDefaultChar;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Narrow form of a wide path; falls back to the ASCII 8.3 short path when the code page can't hold it (pre UTF-8 Windows)
+static AsciiString widePathToFileApiPath(const wchar_t* widePath)
+{
+	AsciiString path;
+	if (wideToProcessCodePage(widePath, path))
+		return path;
+
+	wchar_t shortPath[_MAX_PATH + 1];
+	const DWORD shortLen = GetShortPathNameW(widePath, shortPath, _MAX_PATH + 1);
+	if (shortLen > 0 && shortLen <= _MAX_PATH && wideToProcessCodePage(shortPath, path))
+		return path;
+
+	DEBUG_LOG(("Documents path can't be represented in code page %u and has no short name", GetACP()));
+	return AsciiString::TheEmptyString;
+}
+
+#endif
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1082,6 +1130,9 @@ GlobalData::GlobalData()
 	m_useTreeSway = TRUE;
 	m_useDrawModuleLOD = FALSE;
 	m_useHeatEffects = TRUE;
+#if defined(GENONLINE)
+	m_adaptiveQualityLevel = 0;
+#endif
 	m_useFpsLimit = FALSE;
 	m_weaponScatterOnWaterSurfaceDefault = FALSE;
 	m_reverseMoveIgnoreAngleThreshold = FALSE;
@@ -1096,6 +1147,9 @@ GlobalData::GlobalData()
 	m_framesPerSecondLimit = 0;
 	m_chipSetType = 0;
 	m_headless = FALSE;
+#if defined(GENONLINE)
+	m_exportStats = FALSE;
+#endif
 	m_windowed = 0;
 	m_borderlessWindow = FALSE;
 	// GameData XResolution, -xres and Options.ini override the desktop default
@@ -1541,8 +1595,16 @@ GlobalData::GlobalData()
 
 	m_antiAliasLevel = WW3D::MultiSampleModeEnum::MULTISAMPLE_MODE_NONE;
 	m_superSampling = 100;
+#if defined(GENONLINE)
+
+#if !defined(GENONLINE_DISABLE_TEXTURE_FILTERING_AND_AA)
 	m_textureFilteringMode = TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_ANISOTROPIC;
 	m_textureAnisotropyLevel = TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_8X;
+#endif
+#else
+	m_textureFilteringMode = TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_ANISOTROPIC;
+	m_textureAnisotropyLevel = TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_8X;
+#endif
 
 //	m_languageFilterPref = false;
 	m_languageFilterPref = true;
@@ -1562,10 +1624,22 @@ GlobalData::GlobalData()
 	m_gameTimeFontSize = 8;
 	m_playerInfoListFontSize = 8;
 
+#if defined(GENONLINE)
+	m_observerStatsFontSize = 7;
+	m_observerNotificationFontSize = 10;
+	m_observerNotificationSpecialPowerUsage = TRUE;
+	m_observerNotificationSpecialPowerPurchase = TRUE;
+	m_observerNotificationMilestone = TRUE;
+
+#endif
 	m_showMoneyPerMinute = FALSE;
 	m_allowMoneyPerMinuteForPlayer = FALSE;
 
+#if defined(GENONLINE)
+	m_gameWindowTransitionSpeedMultiplier = 2.5f;
+#else
 	m_gameWindowTransitionSpeedMultiplier = 1.0f;
+#endif
 
 	m_debugShowGraphicalFramerate = FALSE;
 
@@ -1579,7 +1653,11 @@ GlobalData::GlobalData()
 	m_networkFPSHistoryLength = 30;
 	m_networkLatencyHistoryLength = 200;
 	m_networkRunAheadMetricsTime = 500;
+#if defined(GENONLINE)
+	m_networkCushionHistoryLength = 10 * LOGICFRAMES_PER_BASEFRAME; // the 333 ms that retail's 10 frames covered
+#else
 	m_networkCushionHistoryLength = 10;
+#endif
 	m_networkRunAheadSlack = 10;
 	m_networkKeepAliveDelay = 20;
 	m_networkDisconnectTime = 5000;
@@ -1618,7 +1696,18 @@ GlobalData::GlobalData()
 
 	m_shellMapName.set("Maps\\ShellMap1\\ShellMap1.map");
 	m_shellMapOn =TRUE;
+#if defined(GENONLINE)
+
+
+#if defined(GENONLINE) && defined(_DEBUG)
+	m_playIntro = FALSE;
+#else
 	m_playIntro = TRUE;
+#endif
+
+#else
+	m_playIntro = TRUE;
+#endif
 	m_playSizzle = TRUE;
 	m_loadScreenRender = FALSE;
 
@@ -1650,11 +1739,55 @@ GlobalData::GlobalData()
 	m_forceBenchmark = FALSE;	///<forces running of CPU detection benchmark, even on known cpu's.
 
 	m_keyboardCameraRotateSpeed = 0.1f;
+#if defined(GENONLINE)
+	m_cameraRotateFactor = 0.5f;
+	m_cameraPitchFactor = 0.5f;
+	m_cameraZoomFactor = 0.5f;
+#endif
 
+#if defined(GENONLINE)
+#if defined(USE_MAULLER_ONEDRIVE_FIX)
 	// Set user data directory based on registry settings instead of INI parameters.
 	// This allows us to localize the leaf name.
 	m_userDataDir = BuildUserDataPathFromRegistry();
 	CreateDirectory(m_userDataDir.str(), nullptr);
+#else
+    // Set user data directory based on registry settings instead of INI parameters. This allows us to
+// localize the leaf name.
+    wchar_t temp[_MAX_PATH + 1];
+    AsciiString myDocumentsDirectory;
+    if (::SHGetSpecialFolderPathW(nullptr, temp, CSIDL_PERSONAL, true))
+        myDocumentsDirectory = widePathToFileApiPath(temp);
+
+    if (!myDocumentsDirectory.isEmpty())
+    {
+
+        if (myDocumentsDirectory.getCharAt(myDocumentsDirectory.getLength() - 1) != '\\')
+            myDocumentsDirectory.concat('\\');
+
+        AsciiString leafName;
+
+        if (!GetStringFromRegistry("", "UserDataLeafName", leafName))
+        {
+            // Use something, anything
+            // [MH] had to remove this, otherwise mapcache build step won't run... DEBUG_CRASH( ( "Could not find registry key UserDataLeafName; defaulting to \"Command and Conquer Generals Zero Hour Data\" " ) );
+            leafName = "Command and Conquer Generals Zero Hour Data";
+        }
+
+        myDocumentsDirectory.concat(leafName);
+        if (myDocumentsDirectory.getCharAt(myDocumentsDirectory.getLength() - 1) != '\\')
+            myDocumentsDirectory.concat('\\');
+
+        CreateDirectory(myDocumentsDirectory.str(), nullptr);
+        m_userDataDir = myDocumentsDirectory;
+    }
+#endif
+#else
+	// Set user data directory based on registry settings instead of INI parameters.
+	// This allows us to localize the leaf name.
+	m_userDataDir = BuildUserDataPathFromRegistry();
+	CreateDirectory(m_userDataDir.str(), nullptr);
+#endif
 
 	//-allAdvice feature
 	//m_allAdvice = FALSE;
@@ -1773,7 +1906,12 @@ GlobalData::~GlobalData()
 {
 	DEBUG_ASSERTCRASH( m_theOriginal != this || m_next == nullptr, ("~GlobalData: theOriginal is not original") );
 
+#if defined(GENONLINE)
+	if (m_weaponBonusSet)
+		deleteInstance(m_weaponBonusSet);
+#else
 	deleteInstance(m_weaponBonusSet);
+#endif
 
 	if( m_theOriginal == this )	{
 		m_theOriginal = nullptr;
@@ -2133,11 +2271,26 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_playerInfoListFontSize = optionPref.getPlayerInfoListFontSize();
 	TheWritableGlobalData->m_showMoneyPerMinute = optionPref.getShowMoneyPerMinute();
 	TheWritableGlobalData->m_gameWindowTransitionSpeedMultiplier = optionPref.getGameWindowTransitionSpeedMultiplier();
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	// The camera factors and the observer overlay settings come from settings.client.json.
+	TheWritableGlobalData->applyGenOnlineClientSettings();
+#endif
+#else
 
+#endif
 	TheWritableGlobalData->m_antiAliasLevel = optionPref.getAntiAliasing();
 	TheWritableGlobalData->m_superSampling = optionPref.getSuperSampling();
+#if defined(GENONLINE)
+
+#if !defined(GENONLINE_DISABLE_TEXTURE_FILTERING_AND_AA)
 	TheWritableGlobalData->m_textureFilteringMode = optionPref.getTextureFilterMode();
 	TheWritableGlobalData->m_textureAnisotropyLevel = optionPref.getTextureAnisotropyLevel();
+#endif
+#else
+	TheWritableGlobalData->m_textureFilteringMode = optionPref.getTextureFilterMode();
+	TheWritableGlobalData->m_textureAnisotropyLevel = optionPref.getTextureAnisotropyLevel();
+#endif
 	TheWritableGlobalData->m_useBloom = optionPref.getBloomEnabled();
 	TheWritableGlobalData->m_bloomStrength = optionPref.getBloomStrength();
 	TheWritableGlobalData->m_bloomThreshold = optionPref.getBloomThreshold();
@@ -2197,6 +2350,24 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_yResolution = yres;
 }
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+//-------------------------------------------------------------------------------------------------
+void GlobalData::applyGenOnlineClientSettings()
+{
+	const GenOnlineSettings& genOnlineSettings = GenOnlineServicesManager::Settings;
+	m_cameraRotateFactor = genOnlineSettings.Camera_GetRotateFactor();
+	m_cameraPitchFactor = genOnlineSettings.Camera_GetPitchFactor();
+	m_cameraZoomFactor = genOnlineSettings.Camera_GetZoomFactor();
+	m_observerStatsFontSize = genOnlineSettings.Observer_GetStatsFontSize();
+	m_observerNotificationFontSize = genOnlineSettings.Observer_GetNotificationFontSize();
+	m_observerNotificationSpecialPowerUsage = genOnlineSettings.Observer_NotificationSpecialPowerUsage();
+	m_observerNotificationSpecialPowerPurchase = genOnlineSettings.Observer_NotificationSpecialPowerPurchase();
+	m_observerNotificationMilestone = genOnlineSettings.Observer_NotificationMilestone();
+}
+#endif
+
+#endif
 void GlobalData::parseCustomDefinition()
 {
 	if (addon::HasFullviewportDat())
@@ -2279,6 +2450,14 @@ UnsignedInt GlobalData::generateExeCRC()
 
 	DEBUG_LOG(("EXE+Version(%d.%d)+SCB CRC is 0x%8.8X", version >> 16, version & 0xffff, exeCRC.get()));
 
+#if defined(GENONLINE)
+	// the exe CRC this build is compatible with, set by RTS_EXE_CRC
+	if (RTS_EXE_CRC != 0)
+	{
+		DEBUG_LOG(("Exe CRC set to 0x%8.8X by RTS_EXE_CRC", (UnsignedInt)RTS_EXE_CRC));
+		return (UnsignedInt)RTS_EXE_CRC;
+	}
+#endif
 	return exeCRC.get();
 }
 
@@ -2356,14 +2535,24 @@ AsciiString GlobalData::BuildUserDataPathFromRegistry()
 		HRESULT hr = pSHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, nullptr, &pszPath);
 
 		if (SUCCEEDED(hr) && pszPath) {
+#if defined(GENONLINE)
+			myDocumentsDirectory = widePathToFileApiPath(pszPath);
+#else
 			myDocumentsDirectory.translate(pszPath);
+#endif
 			CoTaskMemFree(pszPath);
 		}
 	}
 	else {
+#if defined(GENONLINE)
+		wchar_t temp[_MAX_PATH + 1];
+		if (SHGetSpecialFolderPathW(nullptr, temp, CSIDL_PERSONAL, true)) {
+			myDocumentsDirectory = widePathToFileApiPath(temp);
+#else
 		char temp[_MAX_PATH + 1];
 		if (SHGetSpecialFolderPath(nullptr, temp, CSIDL_PERSONAL, true)) {
 			myDocumentsDirectory = temp;
+#endif
 		}
 	}
 

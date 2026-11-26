@@ -26,6 +26,15 @@
 
 #pragma once
 
+#if defined(GENONLINE)
+
+
+#if defined(GENONLINE)
+#define USE_NEW_FRAMEMETRIC_LOGIC 1
+#endif
+
+#include "Lib/BaseType.h"
+#endif
 #include "GameNetwork/NetworkDefs.h"
 
 #if defined(USE_NEW_FRAMEMETRIC_LOGIC)
@@ -50,6 +59,11 @@ public:
 	Bool hasLatencySample() const { return m_latencySampleCount > 0; }
 	Int getAverageFPS();
 	Int getMinimumCushion();
+#if defined(GENONLINE)
+	Bool isPending(UnsignedInt frame);
+
+	void SeedLatencyData(int latency);
+#endif
 
 protected:
 	// These are used for keeping track of parameters to the run ahead equation.
@@ -57,6 +71,9 @@ protected:
 	Real *m_fpsList;								///< A record of how many game logic frames per second there were for the last 60 seconds.
 	time_t m_lastFpsTimeThing;																///< The time when the last fps entry started being recorded.
 	Int m_fpsListIndex;																				///< Index into the array of the current fps list entry being measured.
+#if defined(GENONLINE)
+	UnsignedInt m_fpsListLength;																						///< Entries m_fpsList holds, the history length can change after construction.
+#endif
 	Real m_averageFps;																				///< The current average logic fps, computed just like m_averageLatency below but with the fps numbers.
 
 	// round trip time to packet router variables.
