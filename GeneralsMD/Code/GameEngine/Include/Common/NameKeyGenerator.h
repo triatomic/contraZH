@@ -149,6 +149,7 @@ private:
 public:
 	StaticNameKey(const char* p) : m_key(NAMEKEY_INVALID), m_name(p) {}
 	NameKeyType key() const;
+	const char* name() const { return m_name; }
 	// ugh, this is a little hokey, but lets us pretend that a StaticNameKey == NameKeyType
 	operator NameKeyType() const { return key(); }
 };

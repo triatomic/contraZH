@@ -4039,7 +4039,7 @@ void Object::updateObjValuesFromMapProperties(Dict* properties)
 	do
 	{
 		AsciiString keyName;
-		keyName.format("%s%d", TheNameKeyGenerator->keyToName(TheKey_objectGrantUpgrade).str(), upgradeNum);
+		keyName.format("%s%d", TheKey_objectGrantUpgrade.name(), upgradeNum);
 		valStr = properties->getAsciiString(NAMEKEY(keyName), &exists);
 
 		if (exists)
