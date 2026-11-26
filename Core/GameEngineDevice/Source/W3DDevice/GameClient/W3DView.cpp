@@ -116,6 +116,7 @@ constexpr const Real NearZ = MAP_XY_FACTOR; ///< Set the near to MAP_XY_FACTOR. 
 #if defined(GENONLINE)
 #if defined(GENONLINE)
 #include "GameNetwork/GenOnline/GenOnlineInit.h"
+#include "GameNetwork/GenOnline/GenOnlineForkMatchSettings.h"
 class GenOnlineLobbyInterface;
 #endif
 
@@ -3163,6 +3164,19 @@ void W3DView::setDefaultView(Real pitch, Real angle, Real maxHeight)
 	setDefaultPitch(pitch);
 #if defined(GENONLINE)
 
+	// GenOnline's camera heights and aspect scale apply in an online match only.
+	if (!GenOnlineForkIsOnlineMatch())
+	{
+		m_maxHeightAboveGround = TheGlobalData->m_maxCameraHeight*maxHeight;
+		if (m_minHeightAboveGround > m_maxHeightAboveGround)
+		{
+			m_maxHeightAboveGround = m_minHeightAboveGround;
+		}
+		m_defaultMaxHeightAboveGround = m_maxHeightAboveGround;
+		return;
+	}
+	GenOnlineForkSaveMatchSettings();
+
     // TODO_GENONLINE: Better way of doing this
 #if defined(GENONLINE)
     if (bForceDefaultCam)
@@ -3207,7 +3221,7 @@ void W3DView::setHeightAboveGround(Real z)
 {
 #if defined(GENONLINE)
 #if defined(GENONLINE)
-	if (ThePlayerList && ThePlayerList->getLocalPlayer() && ThePlayerList->getLocalPlayer()->isPlayerObserver())
+	if (GenOnlineForkIsOnlineMatch() && ThePlayerList && ThePlayerList->getLocalPlayer() && ThePlayerList->getLocalPlayer()->isPlayerObserver())
 	{
 		const Real cameraHeightForReset = 500.0f;
 		m_maxHeightAboveGround = z > cameraHeightForReset ? (float)GENONLINE_MAX_LOBBY_CAMERA_ZOOM : cameraHeightForReset;

@@ -1262,6 +1262,9 @@ void GenOnlineServicesManager::CancelUpdate()
 
 void GenOnlineServicesManager::LaunchPatcher(std::function<void(void)> cbFailed)
 {
+#if !GENONLINE_FORK_SELF_UPDATE
+	NetworkLog(ELogVerbosity::LOG_RELEASE, "[GenOnline] Patcher not launched, self-update is off in this build");
+#else
 	char GameDir[MAX_PATH + 1] = {};
 	::GetCurrentDirectoryA(MAX_PATH + 1u, GameDir);
 
@@ -1314,10 +1317,14 @@ void GenOnlineServicesManager::LaunchPatcher(std::function<void(void)> cbFailed)
 		}
 		ShellExecuteA(NULL, "open", "https://www.generals.online/updatefailed", NULL, NULL, SW_SHOWNORMAL);
 	}
+#endif
 }
 
 void GenOnlineServicesManager::StartDownloadUpdate(std::function<void(void)> cb, std::function<void(void)> cbFailed)
 {
+#if !GENONLINE_FORK_SELF_UPDATE
+	NetworkLog(ELogVerbosity::LOG_RELEASE, "[GenOnline] Update not downloaded, self-update is off in this build");
+#else
 	TheDownloadManager->SetFileName("Connecting to update service...");
 	TheDownloadManager->OnStatusUpdate(DOWNLOADSTATUS_CONNECTING);
 
@@ -1348,6 +1355,7 @@ void GenOnlineServicesManager::StartDownloadUpdate(std::function<void(void)> cb,
 	// start for real
 	ContinueUpdate();
 
+#endif
 
 }
 

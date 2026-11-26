@@ -41,6 +41,7 @@
 #include "Common/FramePacer.h"
 #if defined(GENONLINE)
 #include "Common/AdaptiveQuality.h"
+#include "GameNetwork/GenOnline/GenOnlineForkMatchSettings.h"
 #endif
 #include "Common/GameAudio.h"
 #include "Common/GameType.h"
@@ -4118,11 +4119,13 @@ void InGameUI::update()
 		// TheSuperHackers @tweak The camera rotation and zoom are now decoupled from the render update.
 		const Real fpsRatio = TheFramePacer->getBaseOverUpdateFpsRatio();
 #if defined(GENONLINE)
+		// GenOnline's camera factors apply in an online match only, elsewhere the camera turns and zooms at the fork's speeds.
+		const Bool onlineCamera = GenOnlineForkIsOnlineMatch();
 		// Pitch at half speed feels alike: shorter range, larger view change per degree.
 		const Real turnAngle = TheGlobalData->m_keyboardCameraRotateSpeed * 0.6f * fpsRatio;
-		const Real rotateAngle = turnAngle * SCROLL_MULTIPLIER * TheGlobalData->m_cameraRotateFactor;
-		const Real pitchAngle = turnAngle * 0.5f * SCROLL_MULTIPLIER * TheGlobalData->m_cameraPitchFactor;
-		const Real zoomHeight = (Real)View::ZoomHeightPerSecond * fpsRatio * SCROLL_MULTIPLIER * TheGlobalData->m_cameraZoomFactor;
+		const Real rotateAngle = onlineCamera ? turnAngle * SCROLL_MULTIPLIER * TheGlobalData->m_cameraRotateFactor : TheGlobalData->m_keyboardCameraRotateSpeed * fpsRatio;
+		const Real pitchAngle = onlineCamera ? turnAngle * 0.5f * SCROLL_MULTIPLIER * TheGlobalData->m_cameraPitchFactor : rotateAngle * 0.5f;
+		const Real zoomHeight = onlineCamera ? (Real)View::ZoomHeightPerSecond * fpsRatio * SCROLL_MULTIPLIER * TheGlobalData->m_cameraZoomFactor : (Real)View::ZoomHeightPerSecond * fpsRatio;
 #else
 		const Real rotateAngle = TheGlobalData->m_keyboardCameraRotateSpeed * fpsRatio;
 		const Real zoomHeight = (Real)View::ZoomHeightPerSecond * fpsRatio;

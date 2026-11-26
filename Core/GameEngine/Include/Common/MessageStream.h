@@ -525,6 +525,13 @@ public:
 		MSG_META_SPECIAL_POWER_16,
 #endif
 
+#if defined(GENONLINE)
+		MSG_META_TOGGLE_NETWORK_STATS,							///< GenOnline's network overlay, off then basic then detailed
+		MSG_META_TAKE_SCREENSHOT_ALT,								///< second key for the JPEG screenshot
+		MSG_META_TOGGLE_BUDDY_OVERLAY,							///< open or close GenOnline's buddy overlay
+		MSG_META_TOGGLE_BUDDY_OVERLAY_ALT,					///< second key for the buddy overlay
+
+#endif
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 
 		MSG_MOUSEOVER_DRAWABLE_HINT,								///< (drawableid) the given drawable is under the mouse, regardless of button states

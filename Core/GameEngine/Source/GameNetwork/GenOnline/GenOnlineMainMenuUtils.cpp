@@ -935,7 +935,13 @@ void GenOnlineStartPatchCheck()
 				return;
 			}
 
-#if defined(GENONLINE_BUILD_ENVIRONMENT)
+#if defined(GENONLINE_BUILD_ENVIRONMENT) || !GENONLINE_FORK_SELF_UPDATE
+#if !GENONLINE_FORK_SELF_UPDATE
+			if (bNeedsUpdate)
+			{
+				NetworkLog(ELogVerbosity::LOG_RELEASE, "VERSION CHECK: Update skipped, self-update is off in this build");
+			}
+#endif
 			bNeedsUpdate = false;
 #endif
 			cantConnectBeforeOnline = !bSuccess;

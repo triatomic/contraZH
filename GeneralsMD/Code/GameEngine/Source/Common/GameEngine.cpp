@@ -127,6 +127,7 @@
 #if defined(GENONLINE)
 #include "GameNetwork/GenOnline/GenOnlineInit.h"
 #include "GameNetwork/GenOnline/Provider/GenOnlinePluginHost.h"
+#include "GameNetwork/GenOnline/GenOnlineForkMatchSettings.h"
 #endif
 #endif
 
@@ -1152,17 +1153,7 @@ void GameEngine::update()
 
 #if defined(GENONLINE)
 #if defined(GENONLINE)
-			// GENONLINE_NOTE: Lock the shellmap to 30fps until its issues are fixed
-			Int matchFpsLimit = 0;
-			if (GetOnlineGameHooks()->getMatchFrameRateLimit(matchFpsLimit) && TheGameLogic->isInGame() && !TheShell->isShellActive())
-			{
-				TheFramePacer->setFramesPerSecondLimit(matchFpsLimit);
-				TheWritableGlobalData->m_useFpsLimit = matchFpsLimit;
-			}
-			else
-			{
-				TheFramePacer->setFramesPerSecondLimit(LOGICFRAMES_PER_SECOND);
-			}
+			GenOnlineForkUpdateMatchSettings();
 #endif
 			
 				TheRadar->UPDATE();

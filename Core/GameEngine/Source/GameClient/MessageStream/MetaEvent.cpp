@@ -202,6 +202,12 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "SPECIAL_POWER_15", GameMessage::MSG_META_SPECIAL_POWER_15 },
 	{ "SPECIAL_POWER_16", GameMessage::MSG_META_SPECIAL_POWER_16 },
 #endif
+#if defined(GENONLINE)
+	{ "TOGGLE_NETWORK_STATS",											GameMessage::MSG_META_TOGGLE_NETWORK_STATS },
+	{ "TAKE_SCREENSHOT_ALT",											GameMessage::MSG_META_TAKE_SCREENSHOT_ALT },
+	{ "TOGGLE_BUDDY_OVERLAY",											GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY },
+	{ "TOGGLE_BUDDY_OVERLAY_ALT",									GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT },
+#endif
 	{ "BEGIN_FORCEATTACK",												GameMessage::MSG_META_BEGIN_FORCEATTACK },
 	{ "END_FORCEATTACK",													GameMessage::MSG_META_END_FORCEATTACK },
 	{ "BEGIN_FORCEMOVE",													GameMessage::MSG_META_BEGIN_FORCEMOVE },
@@ -1714,6 +1720,37 @@ void MetaMap::generateMetaMap()
 		}
 	}
 
+#if defined(GENONLINE)
+	{
+		// GenOnline's keys as commands, so the Hotkeys screen rebinds them. Appended, so a command that already has one of these keys keeps it.
+		const struct { GameMessage::Type meta; MappableKeyType key; MappableKeyModState modState; } goKeys[] =
+		{
+			{ GameMessage::MSG_META_TOGGLE_NETWORK_STATS, MK_F10, SHIFT },
+			{ GameMessage::MSG_META_TAKE_SCREENSHOT_ALT, MK_F11, SHIFT },
+			{ GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY, MK_F5, SHIFT },
+			{ GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT, MK_INS, NONE },
+		};
+		for (Int i = 0; i < ARRAY_SIZE(goKeys); ++i)
+		{
+			const MetaMapRec *existing = getFirstMetaMapRec();
+			while (existing && existing->m_meta != goKeys[i].meta)
+			{
+				existing = existing->m_next;
+			}
+			if (existing)
+			{
+				continue;
+			}
+			MetaMapRec *map = appendMetaMapRec(goKeys[i].meta);
+			map->m_category = CATEGORY_GO;
+			map->m_key = goKeys[i].key;
+			map->m_transition = DOWN;
+			map->m_modState = goKeys[i].modState;
+			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
+		}
+	}
+
+#endif
 #if RTS_ZEROHOUR
 	{
 		const GameMessage::Type facingDragTypes[] = { GameMessage::MSG_META_BEGIN_FACING_DRAG, GameMessage::MSG_META_END_FACING_DRAG };

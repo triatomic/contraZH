@@ -9,6 +9,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameLogic/GameLogic.h"
 #include "GameNetwork/GenOnline/GenOnlineLobbyInterface.h"
+#include "GameNetwork/GenOnline/GenOnlineForkMatchSettings.h"
 
 #include <algorithm>
 
@@ -138,7 +139,7 @@ Bool AdaptiveQuality::shouldSkipRender()
 void AdaptiveQuality::frameEnd()
 {
 	const Bool enabled = GenOnlineServicesManager::Settings.Graphics_AdaptiveQuality();
-	const Bool inMatch = enabled && TheGameLogic != nullptr && TheGameLogic->isInGame() && !TheGameLogic->isInShellGame() && !TheGameLogic->isInReplayGame() && TheGameLogic->getFrame() > 0;
+	const Bool inMatch = enabled && TheGameLogic != nullptr && TheGameLogic->isInGame() && !TheGameLogic->isInShellGame() && !TheGameLogic->isInReplayGame() && TheGameLogic->getFrame() > 0 && GenOnlineForkIsOnlineMatch();
 	if (inMatch != m_inMatch)
 	{
 		if (inMatch)

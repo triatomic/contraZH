@@ -581,9 +581,15 @@ void GenOnlineAuthInterface::ApplyTokensV1(const GenOnlineRealtime::TokenRespons
 void GenOnlineAuthInterface::RegisterSessionV1(std::function<void(int statusCode, const std::string& strBody)> fnDone)
 {
 	GenOnlineRealtime::AuthSessionRequest request;
+#if GENONLINE_FORK_HW_FINGERPRINT
 	request.machine_guid = GetMachineGuid();
 	request.mac_addr = GetPrimaryMacAddress();
 	request.vol_serial = GetVolumeSerial();
+#else
+	request.machine_guid = std::string();
+	request.mac_addr = std::string();
+	request.vol_serial = std::string();
+#endif
 	request.exe_crc = TheGlobalData->m_exeCRC;
 	request.ini_crc = TheGlobalData->m_iniCRC;
 	request.anticheat_id = GenOnlinePluginHost::GetAnticheatIdentifier();

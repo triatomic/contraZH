@@ -15,6 +15,7 @@
 #include "Common/GlobalData.h"
 #include "GameClient/View.h"
 #include "../GenOnlineDefines.h"
+#include "GameNetwork/GenOnline/GenOnlineForkMatchSettings.h"
 
 int FRAME_GROUPING_CAP = 32;
 
@@ -480,6 +481,7 @@ void GenOnlineGame::launchGame(void)
 
 #if defined(GENONLINE)
 
+	GenOnlineForkSaveMatchSettings();
 	if (GenOnlineServicesManager::Settings.Graphics_LimitFramerate())
 	{
 		TheWritableGlobalData->m_framesPerSecondLimit = GenOnlineServicesManager::Settings.Graphics_GetFPSLimit();
@@ -512,7 +514,7 @@ void GenOnlineGame::launchGame(void)
 			if (pos != std::string::npos) { strMapName.erase(pos, strExt.size()); }
 
             UnicodeString msg;
-            msg.format(L"Map: %s\nPress F5 or INSERT to open the communicator.", from_utf8(strMapName).c_str());
+            msg.format(L"Map: %s\nPress Shift+F5 or INSERT to open the communicator.", from_utf8(strMapName).c_str());
             GenOnlineShowNotificationBox(AsciiString::TheEmptyString, msg, false);
 		}
 

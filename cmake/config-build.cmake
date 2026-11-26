@@ -33,6 +33,9 @@ add_feature_info(ProfileBuild RTS_BUILD_OPTION_PROFILE "Building as a \"Profile\
 add_feature_info(DebugBuild RTS_BUILD_OPTION_DEBUG "Building as a \"Debug\" build")
 add_feature_info(AddressSanitizer RTS_BUILD_OPTION_ASAN "Building with address sanitizer")
 if(RTS_BUILD_GENERALS_ONLINE)
+    # Declared before GenOnline's hook, which would otherwise default the DSN to its crash report server.
+    set(GENONLINE_SENTRY_DSN "" CACHE STRING "Crash report DSN of release builds, a DSN enables crash reports")
+    option(GENONLINE_FORK_VCRUNTIME_CHECK "Build GenOnline's VC++ runtime check, which can download and run the redistributable" OFF)
     include(${CMAKE_SOURCE_DIR}/GenOnline/cmake/config-build.cmake)
 endif()
 add_feature_info(WorldBuilderQt RTS_ENABLE_WORLDBUILDER_QT "Building WorldBuilder with an embedded Qt event loop (experimental)")

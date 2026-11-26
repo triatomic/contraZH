@@ -334,6 +334,7 @@ void WebSocket::RegisterPeerHandlers()
 		{
 			ModuleScanResponseRequest response;
 			response.scan_id = event.scan_id;
+#if GENONLINE_FORK_HW_FINGERPRINT
 			for (const GOModuleInfo& module : GetLoadedModules())
 			{
 				ScannedModule entry;
@@ -341,6 +342,7 @@ void WebSocket::RegisterPeerHandlers()
 				entry.size = (int64_t)module.size;
 				response.modules.push_back(entry);
 			}
+#endif
 			FireHub(response);
 		});
 }

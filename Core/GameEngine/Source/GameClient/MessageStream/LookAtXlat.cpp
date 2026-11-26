@@ -52,6 +52,9 @@
 #include "GameLogic/GameLogic.h"
 
 #include "Common/GlobalData.h"			// for camera pitch angle only
+#if defined(GENONLINE)
+#include "GameNetwork/GenOnline/GenOnlineForkMatchSettings.h"
+#endif
 
 LookAtTranslator *TheLookAtTranslator = nullptr;
 
@@ -496,7 +499,8 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 #endif
 
 #if defined(GENONLINE)
-			const Real zoom = -spin * View::ZoomHeightPerSecond * SCROLL_MULTIPLIER * TheGlobalData->m_cameraZoomFactor;
+			// GenOnline's zoom factor applies in an online match only.
+			const Real zoom = GenOnlineForkIsOnlineMatch() ? -spin * View::ZoomHeightPerSecond * SCROLL_MULTIPLIER * TheGlobalData->m_cameraZoomFactor : -spin * View::ZoomHeightPerSecond;
 #else
 			const Real zoom = -spin * View::ZoomHeightPerSecond;
 #endif

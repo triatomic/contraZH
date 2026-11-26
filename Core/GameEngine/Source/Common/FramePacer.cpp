@@ -23,6 +23,7 @@
 
 #if defined(GENONLINE)
 #include "Common/GameEngine.h"
+#include "GameNetwork/GenOnline/GenOnlineForkMatchSettings.h"
 
 #endif
 #include "GameLogic/GameLogic.h"
@@ -216,20 +217,10 @@ Int FramePacer::getActualFramesPerSecondLimit() const
 
 #if defined(GENONLINE)
 #if defined(GENONLINE)
-// the most the menus and the shell map render at
-static const Int MENU_FPS_LIMIT = 60;
-
 Int FramePacer::getSituationCappedFramesPerSecondLimit(Int fps) const
 {
-	// A match renders at the chosen limit, uncapped included, the menus and the shell map gain nothing from more than 60.
-	const Bool inMatch = TheGameLogic != nullptr && TheGameLogic->isInGame() && TheGameLogic->getGameMode() != GAME_SHELL;
-	if (!inMatch)
-	{
-		fps = std::min<Int>(fps, MENU_FPS_LIMIT);
-	}
-
-	// Without focus nobody watches the match at a high frame rate.
-	if (TheGameEngine != nullptr && !TheGameEngine->isActive())
+	// GenOnline's focus cap applies in an online match only, elsewhere the fork's own limit rules.
+	if (GenOnlineForkIsOnlineMatch() && TheGameEngine != nullptr && !TheGameEngine->isActive())
 	{
 		fps = std::min<Int>(fps, LOGICFRAMES_PER_SECOND);
 	}

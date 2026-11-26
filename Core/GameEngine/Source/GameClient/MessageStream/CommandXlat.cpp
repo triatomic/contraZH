@@ -4076,38 +4076,6 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 		case GameMessage::MSG_RAW_KEY_UP:
 		{
-#if defined(GENONLINE)
-        {
-            int key = msg->getArgument(0)->integer;
-
-            if (key == KEY_F11)
-            {
-                if (TheDisplay)
-                    TheDisplay->takeScreenShot(SCREENSHOT_JPEG, TheGlobalData->m_jpegQuality);
-
-                disp = DESTROY_MESSAGE;
-            }
-            else if (key == KEY_F10)
-            {
-                GenOnlineServicesManager::ToggleNetworkOverlay((TheKeyboard != nullptr && TheKeyboard->isShift()) ? 2 : 1);
-
-                disp = DESTROY_MESSAGE;
-            }
-            else if (key == KEY_F5 || key == KEY_INS)
-            {
-                if (GameSpyIsOverlayOpen(GSOVERLAY_BUDDY))
-                {
-                    GameSpyCloseOverlay(GSOVERLAY_BUDDY);
-                }
-                else
-                {
-                    GameSpyOpenOverlay(GSOVERLAY_BUDDY);
-                }
-
-                disp = DESTROY_MESSAGE;
-            }
-        }
-#endif
 			// TheSuperHackers @feature Release half of hold to aim reverse move. The meta event
 			// only fires on the press, so watch for whatever key TOGGLE_REVERSEMOVE is bound to
 			// coming up. The message is kept, nothing here consumes the key.
@@ -4977,6 +4945,27 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		}
 
 		// --------------------------------------------------------------------------------------------
+#if defined(GENONLINE)
+		case GameMessage::MSG_META_TOGGLE_NETWORK_STATS:
+			GenOnlineServicesManager::ToggleNetworkOverlay(GenOnlineServicesManager::GetNetworkOverlayMode() == 0 ? 1 : 2);
+			disp = DESTROY_MESSAGE;
+			break;
+
+		case GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY:
+		case GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT:
+			if (GameSpyIsOverlayOpen(GSOVERLAY_BUDDY))
+			{
+				GameSpyCloseOverlay(GSOVERLAY_BUDDY);
+			}
+			else
+			{
+				GameSpyOpenOverlay(GSOVERLAY_BUDDY);
+			}
+			disp = DESTROY_MESSAGE;
+			break;
+
+		case GameMessage::MSG_META_TAKE_SCREENSHOT_ALT:
+#endif
 		case GameMessage::MSG_META_TAKE_SCREENSHOT:
 		{
 			if (TheDisplay)

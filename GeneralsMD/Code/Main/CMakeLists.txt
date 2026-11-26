@@ -11,6 +11,20 @@ if(RTS_DEBUG_CHEATS)
 else()
     set_target_properties(z_generals PROPERTIES OUTPUT_NAME "generalszh${RTS_BUILD_OUTPUT_SUFFIX}")
 endif()
+if(RTS_BUILD_GENERALS_ONLINE)
+    # GenOnline renames the exe in a deferred call, so the fork's name is put back by one deferred after it.
+    get_target_property(_zh_output_name z_generals OUTPUT_NAME)
+    cmake_language(DEFER CALL set_target_properties z_generals PROPERTIES OUTPUT_NAME "${_zh_output_name}")
+
+    if(NOT GENONLINE_FORK_VCRUNTIME_CHECK)
+        get_target_property(_zh_sources z_generals SOURCES)
+        list(REMOVE_ITEM _zh_sources "${GENONLINE_VCRUNTIME_CHECK_SOURCE}")
+        set_target_properties(z_generals PROPERTIES SOURCES "${_zh_sources}")
+        # The delay loads only serve the runtime check.
+        function(genonline_vcruntime_check_link target)
+        endfunction()
+    endif()
+endif()
 
 target_link_libraries(z_generals PRIVATE
     comctl32

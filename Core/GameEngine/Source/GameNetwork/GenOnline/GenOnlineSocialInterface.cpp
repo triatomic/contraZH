@@ -443,7 +443,7 @@ void GenOnlineSocialInterface::OnRealtimeFriends(const GenOnlineRealtime::Friend
 		}
 		else
 		{
-			strText = UnicodeString(L"Press F5 or INSERT to bring up the communicator at any time (including in-game).");
+			strText = UnicodeString(L"Press Shift+F5 or INSERT to bring up the communicator at any time (including in-game).");
 		}
 		if (numPending > 0)
 		{
