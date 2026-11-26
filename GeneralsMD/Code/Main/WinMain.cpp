@@ -793,6 +793,11 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 			if (TheKeyboard)
 				TheKeyboard->resetKeys();
 
+			if (TheInGameUI)
+			{
+				TheInGameUI->clearModifierModes();
+			}
+
 			if (TheMouse)
 				TheMouse->regainFocus();
 
@@ -804,6 +809,11 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 		{
 			if (TheKeyboard)
 				TheKeyboard->resetKeys();
+
+			if (TheInGameUI)
+			{
+				TheInGameUI->clearModifierModes();
+			}
 
 			if (TheMouse)
 			{
@@ -910,6 +920,18 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 				TheWin32Mouse->addWin32Event(message, wParam, lParam, TheMessageTime);
 
 			return 0;
+		}
+
+		//-------------------------------------------------------------------------
+		case 0x020B: // WM_XBUTTONDOWN
+		case 0x020C: // WM_XBUTTONUP
+		case 0x020D: // WM_XBUTTONDBLCLK
+		{
+			if( TheWin32Mouse )
+			{
+				TheWin32Mouse->addWin32Event( message, wParam, lParam, TheMessageTime );
+			}
+			return TRUE;
 		}
 
 		//-------------------------------------------------------------------------

@@ -5180,6 +5180,7 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 		{
 		case GameMessage::MSG_DO_MOVETO_HINT:
 		case GameMessage::MSG_DO_ATTACKMOVETO_HINT:
+		case GameMessage::MSG_DO_REVERSE_MOVETO_HINT:
 		case GameMessage::MSG_ADD_WAYPOINT:
 			setMouseCursor(Mouse::BUILD_PLACEMENT);
 			break;
@@ -5256,7 +5257,10 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 				{
 #if defined(GENONLINE)
 				case GameMessage::MSG_VALID_GUICOMMAND_HINT:
-					cursorName = m_pendingGUICommand->getCursorName();
+					if( hasPendingSpecialPowerLocations() && !m_pendingGUICommand->getSecondCursorName().isEmpty() )
+						cursorName = m_pendingGUICommand->getSecondCursorName();
+					else
+						cursorName = m_pendingGUICommand->getCursorName();
 					break;
 				case GameMessage::MSG_INVALID_GUICOMMAND_HINT:
 				default:
@@ -5367,9 +5371,15 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 				{
 					setMouseCursor(Mouse::CROSS);
 				}
-				setRadiusCursor(m_pendingGUICommand->getRadiusCursorType(), //*****************************************************************
-					m_pendingGUICommand->getSpecialPowerTemplate(),
-					m_pendingGUICommand->getWeaponSlot());
+				{
+					RadiusCursorType rcType;
+					Real rcRadius;
+					resolveSpecialPowerRadiusCursor( m_pendingGUICommand, rcType, rcRadius );
+					setRadiusCursor(rcType,
+						m_pendingGUICommand->getSpecialPowerTemplate(),
+						m_pendingGUICommand->getWeaponSlot(),
+						rcRadius);
+				}
 #endif
 			}
 #if defined(GENONLINE)
@@ -5380,9 +5390,15 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 					setMouseCursor((Mouse::MouseCursor)index);
 				else
 					setMouseCursor(Mouse::CROSS);
-				setRadiusCursor(m_pendingGUICommand->getRadiusCursorType(), //*****************************************************************
-					m_pendingGUICommand->getSpecialPowerTemplate(),
-					m_pendingGUICommand->getWeaponSlot());
+				{
+					RadiusCursorType rcType;
+					Real rcRadius;
+					resolveSpecialPowerRadiusCursor( m_pendingGUICommand, rcType, rcRadius );
+					setRadiusCursor(rcType,
+						m_pendingGUICommand->getSpecialPowerTemplate(),
+						m_pendingGUICommand->getWeaponSlot(),
+						rcRadius);
+				}
 			}
 			else
 			{
