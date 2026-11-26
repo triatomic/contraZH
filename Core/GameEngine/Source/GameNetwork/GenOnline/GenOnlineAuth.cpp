@@ -381,10 +381,15 @@ std::string GenOnlineAuthInterface::CredentialServerKey()
 	return ServiceConnection::CredentialServerKey(GenOnlineServicesManager::Settings.Network_GetConnectionSettings());
 }
 
-// The test and the live services keep their logins in separate files
-static const char* CredentialsFileName()
+// Each service and each extra game instance keeps its login in a separate file
+static std::string CredentialsFileName()
 {
-	return GenOnlineServicesManager::GetEnvironment() == GenOnlineServicesManager::EEnvironment::TEST ? "credentials_env_test.json" : "credentials.json";
+	const char* strBaseName = GenOnlineServicesManager::GetEnvironment() == GenOnlineServicesManager::EEnvironment::TEST ? "credentials_env_test" : "credentials";
+	if (rts::ClientInstance::getInstanceId() > 1u)
+	{
+		return std::format("{}_Instance{:02}.json", strBaseName, rts::ClientInstance::getInstanceId());
+	}
+	return std::format("{}.json", strBaseName);
 }
 
 std::string GenOnlineAuthInterface::GetCredentialsFilePath()

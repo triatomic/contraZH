@@ -27,6 +27,7 @@ This tree holds the GenOnline online stack, the Generals Online team's 2026.11 c
 - `vcpkg.json` holds GenOnline's dependencies in the `genonline` feature and uses GenOnline's baseline, so the vcpkg checkout must be at or past 2026-09-23.
 - Configured with `RTS_BUILD_OPTION_MODERN_MEDIA=OFF`: Miles and Bink only, no OpenAL or FFmpeg.
 - Configured with `GENONLINE_ENVIRONMENT=test`, so the client uses `https://api-test.generals.online`. Left empty, GenOnline picks the service from the git tag: test for a `vYYYY.MM.N-rc.N` tag, live (`https://api.generals.online`) for anything else, which is what the fork's tags give. `network.environment` in `settings.client.json` overrides both.
+- Configured with `RTS_DEBUG_MULTI_INSTANCE=ON`, so a second copy of the game can start for testing a lobby on one PC. Each extra instance keeps its own options, stats, replays and login (`credentials_env_test_Instance02.json`), so it signs in to its own account.
 - `.gitattributes` keeps the overlay port patches LF; `git apply` rejects them as CRLF.
 - The exe keeps the fork's name (`generalszh`, `generalszh_c` with cheats).
 - The data pack is not built by CMake: `python GenOnline/tools/pack_go_data.py zerohour 2026.11.0 <exe folder>\data contra`. The last argument overlays `GenOnline/data/contra`, the Contra colour theme, on the Zero Hour files.
@@ -71,6 +72,7 @@ Switches are in `Include/GameNetwork/GenOnline/GenOnlineForkPolicy.h`; CMake opt
 | `GenOnlineDefines.h` | includes `GenOnlineForkPolicy.h`; texture filter switch |
 | `GenOnlineInit.cpp`, `GenOnlineMainMenuUtils.cpp` | self-update switch |
 | `GenOnlineAuth.cpp`, `GenOnlineRoomsInterface.cpp` | fingerprint switch; Shift+F5 hint text |
+| `GenOnlineAuth.cpp` | login file per extra game instance |
 | `GenOnlineGame.cpp` | saves the fork's render settings at match launch |
 | `GenOnlineSocialInterface.cpp` | Shift+F5 hint text |
 | `Menus/GenOnline/GenOnlineGameSetupMenu.cpp` | ten `ForkLobbyRules*` hook calls and the include |
