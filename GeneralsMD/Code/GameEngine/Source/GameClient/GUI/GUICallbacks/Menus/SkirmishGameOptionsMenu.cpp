@@ -461,13 +461,6 @@ void reallyDoStart()
 	if (maxFPS < 15)
 		maxFPS = 15;
 
-#if defined(GENONLINE)
-#if defined(GENONLINE)
-	// The logic runs faster than retail, so the retail frame rate scales to logic frames per second.
-	TheFramePacer->setGameSpeedFps(maxFPS * LOGICFRAMES_PER_BASEFRAME);
-#endif
-
-#endif
   TheWritableGlobalData->m_mapName = TheSkirmishGameInfo->getMap();
   TheSkirmishGameInfo->startGame(0);
 
