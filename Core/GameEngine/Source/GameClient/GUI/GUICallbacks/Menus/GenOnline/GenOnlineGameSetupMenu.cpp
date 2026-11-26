@@ -80,6 +80,7 @@
 #include <cmath>
 #include "GameNetwork/GenOnline/GenOnlineInit.h"
 #include "GameNetwork/GenOnline/GenOnlineAnticheatKind.h"
+#include "GameNetwork/GenOnline/GenOnlineForkLobbyRules.h"
 #include "GameClient/Image.h"
 #include "GameLogic/GameLogic.h"
 GenOnlineGame* TheGenOnlineGame = NULL;
@@ -1467,6 +1468,8 @@ void GenOnlineDisplayGameOptions()
 		return;
 	}
 
+	ForkLobbyRulesRefresh();
+
 	const GameSlot *localSlot = NULL;
 	if (theGame->getLocalSlotNum() >= 0)
 		localSlot = theGame->getConstSlot(theGame->getLocalSlotNum());
@@ -1926,6 +1929,7 @@ void GenOnlineInitGameGadgets()
 	buttonBack = TheWindowManager->winGetWindowFromId( parentWOLGameSetup,  buttonBackID);
 	GenOnlineListboxGameSetupChat = TheWindowManager->winGetWindowFromId( parentWOLGameSetup, GenOnlineListboxGameSetupChatID );
 	textEntryChat = TheWindowManager->winGetWindowFromId( parentWOLGameSetup, textEntryChatID );
+	ForkLobbyRulesInit(parentWOLGameSetup, GenOnlineListboxGameSetupChat, textEntryChat);
 	textEntryMapDisplay = TheWindowManager->winGetWindowFromId( parentWOLGameSetup, textEntryMapDisplayID );
 	windowMap = TheWindowManager->winGetWindowFromId( parentWOLGameSetup,windowMapID  );
 	SetListBoxRowAnimMode(GenOnlineListboxGameSetupChat, LIST_ROW_ANIM_SLOT);
@@ -2182,6 +2186,7 @@ void GenOnlineDeinitGameGadgets()
 	buttonBack = nullptr;
 	GenOnlineListboxGameSetupChat = nullptr;
 	textEntryChat = nullptr;
+	ForkLobbyRulesDeinit();
 	textEntryMapDisplay = nullptr;
 	if (windowMap)
 	{
@@ -2217,6 +2222,10 @@ Bool GenOnlineInitialAcceptEnable = FALSE;
 // A lobby chat line keeps its key as item data, so a MessageDelete can find and remove it.
 static void AddLobbyChatMessageLine(UnicodeString strMessage, Color color, uint32_t key)
 {
+	if (ForkLobbyRulesOnChatLine(strMessage))
+	{
+		return;
+	}
 	// GenOnline @bugfix arcticdolphin 22/11/2026 A word wider than the chat list is broken so the line wraps fully.
 	const Int row = GadgetListBoxAddEntryText(GenOnlineListboxGameSetupChat, GenOnlineBreakLongWords(GenOnlineListboxGameSetupChat, strMessage), color, -1, -1);
 	if (row >= 0)
@@ -2264,6 +2273,10 @@ void GenOnlineGameSetupMenuInit( WindowLayout *layout, void *userData )
 	// register for chat events
 	pLobbyInterface->RegisterForChatCallback([](UnicodeString strMessage, Color color)
 		{
+			if (ForkLobbyRulesOnChatLine(strMessage))
+			{
+				return;
+			}
 			GadgetListBoxAddEntryText(GenOnlineListboxGameSetupChat, strMessage, color, -1, -1);
 		});
 	pLobbyInterface->RegisterForChatMessageCallbacks(AddLobbyChatMessageLine, RemoveLobbyChatMessageLine);
@@ -2390,6 +2403,7 @@ void GenOnlineGameSetupMenuInit( WindowLayout *layout, void *userData )
 		{
 			GenOnlineDisplaySlotList();
 			GenOnlineDisplayGameOptions();
+			ForkLobbyRulesOnRosterChanged();
 		});
 
 	pLobbyInterface->RegisterForGameStartPacket([]()
@@ -3023,6 +3037,7 @@ void GenOnlineGameSetupMenuUpdate( WindowLayout * layout, void *userData)
 						{
 							GadgetListBoxAddEntryText(GenOnlineListboxGameSetupChat, UnicodeString(L"Host: The previous host left. A new host was selected."), GOUIColor(GOUICOLOR_MUTED, GameMakeColor(192, 192, 192, 255)), -1, -1);
 						}
+						ForkLobbyRulesOnHostMigrated();
 
 						GameWindow* buttonBuddy = TheWindowManager->winGetWindowFromId(NULL, NAMEKEY("GameSpyGameOptionsMenu.wnd:ButtonCommunicator"));
 						if (buttonBuddy != nullptr)
@@ -3200,6 +3215,11 @@ Bool GenOnlineHandleGameSetupSlashCommands(UnicodeString uText)
 	remainder.nextToken(&token);
 	token.toLower();
 
+	if (ForkLobbyRulesOnSlashCommand(token))
+	{
+		return TRUE;
+	}
+
 	if (token == "host")
 	{
 		UnicodeString s;
@@ -3228,6 +3248,7 @@ Bool GenOnlineHandleGameSetupSlashCommands(UnicodeString uText)
 		GadgetListBoxAddEntryText(GenOnlineListboxGameSetupChat, UnicodeString(L"/setpassword <password> - Set a lobby password (host only)."), helpColor, -1, -1);
 		GadgetListBoxAddEntryText(GenOnlineListboxGameSetupChat, UnicodeString(L"/removepassword - Remove the lobby password (host only)."), helpColor, -1, -1);
 		GadgetListBoxAddEntryText(GenOnlineListboxGameSetupChat, UnicodeString(L"/maxcameraheight <value> - Set the camera height limit (host only)."), helpColor, -1, -1);
+		ForkLobbyRulesAddHelp(GenOnlineListboxGameSetupChat, helpColor);
 		GadgetListBoxAddEntryText(GenOnlineListboxGameSetupChat, UnicodeString(L"/net - Show how you reach each player. /net transport, /net relay, /net gns ice and /net reset change your settings."), helpColor, -1, -1);
 		GadgetListBoxAddEntryText(GenOnlineListboxGameSetupChat, UnicodeString(L"/support - Open the GeneralsOnline Discord."), helpColor, -1, -1);
 		GadgetListBoxAddEntryText(GenOnlineListboxGameSetupChat, UnicodeString(L"/help - Show these commands. You can also use /commands."), helpColor, -1, -1);
@@ -3728,6 +3749,11 @@ WindowMsgHandledType GenOnlineGameSetupMenuSystem( GameWindow *window, UnsignedI
 
 				if (handleRowButton(controlID))
 					break;
+
+				if (ForkLobbyRulesOnSelected(controlID))
+				{
+					break;
+				}
 
 				if ( controlID == buttonBackID )
 				{

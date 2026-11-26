@@ -565,6 +565,9 @@ void GameClient::update()
 	// create the FRAME_TICK message
 	GameMessage *frameMsg = TheMessageStream->appendMessage( GameMessage::MSG_FRAME_TICK );
 	frameMsg->appendTimestampArgument( getFrame() );
+#if defined(GENONLINE)
+	TheGameLogic->sendPendingLobbyRules();
+#endif
 
 	// Update intro
 	if (m_intro != nullptr)

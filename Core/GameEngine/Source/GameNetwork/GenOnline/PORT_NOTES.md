@@ -32,6 +32,7 @@ This tree holds the GenOnline online stack, the Generals Online team's 2026.11 c
 - The data pack is not built by CMake: `python GenOnline/tools/pack_go_data.py zerohour 2026.11.0 <exe folder>\data contra`. The last argument overlays `GenOnline/data/contra`, the Contra colour theme, on the Zero Hour files.
 - The Contra theme is the `contra` entry of `THEMES` in `GenOnline/tools/go_ui_kit.py` plus `GenOnline/data/contra/Data/INI/GOUIColors.ini`. After a palette change run `python GenOnline/tools/go_ui_kit.py --theme contra` and repack.
 - The overlay's `ZZ_GeneralsOnline_Logo.INI` is empty on purpose. The Zero Hour one redefines `GeneralsLogo` to the retail texture and would override the mod's logo. The Generals Online logo on the first load screen (`GOLoadLogo`) is kept, as its authors ask in `LoadScreen.cpp`.
+- The overlay's `Window/Menus/GenOnlineGameOptionsMenu.wnd` is GenOnline's lobby layout plus the mod's Game and Rules tabs. It is generated: after a re-sync run `python build/add_genonline_rules_tab_wnd.py` and repack. The script renames GenOnline's own `PanelGame` frame to `PanelSettingsFrame`, because the tab code uses that name.
 - The ON build runs the logic at 60 Hz in every mode and has its own exe CRC, so it cannot share LAN games or replays with the OFF build.
 
 ## Re-syncing with GenOnline
@@ -59,6 +60,7 @@ Switches are in `Include/GameNetwork/GenOnline/GenOnlineForkPolicy.h`; CMake opt
 - GenOnline's FPS limit, camera heights, camera factors and adaptive quality apply only inside an online match. `GenOnlineForkMatchSettings.{h,cpp}` saves the fork's values at launch and restores them after the match.
 - GenOnline's fixed keys are meta commands in `CATEGORY_GO`: `TOGGLE_NETWORK_STATS` (Shift+F10, cycles off, basic, detailed), `TAKE_SCREENSHOT_ALT` (Shift+F11), `TOGGLE_BUDDY_OVERLAY` (Shift+F5), `TOGGLE_BUDDY_OVERLAY_ALT` (Insert).
 - Archives mount through the fork's registry with GenOnline's priorities, so the interface style switch rebuilds the same tree. Lookup order: loose files, GenOnline menu layouts, mod archives and game-folder archives, data packs, retail archives.
+- The mod's lobby rules (Rules tab, slash commands) live in `GenOnlineForkLobbyRules.{h,cpp}`. The service has no field for them, so the host keeps them per lobby id, shows them to the others through a hidden `[rules] ` announcement, and turns them on in the match with `MSG_ENABLE_LOBBY_RULE` on the first frames.
 - `NvOptimusEnablement` and `AmdPowerXpressRequestHighPerformance` come from `GenOnlineInit.cpp`; `WinMain.cpp` skips `DedicatedGpuExports.h` on the `GENONLINE` side.
 
 ## Imported files edited
@@ -70,6 +72,7 @@ Switches are in `Include/GameNetwork/GenOnline/GenOnlineForkPolicy.h`; CMake opt
 | `GenOnlineAuth.cpp`, `GenOnlineRoomsInterface.cpp` | fingerprint switch; Shift+F5 hint text |
 | `GenOnlineGame.cpp` | saves the fork's render settings at match launch |
 | `GenOnlineSocialInterface.cpp` | Shift+F5 hint text |
+| `Menus/GenOnline/GenOnlineGameSetupMenu.cpp` | ten `ForkLobbyRules*` hook calls and the include |
 | `Common/AdaptiveQuality.cpp` | acts in an online match only |
 | `GenOnline/tools/go_ui_kit.py` | `contra` theme entry |
 | `GenOnline/tools/pack_go_data.py` | optional overlay folder argument |
@@ -82,6 +85,7 @@ Switches are in `Include/GameNetwork/GenOnline/GenOnlineForkPolicy.h`; CMake opt
 - The service can require anti-cheat per lobby; the built-in one is a stub that reports identifier 0.
 - The data pack replaces the mod's shell menus (`MainMenu.wnd`, `OptionsMenu.wnd`, skirmish, LAN and replay menus) with GenOnline's. `ui.style: "retail"` in `settings.client.json` drops GenOnline's layouts; which setting suits Contra is undecided.
 - Fork features still active on the `GENONLINE` side inside simulation code, each a possible desync against official clients: `TheCommandSequence->update()` in `GameLogic.cpp`, the `countKill` gate and OnKill modules in `Object.cpp`, `aiAttackPosition(self->getPosition())` in `FireWeaponPower.cpp`, the production speed multiplier in `Upgrade.cpp`, and INI-gated changes in `AIGroup.cpp` and `AIStates.cpp`.
+- The lobby rules send chat of type `announcement` from the host's client. GenOnline's own client never sends that type, so the service may refuse it. The host then sees an error line, the other players' Rules tab stays blank, and the rules still apply in the match.
 - `NETWORK_PROTOCOL_VERSION` is the same in both builds although the ON side disables compressed map transfer.
 - Server probe requests still trigger screenshot uploads, and replays and stats upload after online matches.
 - Per-region notes from the merge: `build/genonline-port/p3/resolve_*.md`, `p4/fixes.md`, `p5/policy.md`, `p5/archives.md`.

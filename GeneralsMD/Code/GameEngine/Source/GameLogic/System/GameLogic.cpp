@@ -139,6 +139,8 @@ struct QuitGameException {};
 #include "../GenOnlineDefines.h"
 #include "Common/LocalApiLive.h"
 #include "Common/StatsExporter.h"
+#include "GameNetwork/GenOnline/GenOnlineForkLobbyRules.h"
+#include "GameNetwork/GenOnline/GenOnlineGame.h"
 
 #endif
 DECLARE_PERF_TIMER(SleepyMaintenance)
@@ -289,6 +291,9 @@ GameLogic::GameLogic()
 	m_freeRadar = FALSE;
 	m_revealMap = FALSE;
 	m_autoQueue = FALSE;
+#if defined(GENONLINE)
+	m_pendingLobbyRules = 0;
+#endif
 
 	for(Int i = 0; i < MAX_SLOTS; i++)
 	{
@@ -1719,6 +1724,23 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// Saved too, because producers save the unit they auto queue
 	m_autoQueue = TheGameInfo != nullptr && TheGameInfo->getAutoQueue();
+#if defined(GENONLINE)
+	m_pendingLobbyRules = 0;
+	if (!loadingSaveGame && TheGenOnlineGame != nullptr && TheGameInfo == TheGenOnlineGame && !TheRecorder->isPlaybackMode())
+	{
+		GenOnlineLobbyInterface *pLobbyInterface = GenOnlineServicesManager::GetInterface<GenOnlineLobbyInterface>();
+		if (pLobbyInterface != nullptr && pLobbyInterface->IsHost())
+		{
+			for (Int rule = 0; rule < LOBBY_RULE_COUNT; ++rule)
+			{
+				if (ForkLobbyRuleIsOn((LobbyRule)rule))
+				{
+					m_pendingLobbyRules |= 1u << rule;
+				}
+			}
+		}
+	}
+#endif
 
 #if defined(GENONLINE)
 	checkForDuplicateColors(game);
@@ -6776,8 +6798,26 @@ bool GameLogic::onSetDiplomacyStance(GameMessage *msg)
 //-------------------------------------------------------------------------------------------------
 static Bool isLobbyHostSender(Int playerIndex)
 {
+#if defined(GENONLINE)
+	// Only the Generals Online lobby owner may turn a rule on; a replay has no lobby, so it trusts the recording
+	if (TheRecorder->isPlaybackMode())
+	{
+		return TRUE;
+	}
+
+	GenOnlineLobbyInterface *pLobbyInterface = GenOnlineServicesManager::GetInterface<GenOnlineLobbyInterface>();
+	const Int slotIndex = ThePlayerList->getSlotIndex(playerIndex);
+	if (TheGenOnlineGame == nullptr || TheGameInfo != TheGenOnlineGame || pLobbyInterface == nullptr || slotIndex < 0)
+	{
+		return FALSE;
+	}
+
+	const GenOnlineGameSlot *slot = (const GenOnlineGameSlot *)TheGenOnlineGame->getConstSlot(slotIndex);
+	return slot != nullptr && slot->m_userID == pLobbyInterface->GetCurrentLobbyOwnerID();
+#else
 	(void)playerIndex;
 	return FALSE;
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -6855,3 +6895,23 @@ void GameLogic::revealMapForAllPlayers()
 	}
 }
 
+#if defined(GENONLINE)
+//-------------------------------------------------------------------------------------------------
+void GameLogic::sendPendingLobbyRules()
+{
+	if (m_pendingLobbyRules == 0 || !isInGame() || isLoadingMap() || getFrame() == 0)
+	{
+		return;
+	}
+
+	for (Int rule = 0; rule < LOBBY_RULE_COUNT; ++rule)
+	{
+		if (m_pendingLobbyRules & (1u << rule))
+		{
+			GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_LOBBY_RULE);
+			msg->appendIntegerArgument(rule);
+		}
+	}
+	m_pendingLobbyRules = 0;
+}
+#endif
