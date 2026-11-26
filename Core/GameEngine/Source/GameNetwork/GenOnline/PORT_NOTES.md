@@ -26,9 +26,11 @@ This tree holds the GenOnline online stack, the Generals Online team's 2026.11 c
 - ON tree: `build/win32-genonline`, configured by `build/genonline-port/configure_on.bat`. It needs the vcpkg toolchain, triplet `x86-windows-static-md` (in `triplets/`), and the overlay ports in `GenOnline/cmake/ports`, which `cmake/config-vcpkg.cmake` adds only when the option is ON.
 - `vcpkg.json` holds GenOnline's dependencies in the `genonline` feature and uses GenOnline's baseline, so the vcpkg checkout must be at or past 2026-09-23.
 - Configured with `RTS_BUILD_OPTION_MODERN_MEDIA=OFF`: Miles and Bink only, no OpenAL or FFmpeg.
+- Configured with `GENONLINE_ENVIRONMENT=test`, so the client uses `https://api-test.generals.online`. Left empty, GenOnline picks the service from the git tag: test for a `vYYYY.MM.N-rc.N` tag, live (`https://api.generals.online`) for anything else, which is what the fork's tags give. `network.environment` in `settings.client.json` overrides both.
 - `.gitattributes` keeps the overlay port patches LF; `git apply` rejects them as CRLF.
 - The exe keeps the fork's name (`generalszh`, `generalszh_c` with cheats).
-- The data pack is not built by CMake: `python GenOnline/tools/pack_go_data.py zerohour 2026.11.0 <exe folder>\data`.
+- The data pack is not built by CMake: `python GenOnline/tools/pack_go_data.py zerohour 2026.11.0 <exe folder>\data contra`. The last argument overlays `GenOnline/data/contra`, the Contra colour theme, on the Zero Hour files.
+- The Contra theme is the `contra` entry of `THEMES` in `GenOnline/tools/go_ui_kit.py` plus `GenOnline/data/contra/Data/INI/GOUIColors.ini`. After a palette change run `python GenOnline/tools/go_ui_kit.py --theme contra` and repack.
 - The ON build runs the logic at 60 Hz in every mode and has its own exe CRC, so it cannot share LAN games or replays with the OFF build.
 
 ## Re-syncing with GenOnline
@@ -68,6 +70,8 @@ Switches are in `Include/GameNetwork/GenOnline/GenOnlineForkPolicy.h`; CMake opt
 | `GenOnlineGame.cpp` | saves the fork's render settings at match launch |
 | `GenOnlineSocialInterface.cpp` | Shift+F5 hint text |
 | `Common/AdaptiveQuality.cpp` | acts in an online match only |
+| `GenOnline/tools/go_ui_kit.py` | `contra` theme entry |
+| `GenOnline/tools/pack_go_data.py` | optional overlay folder argument |
 | `Menus/GenOnline/GenOnlineLoginMenu.cpp`, `GenOnlineWelcomeMenu.cpp` | `WebBrowser.h` include and the unreachable browser branches removed (TSH #3691 deleted the embedded browser) |
 
 ## Open
