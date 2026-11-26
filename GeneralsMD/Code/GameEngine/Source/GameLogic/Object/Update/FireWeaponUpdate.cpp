@@ -85,7 +85,12 @@ FireWeaponUpdate::FireWeaponUpdate( Thing *thing, const ModuleData* moduleData )
 //-------------------------------------------------------------------------------------------------
 FireWeaponUpdate::~FireWeaponUpdate()
 {
+#if defined(GENONLINE)
+	if (m_weapon)
+		deleteInstance(m_weapon);
+#else
 	deleteInstance(m_weapon);
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

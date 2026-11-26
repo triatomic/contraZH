@@ -48,14 +48,32 @@ public:
 	// The constructur takes ownership of the file
 	explicit FFmpegFile(File *file);
 	~FFmpegFile();
+#if defined(GENONLINE)
+	FFmpegFile(const FFmpegFile &) = delete;
+	FFmpegFile &operator=(const FFmpegFile &) = delete;
+#endif
 
 	Bool open(File *file);
 	void close();
+#if defined(GENONLINE)
+	void setErrorLogging(Bool enabled) { m_errorLogging = enabled; }
+#endif
 	void setFrameCallback(FFmpegFrameCallback callback) { m_frameCallback = callback; }
 	void setUserData(void *user_data) { m_userData = user_data; }
 	// Read & decode a packet from the container. Note that we could/should split this step
 	Bool decodePacket();
+#if defined(GENONLINE)
+	// Seeks to a preceding keyframe, from where callers decode forward to an exact frame.
+	Bool seekFrame(int frame_idx);
+	Bool rewind();
+	Bool hasError() const { return m_decodeFailed; }
+	Int getAudioStreamIndex() const;
+	Int getVideoStreamIndex() const;
+	Int64 getFrameTimestampUS(const AVFrame *frame, Int stream) const;
+	Int64 getVideoFrameTimeUS(Int index) const;
+#else
 	void seekFrame(int frame_idx);
+#endif
 	Bool hasAudio() const;
 
 	// Audio specific
@@ -83,8 +101,20 @@ private:
 	};
 
 	static Int readPacket(void *opaque, UnsignedByte *buf, Int buf_size);
+#if defined(GENONLINE)
+	static Int64 seekPacket(void *opaque, Int64 offset, Int whence);
+	Bool receiveFrames(FFmpegStream &stream, Bool &produced);
+	Bool submitPacket(FFmpegStream &stream, const AVPacket *packet, Bool &produced);
+	Bool seek(Int streamIndex, Int64 timestamp);
+#endif
 	const FFmpegStream *findMatch(int type) const;
 
+#if defined(GENONLINE)
+	void logError(const char *operation, Int error);
+	Bool m_errorLogging = true;
+	Bool m_endOfInput = false;
+	Bool m_decodeFailed = false;
+#endif
 	FFmpegFrameCallback 		m_frameCallback = nullptr; ///< Callback for frame processing
 	AVFormatContext 			*m_fmtCtx = nullptr; ///< Format context for AVFormat
 	AVIOContext 				*m_avioCtx = nullptr; ///< IO context for AVFormat

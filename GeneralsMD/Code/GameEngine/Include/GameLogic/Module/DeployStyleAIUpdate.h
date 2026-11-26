@@ -104,8 +104,13 @@ public:
 	virtual DeployStyleAIUpdate* getDeployStyleAIUpdate() override { return this; }
 	virtual const DeployStyleAIUpdate* getDeployStyleAIUpdate() const override { return this; }
 
+#if defined(GENONLINE)
+	UnsignedInt getUnpackTime()					const { return getDeployStyleAIUpdateModuleData()->m_unpackTime/ LOGICFRAMES_PER_BASEFRAME; }
+	UnsignedInt getPackTime()						const { return getDeployStyleAIUpdateModuleData()->m_packTime/ LOGICFRAMES_PER_BASEFRAME; }
+#else
 	UnsignedInt getUnpackTime()					const { return getDeployStyleAIUpdateModuleData()->m_unpackTime; }
 	UnsignedInt getPackTime()						const { return getDeployStyleAIUpdateModuleData()->m_packTime; }
+#endif
 	Bool doTurretsFunctionOnlyWhenDeployed() const { return getDeployStyleAIUpdateModuleData()->m_turretsFunctionOnlyWhenDeployed; }
 	Bool doTurretsHaveToCenterBeforePacking() const { return getDeployStyleAIUpdateModuleData()->m_turretsMustCenterBeforePacking; }
 	void setMyState( DeployStateTypes StateID, Bool reverseDeploy = FALSE );

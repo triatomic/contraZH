@@ -263,16 +263,27 @@ void Display::update()
 		if ( m_videoStream->isFrameReady())
 		{
 			m_videoStream->frameDecompress();
+#if defined(GENONLINE)
+			m_videoStream->frameRender(m_videoBuffer);
+			if (!m_videoStream->isPlaybackComplete())
+#else
 			m_videoStream->frameRender( m_videoBuffer );
 			if( m_videoStream->frameIndex() != m_videoStream->frameCount() - 1)
 			{
+#endif
 				m_videoStream->frameNext();
+#if !defined(GENONLINE)
 			}
 			else
 			{
 				stopMovie();
 			}
+#endif
 		}
+#if defined(GENONLINE)
+		if (m_videoStream->isPlaybackComplete())
+			stopMovie();
+#endif
 	}
 }
 

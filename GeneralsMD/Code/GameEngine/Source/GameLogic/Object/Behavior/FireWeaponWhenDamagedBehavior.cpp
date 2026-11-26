@@ -145,15 +145,37 @@ FireWeaponWhenDamagedBehavior::FireWeaponWhenDamagedBehavior( Thing *thing, cons
 //-------------------------------------------------------------------------------------------------
 FireWeaponWhenDamagedBehavior::~FireWeaponWhenDamagedBehavior()
 {
+#if defined(GENONLINE)
+	if (m_reactionWeaponPristine)
+		deleteInstance(m_reactionWeaponPristine);
+	if (m_reactionWeaponDamaged)
+		deleteInstance(m_reactionWeaponDamaged);
+	if (m_reactionWeaponReallyDamaged)
+		deleteInstance(m_reactionWeaponReallyDamaged);
+	if (m_reactionWeaponRubble)
+		deleteInstance(m_reactionWeaponRubble);
+#else
 	deleteInstance(m_reactionWeaponPristine);
 	deleteInstance(m_reactionWeaponDamaged);
 	deleteInstance(m_reactionWeaponReallyDamaged);
 	deleteInstance(m_reactionWeaponRubble);
+#endif
 
+#if defined(GENONLINE)
+	if (m_continuousWeaponPristine)
+		deleteInstance(m_continuousWeaponPristine);
+	if (m_continuousWeaponDamaged)
+		deleteInstance(m_continuousWeaponDamaged);
+	if (m_continuousWeaponReallyDamaged)
+		deleteInstance(m_continuousWeaponReallyDamaged);
+	if (m_continuousWeaponRubble)
+		deleteInstance(m_continuousWeaponRubble);
+#else
 	deleteInstance(m_continuousWeaponPristine);
 	deleteInstance(m_continuousWeaponDamaged);
 	deleteInstance(m_continuousWeaponReallyDamaged);
 	deleteInstance(m_continuousWeaponRubble);
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

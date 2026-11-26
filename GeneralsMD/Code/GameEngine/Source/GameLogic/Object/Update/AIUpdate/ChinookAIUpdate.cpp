@@ -516,7 +516,11 @@ public:
 				initRopeParms(info.ropeDrawable, info.ropeLenMax, d->m_ropeWidth, d->m_ropeColor, d->m_ropeWobbleLen, d->m_ropeWobbleAmp, d->m_ropeWobbleRate);
 			}
 
+#if defined(GENONLINE)
+			info.nextDropTime = now + GameLogicRandomFramesInBaseFrames(d->m_perRopeDelayMin, d->m_perRopeDelayMax) - d->m_perRopeDelayMin;
+#else
 			info.nextDropTime = now + GameLogicRandomValue(d->m_perRopeDelayMin, d->m_perRopeDelayMax) - d->m_perRopeDelayMin;
+#endif
 			info.rappellerIDs.clear();
 
 			m_ropes.push_back(info);
@@ -598,7 +602,11 @@ public:
 
 					it->rappellerIDs.push_back(rappeller->getID());
 
+#if defined(GENONLINE)
+					it->nextDropTime = now + GameLogicRandomFramesInBaseFrames(d->m_perRopeDelayMin, d->m_perRopeDelayMax);
+#else
 					it->nextDropTime = now + GameLogicRandomValue(d->m_perRopeDelayMin, d->m_perRopeDelayMax);
+#endif
 				}
 			}
 
@@ -1150,7 +1158,11 @@ UpdateSleepTime ChinookAIUpdate::update()
 		}
 
 
+#if defined(GENONLINE)
+    if ( TheGameLogic->getFrame()%ConvertBaseFramesToFrames(10) == 1 )
+#else
     if ( TheGameLogic->getFrame()%10 == 1 )
+#endif
     {
 	    Object *victim = getCurrentVictim();
       if ( victim )

@@ -357,6 +357,17 @@ void ResetInGameChat();
 void ResetInGameChatWindow();
 void SetInGameChatType( InGameChatType chatType );
 Bool IsInGameChatActive();
+#if defined(GENONLINE)
+Bool SubmitInGameChatLine( const UnicodeString& text, InGameChatType chatType );
+/// Handles a line as if it was typed into the chat box of that menu. Returns FALSE if the menu is not open.
+Bool LanLobbyMenuSubmitChatLine( UnicodeString text );
+Bool LanGameOptionsMenuSubmitChatLine( UnicodeString text );
+
+/// Stats pipe lobby control: each game setup screen describes its controls (FALSE when it is not open), and the OK path of the map selector runs without the selector.
+struct StatsLobbyScreen;
+Bool SkirmishGameOptionsMenuStatsLobby( StatsLobbyScreen& out );
+Bool LanGameOptionsMenuStatsLobby( StatsLobbyScreen& out );
+#endif
 
 
 // Diplomacy Controls --------------------------------------------------------------------------------

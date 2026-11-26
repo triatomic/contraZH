@@ -60,6 +60,10 @@ public:
 
 	virtual void setLocalAddress(UnsignedInt ip, UnsignedInt port) = 0;	///< Tell the network what local ip and port to bind to.
 	virtual Bool isFrameDataReady() = 0;												///< Are the commands for the next frame available?
+#if defined(GENONLINE)
+	virtual Bool isGameExitPending() const { return FALSE; }
+	virtual UnsignedInt getMeasuredLogicRate() = 0;	///< Logic frames executed per second, over about a second
+#endif
 	virtual Bool isStalling() = 0;
 	virtual void parseUserList( const GameInfo *game ) = 0;						///< Parse a userlist, creating connections
 	virtual void startGame() = 0;																	///< Sets the network game frame counter to -1
@@ -100,13 +104,45 @@ public:
 
 	virtual Int getAverageFPS() = 0;
 	virtual Int getSlotAverageFPS(Int slot) = 0;
+#if defined(GENONLINE)
+	virtual const ConnectionStats* getConnectionStats(Int slot) const = 0;	///< Latency, jitter and loss of the connection to a slot, nullptr when there is none.
+#endif
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	virtual Bool getOverlayInfo(Int slot, NetworkOverlayInfo &info) = 0;
+	virtual void SeedLatencyData(int highestLatency) = 0;
+	virtual void requireMatchKeys() {}
+	virtual Bool matchKeysRequired() const { return FALSE; }
+	virtual void setStartRunAheadRequired(Bool required) {}	///< The load complete waits for the router's start run ahead.
+	virtual void applyStartRunAhead(Int runAhead, Int maxRttMs, Int pairs) {}	///< Sets the run ahead of frame 1, before any peer runs a frame.
+	virtual bool IsSlugging() = 0;
+#endif
+
+	virtual void attachTransport(Transport* transport) = 0;
+	virtual void initTransport(const char *transportName) = 0;
+#else
 	virtual void attachTransport(Transport *transport) = 0;
 	virtual void initTransport() = 0;
+#endif
 	virtual Bool sawCRCMismatch() = 0;
+#if !defined(GENONLINE)
 	virtual void setSawCRCMismatch() = 0;
+#endif
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	virtual void setSawCRCMismatch(UnicodeString& strMismatchDetails) = 0;
+#else
+	virtual void setSawCRCMismatch() = 0;
+#endif
+
+#if defined(GENONLINE)
+	virtual ConnectionManager* GetConnectionManager() = 0;
+#endif	virtual Bool isPlayerConnected(Int playerID) = 0;
+#else
 	virtual Bool isPlayerConnected(Int playerID) = 0;
+#endif
 
 	virtual void notifyOthersOfCurrentFrame() = 0;					///< Tells all the other players what frame we are on.
 	virtual void notifyOthersOfNewFrame(UnsignedInt frame) = 0;							///< Tells all the other players that we are on a new frame.
@@ -121,6 +157,10 @@ public:
 	virtual UnsignedInt getPingFrame() = 0;
 	virtual Int getPingsSent() = 0;
 	virtual Int getPingsReceived() = 0;
+#if defined(GENONLINE)
+
+	virtual Bool isPlayerConnected(Int playerID) = 0;
+#endif
 };
 
 

@@ -51,6 +51,10 @@
 #include "GameClient/Gadget.h"
 #include "GameClient/GameWindowGlobal.h"
 #include "GameClient/GameWindowManager.h"
+#if defined(GENONLINE)
+#include "GameClient/GadgetComboBox.h"
+#include "GameClient/GadgetListBox.h"
+#endif
 #include "GameClient/GadgetPushButton.h"
 #include "GameClient/Display.h"
 // TheSuperHackers @feature for the command bar hotkey overlay
@@ -482,7 +486,12 @@ static void drawButtonText( GameWindow *window, WinInstanceData *instData )
 	else if( BitIsSet( window->winGetStatus(), WIN_STATUS_SHORTCUT_BUTTON ) )
 	{
 		// Oh god... this is a total hack for shortcut buttons to handle rendering text top left corner...
+#if defined(GENONLINE)
+		// GenOnline @tweak arcticdolphin 08/11/2026 The text margin scales with the screen height.
+		textPos.x = origin.x + GameWindowManager::winScaleLayoutSize( 2 );
+#else
 		textPos.x = origin.x + 2;
+#endif
 		textPos.y = origin.y + 0;
 	}
 	else
@@ -691,6 +700,50 @@ void W3DGadgetPushButtonImageDraw( GameWindow *window,
 	}
 }
 
+#if defined(GENONLINE)
+//=============================================================================
+// GenOnline @feature arcticdolphin 08/11/2026 Draw list scroll arrows as kit chevrons when the GO kit scroll images exist.
+void W3DGadgetPushButtonKitScrollArrowDraw( GameWindow *window,
+																						WinInstanceData *instData )
+{
+	// the list box owns its up and down buttons
+	GameWindow *listbox = window->winGetParent();
+	KitScrollImage arrow = KIT_SCROLL_UP;
+	if( listbox && GadgetListBoxGetDownButton( listbox ) == window )
+		arrow = KIT_SCROLL_DOWN;
+
+	// GenOnline @tweak arcticdolphin 08/11/2026 Hover and pushed light only the chevron, with no cell behind it.
+	if( BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED ) == FALSE )
+		arrow = (KitScrollImage)(arrow + 3);
+	else if( BitIsSet( instData->getState(), WIN_STATE_SELECTED ) )
+		arrow = (KitScrollImage)(arrow + 2);
+	else if( BitIsSet( instData->getState(), WIN_STATE_HILITED ) )
+		arrow = (KitScrollImage)(arrow + 1);
+
+	const Image *image = GadgetListBoxGetKitScrollImage( arrow );
+	if( image == nullptr )
+	{
+		W3DGadgetPushButtonImageDraw( window, instData );
+		return;
+	}
+
+	ICoord2D start, size;
+	window->winGetScreenPosition( &start.x, &start.y );
+	window->winGetSize( &size.x, &size.y );
+
+	// GenOnline @bugfix arcticdolphin 08/11/2026 The chevron centres on the column line the scroll thumb shares.
+	Int chevronX, chevronWidth;
+	GadgetListBoxGetKitScrollSpan( KIT_SCROLL_SPAN_CHEVRON, start.x, size.x, &chevronX, &chevronWidth );
+	Int chevronHeight = chevronWidth;
+	if( image->getImageWidth() > 0 )
+		chevronHeight = (image->getImageHeight() * chevronWidth + image->getImageWidth() / 2) / image->getImageWidth();
+	if( chevronHeight > size.y )
+		chevronHeight = size.y;
+	Int chevronY = start.y + (size.y - chevronHeight) / 2;
+	TheWindowManager->winDrawImage( image, chevronX, chevronY, chevronX + chevronWidth, chevronY + chevronHeight );
+}
+
+#endif
 void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 																	 WinInstanceData *instData )
 {
@@ -731,6 +784,19 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 			if( BitIsSet( instData->getState(), WIN_STATE_SELECTED ) )
 				image			= GadgetButtonGetHiliteSelectedImage( window );
 		}
+#if defined(GENONLINE)
+
+		// GenOnline @tweak arcticdolphin 08/11/2026 A kit combo arrow lights with its whole field, never on its own.
+		GameWindow *combo = window->winGetParent();
+		if( BitIsSet( window->winGetStatus(), WIN_STATUS_ENABLED ) && GadgetComboBoxIsKitField( combo ) &&
+				GadgetComboBoxGetDropDownButton( combo ) == window )
+		{
+			if( GadgetComboBoxIsKitFieldLit( combo ) && GadgetButtonGetHiliteImage( window ) != nullptr )
+				image = GadgetButtonGetHiliteImage( window );
+			else
+				image = GadgetButtonGetEnabledImage( window );
+		}
+#endif
 	}
 
 
@@ -774,7 +840,15 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 				}
 			}
 		}
+#if defined(GENONLINE)
+		// GenOnline @tweak arcticdolphin 08/11/2026 Kit symbol and arrow images keep their border at the kit line weight.
+		if( image->getBorder() > 0.0f && drawMode == Display::DRAW_IMAGE_ALPHA && colorMultiplier == (Int)0xffffffff )
+			TheWindowManager->winDrawImage( image, start.x, start.y, end.x, end.y );
+		else
+			TheDisplay->drawImage( image, start.x, start.y, end.x, end.y, colorMultiplier, drawMode );
+#else
 		TheDisplay->drawImage( image, start.x, start.y, end.x, end.y, colorMultiplier, drawMode );
+#endif
 	}
 
 	// draw the button text
@@ -910,9 +984,15 @@ void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *inst
 {
 
 	const Image *leftImage, *rightImage, *centerImage;
+#if defined(GENONLINE)
+	ICoord2D origin, size, start;
+#else
 	ICoord2D origin, size, start, end;
+#endif
 	Int xOffset, yOffset;
+#if !defined(GENONLINE)
 	Int i;
+#endif
 
 	// get screen position and size
 	window->winGetScreenPosition( &origin.x, &origin.y );
@@ -990,6 +1070,10 @@ void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *inst
 			centerImage == nullptr )
 		return;
 
+#if defined(GENONLINE)
+	TheWindowManager->winDrawThreePieceImage( leftImage, centerImage, nullptr, rightImage,
+																						 origin.x + xOffset, origin.y + yOffset, size.x, size.y );
+#else
 	// get image sizes for the ends
 	ICoord2D leftSize, rightSize;
 	leftSize.x = leftImage->getImageWidth();
@@ -1076,6 +1160,7 @@ void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *inst
 		end.y = start.y + size.y;
 		TheWindowManager->winDrawImage(rightImage, start.x, start.y, end.x, end.y);
 	}
+#endif
 
 	// draw the button text
 	if( instData->getTextLength() )

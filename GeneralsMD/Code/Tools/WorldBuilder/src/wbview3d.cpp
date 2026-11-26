@@ -1992,8 +1992,30 @@ AsciiString WbView3d::getModelNameAndScale(MapObject *pMapObj, Real *scale,
 			break;
 	}
 
+#if defined(GENONLINE)
+	AsciiString modelName("No Model Name");
+#else
 	AsciiString modelName;
+#endif
 	*scale = 1.0f;
+#if defined(GENONLINE)
+	Int i;
+	char buffer[ _MAX_PATH ];
+	if (strncmp(TEST_STRING, pMapObj->getName().str(), strlen(TEST_STRING)) == 0)
+	{
+		/* Handle test art models here */
+		strlcpy(buffer, pMapObj->getName().str(), ARRAY_SIZE(buffer));
+
+		for (i=0; buffer[i]; i++) {
+			if (buffer[i] == '/') {
+				i++;
+				break;
+			}
+		}
+		modelName = buffer+i;
+	}
+	else
+#else
 
 #ifdef LOAD_TEST_ASSETS
 	char buffer[ _MAX_PATH ];
@@ -2015,6 +2037,7 @@ AsciiString WbView3d::getModelNameAndScale(MapObject *pMapObj, Real *scale,
 #endif
 
 	if (modelName.isEmpty())
+#endif
 	{
 		modelName = "No Model Name"; // must be this while GDF exists (it's the default)
 		const ThingTemplate *tTemplate;

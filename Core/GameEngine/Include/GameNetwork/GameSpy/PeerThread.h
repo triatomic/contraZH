@@ -28,9 +28,16 @@
 
 #pragma once
 
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlineChat.h"
+#else
 #include "gamespy/peer/peer.h"
 #include "GameNetwork/NetworkDefs.h"
+#endif
 
+#if defined(GENONLINE)
+typedef IOnlineChat GameSpyPeerMessageQueueInterface;
+#else
 enum SerialAuthResult CPP_11(: Int)
 {
 	SERIAL_NONEXISTENT,
@@ -384,3 +391,4 @@ public:
 };
 
 extern GameSpyPeerMessageQueueInterface *TheGameSpyPeerMessageQueue;
+#endif

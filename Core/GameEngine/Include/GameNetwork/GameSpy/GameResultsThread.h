@@ -27,6 +27,10 @@
 // Author: Matthew D. Campbell, August 2002
 
 #pragma once
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlineResults.h"
+typedef IOnlineResults GameResultsInterface;
+#else
 
 #include "Common/SubsystemInterface.h"
 
@@ -73,3 +77,4 @@ public:
 };
 
 extern GameResultsInterface *TheGameResultsQueue;
+#endif

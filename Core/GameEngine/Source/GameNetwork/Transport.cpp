@@ -30,6 +30,7 @@
 #include "GameNetwork/NetworkInterface.h"
 
 
+#if !defined(GENONLINE)
 //--------------------------------------------------------------------------
 // Packet-level encryption is an XOR operation, for speed reasons.  To get
 // the max throughput, we only XOR whole 4-byte words, so the last bytes
@@ -67,14 +68,18 @@ static inline void decryptBuf( unsigned char *buf, Int len )
 
 //--------------------------------------------------------------------------
 
+#endif
 Transport::Transport()
 {
+#if !defined(GENONLINE)
 	m_winsockInit = false;
 	m_udpsock = nullptr;
+#endif
 }
 
 Transport::~Transport()
 {
+#if !defined(GENONLINE)
 	reset();
 }
 
@@ -424,6 +429,7 @@ Bool Transport::queueSend(UnsignedInt addr, UnsignedShort port, const UnsignedBy
 	}
 	DEBUG_LOG(("Send Queue is getting full, dropping packets"));
 	return false;
+#endif
 }
 
 Bool Transport::isGeneralsPacket( TransportMessage *msg )
@@ -431,7 +437,11 @@ Bool Transport::isGeneralsPacket( TransportMessage *msg )
 	if (!msg)
 		return false;
 
+#if defined(GENONLINE)
+	if (msg->length < 0 || msg->length > MAX_MESSAGE_LEN)
+#else
 	if (msg->length < 0 || msg->length > MAX_NETWORK_MESSAGE_LEN)
+#endif
 		return false;
 
 	CRC crc;

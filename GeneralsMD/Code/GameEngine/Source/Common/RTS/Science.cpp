@@ -54,7 +54,13 @@ ScienceStore::~ScienceStore()
 	{
 		ScienceInfo* si = *it;
 		++it;
+#if defined(GENONLINE)
+		if (si) {
+			deleteInstance(si);
+		}
+#else
 		deleteInstance(si);
+#endif
 	}
 }
 

@@ -29,6 +29,9 @@
 #include "Common/Registry.h"
 #include "GameNetwork/LANAPI.h"
 #include "GameNetwork/networkutil.h"
+#if defined(GENONLINE)
+#include "GameNetwork/UDPTransport.h"
+#endif
 #include "Common/GlobalData.h"
 #include "Common/RandomValue.h"
 #include "GameClient/GameText.h"
@@ -63,10 +66,19 @@ LANGame::LANGame()
 
 
 
+#if defined(GENONLINE)
+LANAPI::LANAPI(void) : m_transport(nullptr)
+#else
 LANAPI::LANAPI() : m_transport(nullptr)
+#endif
 {
+#if defined(GENONLINE)
+	DEBUG_LOG(("LANAPI::LANAPI() - max game option size is %d, sizeof(LANMessage)=%d, MAX_PACKET_SIZE=%d",
+		m_lanMaxOptionsLength, sizeof(LANMessage), MAX_LANAPI_PACKET_SIZE));
+#else
 	DEBUG_LOG(("LANAPI::LANAPI() - max game option size is %d, sizeof(LANMessage)=%d, MAX_LANAPI_PACKET_SIZE=%d",
 		m_lanMaxOptionsLength, sizeof(LANMessage), MAX_LANAPI_PACKET_SIZE));
+#endif
 
 	m_lastResendTime = 0;
 	//
@@ -83,7 +95,11 @@ LANAPI::LANAPI() : m_transport(nullptr)
 	m_directConnectRemoteIP = 0;
 	m_actionTimeout = 5000; // ms
 	m_lastUpdate = 0;
+#if defined(GENONLINE)
+	m_transport = new UDPTransport;
+#else
 	m_transport = new Transport;
+#endif
 	m_isActive = TRUE;
 }
 
@@ -775,7 +791,12 @@ void LANAPI::RequestHasMap()
 		}
 		else
 		{
+#if defined(GENONLINE)
+			// GenOnline @bugfix arcticdolphin 09/11/2026 The map name hides the folders of the user.
+			mapDisplayName = getMapNameFromPath(m_currentGame->getMap());
+#else
 			mapDisplayName.format(L"%hs", TheGameState->getMapLeafName(m_currentGame->getMap()).str());
+#endif
 			willTransfer = WouldMapTransfer(m_currentGame->getMap());
 		}
 		if (willTransfer)

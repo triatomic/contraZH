@@ -35,7 +35,9 @@
 #pragma once
 
 #include "WWCommon.h"
+#if !defined(GENONLINE)
 #include "WWDefines.h"
+#endif
 
 #include <assert.h>
 #include <new>

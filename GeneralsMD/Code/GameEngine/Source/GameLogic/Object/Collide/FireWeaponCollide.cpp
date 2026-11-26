@@ -66,7 +66,12 @@ FireWeaponCollide::FireWeaponCollide( Thing *thing, const ModuleData* moduleData
 //-------------------------------------------------------------------------------------------------
 FireWeaponCollide::~FireWeaponCollide()
 {
+#if defined(GENONLINE)
+	if (m_collideWeapon)
+		deleteInstance(m_collideWeapon);
+#else
 	deleteInstance(m_collideWeapon);
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

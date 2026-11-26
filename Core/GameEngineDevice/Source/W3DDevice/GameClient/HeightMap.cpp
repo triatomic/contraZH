@@ -2746,7 +2746,13 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 		DynamicIBAccessClass::WriteLockClass lockib(&ib_access);
 		UnsignedShort *ib=lockib.Get_Index_Array();
 
+#if defined(GENONLINE)
+		// Enhanced pointer validation: check for NULL and suspiciously low addresses that indicate
+		// invalid/corrupted pointers from failed buffer allocation or device in degraded state
+		if (!vb || !ib || (size_t)vb < 0x10000 || (size_t)ib < 0x10000) return;
+#else
 		if (!vb || !ib) return;
+#endif
 
 		const HeightSampleType* data = m_map->getDataPtr();
 

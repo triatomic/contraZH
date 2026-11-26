@@ -27,6 +27,10 @@
 // Author: Matthew D. Campbell, July 2002
 
 #pragma once
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlineStats.h"
+typedef IOnlineStats GameSpyPSMessageQueueInterface;
+#else
 
 #include "gamespy/gstats/gpersist.h"
 
@@ -180,3 +184,4 @@ public:
 };
 
 extern GameSpyPSMessageQueueInterface *TheGameSpyPSMessageQueue;
+#endif

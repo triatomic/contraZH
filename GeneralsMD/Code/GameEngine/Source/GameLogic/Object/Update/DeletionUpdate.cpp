@@ -67,12 +67,32 @@ void DeletionUpdate::setLifetimeRange( UnsignedInt minFrames, UnsignedInt maxFra
 #endif
 }
 
+#if defined(GENONLINE)
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void DeletionUpdate::restartLifetime()
+{
+	const DeletionUpdateModuleData *d = getDeletionUpdateModuleData();
+	setLifetimeRange( d->m_minFrames, d->m_maxFrames );
+}
+
+#endif
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 UnsignedInt DeletionUpdate::calcSleepDelay(UnsignedInt minFrames, UnsignedInt maxFrames)
 {
+#if defined(GENONLINE)
+	UnsignedInt delay = GameLogicRandomFramesInBaseFrames( minFrames, maxFrames );
+	// Info: At 60Hz, a 1 logic frame lifetime only gives the client 16ms real time to notice a newly created object and
+	// render it before DeletionUpdate destroys it, versus 33ms at the retail 30hz.
+	// This caused one frame objects (like Frenzy's cloud effect) to intermittently never get drawn. 
+	// Doubling the 1 frame case just restores the original real world time.
+	if (delay < (UnsignedInt)LOGICFRAMES_PER_BASEFRAME)
+		delay = LOGICFRAMES_PER_BASEFRAME;
+#else
 	UnsignedInt delay = GameLogicRandomValue( minFrames, maxFrames );
 	if (delay < 1) delay = 1;
+#endif
 	m_dieFrame = TheGameLogic->getFrame() + delay;
 	return delay;
 }

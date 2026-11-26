@@ -27,6 +27,10 @@
 // Author: Matthew D. Campbell, August 2002
 
 #pragma once
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlineLadder.h"
+typedef IOnlineLadder LadderList;
+#else
 
 #include "Common/UnicodeString.h"
 #include "Common/AsciiString.h"
@@ -81,3 +85,4 @@ private:
 };
 
 extern LadderList *TheLadderList;
+#endif

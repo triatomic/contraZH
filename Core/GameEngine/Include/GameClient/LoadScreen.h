@@ -44,6 +44,10 @@
 class VideoBuffer;
 class VideoStreamInterface;
 class WindowVideoManager;
+#if defined(GENONLINE)
+class DisplayString;
+class Image;
+#endif
 
 
 
@@ -62,6 +66,10 @@ public:
 	virtual void update( Int percent ); ///< Update the state of the slider bars
 	virtual void processProgress(Int playerId, Int percentage) = 0;
 	virtual void setProgressRange( Int min, Int max ) = 0;
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 09/11/2026 The load screen stays up after the load while this returns TRUE.
+	virtual Bool holdsAfterLoad() { return FALSE; }
+#endif
 protected:
 	void setLoadScreen( GameWindow *g ) { m_loadScreen = g; }
 	GameWindow *m_loadScreen;		///< The GameWindow that is our loadscreen
@@ -213,10 +221,31 @@ public:
 		DEBUG_CRASH(("We Got to a single player load screen throw the Network..."));
 	}
 	virtual void setProgressRange( Int min, Int max ) override { }
+#if defined(GENONLINE)
+	virtual Bool holdsAfterLoad() override;
+#endif
 
 private:
+#if defined(GENONLINE)
+	void initCredit();
+	void pollCreditSkip();
+	Int creditPercent() const;
+	void drawCredit();
+	static void drawCreditWindow( GameWindow *window, WinInstanceData *instData );
+
+#endif
 	GameWindow *m_progressBar	;				///< Pointer to the Progress Bar on the window
 
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 09/11/2026 The Generals Online credit on the first shell load screen.
+	GameWindow *m_creditWindow;
+	DisplayString *m_creditUrl;
+	const Image *m_creditLogo;
+	UnsignedInt m_creditStartMs;
+	Bool m_creditEscArmed;
+	Bool m_creditSkipped;
+
+#endif
 };
 
 

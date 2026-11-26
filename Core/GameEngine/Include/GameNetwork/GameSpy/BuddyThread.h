@@ -27,6 +27,10 @@
 // Author: Matthew D. Campbell, June 2002
 
 #pragma once
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlinePresence.h"
+typedef IOnlinePresence GameSpyBuddyMessageQueueInterface;
+#else
 
 #include "gamespy/gp/gp.h"
 
@@ -169,3 +173,4 @@ public:
 };
 
 extern GameSpyBuddyMessageQueueInterface *TheGameSpyBuddyMessageQueue;
+#endif

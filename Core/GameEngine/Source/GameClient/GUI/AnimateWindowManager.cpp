@@ -112,11 +112,24 @@ void AnimateWindow::setAnimData( 	ICoord2D startPos, ICoord2D endPos,
 
 static void clearWinList(AnimateWindowList &winList)
 {
+#if defined(GENONLINE)
+	wnd::AnimateWindow *win = NULL;
+#endif
 	while (!winList.empty())
 	{
+#if defined(GENONLINE)
+		win = *(winList.begin());
+#else
 		wnd::AnimateWindow *win = *(winList.begin());
+#endif
 		winList.pop_front();
+#if defined(GENONLINE)
+		if (win)
+			deleteInstance(win);
+		win = NULL;
+#else
 		deleteInstance(win);
+#endif
 	}
 }
 

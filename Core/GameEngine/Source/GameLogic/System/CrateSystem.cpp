@@ -47,7 +47,14 @@ CrateSystem::~CrateSystem()
 	for( Int templateIndex = 0; templateIndex < count; templateIndex ++ )
 	{
 		CrateTemplate *currentTemplate = m_crateTemplateVector[templateIndex];
+#if defined(GENONLINE)
+		if( currentTemplate )
+		{
+			deleteInstance(currentTemplate);
+		}
+#else
 		deleteInstance(currentTemplate);
+#endif
 	}
 	m_crateTemplateVector.clear();
 }

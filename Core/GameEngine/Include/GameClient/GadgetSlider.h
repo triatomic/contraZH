@@ -65,11 +65,29 @@
 // FORWARD REFERENCES /////////////////////////////////////////////////////////
 
 // TYPE DEFINES ///////////////////////////////////////////////////////////////
+#if !defined(GENONLINE)
 enum{
 HORIZONTAL_SLIDER_THUMB_POSITION = HORIZONTAL_SLIDER_THUMB_HEIGHT *2/3
 };
+#endif
 // INLINING ///////////////////////////////////////////////////////////////////
 
+#if defined(GENONLINE)
+// GenOnline @tweak arcticdolphin 08/11/2026 The horizontal slider thumb sits vertically centred in its slider, where the kit track draws.
+inline Int GadgetHorizontalSliderThumbTop( Int sliderHeight, Int thumbHeight )
+{
+	return (sliderHeight - thumbHeight) / 2;
+}
+
+inline Int GadgetHorizontalSliderThumbTop( GameWindow *slider, GameWindow *thumb )
+{
+	Int sliderWidth, sliderHeight, thumbWidth, thumbHeight;
+	slider->winGetSize( &sliderWidth, &sliderHeight );
+	thumb->winGetSize( &thumbWidth, &thumbHeight );
+	return GadgetHorizontalSliderThumbTop( sliderHeight, thumbHeight );
+}
+
+#endif
 inline void GadgetSliderGetMinMax( GameWindow *g, Int *min, Int *max )
 {
 	SliderData *sData = (SliderData *)g->winGetUserData();

@@ -92,7 +92,11 @@ void VeterancyGainCreate::onCreate()
 		if( myExp  &&  myExp->isTrainable() )
 		{
 			// srj sez: use "setMin" here so that we never lose levels
+#if defined(GENONLINE)
+			myExp->setMinVeterancyLevel( md->m_startingLevel );// sVL can override isTrainable, but this module should not.
+#else
 			myExp->setMinVeterancyLevel( md->m_startingLevel, false );// sVL can override isTrainable, but this module should not.
+#endif
 		}
 	}
 

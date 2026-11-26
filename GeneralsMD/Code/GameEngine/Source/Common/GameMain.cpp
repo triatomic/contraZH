@@ -48,7 +48,18 @@ Int GameMain()
 	TheGameEngine = CreateGameEngine();
 	TheGameEngine->init();
 
+#if defined(GENONLINE)
+	// GenOnline @feature arcticdolphin 21/11/2026 -exportStats also records live games, only a headless run without a replay is an error
+	if (TheGlobalData->m_exportStats && TheGlobalData->m_headless && TheGlobalData->m_simulateReplays.empty())
+	{
+		printf("ERROR: -exportStats with -headless requires a replay to simulate (-replay <file>).\n");
+		fflush(stdout);
+		exitcode = 1;
+	}
+	else if (!TheGlobalData->m_simulateReplays.empty())
+#else
 	if (!TheGlobalData->m_simulateReplays.empty())
+#endif
 	{
 		exitcode = ReplaySimulation::simulateReplays(TheGlobalData->m_simulateReplays, TheGlobalData->m_simulateReplayJobs);
 	}

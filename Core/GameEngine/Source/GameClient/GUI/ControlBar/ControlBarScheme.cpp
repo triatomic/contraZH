@@ -749,6 +749,14 @@ void ControlBarScheme::update()
 
 }
 
+#if defined(GENONLINE)
+// An edge on the last pixel of the creation resolution maps to the screen edge.
+static Real schemeEdge( Int edge, Int creationRes, Real multi, Int offset )
+{
+	return (edge == creationRes - 1 ? creationRes : edge) * multi + offset;
+}
+
+#endif
 //
 // Loop through the proper lists and draw everything for the foreground
 //-----------------------------------------------------------------------------
@@ -775,10 +783,17 @@ void ControlBarScheme::drawForeground( Coord2D multi, ICoord2D offset )
 			}
 
 			// draw the image
+#if defined(GENONLINE)
+			TheDisplay->drawImage(schemeImage->m_image, schemeImage->m_position.x * multi.x + offset.x,
+														schemeImage->m_position.y * multi.y + offset.y,
+														schemeEdge(schemeImage->m_position.x + schemeImage->m_size.x, m_ScreenCreationRes.x, multi.x, offset.x),
+														schemeEdge(schemeImage->m_position.y + schemeImage->m_size.y, m_ScreenCreationRes.y, multi.y, offset.y));
+#else
 			TheDisplay->drawImage(schemeImage->m_image, schemeImage->m_position.x * multi.x + offset.x,
 														schemeImage->m_position.y * multi.y + offset.y,
 														(schemeImage->m_position.x + schemeImage->m_size.x) * multi.x + offset.x,
 														(schemeImage->m_position.y + schemeImage->m_size.y) * multi.y + offset.y);
+#endif
 
 			it ++;
 		}
@@ -812,10 +827,17 @@ void ControlBarScheme::drawBackground( Coord2D multi, ICoord2D offset )
 			}
 
 			// draw it
+#if defined(GENONLINE)
+			TheDisplay->drawImage(schemeImage->m_image, schemeImage->m_position.x * multi.x + offset.x,
+														schemeImage->m_position.y * multi.y + offset.y,
+														schemeEdge(schemeImage->m_position.x + schemeImage->m_size.x, m_ScreenCreationRes.x, multi.x, offset.x),
+														schemeEdge(schemeImage->m_position.y + schemeImage->m_size.y, m_ScreenCreationRes.y, multi.y, offset.y));
+#else
 			TheDisplay->drawImage(schemeImage->m_image, schemeImage->m_position.x * multi.x + offset.x,
 														schemeImage->m_position.y * multi.y + offset.y,
 														(schemeImage->m_position.x + schemeImage->m_size.x) * multi.x + offset.x,
 														(schemeImage->m_position.y + schemeImage->m_size.y) * multi.y + offset.y);
+#endif
 
 			it ++;
 		}

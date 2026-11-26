@@ -27,6 +27,10 @@
 // Author: Matthew D. Campbell, June 2002
 
 #pragma once
+#if defined(GENONLINE)
+#include "GameNetwork/Online/IOnlineLobbyState.h"
+typedef IOnlineLobbyState GameSpyInfoInterface;
+#else
 
 #include "gamespy/peer/peer.h"
 #include "gamespy/gp/gp.h"
@@ -295,3 +299,4 @@ extern Int GetAdditionalDisconnectsFromUserFile(Int playerID);
 
 void SetUpGameSpy( const char *motdBuffer, const char *configBuffer );
 void TearDownGameSpy();
+#endif

@@ -48,6 +48,10 @@
 #ifdef RTS_ENABLE_CRASHDUMP
 #include "MiniDumper/MiniDumper.h"
 #endif
+#if defined(GENONLINE)
+#include "../GenOnlineInclude.h"
+#include "../GenOnlineInit.h"
+#endif
 
 
 // Horrible reference, but we really, really need to know if we are windowed.
@@ -298,6 +302,7 @@ void ReleaseCrash(const char *reason)
 		}
 	}
 
+#if defined(GENONLINE)
 #if defined(RTS_DEBUG)
 	/* static */ char buff[8192]; // not so static so we can be threadsafe
 	snprintf(buff, 8192, "Sorry, a serious error occurred. (%s)", reason);
@@ -319,6 +324,35 @@ void ReleaseCrash(const char *reason)
 	}
 
 
+#endif
+
+#if defined(GENONLINE)
+	// GenOnline @bugfix arcticdolphin 17/11/2026 A release crash, like a failed start, reaches Sentry and not only the local dumps.
+	GenOnlineServicesManager::ReportReleaseCrashToSentry(reason);
+#endif
+#else
+#if defined(RTS_DEBUG)
+	/* static */ char buff[8192]; // not so static so we can be threadsafe
+	snprintf(buff, 8192, "Sorry, a serious error occurred. (%s)", reason);
+	if (crashHandler == nullptr && !(TheGlobalData && TheGlobalData->m_headless))
+	{
+		::MessageBox(nullptr, buff, "Technical Difficulties...", MB_OK|MB_SYSTEMMODAL|MB_ICONERROR);
+	}
+#else
+// crash error messaged changed 3/6/03 BGC
+//	::MessageBox(nullptr, "Sorry, a serious error occurred.", "Technical Difficulties...", MB_OK|MB_TASKMODAL|MB_ICONERROR);
+//	::MessageBox(nullptr, "You have encountered a serious error.  Serious errors can be caused by many things including viruses, overheated hardware and hardware that does not meet the minimum specifications for the game. Please visit the forums at www.generals.ea.com for suggested courses of action or consult your manual for Technical Support contact information.", "Technical Difficulties...", MB_OK|MB_TASKMODAL|MB_ICONERROR);
+
+// crash error message changed again 8/22/03 M Lorenzen... made this message box modal to the system so it will appear on top of any task-modal windows, splash-screen, etc.
+	if (crashHandler == nullptr && !(TheGlobalData && TheGlobalData->m_headless))
+	{
+		::MessageBox(nullptr, "You have encountered a serious error.  Serious errors can be caused by many things including viruses, overheated hardware and hardware that does not meet the minimum specifications for the game. Please visit the forums at www.generals.ea.com for suggested courses of action or consult your manual for Technical Support contact information.",
+			"Technical Difficulties...",
+			MB_OK|MB_SYSTEMMODAL|MB_ICONERROR);
+	}
+
+
+#endif
 #endif
 
 	_exit(1);
@@ -399,5 +433,12 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 		theReleaseCrashLogFile = nullptr;
 	}
 
+#if defined(GENONLINE)
+#if defined(GENONLINE)
+	// GenOnline @bugfix arcticdolphin 17/11/2026 A release crash, like a failed start, reaches Sentry and not only the local dumps.
+	GenOnlineServicesManager::ReportReleaseCrashToSentry(m.str());
+#endif
+
+#endif
 	_exit(1);
 }

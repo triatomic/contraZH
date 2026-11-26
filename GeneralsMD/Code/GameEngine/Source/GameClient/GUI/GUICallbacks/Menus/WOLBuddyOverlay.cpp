@@ -681,6 +681,18 @@ void showNotificationBox( AsciiString nick, UnicodeString message)
 
 }
 
+#if defined(GENONLINE)
+// GenOnline @bugfix arcticdolphin 07/11/2026 A notification was raised only when it appeared, so the next shell screen
+// and its ruler were drawn over it. The shell raises it again after every screen change.
+void raiseNotificationBox()
+{
+	if (noticeLayout != nullptr && !noticeLayout->isHidden())
+	{
+		noticeLayout->bringForward();
+	}
+}
+
+#endif
 void deleteNotificationBox()
 {
 	lastNotificationWasStatus = FALSE;

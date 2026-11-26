@@ -132,7 +132,12 @@ Campaign::~Campaign()
 	{
 		Mission *mission = *it;
 		it = m_missions.erase( it );
+#if defined(GENONLINE)
+		if(mission)
+			deleteInstance(mission);
+#else
 		deleteInstance(mission);
+#endif
 	}
 }
 
@@ -237,7 +242,12 @@ CampaignManager::~CampaignManager()
 	{
 		Campaign *campaign = *it;
 		it = m_campaignList.erase( it );
+#if defined(GENONLINE)
+		if(campaign)
+			deleteInstance(campaign);
+#else
 		deleteInstance(campaign);
+#endif
 	}
 }
 
