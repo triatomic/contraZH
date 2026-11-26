@@ -31,6 +31,7 @@ This tree holds the GenOnline online stack, the Generals Online team's 2026.11 c
 - The exe keeps the fork's name (`generalszh`, `generalszh_c` with cheats).
 - The data pack is not built by CMake: `python GenOnline/tools/pack_go_data.py zerohour 2026.11.0 <exe folder>\data contra`. The last argument overlays `GenOnline/data/contra`, the Contra colour theme, on the Zero Hour files.
 - The Contra theme is the `contra` entry of `THEMES` in `GenOnline/tools/go_ui_kit.py` plus `GenOnline/data/contra/Data/INI/GOUIColors.ini`. After a palette change run `python GenOnline/tools/go_ui_kit.py --theme contra` and repack.
+- The overlay's `ZZ_GeneralsOnline_Logo.INI` is empty on purpose. The Zero Hour one redefines `GeneralsLogo` to the retail texture and would override the mod's logo. The Generals Online logo on the first load screen (`GOLoadLogo`) is kept, as its authors ask in `LoadScreen.cpp`.
 - The ON build runs the logic at 60 Hz in every mode and has its own exe CRC, so it cannot share LAN games or replays with the OFF build.
 
 ## Re-syncing with GenOnline
