@@ -37,6 +37,27 @@
 static const UnsignedInt MISSES_BEFORE_DIRECTORY_LISTING = 8;
 static const size_t MAX_DIRECTORY_LISTINGS = 64;
 
+static Bool copyFileDirectory(Char *directory, size_t directorySize, const Char *path)
+{
+	const Char *separator = getLastPathSeparator(path);
+	if (separator == nullptr) {
+		return FALSE;
+	}
+
+	size_t length = separator - path;
+	while (length > 0 && isPathSeparator(path[length - 1])) {
+		--length;
+	}
+
+	if (length == 0 || length >= directorySize) {
+		return FALSE;
+	}
+
+	memcpy(directory, path, length);
+	directory[length] = '\0';
+	return TRUE;
+}
+
 Win32LocalFileSystem::Win32LocalFileSystem(Bool cacheMissingDirectories) : LocalFileSystem(), m_cacheMissingDirectories(cacheMissingDirectories), m_ownerThreadId(GetCurrentThreadId())
 {
 }
@@ -145,7 +166,11 @@ Bool Win32LocalFileSystem::doesFileExist(const Char *filename) const
 
 	const DWORD error = GetLastError();
 	if (error == ERROR_PATH_NOT_FOUND) {
-		noteMissingDirectory(filename);
+		// A directory the missing-directory cache refuses counts as a miss in its parent's listing
+		Char directory[_MAX_PATH];
+		if (!noteMissingDirectory(filename) && copyFileDirectory(directory, ARRAY_SIZE(directory), filename)) {
+			noteMissingFile(directory);
+		}
 	} else if (error == ERROR_FILE_NOT_FOUND) {
 		noteMissingFile(filename);
 	}
@@ -198,16 +223,17 @@ Bool Win32LocalFileSystem::isInMissingDirectory(const Char *filename) const
 	return m_missingDirectories.find(AsciiString(key)) != m_missingDirectories.end();
 }
 
-void Win32LocalFileSystem::noteMissingDirectory(const Char *filename) const
+Bool Win32LocalFileSystem::noteMissingDirectory(const Char *filename) const
 {
 	Char key[_MAX_PATH];
 	if (!isMissingDirectoryCacheActive() || !makeDirectoryKey(key, ARRAY_SIZE(key), filename, TRUE)) {
-		return;
+		return FALSE;
 	}
 
 	// AsciiString reference counts are not atomic, so the key string lives only under the lock
 	FastCriticalSectionClass::LockClass lock(m_missingDirectoriesMutex);
 	m_missingDirectories.insert(AsciiString(key));
+	return TRUE;
 }
 
 void Win32LocalFileSystem::forgetMissingDirectory(const Char *directory)
@@ -223,22 +249,12 @@ void Win32LocalFileSystem::forgetMissingDirectory(const Char *directory)
 
 Bool Win32LocalFileSystem::makeFileKeys(Char *directoryKey, size_t directoryKeySize, Char *nameKey, size_t nameKeySize, const Char *filename)
 {
-	const Char *separator = getLastPathSeparator(filename);
-	if (separator == nullptr) {
-		return FALSE;
-	}
-
-	size_t length = separator - filename;
-	while (length > 0 && isPathSeparator(filename[length - 1])) {
-		--length;
-	}
-
 	Char directory[_MAX_PATH];
-	if (length == 0 || length >= ARRAY_SIZE(directory) || filename[length - 1] == ':') {
+	if (!copyFileDirectory(directory, ARRAY_SIZE(directory), filename) || directory[strlen(directory) - 1] == ':') {
 		return FALSE;
 	}
 
-	const Char *name = separator + 1;
+	const Char *name = getLastPathSeparator(filename) + 1;
 	const size_t nameLength = strlen(name);
 	if (nameLength == 0 || name[nameLength - 1] == '.') {
 		return FALSE;
@@ -252,23 +268,22 @@ Bool Win32LocalFileSystem::makeFileKeys(Char *directoryKey, size_t directoryKeyS
 		}
 	}
 
-	memcpy(directory, filename, length);
-	directory[length] = '\0';
 	return FileSystem::makePathKey(directoryKey, directoryKeySize, directory) && FileSystem::makePathKey(nameKey, nameKeySize, name);
 }
 
-Bool Win32LocalFileSystem::isKnownMissingFile(const Char *filename) const
+Bool Win32LocalFileSystem::isAbsentFromListing(const Char *path, Bool &unlisted) const
 {
+	unlisted = FALSE;
 	Char directoryKey[_MAX_PATH];
 	Char nameKey[_MAX_PATH];
-	if (!isMissingDirectoryCacheActive() || !makeFileKeys(directoryKey, ARRAY_SIZE(directoryKey), nameKey, ARRAY_SIZE(nameKey), filename)) {
+	if (!makeFileKeys(directoryKey, ARRAY_SIZE(directoryKey), nameKey, ARRAY_SIZE(nameKey), path)) {
 		return FALSE;
 	}
 
-	FastCriticalSectionClass::LockClass lock(m_watchMutex);
 	const AsciiString directoryString(directoryKey);
 	std::map<AsciiString, DirectoryListing>::iterator it = m_directoryListings.find(directoryString);
 	if (it == m_directoryListings.end()) {
+		unlisted = TRUE;
 		return FALSE;
 	}
 
@@ -276,10 +291,32 @@ Bool Win32LocalFileSystem::isKnownMissingFile(const Char *filename) const
 		FindCloseChangeNotification(it->second.m_watch);
 		m_directoryListings.erase(it);
 		m_directoryMissCounts.erase(directoryString);
+		unlisted = TRUE;
 		return FALSE;
 	}
 
 	return it->second.m_names.find(AsciiString(nameKey)) == it->second.m_names.end();
+}
+
+Bool Win32LocalFileSystem::isKnownMissingFile(const Char *filename) const
+{
+	if (!isMissingDirectoryCacheActive()) {
+		return FALSE;
+	}
+
+	FastCriticalSectionClass::LockClass lock(m_watchMutex);
+	Bool unlisted;
+	if (isAbsentFromListing(filename, unlisted)) {
+		return TRUE;
+	}
+
+	// A directory absent from its parent's listing holds no files
+	Char directory[_MAX_PATH];
+	if (!unlisted || !copyFileDirectory(directory, ARRAY_SIZE(directory), filename)) {
+		return FALSE;
+	}
+
+	return isAbsentFromListing(directory, unlisted);
 }
 
 void Win32LocalFileSystem::noteMissingFile(const Char *filename) const

@@ -57,7 +57,7 @@ protected:
 	static Bool makeDirectoryKey(Char *key, size_t keySize, const Char *path, Bool pathIsFile);	///< key of the file's directory or of a directory path; FALSE when the path is absolute, has no directory or the key does not fit
 	Bool isMissingDirectoryCacheActive() const;
 	Bool isInMissingDirectory(const Char *filename) const;	///< is the file's directory known to be missing?
-	void noteMissingDirectory(const Char *filename) const;	///< remember that the file's directory is missing
+	Bool noteMissingDirectory(const Char *filename) const;	///< remember that the file's directory is missing; FALSE when the cache cannot hold it
 	void forgetMissingDirectory(const Char *directory);
 
 	// Only relative directories are cached because other code creates absolute ones without this class
@@ -73,7 +73,8 @@ private:
 	};
 
 	static Bool makeFileKeys(Char *directoryKey, size_t directoryKeySize, Char *nameKey, size_t nameKeySize, const Char *filename);	///< keys of the file's directory and name; FALSE when the listing must not answer for the path
-	Bool isKnownMissingFile(const Char *filename) const;	///< is the file absent from its directory's watched listing?
+	Bool isAbsentFromListing(const Char *path, Bool &unlisted) const;	///< caller holds m_watchMutex; is the path's name absent from its directory's watched listing? unlisted is TRUE when the keys are valid and no listing exists
+	Bool isKnownMissingFile(const Char *filename) const;	///< is the file absent from its directory's watched listing, or that directory from its parent's?
 	void noteMissingFile(const Char *filename) const;	///< count a miss in an existing directory and list it after enough misses
 
 	unsigned long m_ownerThreadId;
