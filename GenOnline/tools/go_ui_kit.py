@@ -82,6 +82,27 @@ THEMES = {
         "#070A18": "#140C04",  # button fill
         "#0A0A10": "#100C08",  # disabled fill
     },
+    # contraZH: the olive gold of the Contra interface
+    "contra": {
+        "#2F4BFF": "#645A04",  # kit line
+        "#6A7BFF": "#D6AA18",  # hilite line
+        "#8C9BFF": "#FFC828",  # pushed line
+        "#3446FF": "#8A7A06",  # selected and slider fill
+        "#C9CEFF": "#F4FAAF",  # glyph
+        "#5D6080": "#6E6A50",  # disabled glyph
+        "#2B34B8": "#703800",  # pushed fill
+        "#152078": "#2C2000",  # hilite fill
+        "#05070F": "#020202",  # field
+        "#4A4E6E": "#55523C",  # disabled line
+        "#404159": "#4A4735",  # disabled scroll thumb
+        "#3A4FE0": "#7A6C05",  # scroll thumb
+        "#3A3C55": "#3F3D2E",  # disabled scroll pill
+        "#283489": "#3C3603",  # slider track
+        "#24308C": "#3C3603",  # slider off line
+        "#0B1030": "#0C0B02",  # slider off fill
+        "#070A18": "#020202",  # button fill
+        "#0A0A10": "#0A0A08",  # disabled fill
+    },
 }
 if THEME and THEME not in THEMES:
     sys.exit("unknown theme " + THEME)

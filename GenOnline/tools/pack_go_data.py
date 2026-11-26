@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 r"""Pack GenOnline/data/core and the data folder of a game into the baseline data pack of that game.
 
-Usage: pack_go_data.py <zerohour|generals> <build> [output folder]
+Usage: pack_go_data.py <zerohour|generals> <build> [output folder] [overlay]
 
 The result is <output folder>\genonline_<game>@<build>.gpk. A .gpk is a plain BIG under another extension.
 The folder layout inside core and the game folder is the layout inside the pack (Window\..., Data\INI\..., Art\Textures\...).
 A file in both folders is taken from the game folder.
+An overlay names another folder of GenOnline/data whose files replace those of the game folder, such as the contra theme.
 Entries are sorted by path and carry no timestamps, so packing the same files again gives the same bytes.
 
 The pack ships in the data folder of the client, next to the executable. The client mounts the files listed
@@ -34,7 +35,7 @@ def collect(roots):
 
 
 def main():
-    if len(sys.argv) < 3 or len(sys.argv) > 4:
+    if len(sys.argv) < 3 or len(sys.argv) > 5:
         sys.exit(__doc__)
     game, build = sys.argv[1], sys.argv[2]
     out_dir = sys.argv[3] if len(sys.argv) > 3 else "."
@@ -45,7 +46,13 @@ def main():
     game_folder = os.path.join(DATA, game)
     if not os.path.isdir(game_folder):
         sys.exit("no data folder for " + game + ": " + game_folder)
-    files = collect([CORE, game_folder])
+    roots = [CORE, game_folder]
+    if len(sys.argv) > 4:
+        overlay_folder = os.path.join(DATA, sys.argv[4])
+        if not os.path.isdir(overlay_folder):
+            sys.exit("no overlay folder " + sys.argv[4] + ": " + overlay_folder)
+        roots.append(overlay_folder)
+    files = collect(roots)
     if not files:
         sys.exit("nothing to pack for " + game)
     os.makedirs(out_dir, exist_ok=True)
