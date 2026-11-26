@@ -1218,6 +1218,9 @@ set(GAMEENGINE_SRC
     Source/GameNetwork/User.cpp
     Source/Precompiled/PreRTS.cpp
 )
+if(RTS_BUILD_GENERALS_ONLINE)
+    include(${CMAKE_SOURCE_DIR}/GenOnline/cmake/core-gameengine.cmake)
+endif()
 
 
 add_library(corei_gameengine_private INTERFACE)

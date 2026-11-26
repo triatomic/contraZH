@@ -94,6 +94,10 @@ add_subdirectory(Dependencies)
 
 add_subdirectory(resources)
 
+if(RTS_BUILD_GENERALS_ONLINE)
+    include(GenOnline/cmake/genonline.cmake)
+endif()
+
 add_subdirectory(Core)
 
 # Add main build targets

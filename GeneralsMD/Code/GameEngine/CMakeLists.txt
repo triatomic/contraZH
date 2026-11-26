@@ -1276,6 +1276,9 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Upgrade/PropagateUpgradeToContainedUpgrade.cpp
     Source/GameLogic/Object/Upgrade/UnitProductionBonusUpgrade.cpp
 )
+if(RTS_BUILD_GENERALS_ONLINE)
+    include(${CMAKE_SOURCE_DIR}/GenOnline/cmake/zerohour-gameengine.cmake)
+endif()
 
 
 if(RTS_BUILD_OPTION_GAME_MCP)

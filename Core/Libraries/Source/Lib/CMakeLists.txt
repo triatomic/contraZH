@@ -24,6 +24,9 @@ set(CORE_LIBRARIES_SRC
     Include/Precompiled/BaseTypes.h
     Trig.cpp
 )
+if(RTS_BUILD_GENERALS_ONLINE)
+    list(APPEND CORE_LIBRARIES_SRC Include/AdaptiveQualityLevels.h)
+endif()
 
 add_library(core_libraries STATIC)
 

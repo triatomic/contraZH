@@ -1,4 +1,7 @@
 add_executable(z_generals WIN32)
+if(RTS_BUILD_GENERALS_ONLINE)
+    include(${CMAKE_SOURCE_DIR}/GenOnline/cmake/zerohour-main.cmake)
+endif()
 
 # Use a binary name that doesn't conflict with original game.
 # TheSuperHackers @feature A cheats enabled build gets a _c suffix, so a build that can grant

@@ -1,20 +1,36 @@
 # Interface libraries to set common defines and includes, avoid duplication later
 add_library(core_wwcommon INTERFACE)
 
-target_link_libraries(core_wwcommon INTERFACE
-    d3d8lib
-    deps_dbghelp
-    deps_miles
-    deps_usp10
-    stlport
-)
+if(RTS_BUILD_GENERALS_ONLINE)
+    target_link_libraries(core_wwcommon INTERFACE
+        d3d8lib
+        deps_dbghelp
+        deps_usp10
+        stlport
+    )
+else()
+    target_link_libraries(core_wwcommon INTERFACE
+        d3d8lib
+        deps_dbghelp
+        deps_miles
+        deps_usp10
+        stlport
+    )
+endif()
 
 target_include_directories(core_wwcommon INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 add_subdirectory(WW3D2)
-add_subdirectory(WWAudio)
+if(RTS_BUILD_GENERALS_ONLINE)
+    if(RTS_NEEDS_LEGACY_MEDIA)
+        target_link_libraries(core_wwcommon INTERFACE deps_miles)
+        add_subdirectory(WWAudio)
+    endif()
+else()
+    add_subdirectory(WWAudio)
+endif()
 add_subdirectory(WWDebug)
 add_subdirectory(WWDownload)
 add_subdirectory(WWLib)
