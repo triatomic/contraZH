@@ -30,6 +30,7 @@
 
 #include "Common/LocalFileSystem.h"
 
+#include <map>
 #include <set>
 
 class Win32LocalFileSystem : public LocalFileSystem
@@ -50,6 +51,7 @@ public:
 
 	virtual Bool createDirectory(AsciiString directory) override;
 	virtual AsciiString normalizePath(const AsciiString& filePath) const override;
+	virtual Bool hasDirectoryTreeChanged(const AsciiString& directory) override;
 
 protected:
 	static Bool makeDirectoryKey(Char *key, size_t keySize, const Char *path, Bool pathIsFile);	///< key of the file's directory or of a directory path; FALSE when the path is absolute, has no directory or the key does not fit
@@ -62,4 +64,21 @@ protected:
 	Bool m_cacheMissingDirectories;
 	mutable std::set<AsciiString> m_missingDirectories;
 	mutable FastCriticalSectionClass m_missingDirectoriesMutex;
+
+private:
+	struct DirectoryListing
+	{
+		void *m_watch;
+		std::set<AsciiString> m_names;
+	};
+
+	static Bool makeFileKeys(Char *directoryKey, size_t directoryKeySize, Char *nameKey, size_t nameKeySize, const Char *filename);	///< keys of the file's directory and name; FALSE when the listing must not answer for the path
+	Bool isKnownMissingFile(const Char *filename) const;	///< is the file absent from its directory's watched listing?
+	void noteMissingFile(const Char *filename) const;	///< count a miss in an existing directory and list it after enough misses
+
+	unsigned long m_ownerThreadId;
+	std::map<AsciiString, void *> m_treeWatches;
+	mutable std::map<AsciiString, DirectoryListing> m_directoryListings;
+	mutable std::map<AsciiString, UnsignedInt> m_directoryMissCounts;
+	mutable FastCriticalSectionClass m_watchMutex;
 };

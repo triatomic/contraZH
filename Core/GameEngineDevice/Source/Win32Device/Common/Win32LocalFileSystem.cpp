@@ -34,11 +34,20 @@
 #include "Win32Device/Common/Win32LocalFile.h"
 #include <io.h>
 
-Win32LocalFileSystem::Win32LocalFileSystem(Bool cacheMissingDirectories) : LocalFileSystem(), m_cacheMissingDirectories(cacheMissingDirectories)
+static const UnsignedInt MISSES_BEFORE_DIRECTORY_LISTING = 8;
+static const size_t MAX_DIRECTORY_LISTINGS = 64;
+
+Win32LocalFileSystem::Win32LocalFileSystem(Bool cacheMissingDirectories) : LocalFileSystem(), m_cacheMissingDirectories(cacheMissingDirectories), m_ownerThreadId(GetCurrentThreadId())
 {
 }
 
 Win32LocalFileSystem::~Win32LocalFileSystem() {
+	for (std::map<AsciiString, void *>::iterator it = m_treeWatches.begin(); it != m_treeWatches.end(); ++it) {
+		FindCloseChangeNotification(it->second);
+	}
+	for (std::map<AsciiString, DirectoryListing>::iterator it = m_directoryListings.begin(); it != m_directoryListings.end(); ++it) {
+		FindCloseChangeNotification(it->second.m_watch);
+	}
 }
 
 //DECLARE_PERF_TIMER(Win32LocalFileSystem_openFile)
@@ -52,7 +61,7 @@ File * Win32LocalFileSystem::openFile(const Char *filename, Int access, size_t b
 	}
 
 	const Bool isRead = (access & (File::WRITE | File::CREATE)) == 0;
-	if (isRead && isInMissingDirectory(filename)) {
+	if (isRead && (isInMissingDirectory(filename) || isKnownMissingFile(filename))) {
 		return nullptr;
 	}
 
@@ -126,7 +135,7 @@ void Win32LocalFileSystem::reset()
 Bool Win32LocalFileSystem::doesFileExist(const Char *filename) const
 {
 	//USE_PERF_TIMER(Win32LocalFileSystem_doesFileExist)
-	if (isInMissingDirectory(filename)) {
+	if (isInMissingDirectory(filename) || isKnownMissingFile(filename)) {
 		return FALSE;
 	}
 
@@ -134,8 +143,11 @@ Bool Win32LocalFileSystem::doesFileExist(const Char *filename) const
 		return TRUE;
 	}
 
-	if (GetLastError() == ERROR_PATH_NOT_FOUND) {
+	const DWORD error = GetLastError();
+	if (error == ERROR_PATH_NOT_FOUND) {
 		noteMissingDirectory(filename);
+	} else if (error == ERROR_FILE_NOT_FOUND) {
+		noteMissingFile(filename);
 	}
 
 	return FALSE;
@@ -207,6 +219,177 @@ void Win32LocalFileSystem::forgetMissingDirectory(const Char *directory)
 
 	FastCriticalSectionClass::LockClass lock(m_missingDirectoriesMutex);
 	m_missingDirectories.erase(AsciiString(key));
+}
+
+Bool Win32LocalFileSystem::makeFileKeys(Char *directoryKey, size_t directoryKeySize, Char *nameKey, size_t nameKeySize, const Char *filename)
+{
+	const Char *separator = getLastPathSeparator(filename);
+	if (separator == nullptr) {
+		return FALSE;
+	}
+
+	size_t length = separator - filename;
+	while (length > 0 && isPathSeparator(filename[length - 1])) {
+		--length;
+	}
+
+	Char directory[_MAX_PATH];
+	if (length == 0 || length >= ARRAY_SIZE(directory) || filename[length - 1] == ':') {
+		return FALSE;
+	}
+
+	const Char *name = separator + 1;
+	const size_t nameLength = strlen(name);
+	if (nameLength == 0 || name[nameLength - 1] == '.') {
+		return FALSE;
+	}
+
+	// Short-name aliases, streams, wildcards and non-ASCII case rules need the disk
+	for (const Char *ch = name; *ch != '\0'; ++ch) {
+		const UnsignedByte c = (UnsignedByte)*ch;
+		if (c <= 0x20 || c >= 0x7F || strchr("~:*?\"<>|", c) != nullptr) {
+			return FALSE;
+		}
+	}
+
+	memcpy(directory, filename, length);
+	directory[length] = '\0';
+	return FileSystem::makePathKey(directoryKey, directoryKeySize, directory) && FileSystem::makePathKey(nameKey, nameKeySize, name);
+}
+
+Bool Win32LocalFileSystem::isKnownMissingFile(const Char *filename) const
+{
+	Char directoryKey[_MAX_PATH];
+	Char nameKey[_MAX_PATH];
+	if (!isMissingDirectoryCacheActive() || !makeFileKeys(directoryKey, ARRAY_SIZE(directoryKey), nameKey, ARRAY_SIZE(nameKey), filename)) {
+		return FALSE;
+	}
+
+	FastCriticalSectionClass::LockClass lock(m_watchMutex);
+	const AsciiString directoryString(directoryKey);
+	std::map<AsciiString, DirectoryListing>::iterator it = m_directoryListings.find(directoryString);
+	if (it == m_directoryListings.end()) {
+		return FALSE;
+	}
+
+	if (WaitForSingleObject(it->second.m_watch, 0) != WAIT_TIMEOUT) {
+		FindCloseChangeNotification(it->second.m_watch);
+		m_directoryListings.erase(it);
+		m_directoryMissCounts.erase(directoryString);
+		return FALSE;
+	}
+
+	return it->second.m_names.find(AsciiString(nameKey)) == it->second.m_names.end();
+}
+
+void Win32LocalFileSystem::noteMissingFile(const Char *filename) const
+{
+	Char directoryKey[_MAX_PATH];
+	Char nameKey[_MAX_PATH];
+	if (!isMissingDirectoryCacheActive() || !makeFileKeys(directoryKey, ARRAY_SIZE(directoryKey), nameKey, ARRAY_SIZE(nameKey), filename)) {
+		return;
+	}
+
+	const Bool isOwnerThread = GetCurrentThreadId() == m_ownerThreadId;
+	FastCriticalSectionClass::LockClass lock(m_watchMutex);
+	const AsciiString directoryString(directoryKey);
+	if (m_directoryListings.find(directoryString) != m_directoryListings.end()) {
+		return;
+	}
+
+	UnsignedInt &missCount = m_directoryMissCounts[directoryString];
+	if (missCount < MISSES_BEFORE_DIRECTORY_LISTING) {
+		++missCount;
+	}
+	if (missCount < MISSES_BEFORE_DIRECTORY_LISTING || !isOwnerThread || m_directoryListings.size() >= MAX_DIRECTORY_LISTINGS) {
+		return;
+	}
+
+	// The watch exists before the enumeration so no change falls between them
+	HANDLE watch = FindFirstChangeNotificationA(directoryKey, FALSE, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME);
+	if (watch == INVALID_HANDLE_VALUE) {
+		m_directoryMissCounts.erase(directoryString);
+		return;
+	}
+
+	AsciiString search = directoryString;
+	search.concat("\\*");
+	std::set<AsciiString> names;
+	WIN32_FIND_DATAA findData;
+	HANDLE findHandle = FindFirstFileA(search.str(), &findData);
+	Bool listed = (findHandle != INVALID_HANDLE_VALUE);
+	if (listed) {
+		for (;;) {
+			if (strcmp(findData.cFileName, ".") != 0 && strcmp(findData.cFileName, "..") != 0) {
+				Char entryKey[_MAX_PATH];
+				if (!FileSystem::makePathKey(entryKey, ARRAY_SIZE(entryKey), findData.cFileName)) {
+					listed = FALSE;
+					break;
+				}
+				names.insert(AsciiString(entryKey));
+			}
+			if (!FindNextFileA(findHandle, &findData)) {
+				listed = (GetLastError() == ERROR_NO_MORE_FILES);
+				break;
+			}
+		}
+		FindClose(findHandle);
+	}
+
+	if (!listed) {
+		FindCloseChangeNotification(watch);
+		m_directoryMissCounts.erase(directoryString);
+		return;
+	}
+
+	DirectoryListing &listing = m_directoryListings[directoryString];
+	listing.m_watch = watch;
+	listing.m_names.swap(names);
+}
+
+Bool Win32LocalFileSystem::hasDirectoryTreeChanged(const AsciiString& directory)
+{
+	Char path[_MAX_PATH];
+	size_t length = directory.getLength();
+	if (length >= ARRAY_SIZE(path)) {
+		return TRUE;
+	}
+
+	memcpy(path, directory.str(), length);
+	while (length > 0 && isPathSeparator(path[length - 1])) {
+		--length;
+	}
+	path[length] = '\0';
+
+	Char key[_MAX_PATH];
+	if (!FileSystem::makePathKey(key, ARRAY_SIZE(key), path)) {
+		return TRUE;
+	}
+
+	// A thread's exit cancels the notifications it armed, so only the owner thread arms them
+	const Bool isOwnerThread = GetCurrentThreadId() == m_ownerThreadId;
+	FastCriticalSectionClass::LockClass lock(m_watchMutex);
+	const AsciiString keyString(key);
+	std::map<AsciiString, void *>::iterator it = m_treeWatches.find(keyString);
+	if (it == m_treeWatches.end()) {
+		if (isOwnerThread) {
+			HANDLE watch = FindFirstChangeNotificationA(key, TRUE, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE);
+			if (watch != INVALID_HANDLE_VALUE) {
+				m_treeWatches[keyString] = watch;
+			}
+		}
+		return TRUE;
+	}
+
+	if (WaitForSingleObject(it->second, 0) == WAIT_TIMEOUT) {
+		return FALSE;
+	}
+
+	if (!isOwnerThread || !FindNextChangeNotification(it->second)) {
+		FindCloseChangeNotification(it->second);
+		m_treeWatches.erase(it);
+	}
+	return TRUE;
 }
 
 void Win32LocalFileSystem::getFileListInDirectory(const AsciiString& currentDirectory, const AsciiString& originalDirectory, const AsciiString& searchName, FilenameList & filenameList, Bool searchSubdirectories) const

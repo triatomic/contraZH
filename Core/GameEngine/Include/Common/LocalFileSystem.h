@@ -42,6 +42,7 @@ public:
 	virtual Bool getFileInfo(const AsciiString& filename, FileInfo *fileInfo) const = 0; ///< see FileSystem.h
 	virtual Bool createDirectory(AsciiString directory) = 0; ///< see FileSystem.h
 	virtual AsciiString normalizePath(const AsciiString& filePath) const = 0;	///< see FileSystem.h
+	virtual Bool hasDirectoryTreeChanged(const AsciiString& directory) { return TRUE; }	///< FALSE only when nothing under the directory changed since the previous call for it
 
 protected:
 };

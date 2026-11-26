@@ -480,7 +480,7 @@ void MapCache::updateCache()
 	}
 
 	// Load user maps from disk and update any discrepancies from the map cache.
-	if (loadMapsFromDisk(userMapDir, FALSE))
+	if (TheLocalFileSystem->hasDirectoryTreeChanged(userMapDir) && loadMapsFromDisk(userMapDir, FALSE))
 	{
 		writeCacheINI(userMapDir);
 		m_doLoadStandardMapCacheINI = TRUE;
