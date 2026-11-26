@@ -784,11 +784,7 @@ UpdateSleepTime RailroadBehavior::update()
 			TheAudio->removeAudioEvent( m_runningSound.getPlayingHandle() );
 		}
 
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-		conductorPullInfo.trackDistance += conductorPullInfo.speed * 0.5f;
-#else
 		conductorPullInfo.trackDistance += conductorPullInfo.speed ;
-#endif
 		// only normalize track position for a looping track, otherwise, let train exit by exceeding tracklength
 		while ( (conductorPullInfo.trackDistance > m_track->m_length) && m_track->m_isLooping)
 			conductorPullInfo.trackDistance -= m_track->m_length;

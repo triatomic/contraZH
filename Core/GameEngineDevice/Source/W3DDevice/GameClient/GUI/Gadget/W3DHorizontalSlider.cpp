@@ -206,11 +206,7 @@ void W3DGadgetHorizontalSliderImageDraw( GameWindow *window,
 
 	SliderData *s = (SliderData *)window->winGetUserData();
 
-#if defined(GENERALS_ONLINE_WIDESCREEN)
-	Real xMulti = INT_TO_REAL(TheDisplay->getWidth()) / GENERALS_ONLINE_WIDESCREEN_X_SCALE;
-#else
 	Real xMulti = INT_TO_REAL(TheDisplay->getWidth()) / DEFAULT_DISPLAY_WIDTH;
-#endif
 
 	// figure out how many boxes we draw for this slider
 	Int numBoxes = 0;

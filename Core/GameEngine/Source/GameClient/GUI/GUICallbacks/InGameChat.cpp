@@ -54,11 +54,6 @@ static GameWindow *chatTypeStaticText = nullptr;
 static UnicodeString s_savedChat;
 static InGameChatType inGameChatType;
 
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/GeneralsOnline/NGMPGame.h"
-extern NGMPGame* TheNGMPGame;
-#endif
-
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 void ShowInGameChat( Bool immediate )
@@ -235,12 +230,7 @@ void ToggleInGameChat( Bool immediate )
 	}
 
 	// Block the chat window in singleplayer/skirmish unless EnableSingleplayerChatwindow is set (for chat commands).
-	// GeneralsOnline port: an active NGMP game also allows chat (upstream GO instead
-	// allowed it ONLY then, which would break LAN and the singleplayer chat window).
 	if (
-#if defined(GENERALS_ONLINE)
-		TheNGMPGame == nullptr &&
-#endif
 		!TheGlobalData->m_enableSingleplayerChatWindow
 		&& !TheGameLogic->isInMultiplayerGame() && TheGlobalData->m_netMinPlayers)
 		return;

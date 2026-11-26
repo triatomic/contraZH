@@ -73,9 +73,6 @@ public:
 
 	void setLifetimeRange( UnsignedInt minFrames, UnsignedInt maxFrames );
 	UnsignedInt getDieFrame() { return m_dieFrame; }
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	void restartLifetime();
-#endif
 
 	virtual UpdateSleepTime update() override;
 

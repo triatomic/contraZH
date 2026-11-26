@@ -117,11 +117,6 @@
 #include "GameNetwork/GameSpy/PeerDefs.h"
 #include "GameNetwork/LobbyRules.h"
 
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/GeneralsOnline/NGMPGame.h"
-#include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
-extern NGMPGame* TheNGMPGame;
-#endif
 #include "GameNetwork/GameSpy/ThreadUtils.h"
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameNetwork/NetworkInterface.h"
@@ -255,9 +250,6 @@ GameLogic::GameLogic()
 	m_freeRadar = FALSE;
 	m_revealMap = FALSE;
 	m_autoQueue = FALSE;
-#if defined(GENERALS_ONLINE)
-	m_pendingLobbyRules = 0;
-#endif
 
 	for(Int i = 0; i < MAX_SLOTS; i++)
 	{
@@ -1351,13 +1343,8 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		}
 		else
 		{
-#if defined(GENERALS_ONLINE)
-			DEBUG_LOG(("Starting generals online game"));
-			TheGameInfo = TheNGMPGame;	/// @todo: MDC add back in after demo
-#else
 			DEBUG_LOG(("Starting gamespy game"));
 			TheGameInfo = TheGameSpyGame;	/// @todo: MDC add back in after demo
-#endif
 		}
 	}
 	else
@@ -1407,23 +1394,6 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// Saved too, because producers save the unit they auto queue
 	m_autoQueue = TheGameInfo != nullptr && TheGameInfo->getAutoQueue();
-#if defined(GENERALS_ONLINE)
-	m_pendingLobbyRules = 0;
-	if (!loadingSaveGame && TheNGMPGame != nullptr && TheGameInfo == TheNGMPGame && !TheRecorder->isPlaybackMode())
-	{
-		NGMP_OnlineServices_LobbyInterface *pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
-		if (pLobbyInterface != nullptr && pLobbyInterface->IsHost())
-		{
-			for (Int rule = 0; rule < LOBBY_RULE_COUNT; ++rule)
-			{
-				if (pLobbyInterface->IsLobbyRuleOn((LobbyRule)rule))
-				{
-					m_pendingLobbyRules |= 1u << rule;
-				}
-			}
-		}
-	}
-#endif
 
 	checkForDuplicateColors( TheGameInfo );
 
@@ -2872,93 +2842,7 @@ void GameLogic::processCommandList( CommandList *list )
 					player?player->getPlayerDisplayName().str():L"<NONE>", crcIt->second));
 			}
 #endif // DEBUG_LOGGING
-#if defined(GENERALS_ONLINE)
-			// provide more details
-			UnicodeString strMismatchDetails;
-			strMismatchDetails.format(L"GameLogic frame %d, latest frame %d, GetGameLogicRandomSeedCRC was %d\nHad %d CRCs from %d players\nMismatched Players:\n",
-				TheGameLogic->getFrame(),
-				TheGameLogic->getFrame() - TheNetwork->getRunAhead() - 1,
-				GetGameLogicRandomSeedCRC(),
-				m_cachedCRCs.size(),
-				numPlayers);
-
-			// determine who is at fault
-			std::map<UnsignedInt, int> mapCRCOccurences;
-			for (CachedCRCMap::const_iterator crcIt = m_cachedCRCs.begin(); crcIt != m_cachedCRCs.end(); ++crcIt)
-			{
-				// data to determine who mismatched
-				if (mapCRCOccurences.contains(crcIt->second))
-				{
-					++mapCRCOccurences[crcIt->second];
-				}
-				else
-				{
-					mapCRCOccurences[crcIt->second] = 1;
-				}
-			}
-
-			// determine who mismatched
-			// take the 'most frequent' CRC as the correct one, everyone else is to blame
-			int biggestCRCCount = -1;
-			UnsignedInt biggestCRC = -1;
-			for (auto& crcIter : mapCRCOccurences)
-			{
-				if (crcIter.second > biggestCRCCount)
-				{
-					biggestCRC = crcIter.first;
-					biggestCRCCount = crcIter.second;
-				}
-			}
-
-			// show all players
-			for (CachedCRCMap::const_iterator crcIt = m_cachedCRCs.begin(); crcIt != m_cachedCRCs.end(); ++crcIt)
-			{
-				// only show users who arent OK, UI isn't huge
-				if (crcIt->second != biggestCRC)
-				{
-					Player* player = ThePlayerList->getNthPlayer(crcIt->first);
-					UnicodeString strPlayerInfo;
-					strPlayerInfo.format(L"player %d (%s) = %X [MISMATCH]\n", crcIt->first, player ? player->getPlayerDisplayName().str() : L"<NONE>", crcIt->second);
-
-					strMismatchDetails.concat(strPlayerInfo);
-				}
-			}
-
-			// TODO_NGMP: Handle missing CRCs, although that doesnt seem common
-
-			TheNetwork->setSawCRCMismatch(strMismatchDetails);
-
-#if defined(GENERALS_ONLINE_USE_SENTRY)
-			if (TheNGMPGame != nullptr)
-			{
-				// local player info
-				int64_t userID = -1;
-				std::string strDisplayname = "Unknown";
-				NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
-				if (pAuthInterface != nullptr)
-				{
-					userID = pAuthInterface->GetUserID();
-					strDisplayname = pAuthInterface->GetDisplayName();
-				}
-				std::string strUserID = std::format("{}", userID);
-
-				sentry_set_extra("user_id", sentry_value_new_int32(userID));
-				sentry_set_extra("user_displayname", sentry_value_new_string(strDisplayname.c_str()));
-
-				AsciiString sentryMsg;
-				sentryMsg.translate(strMismatchDetails);
-
-				// send event to sentry
-				sentry_capture_event(sentry_value_new_message_event(
-					SENTRY_LEVEL_ERROR,
-					"CRC_MISMATCH",
-					sentryMsg.str()
-				));
-			}
-#endif
-#else
 			TheNetwork->setSawCRCMismatch();
-#endif
 		}
 	}
 
@@ -5943,28 +5827,10 @@ bool GameLogic::onSetDiplomacyStance(GameMessage *msg)
 }
 
 //-------------------------------------------------------------------------------------------------
-// Only the Generals Online lobby owner may turn a rule on; a replay has no lobby, so it trusts the recording
 static Bool isLobbyHostSender(Int playerIndex)
 {
-#if defined(GENERALS_ONLINE)
-	if (TheRecorder->isPlaybackMode())
-	{
-		return TRUE;
-	}
-
-	NGMP_OnlineServices_LobbyInterface *pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
-	const Int slotIndex = ThePlayerList->getSlotIndex(playerIndex);
-	if (TheNGMPGame == nullptr || TheGameInfo != TheNGMPGame || pLobbyInterface == nullptr || slotIndex < 0)
-	{
-		return FALSE;
-	}
-
-	const NGMPGameSlot *slot = (const NGMPGameSlot *)TheNGMPGame->getConstSlot(slotIndex);
-	return slot != nullptr && slot->m_userID == pLobbyInterface->GetCurrentLobbyOwnerID();
-#else
 	(void)playerIndex;
 	return FALSE;
-#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -6042,23 +5908,3 @@ void GameLogic::revealMapForAllPlayers()
 	}
 }
 
-#if defined(GENERALS_ONLINE)
-//-------------------------------------------------------------------------------------------------
-void GameLogic::sendPendingLobbyRules()
-{
-	if (m_pendingLobbyRules == 0 || !isInGame() || isLoadingMap() || getFrame() == 0)
-	{
-		return;
-	}
-
-	for (Int rule = 0; rule < LOBBY_RULE_COUNT; ++rule)
-	{
-		if (m_pendingLobbyRules & (1u << rule))
-		{
-			GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_LOBBY_RULE);
-			msg->appendIntegerArgument(rule);
-		}
-	}
-	m_pendingLobbyRules = 0;
-}
-#endif

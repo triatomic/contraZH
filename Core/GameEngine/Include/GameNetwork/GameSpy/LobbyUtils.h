@@ -40,41 +40,17 @@ void RefreshGameInfoListBox( GameWindow *mainWin, GameWindow *win );
 void RefreshGameListBoxes();
 void ToggleGameListType();
 
-#if defined(GENERALS_ONLINE)
-// The game listbox's item data is a row index (32-bit safe), not the 64-bit lobby ID itself.
-// Resolve the real ID with this before calling anything that needs it (e.g. GetLobbyFromID).
-int64_t ResolveGameListLobbyID(Int rowItemData);
-#endif
-
 void playerTemplateComboBoxTooltip(GameWindow *wndComboBox, WinInstanceData *instData, UnsignedInt mouse);
 void playerTemplateListBoxTooltip(GameWindow *wndListBox, WinInstanceData *instData, UnsignedInt mouse);
 
 enum GameSortType CPP_11(: Int)
 {
-#if defined(GENERALS_ONLINE)
-	GAMESORT_AGE_ASCENDING = 0, // was alpha
-	GAMESORT_AGE_DESCENDING,	// was alpha
-	GAMESORT_MAP_ASCENDING,		// was ping
-	GAMESORT_MAP_DESCENDING,	// was ping
-#else
 	GAMESORT_ALPHA_ASCENDING = 0,
 	GAMESORT_ALPHA_DESCENDING,
 	GAMESORT_PING_ASCENDING,
 	GAMESORT_PING_DESCENDING,
-#endif
 };
 
 Bool HandleSortButton( NameKeyType sortButton );
 void PopulateLobbyPlayerListbox();
 
-#if defined(GENERALS_ONLINE)
-enum LobbyGameModeFilter CPP_11(: Int)
-{
-	LOBBY_FILTER_ALL = 0,
-	LOBBY_FILTER_1V1,
-	LOBBY_FILTER_TEAM,
-	LOBBY_FILTER_FFA,
-	LOBBY_FILTER_AOD,
-	LOBBY_FILTER_BUDDIES,
-};
-#endif

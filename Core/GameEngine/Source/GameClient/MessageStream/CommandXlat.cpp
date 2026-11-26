@@ -99,10 +99,6 @@
 
 #include "WW3D2/ww3d.h"
 
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/GeneralsOnline/OnlineServices_Init.h"
-#endif
-
 #if defined(RTS_DEBUG)
 /*non-static*/ Real TheSkateDistOverride = 0.0f;
 
@@ -3833,9 +3829,6 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 				}
 
 				ToggleControlBar();
-#if defined(GENERALS_ONLINE)
-				TheInGameUI->toggleObserverOverlay();
-#endif
 			}
 			disp = DESTROY_MESSAGE;
 			break;
@@ -4803,21 +4796,6 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		}
 
 		// --------------------------------------------------------------------------------------------
-#if defined(GENERALS_ONLINE)
-		// GO's keys (F10, F5 and Insert by default), rebindable in the Hotkeys screen's GO section
-		case GameMessage::MSG_META_TOGGLE_NETWORK_STATS:
-			NGMP_OnlineServicesManager::ToggleAdvancedNetworkStats();
-			disp = DESTROY_MESSAGE;
-			break;
-
-		case GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY:
-		case GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT:
-			GameSpyToggleOverlay( GSOVERLAY_BUDDY );
-			disp = DESTROY_MESSAGE;
-			break;
-
-		case GameMessage::MSG_META_TAKE_SCREENSHOT_ALT:
-#endif
 		case GameMessage::MSG_META_TAKE_SCREENSHOT:
 		{
 			if (TheDisplay)

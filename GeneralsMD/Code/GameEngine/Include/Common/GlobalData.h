@@ -587,10 +587,6 @@ public:
 
 	std::vector<AsciiString> m_simulateReplays; ///< If not empty, simulate this list of replays and exit.
 	Int m_simulateReplayJobs; ///< Maximum number of processes to use for simulation, or SIMULATE_REPLAYS_SEQUENTIAL for sequential simulation
-#if defined(GENERALS_ONLINE)
-	Bool m_exportStats; ///< Write game stats JSON next to each simulated replay
-	AsciiString m_statsUrl; ///< If not empty, POST the compressed stats JSON here
-#endif
 
 	Int m_maxParticleCount;						///< maximum number of particles that can exist
 	Int m_maxFieldParticleCount;			///< maximum number of field-type particles that can exist (roughly)
@@ -664,14 +660,6 @@ public:
 	// TheSuperHackers @feature L3-M 21/08/2025 toggle the money per minute display, false shows only the original current money
 	Bool m_showMoneyPerMinute;
 	Bool m_allowMoneyPerMinuteForPlayer;
-
-#if defined(GENERALS_ONLINE)
-	// Observer notification feed; a font size of zero disables it
-	Int m_observerNotificationFontSize;
-	Bool m_observerNotificationSpecialPowerUsage;
-	Bool m_observerNotificationSpecialPowerPurchase;
-	Bool m_observerNotificationMilestone;
-#endif
 
 	// TheSuperHackers @feature bobtista 28/06/2026 user-configurable speed multiplier for game window transitions
 	Real m_gameWindowTransitionSpeedMultiplier;

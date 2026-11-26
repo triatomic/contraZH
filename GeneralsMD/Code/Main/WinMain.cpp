@@ -77,10 +77,6 @@
 #include "MiniDumper/MiniDumper.h"
 #endif
 
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/GeneralsOnline/OnlineServices_Init.h"
-#endif
-
 
 // GLOBALS ////////////////////////////////////////////////////////////////////
 HINSTANCE ApplicationHInstance = nullptr;  ///< our application instance
@@ -934,10 +930,6 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 			return exitcode;
 		}
 
-#if defined(GENERALS_ONLINE)
-		NGMP_OnlineServicesManager::AttemptLoadSteam();
-#endif
-
 		// save our application instance for future use
 		ApplicationHInstance = hInstance;
 
@@ -954,16 +946,9 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
 		// Set up version info
 		TheVersion = NEW Version;
-#if defined(GENERALS_ONLINE)
-		// TODO_NGMP: Better solution
-		TheVersion->setVersion(VERSION_MAJOR, VERSION_MINOR, GENERALS_ONLINE_VERSION, GENERALS_ONLINE_NET_VERSION,
-			AsciiString("triatomic"), AsciiString(""),
-			AsciiString(__TIME__), AsciiString(__DATE__));
-#else
 		TheVersion->setVersion(VERSION_MAJOR, VERSION_MINOR, VERSION_BUILDNUM, VERSION_LOCALBUILDNUM,
 			AsciiString(VERSION_BUILDUSER), AsciiString(VERSION_BUILDLOC),
 			AsciiString(__TIME__), AsciiString(__DATE__));
-#endif
 
 		// TheSuperHackers @refactor The instance mutex now lives in its own class.
 

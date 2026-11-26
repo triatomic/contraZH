@@ -454,24 +454,6 @@ Int parseHeadless(char *args[], int num)
 	return 1;
 }
 
-#if defined(GENERALS_ONLINE)
-Int parseExportStats(char *args[], int num)
-{
-	TheWritableGlobalData->m_exportStats = TRUE;
-	return 1;
-}
-
-Int parseStatsUrl(char *args[], int num)
-{
-	if (num > 1)
-	{
-		TheWritableGlobalData->m_statsUrl = args[1];
-		return 2;
-	}
-	return 1;
-}
-#endif
-
 // TheSuperHackers @feature simonx645 16/11/2026 -pathProfile <file>: pathfinding counters per frame and per match
 // (GameLogic/PathProfile.h): <file>.frames.csv, <file>.json, <file>.summary.csv. Measurement only.
 Int parsePathProfile(char *args[], int num)
@@ -1342,11 +1324,6 @@ static CommandLineParam paramsForStartup[] =
 	// (If you have 4 cores, call it with -jobs 4)
 	// If you do not call this, all replays will be simulated in sequence in the same process.
 	{ "-jobs", parseJobs },
-#if defined(GENERALS_ONLINE)
-	// Export game stats as JSON next to the replay; -statsUrl posts the compressed result.
-	{ "-exportStats", parseExportStats },
-	{ "-statsUrl", parseStatsUrl },
-#endif
 
 	// TheSuperHackers @feature CryoTheRenegade 14/08/2026
 	// Use the current working directory as provided by the OS, or an explicit path.

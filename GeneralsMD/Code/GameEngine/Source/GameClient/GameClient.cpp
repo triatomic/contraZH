@@ -108,10 +108,6 @@ GameClient::GameClient()
 	m_textBearingDrawableList.clear();
 
 	m_frame = 0;
-#if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
-	m_frameLegacy = 0;
-	m_frameLegacyLast = 0;
-#endif
 
 	m_drawableList = nullptr;
 
@@ -554,10 +550,6 @@ void GameClient::update()
 	GameMessage *frameMsg = TheMessageStream->appendMessage( GameMessage::MSG_FRAME_TICK );
 	frameMsg->appendTimestampArgument( getFrame() );
 
-#if defined(GENERALS_ONLINE)
-	TheGameLogic->sendPendingLobbyRules();
-#endif
-
 	// Update intro
 	if (m_intro != nullptr)
 	{
@@ -752,17 +744,7 @@ void GameClient::update()
 	// update all particle systems
 	// TheSuperHackers @info The particle update follows the display update, because that
 	// moves bone-attached particle systems to the current client bone transforms of their drawables.
-#if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
-	// Particles step on the legacy frame, which follows the logic frame and not the wall clock.
-	m_frameLegacyLast = m_frameLegacy;
-	if (!freezeTime && TheGameLogic->hasUpdated() && TheGameLogic->getFrame() % GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER == 0)
-	{
-		m_frameLegacy++;
-	}
-	const Bool updateParticles = HasLegacyFrameAdvanced();
-#else
 	const Bool updateParticles = !freezeTime && TheGameLogic->hasUpdated();
-#endif
 	if( updateParticles )
 	{
 		TheParticleSystemManager->setLocalPlayerIndex(localPlayerIndex);
@@ -793,14 +775,6 @@ void GameClient::update()
 		TheInGameUI->UPDATE();
 	}
 }
-
-#if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
-Real GameClient::getLegacyFramePhase() const
-{
-	const UnsignedInt logicFramesIn = TheGameLogic->getFrame() % GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER;
-	return min(1.0f, ((Real)logicFramesIn + TheFramePacer->getLogicFramePhase()) / (Real)GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER);
-}
-#endif
 
 void GameClient::draw()
 {

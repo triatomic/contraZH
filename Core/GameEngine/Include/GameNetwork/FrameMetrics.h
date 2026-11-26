@@ -26,10 +26,6 @@
 
 #pragma once
 
-#if defined(GENERALS_ONLINE)
-#define USE_NEW_FRAMEMETRIC_LOGIC 1
-#endif
-
 #include "GameNetwork/NetworkDefs.h"
 
 #if defined(USE_NEW_FRAMEMETRIC_LOGIC)
@@ -54,10 +50,6 @@ public:
 	Bool hasLatencySample() const { return m_latencySampleCount > 0; }
 	Int getAverageFPS();
 	Int getMinimumCushion();
-
-#if defined(GENERALS_ONLINE)
-	void SeedLatencyData(int latency);
-#endif
 
 protected:
 	// These are used for keeping track of parameters to the run ahead equation.

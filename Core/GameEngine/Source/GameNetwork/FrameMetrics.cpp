@@ -32,12 +32,6 @@
 #include "GameClient/Display.h"
 #include "GameNetwork/networkutil.h"
 
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/GeneralsOnline/NGMP_include.h"
-#include "GameNetwork/GeneralsOnline/NetworkMesh.h"
-#include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
-#endif
-
 FrameMetrics::FrameMetrics()
 {
 	m_averageFps = 0.0f;
@@ -84,43 +78,13 @@ FrameMetrics::~FrameMetrics() {
 }
 
 void FrameMetrics::init() {
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	m_averageFps = LOGICFRAMES_PER_SECOND;
-#else
 	m_averageFps = 30;
-#endif
-#if defined(GENERALS_ONLINE)
-	// NGMP_NOTE: Don't start with the assumption that we have latency. Connections are now formed earlier, so we have latency data earlier too.
-
-	NetworkMesh* pMesh = NGMP_OnlineServicesManager::GetNetworkMesh();
-	if (TheNGMPGame != nullptr && pMesh != nullptr)
-	{
-		int totalLatency = 0;
-		std::map<int64_t, PlayerConnection>& connections = pMesh->GetAllConnections();
-		for (auto& kvPair : connections)
-		{
-			PlayerConnection& conn = kvPair.second;
-			totalLatency += conn.GetLatency();
-		}
-
-		m_averageLatency = (Real)((Real)totalLatency / 1000.f) / (Real)connections.size();
-	}
-	else
-	{
-		m_averageLatency = (Real)0.2;
-	}
-#else
 	m_averageLatency = (Real)0.2;
-#endif
 	m_minimumCushion = -1;
 
 	UnsignedInt i = 0;
 	for (; i < TheGlobalData->m_networkFPSHistoryLength; ++i) {
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-		m_fpsList[i] = LOGICFRAMES_PER_SECONDS_REAL;
-#else
 		m_fpsList[i] = 30.0;
-#endif
 	}
 	m_fpsListIndex = 0;
 	// The history holds measured round trips only; the average above stands in until the first one arrives
@@ -272,12 +236,6 @@ Real FrameMetrics::getAverageLatency() {
 // Two standard deviations above the mean covers about 95% of round trips, so a jittery link does not stall on every swing
 Real FrameMetrics::getRunAheadLatency()
 {
-#if defined(GENERALS_ONLINE)
-	if (TheNGMPGame != nullptr)
-	{
-		return m_averageLatency;
-	}
-#endif
 	return m_averageLatency + 2.0f * m_latencyDeviation;
 }
 
@@ -285,10 +243,3 @@ Int FrameMetrics::getMinimumCushion() {
 	return m_minimumCushion;
 }
 
-#if defined(GENERALS_ONLINE)
-void FrameMetrics::SeedLatencyData(int latency)
-{
-	m_averageFps = GENERALS_ONLINE_HIGH_FPS_LIMIT;
-	m_averageLatency = latency / 1000.f;
-}
-#endif

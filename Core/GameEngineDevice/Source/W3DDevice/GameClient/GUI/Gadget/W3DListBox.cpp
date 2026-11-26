@@ -231,14 +231,7 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 
 		listLineHeight = list->listData[i].height + 1;
 
-#if defined(GENERALS_ONLINE)
-		Int rowDrawY = drawY;
-		ApplyListBoxRowAnimation(window, i, listLineHeight, rowDrawY);
-#else
-		// rowDrawY is a plain alias here so the drawing code below is shared
-		// with the GeneralsOnline row-entry animation
 		const Int rowDrawY = drawY;
-#endif
 		//textColor =  list->listData[i].textColor;
 		selected = FALSE;
 

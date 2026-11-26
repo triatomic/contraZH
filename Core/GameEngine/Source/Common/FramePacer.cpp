@@ -100,13 +100,6 @@ void FramePacer::reset()
 void FramePacer::setFramesPerSecondLimit( Int fps )
 {
 	DEBUG_LOG(("FramePacer::setFramesPerSecondLimit() - setting max fps to %d (TheGlobalData->m_useFpsLimit == %d)", fps, TheGlobalData->m_useFpsLimit));
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	// The render rate must never drop below the logic rate.
-	if (fps < LOGICFRAMES_PER_SECOND)
-	{
-		fps = LOGICFRAMES_PER_SECOND;
-	}
-#endif
 	m_maxFPS = fps;
 }
 

@@ -75,9 +75,6 @@
 #include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BodyModule.h"
-#if defined(GENERALS_ONLINE)
-#include "Common/StatsExporter.h"
-#endif
 #include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/DeployStyleAIUpdate.h"
@@ -3356,13 +3353,6 @@ void Object::scoreTheKill( const Object *victim, const DamageInfo *damageInfo )
 		if (countKill)
 		{
 			controller->doBountyForKill(this, victim);
-#if defined(GENERALS_ONLINE)
-			if (TheGlobalData->m_exportStats)
-			{
-				const DamageInfo *damageInfo = victim->getBodyModule() ? victim->getBodyModule()->getLastDamageInfo() : nullptr;
-				StatsExporterRecordKill(this, victim, damageInfo);
-			}
-#endif
 		}
 	}
 
@@ -5092,12 +5082,6 @@ void Object::onCapture( Player *oldOwner, Player *newOwner )
 
 	// this gets the new owner some points
 	newOwner->getScoreKeeper()->addObjectCaptured(this);
-#if defined(GENERALS_ONLINE)
-	if (TheGlobalData->m_exportStats)
-	{
-		StatsExporterRecordCapture(this, oldOwner, newOwner);
-	}
-#endif
 
 	// rip through the behavior modules and call the onCapture for any modules that care
 	for( BehaviorModule **module = m_behaviors; *module; ++module )

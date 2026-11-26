@@ -46,11 +46,6 @@ void GSMessageBoxOkCancelWithLabels(
 	GameWinMsgBoxFunc okFunc,
 	GameWinMsgBoxFunc cancelFunc); ///< Display a tracked Ok/Cancel message box with caller-provided button labels
 void GSMessageBoxYesNo(UnicodeString title, UnicodeString message, GameWinMsgBoxFunc yesFunc, GameWinMsgBoxFunc noFunc);	///< Display a Message box with Yes/No buttons and track it
-#if defined(GENERALS_ONLINE)
-// GeneralsOnline
-void GSMessageBoxCancel(UnicodeString title, UnicodeString message, GameWinMsgBoxFunc cancelFunc);	///< Display a Message box with a Cancel button and track it
-void GSMessageBoxNoButtons(UnicodeString title, UnicodeString message, bool bShowLogo);
-#endif
 
 void RaiseGSMessageBox();		///< Bring GS message box to the foreground (if we transition screens while a message box is up)
 

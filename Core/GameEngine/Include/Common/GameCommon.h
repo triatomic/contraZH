@@ -53,10 +53,6 @@
 #include "WWLib/WWCommon.h"
 #include "Common/GameDefines.h"
 
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/GeneralsOnline/NextGenMP_defines.h"
-#endif
-
 // ----------------------------------------------------------------------------------------------
 #if defined(RTS_DEBUG)
 	#define DUMP_PERF_STATS

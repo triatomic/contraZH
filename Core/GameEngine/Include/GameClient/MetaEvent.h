@@ -41,9 +41,6 @@ enum MappableKeyCategories CPP_11(: Int)
 	CATEGORY_TEAM,
 	CATEGORY_MISC,
 	CATEGORY_DEBUG,
-#if defined(GENERALS_ONLINE)
-	CATEGORY_GO,		///< Generals Online keys, the GO section of the Hotkeys screen
-#endif
 
 	CATEGORY_NUM_CATEGORIES
 };
@@ -58,9 +55,6 @@ static const LookupListRec CategoryListName[] =
 	{"TEAM",							CATEGORY_TEAM},
 	{"MISC",							CATEGORY_MISC},
 	{"DEBUG",							CATEGORY_DEBUG},
-#if defined(GENERALS_ONLINE)
-	{"GO",								CATEGORY_GO},
-#endif
 	{ nullptr, 0}
 };
 static_assert(ARRAY_SIZE(CategoryListName) == CATEGORY_NUM_CATEGORIES + 1, "Incorrect array size");

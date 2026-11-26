@@ -59,15 +59,6 @@ void Keyboard::createStreamMessages()
 	while( key->key != KEY_NONE )
 	{
 
-#if defined(GENERALS_ONLINE)
-		// Skip repeat duplicates suppressed by updateKeys().
-		if( key->status == KeyboardIO::STATUS_USED )
-		{
-			key++;
-			continue;
-		}
-#endif
-
 		// add message to stream
 		if( BitIsSet( key->state, KEY_STATE_DOWN ) )
 		{
@@ -148,15 +139,6 @@ void Keyboard::updateKeys()
 		/** @todo -- if we don't have focus, we could destroy all the keys retrieved
 		here so that we don't process anything */
 
-#if defined(GENERALS_ONLINE)
-		// The OS auto repeat arrives as a fresh DOWN; drop it so checkKeyRepeat() owns the repeat rate.
-		if( BitIsSet( m_keys[ index ].state, KEY_STATE_DOWN ) &&
-		    BitIsSet( m_keyStatus[ m_keys[ index ].key ].state, KEY_STATE_DOWN ) )
-		{
-			m_keys[ index ].status = KeyboardIO::STATUS_USED;
-		}
-		else
-#endif
 		{
 			m_keyStatus[ m_keys[ index ].key ].state = m_keys[ index ].state;
 			m_keyStatus[ m_keys[ index ].key ].status = m_keys[ index ].status;

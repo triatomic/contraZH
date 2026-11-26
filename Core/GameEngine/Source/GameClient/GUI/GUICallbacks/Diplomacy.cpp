@@ -101,11 +101,7 @@ static AnimateWindowManager *theAnimateWindowManager = nullptr;
 WindowMsgHandledType BuddyControlSystem( GameWindow *window, UnsignedInt msg,
 														 WindowMsgData mData1, WindowMsgData mData2);
 void InitBuddyControls(Int type);
-#if defined(GENERALS_ONLINE)
-void updateBuddyInfo(bool bIsAutoRefresh = false, bool bUseCache = false);
-#else
 void updateBuddyInfo();
-#endif
 
 #if RTS_ZEROHOUR
 //-------------------------------------------------------------------------------------------------

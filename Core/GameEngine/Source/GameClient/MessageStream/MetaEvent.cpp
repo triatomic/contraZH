@@ -196,12 +196,6 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "SPECIAL_POWER_15", GameMessage::MSG_META_SPECIAL_POWER_15 },
 	{ "SPECIAL_POWER_16", GameMessage::MSG_META_SPECIAL_POWER_16 },
 #endif
-#if defined(GENERALS_ONLINE)
-	{ "TOGGLE_NETWORK_STATS",											GameMessage::MSG_META_TOGGLE_NETWORK_STATS },
-	{ "TAKE_SCREENSHOT_ALT",											GameMessage::MSG_META_TAKE_SCREENSHOT_ALT },
-	{ "TOGGLE_BUDDY_OVERLAY",											GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY },
-	{ "TOGGLE_BUDDY_OVERLAY_ALT",									GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT },
-#endif
 	{ "BEGIN_FORCEATTACK",												GameMessage::MSG_META_BEGIN_FORCEATTACK },
 	{ "END_FORCEATTACK",													GameMessage::MSG_META_END_FORCEATTACK },
 	{ "BEGIN_FORCEMOVE",													GameMessage::MSG_META_BEGIN_FORCEMOVE },
@@ -1563,28 +1557,6 @@ void MetaMap::generateMetaMap()
 			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
 		}
 	}
-
-#if defined(GENERALS_ONLINE)
-	{
-		// GO's fixed keys, as commands so the Hotkeys screen can rebind them under GO. Appended,
-		// so a command that already has one of these keys, or gets it from Hotkeys.ini (an F5
-		// control group, say), keeps it.
-		const struct { GameMessage::Type meta; MappableKeyType key; } goKeys[] =
-		{
-			{ GameMessage::MSG_META_TOGGLE_NETWORK_STATS, MK_F10 },
-			{ GameMessage::MSG_META_TAKE_SCREENSHOT_ALT, MK_F11 },
-			{ GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY, MK_F5 },
-			{ GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT, MK_INS },
-		};
-		for (Int i = 0; i < ARRAY_SIZE(goKeys); ++i)
-		{
-			MetaMapRec *map = appendMetaMapRec(goKeys[i].meta);
-			map->m_category = CATEGORY_GO;
-			map->m_key = goKeys[i].key;
-			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
-		}
-	}
-#endif
 
 #if RTS_ZEROHOUR
 	{

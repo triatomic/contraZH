@@ -27,9 +27,6 @@
 #include "Common/WorkerProcess.h"
 #include "GameLogic/GameLogic.h"
 #include "GameClient/GameClient.h"
-#if defined(GENERALS_ONLINE)
-#include "Common/StatsExporter.h"
-#endif
 
 
 Bool ReplaySimulation::s_isRunning = false;
@@ -85,12 +82,6 @@ int ReplaySimulation::simulateReplaysInThisProcess(const std::vector<AsciiString
 		printf("Simulating Replay \"%s\"\n", filename.str());
 		fflush(stdout);
 		DWORD startTimeMillis = GetTickCount();
-#if defined(GENERALS_ONLINE)
-		if (TheGlobalData->m_exportStats)
-		{
-			StatsExporterBeginRecording();
-		}
-#endif
 		if (TheRecorder->simulateReplay(filename))
 		{
 			UnsignedInt totalTimeSec = TheRecorder->getPlaybackFrameCount() / LOGICFRAMES_PER_SECOND;
@@ -107,12 +98,6 @@ int ReplaySimulation::simulateReplaysInThisProcess(const std::vector<AsciiString
 					fflush(stdout);
 				}
 				TheGameLogic->UPDATE();
-#if defined(GENERALS_ONLINE)
-				if (TheGlobalData->m_exportStats)
-				{
-					StatsExporterCollectSnapshot();
-				}
-#endif
 				if (TheRecorder->sawCRCMismatch())
 				{
 					numErrors++;
@@ -124,12 +109,6 @@ int ReplaySimulation::simulateReplaysInThisProcess(const std::vector<AsciiString
 			printf("Elapsed Time: %02d:%02d Game Time: %02d:%02d/%02d:%02d\n",
 					realTimeSec/60, realTimeSec%60, gameTimeSec/60, gameTimeSec%60, totalTimeSec/60, totalTimeSec%60);
 			fflush(stdout);
-#if defined(GENERALS_ONLINE)
-			if (TheGlobalData->m_exportStats)
-			{
-				ExportGameStatsJSON(TheRecorder->getReplayDir(), filename);
-			}
-#endif
 		}
 		else
 		{
@@ -198,20 +177,6 @@ int ReplaySimulation::simulateReplaysInWorkerProcesses(const std::vector<AsciiSt
 				TheGlobalData->m_headless ? L" -headless" : L"",
 				TheDebugIgnoreReplaySyncErrors ? L" -ignoreReplaySyncErrors" : L"",
 				filenameWide.str());
-#if defined(GENERALS_ONLINE)
-			if (TheGlobalData->m_exportStats)
-			{
-				command.concat(L" -exportStats");
-			}
-			if (!TheGlobalData->m_statsUrl.isEmpty())
-			{
-				UnicodeString statsUrlWide;
-				statsUrlWide.translate(TheGlobalData->m_statsUrl);
-				command.concat(L" -statsUrl \"");
-				command.concat(statsUrlWide);
-				command.concat(L"\"");
-			}
-#endif
 
 			processes.push_back(WorkerProcess());
 			processes.back().startProcess(command);

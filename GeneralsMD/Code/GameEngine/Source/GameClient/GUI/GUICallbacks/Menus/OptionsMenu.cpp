@@ -1615,19 +1615,6 @@ static void saveOptions()
 		TheInGameUI->refreshPlayerInfoListResources();
 	}
 
-#if defined(GENERALS_ONLINE)
-	//-------------------------------------------------------------------------------------------------
-	// Set Observer Notification Font Size
-	val = pref->getObserverNotificationFontSize();
-	if (val >= 0)
-	{
-		AsciiString prefString;
-		prefString.format("%d", val);
-		(*pref)["ObserverNotificationFontSize"] = prefString;
-		TheInGameUI->refreshObserverNotificationResources();
-	}
-#endif
-
 	//-------------------------------------------------------------------------------------------------
 	// Set User Font Scaling Percentage
 	val = pref->getResolutionFontAdjustment() * 100.0f; // TheSuperHackers @todo replace with options input when applicable

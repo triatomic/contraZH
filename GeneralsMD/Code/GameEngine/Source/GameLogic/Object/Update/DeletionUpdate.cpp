@@ -67,29 +67,12 @@ void DeletionUpdate::setLifetimeRange( UnsignedInt minFrames, UnsignedInt maxFra
 #endif
 }
 
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-//-------------------------------------------------------------------------------------------------
-void DeletionUpdate::restartLifetime()
-{
-	const DeletionUpdateModuleData *d = getDeletionUpdateModuleData();
-	setLifetimeRange( d->m_minFrames, d->m_maxFrames );
-}
-#endif
-
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 UnsignedInt DeletionUpdate::calcSleepDelay(UnsignedInt minFrames, UnsignedInt maxFrames)
 {
 	UnsignedInt delay = GameLogicRandomValue( minFrames, maxFrames );
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	// A one frame lifetime at 60 Hz can expire before the client ever draws the object.
-	if (delay <= 1)
-	{
-		delay = 2;
-	}
-#else
 	if (delay < 1) delay = 1;
-#endif
 	m_dieFrame = TheGameLogic->getFrame() + delay;
 	return delay;
 }

@@ -312,19 +312,6 @@ void WaypointMap::update()
 
 const char *const MapCache::m_mapCacheName = "MapCache.ini";
 
-#if defined(GENERALS_ONLINE)
-AsciiString MapCache::getMapDir(bool bCustomMapDebug) const
-{
-	return "Maps";
-}
-
-AsciiString MapCache::getUserMapDir(bool bCustomMapDebug) const
-{
-	AsciiString tmp = TheGlobalData->getPath_UserData();
-	tmp.concat(getMapDir(bCustomMapDebug));
-	return tmp;
-}
-#else
 AsciiString MapCache::getMapDir() const
 {
 	return "Maps";
@@ -336,7 +323,6 @@ AsciiString MapCache::getUserMapDir() const
 	tmp.concat(getMapDir());
 	return tmp;
 }
-#endif
 
 AsciiString MapCache::getMapExtension() const
 {

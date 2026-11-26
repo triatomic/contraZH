@@ -128,11 +128,6 @@ public:
 	// virtual so the WorldBuilder editor can supply its own frame clock (WBParticleRuntime)
 	// without standing up the real simulation -- the game keeps the base m_frame implementation.
 	virtual UnsignedInt getFrame();						///< Returns the current simulation frame number
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	// The legacy frame is the 30 Hz frame that frame-count code was written against.
-	UnsignedInt getFrameLegacy() const;
-	Bool HasLegacyFrameAdvanced() const;
-#endif
 	UnsignedInt getCRC( Int mode = CRC_CACHED, AsciiString deepCRCFileName = AsciiString::TheEmptyString );		///< Returns the CRC
 
 	void setObjectIDCounter( ObjectID nextObjID ) { m_nextObjID = nextObjID; }
@@ -229,10 +224,6 @@ public:
 	void initTimeOutValues();
 	UnsignedInt getObjectCount();
 
-#if defined(GENERALS_ONLINE)
-	bool IsLoadScreenActive() const { return m_loadScreen != nullptr; }
-#endif
-
 	Int getRankLevelLimit() const { return m_rankLevelLimit; }
 	void setRankLevelLimit(Int limit)
 	{
@@ -251,9 +242,6 @@ public:
   Bool isDiplomacyParticipant(const Player *player) const; ///< May this player take or receive a Diplomacy stance
   Bool isFreeRadar() const { return m_freeRadar; } ///< Does every player have radar without a radar source
   Bool isAutoQueue() const { return m_autoQueue; } ///< May players have producers build a unit whenever their queue is empty
-#if defined(GENERALS_ONLINE)
-  void sendPendingLobbyRules(); ///< The Generals Online host turns its rules on once the match runs
-#endif
 
 #ifdef DUMP_PERF_STATS
 	void getAIMetricsStatistics( UnsignedInt *numAI, UnsignedInt *numMoving, UnsignedInt *numAttacking, UnsignedInt *numWaitingForPath, UnsignedInt *overallFailedPathfinds );
@@ -479,9 +467,6 @@ private:
   Bool m_freeRadar;
   Bool m_revealMap;
   Bool m_autoQueue;
-#if defined(GENERALS_ONLINE)
-  UnsignedInt m_pendingLobbyRules; ///< LobbyRule bits the host has yet to send
-#endif
 
 	LoadScreen *getLoadScreen( Bool loadSaveGame );
 	LoadScreen *m_loadScreen;
@@ -536,10 +521,6 @@ inline Real GameLogic::getWidth() { return m_width; }
 inline void GameLogic::setHeight( Real height ) { m_height = height; }
 inline Real GameLogic::getHeight() { return m_height; }
 inline UnsignedInt GameLogic::getFrame() { return m_frame; }
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-inline UnsignedInt GameLogic::getFrameLegacy() const { return m_frame / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER; }
-inline Bool GameLogic::HasLegacyFrameAdvanced() const { return (m_frame % GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER) == 0; }
-#endif
 
 inline GameMode GameLogic::getGameMode() { return m_gameMode; }
 inline Bool GameLogic::isInGame() const { return rts::isGame(m_gameMode); }

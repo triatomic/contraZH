@@ -923,14 +923,6 @@ void SpecialPowerModule::aboutToDoSpecialPower( const Coord3D *location )
 		getSpecialPowerModuleData()->m_specialPowerTemplate->getName(),
 		getObject()->getID());
 
-#if defined(GENERALS_ONLINE)
-	// Aircraft launched by a command center power would otherwise notify twice.
-	if (TheInGameUI && !getObject()->isKindOf(KINDOF_AIRCRAFT))
-	{
-		TheInGameUI->notifySpecialPowerUsed(getObject()->getControllingPlayer(), getSpecialPowerTemplate());
-	}
-#endif
-
 	// Let EVA do her thing
 	SpecialPowerType type = getSpecialPowerModuleData()->m_specialPowerTemplate->getSpecialPowerType();
 

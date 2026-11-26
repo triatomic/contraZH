@@ -136,11 +136,7 @@ UpdateSleepTime EMPUpdate::update()
 	Drawable *dr = obj->getDrawable();
 	UnsignedInt now = TheGameLogic->getFrame();
 
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	m_currentScale += ( m_targetScale - m_currentScale ) * ( 0.05f / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER );
-#else
 	m_currentScale += ( m_targetScale - m_currentScale ) * 0.05f;
-#endif
 	dr->setInstanceScale( m_currentScale );
 
 	if ( now < m_tintEnvPlayFrame)
@@ -341,16 +337,8 @@ void EMPUpdate::doDisableAttack()
 
 							sys->attachToObject(curVictim);
 							sys->setPosition( &offs );
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-							sys->setSystemLifetime(MAX(0, (data->m_disabledDuration / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER) - 240));
-#else
 							sys->setSystemLifetime(MAX(0, data->m_disabledDuration - 30));
-#endif
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-							sys->setInitialDelay(GameClientRandomValue(1,100) / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER);
-#else
 							sys->setInitialDelay(GameClientRandomValue(1,100));
-#endif
 						}
 					}
 				}

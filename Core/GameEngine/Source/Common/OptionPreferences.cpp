@@ -1572,41 +1572,6 @@ Bool OptionPreferences::getShowMoneyPerMinute() const
 	return FALSE;
 }
 
-#if defined(GENERALS_ONLINE)
-Int OptionPreferences::getObserverNotificationFontSize() const
-{
-	OptionPreferences::const_iterator it = find("ObserverNotificationFontSize");
-	if (it == end())
-		return TheGlobalData->m_observerNotificationFontSize;
-
-	return clamp(0, atoi(it->second.str()), 15);
-}
-
-static Bool getYesNoPreference(const OptionPreferences &prefs, const char *key, Bool defaultValue)
-{
-	OptionPreferences::const_iterator it = prefs.find(key);
-	if (it == prefs.end())
-		return defaultValue;
-
-	return stricmp(it->second.str(), "yes") == 0;
-}
-
-Bool OptionPreferences::getObserverNotificationSpecialPowerUsage() const
-{
-	return getYesNoPreference(*this, "ObserverNotificationSpecialPowerUsage", TheGlobalData->m_observerNotificationSpecialPowerUsage);
-}
-
-Bool OptionPreferences::getObserverNotificationSpecialPowerPurchase() const
-{
-	return getYesNoPreference(*this, "ObserverNotificationSpecialPowerPurchase", TheGlobalData->m_observerNotificationSpecialPowerPurchase);
-}
-
-Bool OptionPreferences::getObserverNotificationMilestone() const
-{
-	return getYesNoPreference(*this, "ObserverNotificationMilestone", TheGlobalData->m_observerNotificationMilestone);
-}
-#endif
-
 Real OptionPreferences::getGameWindowTransitionSpeedMultiplier() const
 {
 	OptionPreferences::const_iterator it = find("GameWindowTransitionSpeedMultiplier");

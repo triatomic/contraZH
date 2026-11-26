@@ -3119,25 +3119,12 @@ void W3DView::setPitchToDefault()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-#if defined(GENERALS_ONLINE)
-// GeneralsOnline port: bForceDefaultCam is unused, the lobby camera limit arrives through GameInfo
-void W3DView::setDefaultView(Real pitch, Real angle, Real maxHeight, bool bForceDefaultCam)
-#else
 void W3DView::setDefaultView(Real pitch, Real angle, Real maxHeight)
-#endif
 {
 	// MDC - we no longer want to rotate maps (design made all of them right to begin with)
 	//	m_defaultAngle = angle * WWMATH_PI/180.0f;
 	setDefaultPitch(pitch);
-#if defined(GENERALS_ONLINE_WIDESCREEN)
-	// A wider aspect than 4:3 shows less map vertically, so the camera may rise to compensate.
-	const Real baseAspectRatio = (Real)DEFAULT_DISPLAY_WIDTH / (Real)DEFAULT_DISPLAY_HEIGHT;
-	const Real currentAspectRatio = (Real)TheDisplay->getWidth() / (Real)TheDisplay->getHeight();
-	const Real aspectWidthScale = fabs(1.0f + (currentAspectRatio - baseAspectRatio));
-	m_maxHeightAboveGround = TheGlobalData->m_maxCameraHeight * maxHeight * aspectWidthScale;
-#else
 	m_maxHeightAboveGround = TheGlobalData->m_maxCameraHeight*maxHeight;
-#endif
 	if (m_minHeightAboveGround > m_maxHeightAboveGround)
 		m_maxHeightAboveGround = m_minHeightAboveGround;
 }

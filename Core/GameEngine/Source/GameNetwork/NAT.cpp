@@ -33,9 +33,6 @@
 
 #include "GameNetwork/NAT.h"
 #include "GameNetwork/Transport.h"
-#if defined(GENERALS_ONLINE)
-#include "GameNetwork/UDPTransport.h"
-#endif
 #include "GameNetwork/NetworkDefs.h"
 #include "GameClient/EstablishConnectionsMenu.h"
 #include "GameNetwork/NetworkInterface.h"
@@ -574,11 +571,7 @@ void NAT::establishConnectionPaths() {
 void NAT::attachSlotList(GameSlot *slotList[], Int localSlot, UnsignedInt localIP) {
 	m_slotList = slotList;
 	m_localIP = localIP;
-#if defined(GENERALS_ONLINE)
-	m_transport = new UDPTransport;
-#else
 	m_transport = new Transport;
-#endif
 	DEBUG_LOG(("NAT::attachSlotList - initializing the transport socket with address %d.%d.%d.%d:%d",
 							PRINTF_IP_AS_4_INTS(m_localIP), getSlotPort(localSlot)));
 

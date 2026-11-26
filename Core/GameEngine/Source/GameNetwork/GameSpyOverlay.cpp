@@ -211,19 +211,6 @@ void GSMessageBoxYesNo(UnicodeString title, UnicodeString message, GameWinMsgBox
 	* If the screen transitions underneath the dialog box, we
 	* need to raise it to keep it visible.
 	*/
-#if defined(GENERALS_ONLINE)
-void GSMessageBoxCancel(UnicodeString title, UnicodeString message, GameWinMsgBoxFunc cancelFunc)
-{
-	ClearGSMessageBoxes();
-	messageBoxWindow = MessageBoxCancel(title, message, cancelFunc);
-}
-
-void GSMessageBoxNoButtons(UnicodeString title, UnicodeString message, bool bShowLogo)
-{
-	ClearGSMessageBoxes();
-	messageBoxWindow = MessageBoxNoButtons(title, message, bShowLogo);
-}
-#endif
 
 void RaiseGSMessageBox()
 {
@@ -279,7 +266,6 @@ void GameSpyOpenOverlay( GSOverlayType overlay )
 {
 	if (overlay == GSOVERLAY_BUDDY)
 	{
-#if !defined(GENERALS_ONLINE)
 		if (!TheGameSpyBuddyMessageQueue->isConnected())
 		{
 			// not connected - is it because we were disconnected?
@@ -295,7 +281,6 @@ void GameSpyOpenOverlay( GSOverlayType overlay )
 			}
 			return;
 		}
-#endif
 		AudioEventRTS buttonClick("GUICommunicatorOpen");
 
 		if( TheAudio )

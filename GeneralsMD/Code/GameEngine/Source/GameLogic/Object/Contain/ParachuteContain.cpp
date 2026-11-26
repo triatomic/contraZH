@@ -39,9 +39,6 @@
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-#include "GameLogic/Module/DeletionUpdate.h"
-#endif
 #include "GameLogic/Module/ParachuteContain.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Object.h"
@@ -470,16 +467,6 @@ void ParachuteContain::onRemoving( Object *rider )
 	OpenContain::onRemoving(rider);
 
 	const ParachuteContainModuleData* d = getParachuteContainModuleData();
-
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	// A short lifetime can expire mid drop at 60 Hz, deleting the rider before its landing OCL runs.
-	static NameKeyType key_DeletionUpdate = NAMEKEY( "DeletionUpdate" );
-	DeletionUpdate *dup = (DeletionUpdate*)rider->findUpdateModule( key_DeletionUpdate );
-	if (dup && dup->getDieFrame() <= TheGameLogic->getFrame())
-	{
-		dup->restartLifetime();
-	}
-#endif
 
 	// object is no longer held inside a transport
 	rider->clearDisabled( DISABLED_HELD );

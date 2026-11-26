@@ -153,13 +153,7 @@
 
 // Disable non retail fixes in the networking; the game packet size has its own switch below
 #ifndef RETAIL_COMPATIBLE_NETWORKING
-#if defined(GENERALS_ONLINE)
-// GeneralsOnline port: the GeneralsOnline netcode uses the larger non-retail packet
-// sizes, further adjusted for TURN relay overhead in NetworkDefs.h.
-#define RETAIL_COMPATIBLE_NETWORKING (0)
-#else
 #define RETAIL_COMPATIBLE_NETWORKING (1)
-#endif
 #endif
 
 // Keep the 476 byte retail game packets; Zero Hour uses the larger payload since its exe CRC already keeps retail peers out

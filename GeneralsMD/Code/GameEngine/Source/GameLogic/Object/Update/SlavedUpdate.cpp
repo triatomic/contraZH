@@ -109,12 +109,6 @@ void SlavedUpdate::onSlaverDamage( const DamageInfo *info )
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime SlavedUpdate::update()
 {
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-	if (!TheGameLogic->HasLegacyFrameAdvanced())
-	{
-		return UPDATE_SLEEP_NONE;
-	}
-#endif
 
 /// @todo srj use SLEEPY_UPDATE here
 	if( m_framesToWait > 0 )
@@ -681,11 +675,7 @@ void SlavedUpdate::setRepairState( RepairStates repairState )
 						}
 
 						weldingSys->setPosition( &pos );
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-						Real time = (Real)(m_framesToWait * (LOGICFRAMES_PER_SECOND / GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER));
-#else
 						Real time = (Real)(m_framesToWait * LOGICFRAMES_PER_SECOND);
-#endif
 						weldingSys->setLifetimeRange( time, time );
 
 						AudioEventRTS soundToPlay = TheAudio->getMiscAudio()->m_repairSparks;

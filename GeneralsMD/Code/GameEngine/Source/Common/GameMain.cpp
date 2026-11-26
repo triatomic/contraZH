@@ -48,15 +48,6 @@ Int GameMain()
 	TheGameEngine = CreateGameEngine();
 	TheGameEngine->init();
 
-#if defined(GENERALS_ONLINE)
-	if (TheGlobalData->m_exportStats && (!TheGlobalData->m_headless || TheGlobalData->m_simulateReplays.empty()))
-	{
-		printf("ERROR: -exportStats requires headless replay mode (-headless -replay <file>).\n");
-		fflush(stdout);
-		exitcode = 1;
-	}
-	else
-#endif
 	if (!TheGlobalData->m_simulateReplays.empty())
 	{
 		exitcode = ReplaySimulation::simulateReplays(TheGlobalData->m_simulateReplays, TheGlobalData->m_simulateReplayJobs);
