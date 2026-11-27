@@ -52,6 +52,7 @@ public:
 
 	// Called with the draw's render state applied. False leaves the draw fixed-function, and End uncalled.
 	// The data is whatever the inserter handed over with the effects, opaque to the renderer.
+	// The sorter keeps a binding for a run that differs only in its first texture, so an effect that reads more of the draw joins the list in Keeps_Pool_Soft.
 	virtual bool Begin(const ShaderClass &shader, unsigned effects, const void *effectData) = 0;
 	virtual void End() = 0;
 

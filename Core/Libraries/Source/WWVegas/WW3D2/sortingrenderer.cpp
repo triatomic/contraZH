@@ -764,7 +764,7 @@ static bool Draw_Pool_Sprites(const TempIndexStruct *sorted, unsigned count, con
 	if (!PointGroupClass::Draw_Uploaded_Billboards(pool_sprites, pool_sprites_drawn, count, true))
 	{
 		Reset_Pool_Sprites();
-		if (!PointGroupClass::Can_Instance_Billboards())
+		if (count > PointGroupClass::MAX_BILLBOARD_UPLOAD || !PointGroupClass::Can_Instance_Billboards())
 		{
 			return false;
 		}

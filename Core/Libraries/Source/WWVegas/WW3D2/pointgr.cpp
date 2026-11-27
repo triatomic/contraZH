@@ -105,7 +105,7 @@ SortingIndexBufferClass		*SortingTris, *SortingQuads;	// Sorting index buffers.
 
 #if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
 
-enum { BILLBOARD_BUFFER_COUNT = 8192 };
+enum { BILLBOARD_BUFFER_COUNT = PointGroupClass::MAX_BILLBOARD_UPLOAD };
 
 static IDirect3DVertexShader9 *BillboardShader = nullptr;
 static IDirect3DVertexDeclaration9 *BillboardDeclaration = nullptr;

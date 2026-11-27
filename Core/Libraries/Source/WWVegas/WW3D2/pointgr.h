@@ -255,6 +255,9 @@ public:
 	static void Release_Billboard_Resources();
 	static void Draw_Billboards(const BillboardInstance *instances, unsigned count, bool triangles);
 
+	// The instance buffer's size, so the most sprites one upload holds.
+	enum { MAX_BILLBOARD_UPLOAD = 8192 };
+
 	// Sprites held in the instance buffer for several draws. A later upload can drop them, and drawing them then fails.
 	struct BillboardUpload
 	{
