@@ -3908,7 +3908,7 @@ ParticleSystem *ParticleSystemManager::findParticleSystem( ParticleSystemID id )
 	ParticleSystemIDMap::const_iterator it = m_systemMap.find(id);
 	if (it != m_systemMap.end())
 	{
-		return it->second;
+		return *it->second;
 	}
 
 	return nullptr;
@@ -4074,8 +4074,7 @@ void ParticleSystemManager::removeParticle( Particle *particleToRemove)
 void ParticleSystemManager::friend_addParticleSystem( ParticleSystem *particleSystemToAdd )
 {
 	DEBUG_ASSERTCRASH(particleSystemToAdd != nullptr, ("ParticleSystemManager::friend_addParticleSystem: ParticleSystem is null"));
-	m_allParticleSystemList.push_back(particleSystemToAdd);
-	m_systemMap[particleSystemToAdd->getSystemID()] = particleSystemToAdd;
+	m_systemMap[particleSystemToAdd->getSystemID()] = m_allParticleSystemList.insert(m_allParticleSystemList.end(), particleSystemToAdd);
 	++m_particleSystemCount;
 }
 
@@ -4084,9 +4083,19 @@ void ParticleSystemManager::friend_addParticleSystem( ParticleSystem *particleSy
 // ------------------------------------------------------------------------------------------------
 void ParticleSystemManager::friend_removeParticleSystem( ParticleSystem *particleSystemToRemove )
 {
-	ParticleSystemListIt it = std::find(m_allParticleSystemList.begin(), m_allParticleSystemList.end(), particleSystemToRemove);
+	ParticleSystemListIt it;
+	ParticleSystemIDMap::iterator mapIt = m_systemMap.find(particleSystemToRemove->getSystemID());
+	if (mapIt != m_systemMap.end() && *mapIt->second == particleSystemToRemove)
+	{
+		it = mapIt->second;
+		m_systemMap.erase(mapIt);
+	}
+	else
+	{
+		// The map holds one system per ID, so a second system under the same ID is found by search.
+		it = std::find(m_allParticleSystemList.begin(), m_allParticleSystemList.end(), particleSystemToRemove);
+	}
 	if (it != m_allParticleSystemList.end()) {
-		m_systemMap.erase((*it)->getSystemID());
 		m_allParticleSystemList.erase(it);
 		--m_particleSystemCount;
 	} else {
