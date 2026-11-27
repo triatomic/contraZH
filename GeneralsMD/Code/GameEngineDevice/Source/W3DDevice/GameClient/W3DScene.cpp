@@ -748,7 +748,14 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 	ObjectShroudStatus ss=OBJECTSHROUD_INVALID;
 	Int extraMaterialPops=0;
 	Bool doExtraFlagsPop=FALSE;
-	std::vector<Int> pixelLights(max(W3DShaderManager::getPixelLightCount(), 1));
+
+	// Shared by every call, which spares each object an allocation. Nothing reads it once the object renders.
+	static std::vector<Int> pixelLights;
+	if ((Int)pixelLights.size() < max(W3DShaderManager::getPixelLightCount(), 1))
+	{
+		pixelLights.resize(max(W3DShaderManager::getPixelLightCount(), 1));
+	}
+
 	Int pixelLightCount=0;
 	LightClass **sceneLights=m_globalLight;
 
@@ -2532,9 +2539,10 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 			continue;
 		}
 
-		// Brightness at the sphere's nearest point, with the shader's falloff.
-		const Real distance = max((pixelLight.position - sphere.Center).Length() - sphere.Radius, 0.0f);
-		if (distance >= pixelLight.outerRadius)
+		// Compared squared, so a light out of reach costs no square root.
+		const Real reach = pixelLight.outerRadius + sphere.Radius;
+		const Real distanceSquared = (pixelLight.position - sphere.Center).Length2();
+		if (pixelLight.outerRadius <= 0.0f || distanceSquared >= reach * reach)
 		{
 			continue;
 		}
@@ -2543,14 +2551,17 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 			lights[count++] = index;
 			continue;
 		}
+
+		// Brightness at the sphere's nearest point, with the shader's falloff.
+		const Real distance = max(WWMath::Sqrt(distanceSquared) - sphere.Radius, 0.0f);
 		const Real ramp = WWMath::Clamp((pixelLight.outerRadius - distance) / (pixelLight.outerRadius - pixelLight.innerRadius), 0.0f, 1.0f);
 		const Real falloff = ramp * ramp * (3.0f - 2.0f * ramp);
 		const Real brightness = max(pixelLight.diffuse.X, max(pixelLight.diffuse.Y, pixelLight.diffuse.Z)) * (1.0f + pixelLight.ambientScale);
 		const Real score = falloff * brightness;
 
-		// Kept sorted, so a full list drops its weakest.
+		// Kept sorted, so a full list drops its weakest. Equal scores go by index, whatever order the lights come in.
 		Int slot = count;
-		while (slot > 0 && scores[slot - 1] < score)
+		while (slot > 0 && (scores[slot - 1] < score || (scores[slot - 1] == score && lights[slot - 1] > index)))
 		{
 			slot--;
 		}
@@ -2567,6 +2578,11 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 		scores[slot] = score;
 		lights[slot] = index;
 		count = min(count + 1, limit);
+	}
+	if (allLights)
+	{
+		// A lower index is a more important light, and the first ones share the base pass.
+		std::sort(lights, lights + count);
 	}
 	return count;
 }

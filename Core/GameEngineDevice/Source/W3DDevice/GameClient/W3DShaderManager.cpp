@@ -3464,7 +3464,6 @@ void W3DShaderManager::gatherPixelLights(Real minX, Real minY, Real maxX, Real m
 		}
 	}
 	lights.insert(lights.end(), PixelLightGridWide.begin(), PixelLightGridWide.end());
-	std::sort(lights.begin(), lights.end());
 }
 
 void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
@@ -3588,29 +3587,19 @@ Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &l
 			lights.push_back(index);
 		}
 	}
+
+	// A lower index is a more important light, and draws take the first ones.
+	std::sort(lights.begin(), lights.end());
 	return (Int)lights.size();
 }
 
 Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)
 {
-	static std::vector<Int> nearby;
-	gatherPixelLights(box.Center.X - box.Extent.X, box.Center.Y - box.Extent.Y, box.Center.X + box.Extent.X, box.Center.Y + box.Extent.Y, nearby);
-	Int count = 0;
-	for (size_t i = 0; i < nearby.size() && count < MAX_PIXEL_LIGHTS; i++)
+	static std::vector<Int> reaching;
+	const Int count = min(pickPixelLights(box, reaching), (Int)MAX_PIXEL_LIGHTS);
+	for (Int i = 0; i < count; i++)
 	{
-		const Int index = nearby[i];
-		const PixelLight &light = PixelLights[index];
-		if (light.objectsOnly)
-		{
-			continue;
-		}
-		const Real dx = max((Real)fabs(light.position.X - box.Center.X) - box.Extent.X, 0.0f);
-		const Real dy = max((Real)fabs(light.position.Y - box.Center.Y) - box.Extent.Y, 0.0f);
-		const Real dz = max((Real)fabs(light.position.Z - box.Center.Z) - box.Extent.Z, 0.0f);
-		if (dx * dx + dy * dy + dz * dz < light.outerRadius * light.outerRadius)
-		{
-			lights[count++] = index;
-		}
+		lights[i] = reaching[i];
 	}
 	return count;
 }
