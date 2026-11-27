@@ -335,7 +335,7 @@ Particle::Particle( ParticleSystem *system, const ParticleInfo *info )
 	m_createTimestamp = TheGameLogic->getFrame();
 #else
 #if defined(GENONLINE)
-	m_createTimestamp = TheGameClient->getFrameLegacy();
+	m_createTimestamp = TheGameLogic->getFrameLegacy();
 #else
 	m_createTimestamp = TheGameClient->getFrame();
 #endif
@@ -699,7 +699,8 @@ UnsignedInt Particle::getElapsedFrames() const
 	return TheGameLogic->getFrame() - m_createTimestamp;
 #else
 #if defined(GENONLINE)
-	return TheGameClient->getFrameLegacy() - m_createTimestamp;
+	// update() steps on the logic base frame, so an age counted on it matches the steps a particle has taken.
+	return TheGameLogic->getFrameLegacy() - m_createTimestamp;
 #else
 	return TheGameClient->getFrame() - m_createTimestamp;
 #endif
@@ -1376,7 +1377,7 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 	m_startTimestamp = TheGameLogic->getFrame();
 #else
 #if defined(GENONLINE)
-	m_startTimestamp = TheGameClient->getFrameLegacy();
+	m_startTimestamp = TheGameLogic->getFrameLegacy();
 #else
 	m_startTimestamp = TheGameClient->getFrame();
 #endif
@@ -2326,7 +2327,7 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 			m_startTimestamp = TheGameLogic->getFrame();
 #else
 #if defined(GENONLINE)
-			m_startTimestamp = TheGameClient->getFrameLegacy();
+			m_startTimestamp = TheGameLogic->getFrameLegacy();
 #else
 			m_startTimestamp = TheGameClient->getFrame();
 #endif
