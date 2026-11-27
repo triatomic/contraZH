@@ -227,9 +227,9 @@ build keeps the strip of dynamic lights described in
 pictured on [Electric & Laser Shading](Laser-Shading.md#laser-ground-glow).
 
 Uses the same switches and keys as the Direct3D 8 glow: `LaserRef`, `DynamicLights`,
-`LaserGroundGlowColor`, `LaserGroundGlowIntensity`, `LaserGroundGlowRadius`, and `GroundGlowColor`,
-`GroundGlowIntensity` and `GroundGlowRadius` on the `W3DLaserDraw` module. Shaped further in the
-mod's `GameData.ini`:
+`LaserGroundGlowColor`, `LaserGroundGlowIntensity`, `LaserGroundGlowRadius`, and `GroundGlow`,
+`GroundGlowColor`, `GroundGlowIntensity` and `GroundGlowRadius` on the `W3DLaserDraw` module. Shaped
+further in the mod's `GameData.ini`:
 
 * `LaserGroundGlowFalloff = 2` - (How fast the light fades with distance from the beam, as a power.
 Higher gives a tight bright core, lower a broad wash.)

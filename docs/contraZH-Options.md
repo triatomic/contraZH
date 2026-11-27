@@ -728,6 +728,10 @@ colours weighted by width, times the laser texture's average colour, normalised 
 * `LaserGroundGlowRadius = 0` - (How far the light reaches from the beam, in world units. 0 takes it
 from the beam, as below. Also `GroundGlowRadius` on the module.)
 
+A `W3DLaserDraw` module can also turn the glow off for its own beam.
+
+* `GroundGlow = Yes` - (No keeps that beam from lighting the ground, which `LaserShader = No` does not.)
+
 Notes:
 * Each light's reach is `GroundGlowRadius` on the module, else `LaserGroundGlowRadius`, else the
 laser's `OuterBeamWidth`, at least 15, plus a 6 unit soft edge. Long beams spread and dim their twelve lights.

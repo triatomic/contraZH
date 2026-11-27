@@ -95,6 +95,7 @@ public:
 	Color m_groundGlowColor;
 	Real m_groundGlowRadius;
 	Real m_groundGlowIntensity;
+	Bool m_groundGlow;		///< No keeps the beam from lighting the ground
 	Bool m_laserShader;		///< shade the beam with the laser shader: a hot core and pulses running along it
 	Bool m_electricShader;	///< shade the beam with the electric shader instead: arcs, jitter and flicker
 	Bool m_cryoShader;		///< shade the beam with the cryo shader over either: an ice tint, a blue-white core, frost bands and ice teeth

@@ -183,6 +183,7 @@ W3DLaserDrawModuleData::W3DLaserDrawModuleData() :
 	m_groundGlowColor = 0;
 	m_groundGlowRadius = 0.0f;
 	m_groundGlowIntensity = 0.0f;
+	m_groundGlow = TRUE;
 	m_laserShader = TRUE;
 	m_electricShader = FALSE;
 	m_cryoShader = FALSE;
@@ -221,6 +222,7 @@ void W3DLaserDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "TextureGridColumns",				INI::parseUnsignedInt,							NULL, offsetof(W3DLaserDrawModuleData, m_gridColumns) },
 		{ "UseHouseColorOuter",				INI::parseBool,							NULL, offsetof(W3DLaserDrawModuleData, m_useHouseColorOuter) },
 		{ "UseHouseColorInner",				INI::parseBool,							NULL, offsetof(W3DLaserDrawModuleData, m_useHouseColorInner) },
+		{ "GroundGlow",								INI::parseBool,									nullptr, offsetof(W3DLaserDrawModuleData, m_groundGlow) },
 		{ "GroundGlowColor",					INI::parseColorInt,							nullptr, offsetof(W3DLaserDrawModuleData, m_groundGlowColor) },
 		{ "GroundGlowRadius",					INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_groundGlowRadius) },
 		{ "GroundGlowIntensity",			INI::parsePercentToReal,				nullptr, offsetof(W3DLaserDrawModuleData, m_groundGlowIntensity) },
@@ -690,14 +692,14 @@ void W3DLaserDraw::updateGroundLights( LaserUpdate *update, Bool beamChanged )
 #if defined(RTS_ZEROHOUR)
 	emissive = TheGlobalData->m_usePathTracing && TheGlobalData->m_usePixelLights;
 #endif
+	const W3DLaserDrawModuleData *data = getW3DLaserDrawModuleData();
+
 	// the ground is lit from the first frame and goes dark the moment the beam starts to fade or decay
-	if ((!TheGlobalData->m_laserRef && !emissive) || !TheGlobalData->m_useDynamicLights || update->isEnding() || update->getAlphaScale() <= 0.0f || update->getWidthScale() <= 0.0f)
+	if (!data->m_groundGlow || (!TheGlobalData->m_laserRef && !emissive) || !TheGlobalData->m_useDynamicLights || update->isEnding() || update->getAlphaScale() <= 0.0f || update->getWidthScale() <= 0.0f)
 	{
 		releaseGroundLights();
 		return;
 	}
-
-	const W3DLaserDrawModuleData *data = getW3DLaserDrawModuleData();
 
 	// A shader lights the ground per pixel where it can, with one light shaped like the beam, so no light strip is needed.
 	if (TheW3DLaserGlow != nullptr && TheW3DLaserGlow->isEnabled())
