@@ -160,8 +160,7 @@ public:
 	static Bool supportsTerrainSeabed();
 	/// Lights a terrain draw as setDrawPixelLights does, through the seabed shaders when it has standing water.
 	static void setDrawTerrain(const Int *indices, Int count, Bool seabed);
-	/// The first lights, nearest the middle of the view, that reach the box, as many as one ground draw takes.
-	static Int pickPixelLights(const AABoxClass &box, Int *lights);
+	/// Every ground light that reaches the box, most important first.
 	static Int pickPixelLights(const AABoxClass &box, std::vector<Int> &lights);
 	static void filterPixelLights(const AABoxClass &box, std::vector<Int> &lights);
 	/// Whether any surface draws point lights per pixel, so the scene has to pick them.

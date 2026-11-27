@@ -3593,17 +3593,6 @@ Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &l
 	return (Int)lights.size();
 }
 
-Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)
-{
-	static std::vector<Int> reaching;
-	const Int count = min(pickPixelLights(box, reaching), (Int)MAX_PIXEL_LIGHTS);
-	for (Int i = 0; i < count; i++)
-	{
-		lights[i] = reaching[i];
-	}
-	return count;
-}
-
 Bool W3DShaderManager::supportsPixelLights()
 {
 	return TerrainPixelLightsLoaded || UnitPixelLightsLoaded || RoadPixelLightsLoaded || FlatPixelLightsLoaded || PointLightPassLoaded;
