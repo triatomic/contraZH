@@ -36,6 +36,10 @@
 #include <gmath.h>
 #endif
 
+#if USE_SSE_SQRT
+#include <emmintrin.h>
+#endif
+
 Real Sin(Real x)
 {
 #if USE_DETERMINISTIC_MATH
@@ -83,7 +87,9 @@ Real ASin(Real x)
 
 Real Sqrt(Real x)
 {
-#if USE_DETERMINISTIC_MATH
+#if USE_SSE_SQRT
+	return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(x)));
+#elif USE_DETERMINISTIC_MATH
 	return gm_sqrtf(x);
 #else
 	return (Real)sqrt((double)x);
@@ -92,7 +98,9 @@ Real Sqrt(Real x)
 
 double Sqrt(double x)
 {
-#if USE_DETERMINISTIC_MATH
+#if USE_SSE_SQRT
+	return _mm_cvtsd_f64(_mm_sqrt_sd(_mm_setzero_pd(), _mm_set_sd(x)));
+#elif USE_DETERMINISTIC_MATH
 	return gm_sqrt(x);
 #else
 	return sqrt(x);

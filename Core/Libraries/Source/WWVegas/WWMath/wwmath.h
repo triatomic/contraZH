@@ -45,6 +45,10 @@
 #include <gmath.h>
 #endif
 
+#if USE_SSE_SQRT
+#include <emmintrin.h>
+#endif
+
 /*
 ** Some global constants.
 */
@@ -233,7 +237,9 @@ WWINLINE float WWMath::Powf(float x, float y)
 
 WWINLINE float WWMath::Sqrt(float x)
 {
-#if USE_DETERMINISTIC_MATH
+#if USE_SSE_SQRT
+	return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(x)));
+#elif USE_DETERMINISTIC_MATH
 	return gm_sqrtf(x);
 #else
 	return sqrtf(x);
@@ -242,7 +248,9 @@ WWINLINE float WWMath::Sqrt(float x)
 
 WWINLINE double WWMath::Sqrt(double x)
 {
-#if USE_DETERMINISTIC_MATH
+#if USE_SSE_SQRT
+	return _mm_cvtsd_f64(_mm_sqrt_sd(_mm_setzero_pd(), _mm_set_sd(x)));
+#elif USE_DETERMINISTIC_MATH
 	return gm_sqrt(x);
 #else
 	return sqrt(x);
@@ -251,7 +259,9 @@ WWINLINE double WWMath::Sqrt(double x)
 
 WWINLINE float WWMath::Sqrtf(float x)
 {
-#if USE_DETERMINISTIC_MATH
+#if USE_SSE_SQRT
+	return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(x)));
+#elif USE_DETERMINISTIC_MATH
 	return gm_sqrtf(x);
 #else
 	return sqrtf(x);
@@ -260,7 +270,10 @@ WWINLINE float WWMath::Sqrtf(float x)
 
 WWINLINE float WWMath::Inv_Sqrt_Legacy(float a)
 {
-#if USE_DETERMINISTIC_MATH
+#if USE_SSE_SQRT
+	return 1.0f / _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(a)));
+
+#elif USE_DETERMINISTIC_MATH
 	return 1.0f / gm_sqrtf(a);
 
 #elif defined(_MSC_VER) && defined(_M_IX86)
@@ -763,13 +776,14 @@ WWINLINE float WWMath::Fabsf(float x)
 
 WWINLINE float WWMath::Fabsf_Legacy(float val)
 {
-#if USE_DETERMINISTIC_MATH
-	return gm_fabsf(val);
-
-#elif defined(_MSC_VER) && defined(_M_IX86)
+	// the mask gives the same bits as gm_fabsf without a call, so it serves deterministic math too
+#if defined(_MSC_VER) && defined(_M_IX86)
 	int value=std::bit_cast<int>(val);
 	value&=0x7fffffff;
 	return std::bit_cast<float>(value);
+
+#elif USE_DETERMINISTIC_MATH
+	return gm_fabsf(val);
 
 #else
 	return fabsf(val);

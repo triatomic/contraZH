@@ -43,3 +43,7 @@
 #if !HAS_GAMEMATH || RETAIL_COMPATIBLE_CRC
 #undef USE_DETERMINISTIC_MATH // Unfortunately cannot actually use deterministic math
 #endif
+
+#if USE_DETERMINISTIC_MATH && (defined(_M_IX86) || defined(_M_X64) || defined(__SSE2__))
+#define USE_SSE_SQRT (1) // IEEE 754 rounds sqrt exactly, so SSE returns the same bits as GameMath's software sqrt
+#endif
