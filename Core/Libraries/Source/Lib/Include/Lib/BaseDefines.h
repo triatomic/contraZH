@@ -31,7 +31,11 @@
 #endif
 
 #ifndef USE_DETERMINISTIC_MATH
+#if defined(GENONLINE)
+#define USE_DETERMINISTIC_MATH (0) // RTS_GENERALS_ONLINE_DETERMINISTIC_MATH turns it on for a build that must match other operating systems
+#else
 #define USE_DETERMINISTIC_MATH (1) // Game uses deterministic math for game simulation compatibility among different system architectures in peer to peer networks
+#endif
 #endif
 
 #if defined(__has_include)

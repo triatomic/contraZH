@@ -262,6 +262,13 @@ void setFPMode()
 
 	unsigned int cw;
 	_controlfp_s(&cw, _MCW_EM, _MCW_EM);
+#endif
+#if USE_DETERMINISTIC_MATH
+
+	// GameMath targets CPUs that keep denormals, and SSE sqrt matches gm_sqrt only with them kept.
+	_MM_SET_ROUNDING_MODE(_MM_ROUND_NEAREST);
+	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_OFF);
+	_MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_OFF);
 #else
 
 	// SSE2 math rounds to nearest and flushes denormals to zero on every client.

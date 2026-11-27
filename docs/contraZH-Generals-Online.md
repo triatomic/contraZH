@@ -30,6 +30,13 @@ keyframes, script timers, deploy animations) keeps retail timing via a 30 Hz cou
 * `-DRTS_GENERALS_ONLINE_60HZ=OFF` builds a classic 30 Hz online client instead.
 * A 30 Hz client only plays with players on the same 30 Hz exe. Lobbies refuse a different exe CRC, so it never meets the official 60 Hz client.
 
+### Float math
+
+The online build uses the CPU's float math with denormals flushed to zero, like the offline build.
+
+* Every player in a match needs the same exe on Windows.
+* `-DRTS_GENERALS_ONLINE_DETERMINISTIC_MATH=ON` builds with GameMath instead, for a client that must match other operating systems.
+
 ### Frame rate cap during online matches
 
 During an online match the render cap comes from Generals Online's `settings.json`. After the match,
