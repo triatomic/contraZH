@@ -377,12 +377,12 @@ static bool Is_Additive_Blend(const ShaderClass& shader)
 //
 // ----------------------------------------------------------------------------
 
-static bool Same_Render_State(const RenderStateStruct& a, const RenderStateStruct& b)
+static bool Same_Render_State(const RenderStateStruct& a, const RenderStateStruct& b, int first_texture=0)
 {
 	if (a.shader.Get_Bits() != b.shader.Get_Bits() || a.material != b.material) {
 		return false;
 	}
-	for (int i=0;i<DX8Wrapper::Get_Current_Caps()->Get_Max_Textures_Per_Pass();++i) {
+	for (int i=first_texture;i<DX8Wrapper::Get_Current_Caps()->Get_Max_Textures_Per_Pass();++i) {
 		if (a.Textures[i] != b.Textures[i]) {
 			return false;
 		}
@@ -407,7 +407,7 @@ static bool Same_Render_State(const RenderStateStruct& a, const RenderStateStruc
 	return true;
 }
 
-static bool Same_Node_State(const SortingNodeStruct* a, const SortingNodeStruct* b)
+static bool Same_Node_State(const SortingNodeStruct* a, const SortingNodeStruct* b, int first_texture=0)
 {
 #if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
 	if (a->billboards.empty() != b->billboards.empty())
@@ -415,7 +415,31 @@ static bool Same_Node_State(const SortingNodeStruct* a, const SortingNodeStruct*
 		return false;
 	}
 #endif
-	return a->effects == b->effects && a->effect_data == b->effect_data && Same_Render_State(a->sorting_state, b->sorting_state);
+	return a->effects == b->effects && a->effect_data == b->effect_data && Same_Render_State(a->sorting_state, b->sorting_state, first_texture);
+}
+
+// ----------------------------------------------------------------------------
+//
+// A pool run leaves its soft state bound, and the next run keeps it when only its first texture differs.
+//
+// ----------------------------------------------------------------------------
+
+static const SortingNodeStruct* pool_soft_node;
+
+static void End_Pool_Soft()
+{
+	if (pool_soft_node != nullptr) {
+		SoftHook->End();
+		pool_soft_node = nullptr;
+	}
+}
+
+static bool Keeps_Pool_Soft(const SortingNodeStruct* state)
+{
+	// These read a scene copy or the mirror's own state, which this comparison does not cover.
+	const unsigned excluded = SoftParticleHookClass::EFFECT_HAZE | SoftParticleHookClass::EFFECT_DISRUPT |
+		SoftParticleHookClass::EFFECT_MIRROR | SoftParticleHookClass::EFFECT_SMUDGE;
+	return pool_soft_node != nullptr && (state->effects & excluded) == 0 && Same_Node_State(pool_soft_node, state, 1);
 }
 
 // ----------------------------------------------------------------------------
@@ -717,14 +741,81 @@ static void Apply_Render_State(RenderStateStruct& render_state)
 
 // ----------------------------------------------------------------------------
 
-static void Draw_Pool_Run(SortingNodeStruct* state, unsigned start_index, unsigned polygon_count, unsigned first_vertex, unsigned end_vertex, const TempIndexStruct *sorted)
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+
+// ----------------------------------------------------------------------------
+//
+// The pool's sorted sprites reach the instance buffer a block at a time, so the runs inside a block share one upload.
+//
+// ----------------------------------------------------------------------------
+
+static const unsigned POOL_SPRITE_BLOCK = 1024;
+static PointGroupClass::BillboardUpload pool_sprites;
+static unsigned pool_sprites_drawn;
+
+static void Reset_Pool_Sprites()
 {
-	Apply_Render_State(state->sorting_state);
-	const bool soft = Begin_Soft(state);
+	pool_sprites.Count = 0;
+	pool_sprites_drawn = 0;
+}
+
+static bool Draw_Pool_Sprites(const TempIndexStruct *sorted, unsigned count, const TempIndexStruct *sorted_end)
+{
+	if (!PointGroupClass::Draw_Uploaded_Billboards(pool_sprites, pool_sprites_drawn, count, true))
+	{
+		Reset_Pool_Sprites();
+		if (!PointGroupClass::Can_Instance_Billboards())
+		{
+			return false;
+		}
+
+		// The block starts at this run and takes the sprites sorted after it, past the triangles between them.
+		static std::vector<BillboardInstance> block;
+		block.clear();
+		const unsigned wanted = std::max<unsigned>(count, POOL_SPRITE_BLOCK);
+		for (const TempIndexStruct *triangle = sorted; triangle != sorted_end && block.size() < wanted; ++triangle)
+		{
+			const SortingNodeStruct *node = overlapping_nodes[triangle->idx];
+			if (node->billboards.empty())
+			{
+				continue;
+			}
+			block.push_back(node->billboards[triangle->tri.i]);
+			block.back().Triangle = (float)triangle->tri.j;
+		}
+		if (!PointGroupClass::Upload_Billboards(&block[0], (unsigned)block.size(), pool_sprites) ||
+			!PointGroupClass::Draw_Uploaded_Billboards(pool_sprites, 0, count, true))
+		{
+			Reset_Pool_Sprites();
+			return false;
+		}
+	}
+	pool_sprites_drawn += count;
+	return true;
+}
+
+#endif
+
+static void Draw_Pool_Run(SortingNodeStruct* state, unsigned start_index, unsigned polygon_count, unsigned first_vertex, unsigned end_vertex, const TempIndexStruct *sorted, const TempIndexStruct *sorted_end)
+{
+	if (Keeps_Pool_Soft(state)) {
+		DX8Wrapper::Set_Texture(0,state->sorting_state.Textures[0]);
+	}
+	else {
+		End_Pool_Soft();
+		Apply_Render_State(state->sorting_state);
+		if (Begin_Soft(state)) {
+			pool_soft_node = state;
+		}
+	}
 
 #if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
 	if (!state->billboards.empty())
 	{
+		if (Draw_Pool_Sprites(sorted, polygon_count, sorted_end))
+		{
+			return;
+		}
 		static std::vector<BillboardInstance> instances;
 		instances.resize(polygon_count);
 		for (unsigned i = 0; i < polygon_count; ++i)
@@ -734,7 +825,6 @@ static void Draw_Pool_Run(SortingNodeStruct* state, unsigned start_index, unsign
 			instances[i].Triangle = (float)triangle.tri.j;
 		}
 		PointGroupClass::Draw_Billboards(&instances[0], polygon_count, true);
-		End_Soft(soft);
 		return;
 	}
 #endif
@@ -744,8 +834,6 @@ static void Draw_Pool_Run(SortingNodeStruct* state, unsigned start_index, unsign
 		polygon_count,
 		first_vertex,
 		end_vertex-first_vertex);
-
-	End_Soft(soft);
 }
 
 // ----------------------------------------------------------------------------
@@ -903,6 +991,10 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 
 		DX8Wrapper::Apply_Render_State_Changes();
 
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+		Reset_Pool_Sprites();
+#endif
+
 		unsigned count_to_render=0;
 		unsigned start_index=0;
 		unsigned node_id=0;
@@ -917,12 +1009,13 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 			if (count_to_render && (object_first || new_state)) {
 				DX8Wrapper::Set_Index_Buffer(dyn_ib_access,0);
 				DX8Wrapper::Set_Vertex_Buffer(dyn_vb_access);
-				Draw_Pool_Run(overlapping_nodes[node_id],start_index,count_to_render,first_vertex,end_vertex,tis + chunkOffset + start_index);
+				Draw_Pool_Run(overlapping_nodes[node_id],start_index,count_to_render,first_vertex,end_vertex,tis + chunkOffset + start_index,tis + chunkEnd);
 				count_to_render=0;
 			}
 
 			// Object nodes bind their own buffers, so the pool's go back afterwards.
 			if (object_first) {
+				End_Pool_Soft();
 				Draw_Objects_Before(tis[i].z);
 				DX8Wrapper::Set_Index_Buffer(dyn_ib_access,0);
 				DX8Wrapper::Set_Vertex_Buffer(dyn_vb_access);
@@ -945,11 +1038,13 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 		if (count_to_render) {
 			DX8Wrapper::Set_Index_Buffer(dyn_ib_access,0);
 			DX8Wrapper::Set_Vertex_Buffer(dyn_vb_access);
-			Draw_Pool_Run(overlapping_nodes[node_id],start_index,count_to_render,first_vertex,end_vertex,tis + chunkOffset + start_index);
+			Draw_Pool_Run(overlapping_nodes[node_id],start_index,count_to_render,first_vertex,end_vertex,tis + chunkOffset + start_index,tis + chunkEnd);
 		}
 
 		chunkOffset += chunkCount;
 	}
+
+	End_Pool_Soft();
 }
 
 // ----------------------------------------------------------------------------

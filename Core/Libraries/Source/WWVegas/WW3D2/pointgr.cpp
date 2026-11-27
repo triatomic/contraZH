@@ -113,6 +113,7 @@ static IDirect3DVertexBuffer9 *BillboardInstances = nullptr;
 static DX8VertexBufferClass *BillboardQuad = nullptr;
 static DX8VertexBufferClass *BillboardFallback = nullptr;
 static unsigned BillboardBufferUsed = BILLBOARD_BUFFER_COUNT;
+static unsigned BillboardBufferGeneration = 0;
 
 static bool Billboard_Instancing_Enabled()
 {
@@ -134,6 +135,7 @@ void PointGroupClass::Release_Billboard_Resources()
 	SAFE_RELEASE(BillboardInstances);
 	SAFE_RELEASE(BillboardDeclaration);
 	BillboardBufferUsed = BILLBOARD_BUFFER_COUNT;
+	++BillboardBufferGeneration;
 }
 
 static bool Create_Billboard_Resources()
@@ -178,7 +180,7 @@ static bool Create_Billboard_Resources()
 	return true;
 }
 
-static bool Can_Instance_Billboards()
+bool PointGroupClass::Can_Instance_Billboards()
 {
 	if (!BillboardInstancingEnabled || BillboardShader == nullptr)
 	{
@@ -197,17 +199,15 @@ static bool Can_Instance_Billboards()
 	return !DX8VertexShadingClass::Are_Clip_Planes_Enabled() && DX8VertexShadingClass::Get_Fog_Constant(fog) && Create_Billboard_Resources();
 }
 
-static bool Draw_Instanced_Billboards(const BillboardInstance *instances, unsigned count, bool triangles)
+// Appends to the instance buffer and starts it over when full, which drops every earlier upload.
+static bool Upload_Billboard_Instances(const BillboardInstance *instances, unsigned count, unsigned &first)
 {
-	if (!Can_Instance_Billboards())
-	{
-		return false;
-	}
 	DWORD flags = D3DLOCK_NOOVERWRITE;
 	if (BillboardBufferUsed + count > BILLBOARD_BUFFER_COUNT)
 	{
 		BillboardBufferUsed = 0;
 		flags = D3DLOCK_DISCARD;
+		++BillboardBufferGeneration;
 	}
 	const unsigned offset = BillboardBufferUsed * sizeof(BillboardInstance);
 	void *data = nullptr;
@@ -222,8 +222,13 @@ static bool Draw_Instanced_Billboards(const BillboardInstance *instances, unsign
 		BillboardBufferUsed = BILLBOARD_BUFFER_COUNT;
 		return false;
 	}
+	first = BillboardBufferUsed;
 	BillboardBufferUsed += count;
+	return true;
+}
 
+static void Draw_Billboard_Instances(unsigned first, unsigned count, bool triangles)
+{
 	DX8Wrapper::Set_Vertex_Buffer(BillboardQuad);
 	DX8Wrapper::Set_Index_Buffer(Quads, 0);
 	DX8Wrapper::Apply_Render_State_Changes();
@@ -237,8 +242,40 @@ static bool Draw_Instanced_Billboards(const BillboardInstance *instances, unsign
 		DX8VertexShadingClass::CONSTANT_COUNT - DX8VertexShadingClass::CONSTANT_STAGE_SOURCE);
 
 	DX8Wrapper::Begin_Instanced_Drawing(BillboardDeclaration, BillboardShader);
-	DX8Wrapper::Draw_Instanced_Triangles(0, triangles ? 1 : 2, 0, triangles ? 3 : 4, BillboardInstances, offset, sizeof(BillboardInstance), count);
+	DX8Wrapper::Draw_Instanced_Triangles(0, triangles ? 1 : 2, 0, triangles ? 3 : 4, BillboardInstances, first * sizeof(BillboardInstance), sizeof(BillboardInstance), count);
 	DX8Wrapper::End_Instanced_Drawing();
+}
+
+static bool Draw_Instanced_Billboards(const BillboardInstance *instances, unsigned count, bool triangles)
+{
+	unsigned first = 0;
+	if (!PointGroupClass::Can_Instance_Billboards() || !Upload_Billboard_Instances(instances, count, first))
+	{
+		return false;
+	}
+	Draw_Billboard_Instances(first, count, triangles);
+	return true;
+}
+
+bool PointGroupClass::Upload_Billboards(const BillboardInstance *instances, unsigned count, BillboardUpload &upload)
+{
+	upload.Count = 0;
+	if (count > BILLBOARD_BUFFER_COUNT || !Can_Instance_Billboards() || !Upload_Billboard_Instances(instances, count, upload.First))
+	{
+		return false;
+	}
+	upload.Count = count;
+	upload.Generation = BillboardBufferGeneration;
+	return true;
+}
+
+bool PointGroupClass::Draw_Uploaded_Billboards(const BillboardUpload &upload, unsigned first, unsigned count, bool triangles)
+{
+	if (first + count > upload.Count || upload.Generation != BillboardBufferGeneration || !Can_Instance_Billboards())
+	{
+		return false;
+	}
+	Draw_Billboard_Instances(upload.First + first, count, triangles);
 	return true;
 }
 

@@ -254,6 +254,18 @@ public:
 	static void Set_Billboard_Shader(IDirect3DVertexShader9 *shader);
 	static void Release_Billboard_Resources();
 	static void Draw_Billboards(const BillboardInstance *instances, unsigned count, bool triangles);
+
+	// Sprites held in the instance buffer for several draws. A later upload can drop them, and drawing them then fails.
+	struct BillboardUpload
+	{
+		BillboardUpload() : First(0), Count(0), Generation(0) {}
+		unsigned First;
+		unsigned Count;
+		unsigned Generation;
+	};
+	static bool Can_Instance_Billboards();
+	static bool Upload_Billboards(const BillboardInstance *instances, unsigned count, BillboardUpload &upload);
+	static bool Draw_Uploaded_Billboards(const BillboardUpload &upload, unsigned first, unsigned count, bool triangles);
 #endif
 
 private:
