@@ -34,13 +34,12 @@
 // control bar scheme's build border. Under a Pro scheme the bar's own frame rises around the row:
 // one housing, cut from the faction's command bar art and scaled like it, whose thin left frame
 // continues the bar's left stone line and whose panel runs down to the bar's top stone line, which
-// then divides the row from the header strip. The bar draws the part above its top edge before
-// its art, so the money tab stays in front, and the band down to the stone line after its art,
-// around the tab. The row is a top level window created after the bar, so its cameos draw
-// over both. Once the row would reach the money tab it lifts above it. An
-// invisible blocker under the row in the hit test takes the housing's rect down to the bar's top
-// edge, so clicks on the frame and panel stay off the world. Without that art the row has no
-// housing and no blocker, and keeps the CAMEO_ROW_GAP spacing.
+// then divides the row from the header strip. Once the row would reach the money tab it lifts
+// above it. An invisible blocker, a top level window created after the bar and before the row,
+// takes the housing's rect down to the bar's top edge, so clicks on the frame and panel stay off
+// the world. The blocker also draws the housing, so the housing covers the bar's art, money tab
+// included, and the cameos cover the housing. Without that art the row has no housing and no
+// blocker, and keeps the CAMEO_ROW_GAP spacing.
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
@@ -153,7 +152,6 @@ static const Int HOUSING_RIGHT = 1413;
 static const Int BAR_STONE_TOP = 334;
 // the money tab, the only art above the bar's top edge
 static const Int MONEY_TAB_LEFT = 862;
-static const Int MONEY_TAB_RIGHT = 1056;
 static const Int MONEY_TAB_TOP = 302;
 
 static const char *const PRO_COMMAND_BAR_IMAGES[] = { "AmericaProCommandBar", "ChinaProCommandBar", "GlaProCommandBar" };
@@ -469,12 +467,8 @@ void ControlBar::drawCameoBoxFrame( GameWindow *box )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** An open housing runs from above the top row down to the bar's top stone line. Before the bar's
-	* art it draws the part above the bar's top edge, so the money tab covers it; over the bar it draws
-	* the band that hides the bar's dark top bevel, around the tab. A closed housing draws whole
-	* before the bar's art and nothing over the bar. */
 //-------------------------------------------------------------------------------------------------
-void ControlBar::drawCameoRowHousing( Bool overBar )
+void ControlBar::drawCameoRowHousing()
 {
 	IRegion2D housing;
 	Bool closed;
@@ -484,56 +478,17 @@ void ControlBar::drawCameoRowHousing( Bool overBar )
 	{
 		return;
 	}
-	if( closed && overBar )
+
+	// an open housing's rect ends at the bar's top edge, but its picture hides the bar's dark top
+	// bevel down to the stone line
+	if( !closed )
 	{
-		return;
-	}
-	if( closed )
-	{
-		drawCameoFrame( housing, 100 );
-		return;
+		housing.hi.y += scaleArt( BAR_STONE_TOP - BAR_TOP, scale.y );
 	}
 
-	const Image *source = part->m_image;
-	prepareFrameSlice( source );
-
-	const Int x0 = housing.lo.x;
-	const Int y0 = housing.lo.y;
-	const Int x1 = housing.hi.x;
-	const Int barTop = housing.hi.y;
-	const Int y1 = barTop + scaleArt( BAR_STONE_TOP - BAR_TOP, scale.y );
-
-	IRegion2D clip;
+	prepareFrameSlice( part->m_image );
 	TheDisplay->beginBatch();
-	if( !overBar )
-	{
-		clip = housing;
-		drawHousingPieces( source, scale, scale, x0, y0, x1, y1, FALSE, clip );
-	}
-	else
-	{
-		ICoord2D commandPos;
-		GameWindow *commandWindow = m_contextParent[ CP_COMMAND ] ? m_contextParent[ CP_COMMAND ] : m_contextParent[ CP_MASTER ];
-		commandWindow->winGetScreenPosition( &commandPos.x, &commandPos.y );
-		const Int tabLeft = commandPos.x + scaleArt( MONEY_TAB_LEFT - BAR_LEFT, scale.x );
-		const Int tabRight = commandPos.x + scaleArt( MONEY_TAB_RIGHT - BAR_LEFT, scale.x );
-		clip.lo.y = barTop;
-		clip.hi.y = barTop + scaleArt( BAR_STONE_TOP - BAR_TOP, scale.y );
-
-		clip.lo.x = x0;
-		clip.hi.x = MIN( x1, tabLeft );
-		if( clip.lo.x < clip.hi.x )
-		{
-			drawHousingPieces( source, scale, scale, x0, y0, x1, y1, FALSE, clip );
-		}
-
-		clip.lo.x = MAX( x0, tabRight );
-		clip.hi.x = x1;
-		if( clip.lo.x < clip.hi.x )
-		{
-			drawHousingPieces( source, scale, scale, x0, y0, x1, y1, FALSE, clip );
-		}
-	}
+	drawHousingPieces( part->m_image, scale, scale, housing.lo.x, housing.lo.y, housing.hi.x, housing.hi.y, closed, housing );
 	TheDisplay->endBatch();
 	TheDisplay->enableClipping( FALSE );
 }
@@ -541,6 +496,7 @@ void ControlBar::drawCameoRowHousing( Bool overBar )
 //-------------------------------------------------------------------------------------------------
 static void CameoRowBlockerDraw( GameWindow *window, WinInstanceData *instData )
 {
+	TheControlBar->drawCameoRowHousing();
 }
 
 //-------------------------------------------------------------------------------------------------

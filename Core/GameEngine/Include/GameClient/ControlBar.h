@@ -816,8 +816,8 @@ public:
 	void processBuildQueueClick( GameWindow *button );
 	/// the build queue box draws its frame
 	void drawBuildQueueBar();
-	/// the bar draws the smart selection row's housing in two passes, around its own art, for the money tab
-	void drawCameoRowHousing( Bool overBar );
+	/// the smart selection row's blocker draws the row's housing
+	void drawCameoRowHousing();
 
 	//-----------------------------------------------------------------------------------------------
 	// the remaining methods are used to construct the command buttons and command sets for
