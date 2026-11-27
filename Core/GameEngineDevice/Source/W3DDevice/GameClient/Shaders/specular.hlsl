@@ -99,22 +99,24 @@ float3 BumpNormal(float3 normal, float3 position, float2 uv)
     float3 dpdx = ddx(position);
     float3 dpdy = ddy(position);
 
-    float3 r1 = cross(dpdy, normal);
-    float3 r2 = cross(normal, dpdx);
+    // The face's plane carries the gradient, since a vertex normal tilted past it would flip the bump along a line.
+    float3 face = normalize(cross(dpdx, dpdy));
+    float3 r1 = cross(dpdy, face);
+    float3 r2 = cross(face, dpdx);
     float det = dot(dpdx, r1);
 
     float2 slope = (tex2D(SlopeMap, uv).rg - 128.0f / 255.0f) * TextureInfo.yz;
     float dhdx = dot(slope, ddx(uv));
     float dhdy = dot(slope, ddy(uv));
 
-    float3 gradient = sign(det) * (dhdx * r1 + dhdy * r2) * Bump.x;
-    return NormalizeOr(abs(det) * normal - gradient, normal);
+    float3 gradient = (dhdx * r1 + dhdy * r2) * Bump.x;
+    return NormalizeOr(det * normal - gradient, normal);
 }
 
 #elif BUMP == 2
 
-// Schuler's cotangent frame. The determinant's sign keeps the frame the right way round
-// whatever the handedness of camera space and the UV layout.
+// Schuler's cotangent frame. The face's own normal keeps the frame the right way round
+// whatever the handedness of camera space, the UV layout and the vertex normals.
 float3 BumpNormal(float3 normal, float3 position, float2 uv)
 {
     float3 dpdx = ddx(position);
@@ -122,12 +124,16 @@ float3 BumpNormal(float3 normal, float3 position, float2 uv)
     float2 duvdx = ddx(uv);
     float2 duvdy = ddy(uv);
 
-    float3 dpdyPerp = cross(dpdy, normal);
-    float3 dpdxPerp = cross(normal, dpdx);
+    float3 face = normalize(cross(dpdx, dpdy));
+    float3 dpdyPerp = cross(dpdy, face);
+    float3 dpdxPerp = cross(face, dpdx);
     float3 tangent = dpdyPerp * duvdx.x + dpdxPerp * duvdy.x;
     float3 bitangent = dpdyPerp * duvdx.y + dpdxPerp * duvdy.y;
-    float side = (dot(dpdx, dpdyPerp) < 0.0f) ? -1.0f : 1.0f;
-    float scale = side * rsqrt(max(max(dot(tangent, tangent), dot(bitangent, bitangent)), 1e-30f));
+
+    // Laid flat against the vertex normal, the frame tilts both ways alike on smoothed faces.
+    tangent -= normal * dot(normal, tangent);
+    bitangent -= normal * dot(normal, bitangent);
+    float scale = rsqrt(max(max(dot(tangent, tangent), dot(bitangent, bitangent)), 1e-30f));
 
     float3 texel = tex2D(NormalMap, uv).xyz * 2.0f - 1.0f;
     texel.xy *= Bump.y;
@@ -147,7 +153,7 @@ float4 main(PsIn input) : COLOR
     float3 halfway = normalize(toSun + toEye);
 
 #if BUMP
-    float3 surface = BumpNormal(normal, input.Position, input.TexCoord);
+    float3 surface = (normalLength > 1e-6f) ? BumpNormal(normal, input.Position, input.TexCoord) : normal;
 #else
     float3 surface = normal;
 #endif
