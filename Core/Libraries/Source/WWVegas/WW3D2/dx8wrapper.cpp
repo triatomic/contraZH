@@ -387,10 +387,8 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 #if !defined(BUILD_WITH_D3D9)
 			LoadLibrary("dxwrapper_go.dll");
 #endif
-			D3D8Lib = LoadLibraryEx(DX8_D3D_DLL_NAME, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32); // dont load a local hooked runtime
-#else
-			D3D8Lib = LoadLibrary(DX8_D3D_DLL_NAME);
 #endif
+			D3D8Lib = LoadLibrary(DX8_D3D_DLL_NAME);
 		}
 
 		if (D3D8Lib == nullptr) return false;	// Return false at this point if init failed

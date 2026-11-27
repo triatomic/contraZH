@@ -64,6 +64,7 @@ Switches are in `Include/GameNetwork/GenOnline/GenOnlineForkPolicy.h`; CMake opt
 - Archives mount through the fork's registry with GenOnline's priorities, so the interface style switch rebuilds the same tree. Lookup order: loose files, GenOnline menu layouts, mod archives and game-folder archives, data packs, retail archives.
 - The mod's lobby rules (Rules tab, slash commands) live in `GenOnlineForkLobbyRules.{h,cpp}`. The service has no field for them, so the host keeps them per lobby id, shows them to the others through a hidden `[rules] ` announcement, and turns them on in the match with `MSG_ENABLE_LOBBY_RULE` on the first frames.
 - `NvOptimusEnablement` and `AmdPowerXpressRequestHighPerformance` come from `GenOnlineInit.cpp`; `WinMain.cpp` skips `DedicatedGpuExports.h` on the `GENONLINE` side.
+- `dx8wrapper.cpp` loads `d3d8.dll` or `d3d9.dll` through the normal DLL search, so a copy in the game folder (DXVK, ReShade) wins over system32. GenOnline loads it from system32 only.
 
 ## Imported files edited
 
