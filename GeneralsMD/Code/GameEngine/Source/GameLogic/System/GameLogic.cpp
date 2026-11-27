@@ -3374,12 +3374,23 @@ void GameLogic::processDestroyList()
 		UpdateModulePtr sleepyUpdatesForThisObject[MAX_SUO];
 		Int numSUO = 0;
 
-		for (std::vector<UpdateModulePtr>::iterator it2 = m_sleepyUpdates.begin(); it2 != m_sleepyUpdates.end(); ++it2)
+		for (BehaviorModule** b = currentObject->getBehaviorModules(); *b; ++b)
 		{
-			UpdateModulePtr u = *it2;
-			if (u->friend_getObject() == currentObject && numSUO < MAX_SUO)
+#ifdef DIRECT_UPDATEMODULE_ACCESS
+			UpdateModulePtr u = (UpdateModulePtr)((*b)->getUpdate());
+#else
+			UpdateModulePtr u = (*b)->getUpdate();
+#endif
+			if (u && u->friend_getIndexInLogic() != -1 && numSUO < MAX_SUO)
 			{
-				sleepyUpdatesForThisObject[numSUO++] = u;
+				// Kept in heap order, since each erase below moves other updates.
+				Int slot = numSUO++;
+				while (slot > 0 && sleepyUpdatesForThisObject[slot - 1]->friend_getIndexInLogic() > u->friend_getIndexInLogic())
+				{
+					sleepyUpdatesForThisObject[slot] = sleepyUpdatesForThisObject[slot - 1];
+					--slot;
+				}
+				sleepyUpdatesForThisObject[slot] = u;
 			}
 		}
 
