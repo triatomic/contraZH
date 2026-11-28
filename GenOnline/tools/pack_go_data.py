@@ -9,7 +9,7 @@ A file in both folders is taken from the game folder.
 An overlay names another folder of GenOnline/data whose files replace those of the game folder, such as the contra theme.
 Entries are sorted by path and carry no timestamps, so packing the same files again gives the same bytes.
 
-The pack ships in the data folder of the client, next to the executable. The client mounts the files listed
+The pack ships in the game folder, next to the executable. The client mounts the files listed
 in the data.include list of settings.client.json, first listed wins, or this pack alone when the list is absent.
 """
 import os

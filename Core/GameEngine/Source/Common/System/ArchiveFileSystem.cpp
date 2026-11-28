@@ -674,7 +674,7 @@ static std::string getBaselineDataPackPath()
 #else
 	const char* game = "generals";
 #endif
-	return std::string("data\\genonline_") + game + "@" + GenOnlineRealtime::CompatibilityVersion(GitReleaseTag, GitCommitDate) + ".gpk";
+	return std::string("genonline_") + game + "@" + GenOnlineRealtime::CompatibilityVersion(GitReleaseTag, GitCommitDate) + ".gpk";
 }
 
 // A relative data pack path starts at the folder of the executable because the launcher may set the working directory to the retail folder.
