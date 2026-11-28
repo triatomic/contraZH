@@ -467,7 +467,20 @@ Bool Particle::update()
 	m_accel.y = 0.0f;
 	m_accel.z = 0.0f;
 
+#if defined(GENONLINE)
+	UnsignedInt frameCount = getElapsedFrames();
+
+	// An age counts steps, so base frames that passed without a particle step move the creation forward.
+	const UnsignedInt skippedFrames = TheParticleSystemManager->getSkippedBaseFrames();
+	if (skippedFrames > 0 && frameCount > 0)
+	{
+		const UnsignedInt takenFrames = min( skippedFrames, frameCount - 1 );
+		m_createTimestamp += takenFrames;
+		frameCount -= takenFrames;
+	}
+#else
 	const UnsignedInt frameCount = getElapsedFrames();
+#endif
 
 	// TheSuperHackers @info Skip the rest of the logic update on the creation frame. No render update has
 	// integrated this particle yet, so its rates must stay at their initial values for this frame, and testing
@@ -3629,6 +3642,7 @@ ParticleSystemManager::ParticleSystemManager()
 	m_updateCount = 0;
 #if defined(GENONLINE)
 	m_particleBaseFrame = 0;
+	m_skippedBaseFrames = 0;
 	m_hasParticleBaseFrame = FALSE;
 #endif
 
@@ -3733,27 +3747,13 @@ void ParticleSystemManager::update()
 {
 
 #if defined(GENONLINE)
-	// GenOnline @bugfix arcticdolphin 22/11/2026 Particles step once per base frame of the logic clock, the rate their INI
-	// timings are written for. The wall clock legacy frame met a logic update only by chance above 60 FPS, so particles froze.
+	// GenOnline @bugfix arcticdolphin 22/11/2026 Particles step once per base frame of the logic clock, the rate their INI timings are written for.
 	const UnsignedInt baseFrame = TheGameLogic->getFrame() / LOGICFRAMES_PER_BASEFRAME;
 	if (m_hasParticleBaseFrame && baseFrame == m_particleBaseFrame)
 	{
 		return;
 	}
-
-	// A drawn frame that ran several logic frames passes base frames without a particle step, and an age counts steps.
-	if (m_hasParticleBaseFrame && baseFrame > m_particleBaseFrame + 1)
-	{
-		const UnsignedInt skippedFrames = baseFrame - m_particleBaseFrame - 1;
-		for (Int i = 0; i < NUM_PARTICLE_PRIORITIES; ++i)
-		{
-			for (Particle *p = m_allParticlesHead[ i ]; p; p = p->m_overallNext)
-			{
-				p->delayCreation(skippedFrames);
-			}
-		}
-	}
-
+	m_skippedBaseFrames = (m_hasParticleBaseFrame && baseFrame > m_particleBaseFrame + 1) ? baseFrame - m_particleBaseFrame - 1 : 0;
 	m_particleBaseFrame = baseFrame;
 	m_hasParticleBaseFrame = TRUE;
 #endif

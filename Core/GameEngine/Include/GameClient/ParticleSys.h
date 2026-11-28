@@ -210,9 +210,6 @@ public:
 	void setPersonality(UnsignedInt p) { m_personality = p; };
 
 	UnsignedInt getElapsedFrames() const;
-#if defined(GENONLINE)
-	void delayCreation( UnsignedInt frames ) { m_createTimestamp += frames; }	///< takes frames without a particle step out of the age
-#endif
 
 protected:
 
@@ -1104,6 +1101,9 @@ public:
 
 	UnsignedInt getFieldParticleCount()     const { return m_fieldParticleCount; }
 	UnsignedInt getUpdateCount()            const { return m_updateCount; }	///< particle updates run so far, which paces what changes once per update
+#if defined(GENONLINE)
+	UnsignedInt getSkippedBaseFrames()      const { return m_skippedBaseFrames; }
+#endif
 
 	UnsignedInt getParticleSystemCount() const { return m_particleSystemCount; }
 
@@ -1145,6 +1145,7 @@ protected:
 	UnsignedInt m_updateCount;
 #if defined(GENONLINE)
 	UnsignedInt m_particleBaseFrame; ///< logic base frame of the last particle step
+	UnsignedInt m_skippedBaseFrames; ///< base frames between the last two particle steps
 	Bool m_hasParticleBaseFrame;
 #endif
 
