@@ -90,7 +90,6 @@
 
 #if defined(GENONLINE)
 #include "../GenOnlineDefines.h"
-#include <chrono>
 
 
 #endif
@@ -115,14 +114,6 @@ GameClient::GameClient()
 
 	m_frame = 0;
 
-#if defined(GENONLINE)
-#if defined(GENONLINE)
-	m_legacyFrameMSAccured = 0;
-	m_frameLegacy = 0;
-	m_frameLegacyLast = 0;
-#endif
-
-#endif
 	m_drawableList = nullptr;
 
 	m_nextDrawableID = (DrawableID)1;
@@ -803,33 +794,6 @@ void GameClient::update()
 		// update the in game UI
 		TheInGameUI->UPDATE();
 	}
-#if defined(GENONLINE)
-
-#if defined(GENONLINE)
-	int64_t currTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::utc_clock::now().time_since_epoch()).count();
-
-	// The accumulator counts milliseconds times the base frame rate, so one base frame is MSEC_PER_SECOND units.
-	if (!freezeTime)
-	{
-		m_legacyFrameMSAccured += (currTime - m_LegacyFrameEndLastFrame) * BaseFps;
-	}
-	m_LegacyFrameEndLastFrame = currTime;
-
-	// TODO_GENONLINE: This should really use partial frame intervals instead of a fixed 60hz update
-	if (m_legacyFrameMSAccured >= MSEC_PER_SECOND)
-	{
-		m_legacyFrameMSAccured -= MSEC_PER_SECOND;
-		// A stall advances one base frame only and does not queue a burst of catch up frames.
-		if (m_legacyFrameMSAccured >= MSEC_PER_SECOND)
-			m_legacyFrameMSAccured = 0;
-		m_frameLegacy++;
-	}
-	else
-	{
-		m_frameLegacyLast = m_frameLegacy;
-	}
-#endif
-#endif
 }
 
 void GameClient::draw()

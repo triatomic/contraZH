@@ -210,6 +210,9 @@ public:
 	void setPersonality(UnsignedInt p) { m_personality = p; };
 
 	UnsignedInt getElapsedFrames() const;
+#if defined(GENONLINE)
+	void delayCreation( UnsignedInt frames ) { m_createTimestamp += frames; }	///< takes frames without a particle step out of the age
+#endif
 
 protected:
 

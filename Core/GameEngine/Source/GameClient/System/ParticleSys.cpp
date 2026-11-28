@@ -3740,6 +3740,20 @@ void ParticleSystemManager::update()
 	{
 		return;
 	}
+
+	// A drawn frame that ran several logic frames passes base frames without a particle step, and an age counts steps.
+	if (m_hasParticleBaseFrame && baseFrame > m_particleBaseFrame + 1)
+	{
+		const UnsignedInt skippedFrames = baseFrame - m_particleBaseFrame - 1;
+		for (Int i = 0; i < NUM_PARTICLE_PRIORITIES; ++i)
+		{
+			for (Particle *p = m_allParticlesHead[ i ]; p; p = p->m_overallNext)
+			{
+				p->delayCreation(skippedFrames);
+			}
+		}
+	}
+
 	m_particleBaseFrame = baseFrame;
 	m_hasParticleBaseFrame = TRUE;
 #endif
