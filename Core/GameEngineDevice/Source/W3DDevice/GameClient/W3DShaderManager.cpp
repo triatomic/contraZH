@@ -1840,6 +1840,18 @@ static D3DVIEWPORT9 AdditionalLightViewport;
 static D3DMATRIX AdditionalLightWorldToClip;
 static Bool AdditionalLightScissor = FALSE;
 static size_t AdditionalLightNext = 0;
+
+// A light's screen rectangle holds for as long as the lights, the transform and the viewport do.
+struct PixelLightRect
+{
+	UnsignedInt generation;
+	bool visible;
+	RECT rectangle;
+};
+static std::vector<PixelLightRect> PixelLightRects;
+static UnsignedInt PixelLightRectGeneration = 1;
+static D3DVIEWPORT9 PixelLightRectViewport;
+static D3DMATRIX PixelLightRectWorldToClip;
 #endif
 
 // DynamicLightsDebug draws every lightable surface through its lit shader, so unlit ground and objects go black too.
@@ -1977,6 +1989,22 @@ static bool Pixel_Light_Screen_Rect(const W3DShaderManager::PixelLight &light, c
 	return rectangle.left < rectangle.right && rectangle.top < rectangle.bottom;
 }
 
+static bool Cached_Pixel_Light_Screen_Rect(Int index, RECT &rectangle)
+{
+	if (PixelLightRects.size() < (size_t)PixelLightCount)
+	{
+		PixelLightRects.resize(PixelLightCount);
+	}
+	PixelLightRect &cached = PixelLightRects[index];
+	if (cached.generation != PixelLightRectGeneration)
+	{
+		cached.visible = Pixel_Light_Screen_Rect(PixelLights[index], AdditionalLightWorldToClip, AdditionalLightViewport, cached.rectangle);
+		cached.generation = PixelLightRectGeneration;
+	}
+	rectangle = cached.rectangle;
+	return cached.visible;
+}
+
 static bool Additional_Light_Screen_Rect(size_t first, RECT &rectangle)
 {
 	rectangle.left = AdditionalLightViewport.X + AdditionalLightViewport.Width;
@@ -1988,8 +2016,7 @@ static bool Additional_Light_Screen_Rect(size_t first, RECT &rectangle)
 	{
 		const Int index = AdditionalLightIndices[i];
 		RECT lightRectangle;
-		if (index >= 0 && index < PixelLightCount &&
-			Pixel_Light_Screen_Rect(PixelLights[index], AdditionalLightWorldToClip, AdditionalLightViewport, lightRectangle))
+		if (index >= 0 && index < PixelLightCount && Cached_Pixel_Light_Screen_Rect(index, lightRectangle))
 		{
 			rectangle.left = min(rectangle.left, lightRectangle.left);
 			rectangle.top = min(rectangle.top, lightRectangle.top);
@@ -2026,6 +2053,13 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 				DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
 			}
 			AdditionalLightWorldToClip = (AdditionalLightsInView ? AdditionalLightView : view) * projection;
+			if (memcmp(&PixelLightRectWorldToClip, &AdditionalLightWorldToClip, sizeof(D3DMATRIX)) != 0 ||
+				memcmp(&PixelLightRectViewport, &AdditionalLightViewport, sizeof(D3DVIEWPORT9)) != 0)
+			{
+				PixelLightRectWorldToClip = AdditionalLightWorldToClip;
+				PixelLightRectViewport = AdditionalLightViewport;
+				PixelLightRectGeneration++;
+			}
 		}
 		AdditionalLightNext = AdditionalLightSlots;
 		// Opaque draws leave their source blend factor unspecified.
@@ -3402,6 +3436,9 @@ void W3DShaderManager::setPixelLights(const PixelLight *lights, Int count)
 {
 	PixelLightCount = count;
 	PixelLights.resize(count);
+#if defined(BUILD_WITH_D3D9)
+	PixelLightRectGeneration++;
+#endif
 	Real minX = 0.0f;
 	Real minY = 0.0f;
 	for (Int i = 0; i < PixelLightCount; i++)
